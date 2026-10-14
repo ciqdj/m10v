@@ -3,12 +3,13 @@
 set -Eeuo pipefail
 mode=${1:---check}
 expected=${2:-}
+bundle=${3:-}
 repo=${M10V_DEPLOY_ROOT:-/www/wwwroot/m10v}
 node=${M10V_DEPLOY_NODE:-/usr/local/bin/m10v-node}
 lock=${M10V_DEPLOY_LOCK:-/var/lock/m10v-deploy.lock}
 service=m10v
 if [[ "$mode" != --check && "$mode" != --deploy ]]; then
-  printf 'Usage: bash update-server.sh --check | --deploy FULL_COMMIT_SHA\n' >&2; exit 2
+  printf 'Usage: bash update-server.sh --check | --deploy FULL_COMMIT_SHA [GIT_BUNDLE]\n' >&2; exit 2
 fi
 if [[ "$mode" == --deploy && ! "$expected" =~ ^[0-9a-f]{40}$ ]]; then
   printf 'A full Git commit SHA is required.\n' >&2; exit 2
@@ -33,8 +34,16 @@ exec 9>"$lock"
 flock -n 9 || { printf 'Another deployment is running.\n' >&2; exit 1; }
 # Recheck after locking, before any mutation.
 clean_checkout
-git fetch origin main
-[[ $(git rev-parse origin/main) == "$expected" ]] || { printf 'GitHub main differs from requested SHA; stop.\n' >&2; exit 1; }
+if [[ -n "$bundle" ]]; then
+  bundle=$(realpath "$bundle")
+  git bundle verify "$bundle"
+  ref="refs/m10v/releases/$expected"
+  git fetch "$bundle" "HEAD:$ref"
+else
+  git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 fetch origin main
+  ref=origin/main
+fi
+[[ $(git rev-parse "$ref") == "$expected" ]] || { printf 'Fetched release differs from requested SHA; stop.\n' >&2; exit 1; }
 git merge-base --is-ancestor HEAD "$expected"
 previous=$(git rev-parse HEAD)
 work=$(mktemp -d /tmp/m10v-deploy.XXXXXX)

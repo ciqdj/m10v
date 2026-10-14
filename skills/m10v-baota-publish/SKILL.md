@@ -30,7 +30,7 @@ git ls-remote origin refs/heads/main refs/heads/develop
 
 发布脚本仅更新已有main checkout：检查干净工作区和服务，获取指定提交，fast-forward，以www构建GR III调试版和GR IIIx，再重启、检查调试开关，失败尝试保留工作区修改的回退。保留bin/data/.venv；不运行git clean，不修改Nginx或证书。
 
-首次/脚本更新时，在服务器运行（将完整SHA替换为此次发布值）：
+服务器GitHub连接正常时，在服务器运行（将完整SHA替换为此次发布值）：
 
 ```sh
 cd /www/wwwroot/m10v && git fetch origin main && git show origin/main:skills/m10v-baota-publish/scripts/update-server.sh > /tmp/m10v-update-server.sh && bash /tmp/m10v-update-server.sh --check
@@ -38,6 +38,24 @@ bash /tmp/m10v-update-server.sh --deploy FULL_COMMIT_SHA
 ```
 
 脚本 `--check` 为只读环境核验；获取脚本会写其专用/tmp文件并更新远端Git引用。`--deploy` 含实际更新与服务重启。服务器路径、服务用户或进程管理方式不同则先核对，不直接套用脚本。没有登录能力时，完成本地准备并明确缺少的登录条件。
+
+## 增量包快速链路
+
+服务器拉取GitHub超时，或用户希望快速同步时，先用宝塔终端读取服务器当前完整HEAD，并确认它是本地发布HEAD的祖先；创建增量包（只含Git跟踪对象，不含bin/data/.venv）：
+
+```sh
+git bundle create /tmp/m10v-release.bundle SERVER_SHA..HEAD
+git bundle verify /tmp/m10v-release.bundle
+```
+
+在已登录宝塔「文件」中导航到`/tmp`，上传bundle和本skill的`update-server.sh`。使用唯一文件名避免覆盖已有文件。上传本地源代码属于本次同步发布的范围；不导出浏览器cookie或新增面板API权限。随后终端执行：
+
+```sh
+bash /tmp/update-server.sh --check
+bash /tmp/update-server.sh --deploy FULL_COMMIT_SHA /tmp/m10v-release.bundle
+```
+
+服务器验证bundle前置对象并把HEAD导入专用`refs/m10v/releases/<SHA>`，核对SHA再更新，不修改origin/main引用。首次部署或服务器HEAD不是祖先时不能使用该增量范围，先检查差异。bundle导入与直接fetch共享构建、重启和回退逻辑。
 
 ## 上线校验
 

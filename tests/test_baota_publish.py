@@ -18,7 +18,7 @@ if name=='git':
   if os.getenv('FAKE_STATUS_FAIL'):sys.exit(128)
   print(' M server-edit' if os.getenv('FAKE_DIRTY') else '',end='')
  elif a[0]=='branch':print('main')
- elif a[0]=='rev-parse':print(os.environ['FAKE_EXPECTED'] if a[1]=='origin/main' else (root/'head').read_text())
+ elif a[0]=='rev-parse':print(os.environ['FAKE_EXPECTED'] if (a[1]=='origin/main' or a[1].startswith('refs/m10v/releases/')) else (root/'head').read_text())
  elif a[0]=='merge':(root/'head').write_text(a[-1])
  elif a[0]=='reset':(root/'head').write_text(a[-1])
 elif name=='systemctl':
@@ -59,6 +59,11 @@ class BaotaPublishTests(unittest.TestCase):
  def test_build_failure_restores_previous_commit(self):
   r=self.run_script('--deploy',AFTER,FAKE_BUILD_FAIL='1');self.assertNotEqual(r.returncode,0)
   self.assertEqual((self.root/'head').read_text(),BEFORE);self.assertIn("'reset', '--keep'",self.trace());self.assertNotIn('DEPLOY_OK',r.stdout)
+ def test_bundle_path_verifies_and_avoids_github_fetch(self):
+  bundle=self.root/'release.bundle';bundle.write_bytes(b'fixture')
+  r=self.run_script('--deploy',AFTER,str(bundle));self.assertEqual(r.returncode,0,r.stderr)
+  self.assertIn("'bundle', 'verify'",self.trace());self.assertIn('refs/m10v/releases/'+AFTER,self.trace())
+  self.assertNotIn("'fetch', 'origin'",self.trace())
  def test_success_checks_builds_restart_and_exact_commit(self):
   r=self.run_script('--deploy',AFTER);self.assertEqual(r.returncode,0,r.stderr)
   self.assertEqual((self.root/'head').read_text(),AFTER);self.assertIn('DEPLOY_OK commit='+AFTER,r.stdout)
