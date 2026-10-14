@@ -1,7 +1,7 @@
 import { fitXmp } from './gr3-xmp-fit.mjs';
 import { prepareCustomization, buildCustomization } from './gr3-customization.mjs';
 import { stockPresetCapabilities } from './gr3-stock-presets.mjs';
-// Loopback-only web server. GR III exports are rebuilt and verified in memory.
+// Backend binds loopback; an explicit public origin supports a trusted reverse proxy.
 import { randomBytes } from 'node:crypto';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import http from 'node:http';
@@ -70,11 +70,19 @@ async function readBody(request, limit = MAX_UPLOAD) {
 
 export function createServer(store = new Store(path.join(root, 'data')),
   sd = { listSdVolumes, resolveSdVolume, prepareOfficialSd },
-  gr4 = new Gr4Runtime(path.join(root, 'data', 'gr4'))) {
+  gr4 = new Gr4Runtime(path.join(root, 'data', 'gr4')), {publicOrigin} = {}) {
+  let configuredOrigin=null;
+  if(publicOrigin){
+    const url=new URL(publicOrigin);
+    if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('M10V_PUBLIC_ORIGIN must be a single HTTP(S) origin');
+    configuredOrigin=url.origin;
+  }
   const token = randomBytes(32).toString('base64url');
   const server = http.createServer(async (request, response) => {
-    const origin = `http://127.0.0.1:${server.address().port}`;
-    if (request.headers.host !== origin.slice(7)) return send(response, 403, { error: 'invalid host' });
+    const localOrigin = `http://127.0.0.1:${server.address().port}`;
+    const origin=configuredOrigin||localOrigin;
+    const allowedHosts=[new URL(localOrigin).host,new URL(origin).host];
+    if (!allowedHosts.includes(request.headers.host)) return send(response, 403, { error: 'invalid host' });
     if (request.url?.startsWith('/api/gr4/')) {
       await handleGr4Request({ request, response, runtime: gr4, token, readBody, send, origin });
       return;
@@ -273,8 +281,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const server = createServer();
-  server.listen(0, '127.0.0.1', () => {
+  const rawPort=process.env.M10V_PORT;
+  if(rawPort!==undefined&&(!/^[1-9][0-9]{0,4}$/.test(rawPort)||Number(rawPort)>65535))throw new Error('M10V_PORT must be an integer between 1 and 65535');
+  const server = createServer(undefined,undefined,undefined,{publicOrigin:process.env.M10V_PUBLIC_ORIGIN});
+  server.listen(rawPort?Number(rawPort):0, '127.0.0.1', () => {
     const url = `http://127.0.0.1:${server.address().port}/`;
     console.log(url);
     if (process.env.M10V_NO_BROWSER !== '1' && process.platform === 'darwin') {

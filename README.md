@@ -104,7 +104,7 @@ npm start
 
 先选槽位，再选胶卷与质感。点击「保存固件」时阅读风险提示，明确确认后才会开始构建。取消或按 Esc 不会生成文件；每次保存都要重新确认。
 
-> 当前服务器仅监听 loopback，并核验 localhost Host。它还不是可直接上传到静态托管平台的线上站点；公网部署需要另行适配域名、后端环境和访问策略。
+> 服务器监听 loopback；配置 `M10V_PORT` 和 `M10V_PUBLIC_ORIGIN` 后可通过 Nginx 反向代理。不能只上传静态 web 目录。Ubuntu 24.04 + 宝塔的具体步骤见 [部署指南](deploy/README.md)。
 
 <details>
 <summary><strong>GR III 原厂工具的可选兼容运行时</strong></summary>
