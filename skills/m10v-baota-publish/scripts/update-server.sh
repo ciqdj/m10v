@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run on the existing Baota host; preserve firmware inputs, settings and venv.
 set -Eeuo pipefail
+trap 'printf "RELEASE_ERROR line=%s\n" "$LINENO" >&2' ERR
 mode=${1:---check}
 expected=${2:-}
 bundle=${3:-}
@@ -20,7 +21,8 @@ clean_checkout(){
   [[ -z "$changes" ]]
 }
 cd "$repo"
-[[ $(git remote get-url origin) == https://github.com/zhaoo/m10v.git ]]
+origin=$(git remote get-url origin)
+[[ "${origin%.git}" == https://github.com/zhaoo/m10v ]]
 clean_checkout || { printf 'Tracked or untracked server changes exist; stop for inspection.\n' >&2; exit 1; }
 [[ $(git branch --show-current) == main ]] || { printf 'Server must be on main.\n' >&2; exit 1; }
 [[ $(systemctl show "$service" -p User --value) == www ]]

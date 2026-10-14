@@ -13,7 +13,7 @@ from pathlib import Path
 name=Path(sys.argv[0]).name;a=sys.argv[1:];root=Path(os.environ['M10V_DEPLOY_ROOT'])
 with (root/'trace').open('a') as f:f.write(name+' '+repr(a)+'\\n')
 if name=='git':
- if a[:2]==['remote','get-url']:print('https://github.com/zhaoo/m10v.git')
+ if a[:2]==['remote','get-url']:print(os.getenv('FAKE_ORIGIN','https://github.com/zhaoo/m10v.git'))
  elif a[0]=='status':
   if os.getenv('FAKE_STATUS_FAIL'):sys.exit(128)
   print(' M server-edit' if os.getenv('FAKE_DIRTY') else '',end='')
@@ -47,6 +47,8 @@ class BaotaPublishTests(unittest.TestCase):
  def test_git_status_failure_stops_before_mutation(self):
   r=self.run_script('--deploy',AFTER,FAKE_STATUS_FAIL='1');self.assertNotEqual(r.returncode,0)
   self.assertNotIn("'fetch'",self.trace());self.assertNotIn("'restart'",self.trace())
+ def test_github_origin_without_dot_git_is_accepted(self):
+  r=self.run_script('--check',FAKE_ORIGIN='https://github.com/zhaoo/m10v');self.assertEqual(r.returncode,0,r.stderr)
  def test_check_is_read_only(self):
   r=self.run_script('--check');self.assertEqual(r.returncode,0,r.stderr)
   self.assertNotIn("'fetch'",self.trace());self.assertNotIn("'restart'",self.trace())
