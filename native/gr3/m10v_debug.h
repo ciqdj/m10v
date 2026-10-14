@@ -1,0 +1,13 @@
+#ifndef M10V_DEBUG_H
+#define M10V_DEBUG_H
+#include <stdint.h>
+#ifndef M10V_DEBUG_MODE
+#define M10V_DEBUG_MODE 0
+#endif
+#if M10V_DEBUG_MODE
+int m10v_debug_log(uint32_t event, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
+#define M10V_LOG(e,a,b,c,d) ((void)m10v_debug_log((e),(a),(b),(c),(d)))
+#else
+#define M10V_LOG(e,a,b,c,d) ((void)0)
+#endif
+#endif

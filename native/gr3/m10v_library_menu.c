@@ -4,6 +4,7 @@
  * the five real stock slots. The original controller owns view allocation.
  */
 #include "m10v_library.h"
+#include "m10v_debug.h"
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -22,7 +23,10 @@ static int supported(const uint8_t *m) {
 }
 static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= 14 ? m[0x1d] : 0; }
 static uint32_t slot(const uint8_t *m) {
-    for (uint32_t i = 0; i < 5; ++i) if (m[0] == tones[i]) return i;
+    /* Byte 0x1e is padding after the stock last member at 0x1c. Keep
+     * the original m[0] entry snapshot intact for stock cancellation. */
+    uint32_t tone = mode(m) && m[0x1e] ? m[0x1e] : m[0];
+    for (uint32_t i = 0; i < 5; ++i) if (tone == tones[i]) return i;
     return 0;
 }
 uint32_t m10v_menu_count(uint32_t address) {
@@ -62,7 +66,22 @@ static uint32_t resource(uint32_t tone) {
     if (tone >= 208 && tone < 213) return 818 + tone - 208;
     return 0;
 }
+static uint32_t film_resource(uint32_t film) {
+    if (film >= 1 && film <= 32) return 786 + film - 1;
+    if (film == 33) return 860;
+    if (film >= 34 && film <= 65) return 879 + film - 34;
+    return 0;
+}
 uint32_t m10v_menu_name(uint32_t translator, uint32_t tone) {
+    for (uint32_t i = 0; i < 5; ++i) {
+        if ((tone == tones[i] || tone == 208 + i) && supported(model())) {
+            m10v_library_state state;
+            /* Load initializes the compiled defaults even when storage is
+             * unavailable. Never index a catalog with an unchecked journal. */
+            m10v_camera_library_load(&state);
+            if (m10v_library_valid(&state)) return film_resource(state.slots[i].film);
+        }
+    }
     uint32_t id = resource(tone);
     return id ? id : ((call2_fn)(M10V_NATIVE_BASE + 0x10u))(translator, tone);
 }
@@ -86,10 +105,15 @@ uint32_t m10v_menu_value_icon(uint32_t translator, uint32_t value) {
 }
 uint32_t m10v_menu_focus(uint32_t controller, uint32_t index) {
     uint8_t *m = model();
-    if (supported(m) && (mode(m) || index == 12)) return 0;
-    return ((call2_fn)(M10V_NATIVE_BASE + 0xa0u))(controller, index);
+    M10V_LOG(30,controller,index,m[0],(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
+    uint32_t result=0;
+    if (!(supported(m) && (mode(m) || index == 12)))
+        result=((call2_fn)(M10V_NATIVE_BASE + 0xa0u))(controller, index);
+    M10V_LOG(31,controller,index,result,(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
+    return result;
 }
 static void redraw(uint32_t controller) {
+    M10V_LOG(50,controller,0,0,0);
     ((get_fn)0x531ac074u)(controller);
     uint32_t view = *(const uint32_t *)(uintptr_t)(controller + 0x174u);
     uint8_t *m=model();uint32_t group=mode(m),selected=0,target=slot(m);
@@ -106,18 +130,28 @@ static void redraw(uint32_t controller) {
         }
     }
     ((call2_fn)0x53395430u)(view, selected);
+    M10V_LOG(51,controller,selected,group,target);
 }
 static void failure(uint32_t controller) {
     uint32_t caption = *(const uint32_t *)(uintptr_t)(controller + 0x160u);
     ((call3_fn)0x53396f80u)(caption, 824, 0);
 }
+#if M10V_DEBUG_MODE
+static uint32_t menu_confirm_impl(uint32_t controller) {
+#else
 uint32_t m10v_menu_confirm(uint32_t controller) {
+#endif
     uint8_t *m = model();
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x60u))(controller);
     uint32_t view = *(const uint32_t *)(uintptr_t)(controller + 0x174u);
     uint32_t index = ((get_fn)0x53394820u)(view), group = mode(m);
     if (!group) {
         if (index != 12) return ((get_fn)(M10V_NATIVE_BASE + 0x60u))(controller);
+        /* The stock entry snapshot at m[0] does not follow live browsing.
+         * Capture the actual tone before switching to the private menu. */
+        uint32_t active = ((get_fn)0x532bd6b4u)((uint32_t)(uintptr_t)m);
+        m[0x1e] = 0;
+        for (uint32_t i = 0; i < 5; ++i) if (active == tones[i]) m[0x1e] = (uint8_t)active;
         m[0x1d] = 1; redraw(controller); return 0;
     }
     if (index == counts[group]) {
@@ -130,7 +164,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     if (index >= counts[group]) return 0;
     if (group == 1) { m[0x1d] = (uint8_t)(index==5?10:index == 4 ? 6 : index + 2); redraw(controller); return 0; }
     if (group == 6) {
-        m[0] = tones[index];
+        m[0x1e] = tones[index];
         ((call2_fn)(M10V_NATIVE_BASE + 0x00u))((uint32_t)(uintptr_t)m, tones[index]);
         m[0x1d] = 1; redraw(controller); return 0;
     }
@@ -143,6 +177,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     m10v_library_state state;
     if (m10v_camera_library_load(&state) < 0) { failure(controller); return 0; }
     uint32_t target = slot(m); int result;
+    M10V_LOG(60,controller,index,group,target);
     if(group>=11){const m10v_slot *v=&state.slots[target];
         result=m10v_camera_library_halation(&state,target,group==11?index:v->halo_gain,group==12?index:v->halo_spread,group==13?index:v->halo_threshold,group==14?index:v->halo_profile);
     }
@@ -151,12 +186,22 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     else if (group == 4) result = m10v_camera_library_texture(&state, target, state.slots[target].grain, index);
     else result = m10v_camera_library_stamp(&state, group == 5 ? index : state.stamp,
         group == 7 ? index : state.format, group == 8 ? index : state.corner, group == 9 ? index : state.color);
+    M10V_LOG(61,controller,(uint32_t)result,group,state.slots[target].film);
     if (result) { failure(controller); return 0; }
     if (group == 2) ((call2_fn)(M10V_NATIVE_BASE + 0x00u))((uint32_t)(uintptr_t)m, tones[target]);
     m[0x1d] = group>=11?10:group >= 7 || group == 5 ? 5 : 1;
     redraw(controller); return 0;
 }
+#if M10V_DEBUG_MODE
+uint32_t m10v_menu_confirm(uint32_t controller) {
+    uint8_t *m=model();M10V_LOG(40,controller,m[0],m[0x1d],m[0x1e]);
+    uint32_t result=menu_confirm_impl(controller);
+    M10V_LOG(41,controller,result,m[0x1d],m[0x1e]);return result;
+}
+static uint32_t menu_key_impl(uint32_t controller, uint32_t event) {
+#else
 uint32_t m10v_menu_key(uint32_t controller, uint32_t event) {
+#endif
     uint8_t *m = model();
     if (supported(m)) {
         uint16_t key = *(const uint16_t *)(uintptr_t)event;
@@ -169,7 +214,17 @@ uint32_t m10v_menu_key(uint32_t controller, uint32_t event) {
     }
     return ((call2_fn)(M10V_NATIVE_BASE + 0x50u))(controller, event);
 }
+#if M10V_DEBUG_MODE
+uint32_t m10v_menu_key(uint32_t controller,uint32_t event) {
+    uint16_t key=*(const uint16_t *)(uintptr_t)event;
+    uint8_t *m=model();M10V_LOG(20,controller,key,m[0],m[0x1d]);
+    uint32_t result=menu_key_impl(controller,event);
+    M10V_LOG(21,controller,key,result,m[0x1d]);return result;
+}
+#endif
 uint32_t m10v_menu_enter(uint32_t controller) {
-    uint8_t *m = model(); if (supported(m)) m[0x1d] = 0;
-    return ((get_fn)(M10V_NATIVE_BASE + 0xb0u))(controller);
+    M10V_LOG(10,controller,0,0,0);
+    uint8_t *m = model(); if (supported(m)) { m[0x1d] = 0; m[0x1e] = 0; }
+    uint32_t result=((get_fn)(M10V_NATIVE_BASE + 0xb0u))(controller);
+    M10V_LOG(11,controller,result,m[0],m[0x1d]);return result;
 }

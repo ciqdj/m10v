@@ -112,12 +112,15 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
         'm10v_icon_': {'m10v_icon_pixels'},
+        'm10v_debug_': {'m10v_debug_log'},
     }[prefix]
     if set(symbols) != required or not image_sections: raise ValueError('runtime API incomplete')
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0):
+    if type(debug_mode) is not bool or not isinstance(debug_build_id,int) or not 0<=debug_build_id<=0xffffffff:
+        raise ValueError('invalid debug build options')
     if initial_state_hex is None:
         initial = bytearray(64)
         struct.pack_into('<IHHI', initial, 0, 0x5630314d, 2, 64, 0)
@@ -176,8 +179,15 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None):
         image += bytes(camera_base - base - len(image)) + camera
         symbols.update(camera_symbols)
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
+        debug_flags = [f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u']
+        if debug_mode:
+            debug_obj = folder / 'debug.o'
+            subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_debug.c'),'-o',str(debug_obj)],check=True,capture_output=True)
+            debug_base=(base+len(image)+15)&~15
+            debug,debug_symbols=link_object(debug_obj.read_bytes(),debug_base,prefix='m10v_debug_')
+            image+=bytes(debug_base-base-len(image))+debug;symbols.update(debug_symbols)
         menu_obj = folder / 'menu.o'
-        subprocess.run([compiler, *FLAGS, f'-DM10V_NATIVE_BASE={base}u', '-c',
+        subprocess.run([compiler, *FLAGS, *debug_flags, f'-DM10V_NATIVE_BASE={base}u', '-c',
                         str(ROOT / 'native/gr3/m10v_library_menu.c'), '-o', str(menu_obj)], check=True, capture_output=True)
         menu_base = (base + len(image) + 15) & ~15
         menu, menu_symbols = link_object(menu_obj.read_bytes(), menu_base, symbols, 'm10v_menu_')
@@ -185,7 +195,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None):
         symbols.update(menu_symbols)
         (out / 'm10v-library-menu-arm.o').write_bytes(menu_obj.read_bytes())
         capture_obj = folder / 'capture.o'
-        subprocess.run([compiler, *FLAGS, '-c', str(ROOT / 'native/gr3/m10v_library_capture.c'),
+        subprocess.run([compiler, *FLAGS, *debug_flags, '-c', str(ROOT / 'native/gr3/m10v_library_capture.c'),
                         '-o', str(capture_obj)], check=True, capture_output=True)
         capture_base = (base + len(image) + 15) & ~15
         capture, capture_symbols = link_object(capture_obj.read_bytes(), capture_base, symbols, 'm10v_capture_')
@@ -347,12 +357,17 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None):
                              'native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py',
                              'native/gr3/m10v_library_camera.c', 'native/gr3/m10v_library_menu.c',
                              'native/gr3/m10v_library_capture.c',
+                             'native/gr3/m10v_debug.c','native/gr3/m10v_debug.h',
                              'scripts/build_gr3_m10v_library.py','scripts/generate_m10v_icons.py',
                              'native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin')},
                 'compiler': subprocess.check_output([compiler, '--version'], text=True).splitlines()[0],
-                'flags': FLAGS, 'firmware_artifact': False, 'camera_tested': False,
+                'flags': FLAGS, 'debug_compile_flags': debug_flags, 'firmware_artifact': False, 'camera_tested': False,
                 'abi': 'M10V state64 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
+    manifest['debug_mode']=debug_mode
+    manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
+        'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'],
+        'page_bytes':4096,'records_per_channel':63,'guard_address':0x5506821f} if debug_mode else None
     initial_offset = bytes(image).find(initial)
     if initial_offset < 0 or bytes(image).find(initial, initial_offset+1) >= 0: raise ValueError('initial state not uniquely embedded')
     manifest['initial_state_hex'] = initial.hex()
@@ -369,4 +384,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'builds/gr3-m10v-library')
     parser.add_argument('--initial-state-hex')
-    args = parser.parse_args(); print(json.dumps(build(args.out, initial_state_hex=args.initial_state_hex), indent=2))
+    parser.add_argument('--debug',action='store_true')
+    parser.add_argument('--debug-build-id',type=lambda v:int(v,0),default=0)
+    args = parser.parse_args(); print(json.dumps(build(args.out, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id), indent=2))

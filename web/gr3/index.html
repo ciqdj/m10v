@@ -62,6 +62,7 @@
         <button class="outline wide" id="prepare-build" hidden>核验方案 →</button>
         <div id="preflight-result" class="preflight-result" role="status">保存时自动核验来源和方案。</div>
 
+        <label class="debug-option" id="debug-option"><input type="checkbox" id="debug-mode" aria-describedby="debug-mode-hint"><span>调试模式<small id="debug-mode-hint">将菜单切换和拍摄阶段记录到 SD 卡，便于排查黑屏；开启后操作和拍摄可能变慢。</small></span></label>
         <button class="primary wide" id="build-firmware" disabled>保存固件 →</button>
         <button class="outline wide" id="cancel-build" hidden>取消当前构建</button>
         <div id="build-result" class="build-result" role="status" aria-live="polite"></div>

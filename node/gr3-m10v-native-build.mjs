@@ -21,7 +21,8 @@ const hooks = [
 ];
 const sources = ['scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
-  'native/gr3/m10v_library_capture.c','scripts/build_gr3_m10v_library.py'];
+  'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','scripts/build_gr3_m10v_library.py'];
+export function nativeSourceFingerprint(){return sha(JSON.stringify(sources.map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
   const delta = target - address - 8;
@@ -41,7 +42,13 @@ function checkRuntime(runtime, manifest) {
     'native source changed since compilation: '+name);
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
   need(init.length === 64 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+64).equals(init), 'native initial settings readback differs');
-  for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library']) {
+  need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
+    manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
+    /^[0-9a-f]{8}$/.test(manifest.debug_log.build_id)&&manifest.debug_log.page_bytes===4096&&manifest.debug_log.records_per_channel===63&&
+    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'])&&
+    manifest.debug_log.files.every(name=>runtime.includes(Buffer.from('C:\\'+name))):
+    !manifest.debug_log&&!manifest.symbols?.m10v_debug_log&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
+  for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log']:[])]) {
     const address = manifest.symbols?.[name];
     need(Number.isInteger(address) && address % 4 === 0 && address >= BASE + 0x100 && address < BASE + runtime.length,
       'native symbol outside module: '+name);
@@ -164,6 +171,6 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
     verified_hooks:patchList(manifest).length,icon_count:65,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:2,film_count:65,active_slots:5,external_film_pack:false,
-    camera_tested:false,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
+    camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
     camera_scope:'still JPEG; original RAW pixels protected; live-view color and RAW-development effects not integrated'};
 }

@@ -27,7 +27,11 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const config=normalizeConfiguration({slots:[{film:33,grain:3,soft:2},{film:7,grain:1,soft:3},{film:16,grain:0,soft:1},{film:21,grain:2,soft:0},{film:1,grain:0,soft:0}],stamp:2,format:3,corner:2,color:1});
   assert.equal((await post(route+'prepare',{configuration:{...config,stamp:9}})).status,400);
   const p=await post(route+'prepare',{configuration:config});assert.equal(p.status,200);const plan=await p.json();
-  assert.deepEqual(plan.configuration,config);
+  assert.deepEqual(plan.configuration,config);assert.equal(plan.debug_mode,false);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,debug_mode:true})).status,400);
+  const dp=await post(route+'prepare',{configuration:config,debug_mode:true});assert.equal(dp.status,200);const debugPlan=await dp.json();
+  assert.notEqual(debugPlan.configuration_sha256,plan.configuration_sha256);
+  assert.equal((await post(route+'build',{configuration:config,debug_mode:true,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
   const stale=await post(route+'build',{configuration:config,accepted_configuration_sha256:'0'.repeat(64)});assert.equal(stale.status,400);
   const built=await post(route+'build',{configuration:config,accepted_configuration_sha256:plan.configuration_sha256});
   assert.equal(built.status,200,await built.clone().text());
@@ -37,6 +41,13 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const xp=await (await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).json();assert.equal(xp.model,'GR IIIx');assert.equal(xp.filename,'fwdc243b.bin');
   const xb=await post(`/api/projects/${xid}/native-library/build`,{configuration:config,accepted_configuration_sha256:xp.configuration_sha256});assert.equal(xb.status,200);assert.ok(xb.headers.get('Content-Disposition').includes('fwdc243b.bin'));
   const xr=JSON.parse(Buffer.from(xb.headers.get('X-M10V-Native-Receipt'),'base64'));assert.equal(xr.model,'GR IIIx');assert.equal(xr.source_sha256,xid);assert.equal(xr.candidate_sha256,createHash('sha256').update(Buffer.from(await xb.arrayBuffer())).digest('hex'));
+  assert.equal(receipt.debug_mode,false);
+  const debugBuilt=await post(route+'build',{configuration:config,debug_mode:true,accepted_configuration_sha256:debugPlan.configuration_sha256});
+  assert.equal(debugBuilt.status,200,debugBuilt.status===200?'':await debugBuilt.text());
+  const debugReceipt=JSON.parse(Buffer.from(debugBuilt.headers.get('X-M10V-Native-Receipt'),'base64'));
+  assert.equal(debugReceipt.debug_mode,true);assert.equal(debugReceipt.debug_log.build_id,debugPlan.configuration_sha256.slice(0,8));
+  assert.equal(debugReceipt.candidate_sha256,createHash('sha256').update(Buffer.from(await debugBuilt.arrayBuffer())).digest('hex'));
+  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,27);
   assert.equal(receipt.external_film_pack,false);assert.equal(receipt.initial_state_hex.length,128);
  }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
 });

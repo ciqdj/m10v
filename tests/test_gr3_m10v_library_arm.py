@@ -27,7 +27,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         u.mem_protect(base,(len(self.code)+4095)&~4095,UC_PROT_READ|UC_PROT_EXEC)
         u.mem_map(0x55000000, 0x100000)
         self.store_result = 0; self.saved = []; self.files = {}; self.file_calls = []
-        self.focus = 0; self.native_tones = []; self.redraws = 0; self.captions = []; self.forwarded = []
+        self.focus = 0; self.current_tone = 18; self.native_tones = []; self.redraws = 0; self.captions = []; self.forwarded = []
         for address in (0x53828000, 0x53825000): u.mem_map(address, 8192)
         u.mem_write(0x55004008, struct.pack('<I', 0x55004100))
         u.mem_write(0x55004100, struct.pack('<I', 0x55004200))
@@ -35,7 +35,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         u.mem_write(0x55068200, bytes([18]) + bytes(31))
         u.mem_write(0x55005174, struct.pack('<I', 0x55005200))
         u.mem_write(0x55005160, struct.pack('<I', 0x55005300))
-        for address in (0x5320a000, 0x53394000, 0x53396000, 0x531ac000): u.mem_map(address, 8192)
+        for address in (0x5320a000, 0x532bd000, 0x53394000, 0x53396000, 0x531ac000): u.mem_map(address, 8192)
         def services(uc, address, size, data):
             if address == 0x550ff100:
                 self.saved.append(bytes(uc.mem_read(uc.reg_read(UC_ARM_REG_R1), C.sizeof(State))))
@@ -56,9 +56,10 @@ class FilmLibraryArmTests(unittest.TestCase):
                 elif address == 0x53825648 and filename in self.files and len(self.files[filename])==length:
                     uc.mem_write(buffer, self.files[filename]); result = 1
                 uc.reg_write(UC_ARM_REG_R0, result); uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
-            elif address in (0x5320ad88, 0x5320ba9c, 0x53394820, 0x53395430, 0x531ac074, 0x53396f80):
+            elif address in (0x5320ad88, 0x5320ba9c, 0x532bd6b4, 0x53394820, 0x53395430, 0x531ac074, 0x53396f80):
                 if address == 0x5320ad88: uc.reg_write(UC_ARM_REG_R0, 0x55006000)
                 elif address == 0x5320ba9c: uc.reg_write(UC_ARM_REG_R0, 0x55068200)
+                elif address == 0x532bd6b4: uc.reg_write(UC_ARM_REG_R0, self.current_tone)
                 elif address == 0x53394820: uc.reg_write(UC_ARM_REG_R0, self.focus)
                 elif address == 0x53395430: self.focus = uc.reg_read(UC_ARM_REG_R1)
                 elif address == 0x531ac074: self.redraws += 1
@@ -66,7 +67,9 @@ class FilmLibraryArmTests(unittest.TestCase):
                 uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
             elif base <= address < base + 0x100 and (address - base) % 16 == 0:
                 offset = address - base; self.forwarded.append(offset)
-                if offset == 0: self.native_tones.append(uc.reg_read(UC_ARM_REG_R1))
+                if offset == 0:
+                    self.current_tone = uc.reg_read(UC_ARM_REG_R1)
+                    self.native_tones.append(self.current_tone)
                 if offset == 0x80: uc.reg_write(UC_ARM_REG_R0, 12)
                 if offset == 0x90: uc.reg_write(UC_ARM_REG_R0, 11 + uc.reg_read(UC_ARM_REG_R1))
                 uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
@@ -94,6 +97,40 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u,'m10v_menu_icon',0,18),735)
         self.assertEqual(self.call(u,'m10v_menu_icon',0,209),735)
         self.assertEqual(self.call(u,'m10v_menu_icon',0,21),703)
+
+    def test_slot_names_follow_saved_films_in_main_and_slot_selection_lists(self):
+        u = self.machine(); state = 0x55008000
+        self.call(u, 'm10v_library_init', state)
+        # Catalog IDs and captions are independently assigned: 33 is 800T;
+        # legacy catalog 34..65 occupies captions 879..910.
+        for slot, film, caption in [(0, 1, 786), (1, 64, 909), (2, 56, 901),
+                                    (3, 54, 899), (4, 33, 860)]:
+            self.assertEqual(self.call(u, 'm10v_camera_library_select', state, slot, film), 0)
+            tone = (12, 18, 19, 20, 21)[slot]
+            self.assertEqual(self.call(u, 'm10v_menu_name', 0, tone), caption)
+            self.assertEqual(self.call(u, 'm10v_menu_name', 0, 208 + slot), caption)
+        self.assertEqual(self.call(u, 'm10v_camera_library_select', state, 4, 65), 0)
+        self.assertEqual(self.call(u, 'm10v_menu_name', 0, 21), 910)
+        self.assertEqual(self.call(u, 'm10v_menu_name', 0, 212), 910)
+
+    def test_open_library_targets_highlighted_slot_instead_of_entry_snapshot(self):
+        u = self.machine(); state = 0x55008000; model = 0x55068200
+        self.call(u, 'm10v_library_init', state)
+        self.assertEqual(self.call(u, 'm10v_camera_library_halation', state, 4, 8, 1, 7, 3), 0)
+        # Stock m[0] is the entry snapshot; browsing changed the active tone.
+        self.current_tone = 21
+        self.focus = 12; self.call(u, 'm10v_menu_confirm', 0x55005000)
+        self.assertEqual(u.mem_read(model, 1), b'\x12')
+        self.focus = 5; self.call(u, 'm10v_menu_confirm', 0x55005000)
+        self.focus = 0; self.call(u, 'm10v_menu_confirm', 0x55005000)
+        self.assertEqual(u.mem_read(model + 0x1d, 1), b'\x0b')
+        self.assertEqual(self.focus, 8)
+        self.assertFalse(self.native_tones)
+        # Pick another slot without altering the stock cancellation snapshot.
+        u.mem_write(model + 0x1d, b'\x06'); self.focus = 3
+        self.call(u, 'm10v_menu_confirm', 0x55005000)
+        self.assertEqual(u.mem_read(model, 1), b'\x12')
+        self.assertEqual(u.mem_read(model + 0x1e, 1), b'\x14')
 
     def test_original_icon_dimensions_and_bitmap_pointer_with_flags_preserved(self):
         from subprocess import check_output

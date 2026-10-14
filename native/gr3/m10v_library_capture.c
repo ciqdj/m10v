@@ -3,6 +3,7 @@
  * CFA is checked as a protected interval and is never read or written.
  */
 #include "m10v_library.h"
+#include "m10v_debug.h"
 typedef void *(*allocate_fn)(uint32_t);
 typedef void (*free_fn)(void *);
 typedef void (*cache_fn)(void *, uint32_t);
@@ -18,7 +19,11 @@ static int raw_ram(uint32_t p, uint32_t size) {
 static int overlap(uint32_t a, uint32_t an, uint32_t b, uint32_t bn) {
     return a < b + bn && b < a + an;
 }
+#if M10V_DEBUG_MODE
+static int capture_library_impl(uint32_t context) {
+#else
 int m10v_capture_library(uint32_t context) {
+#endif
     if (!ram(context, 0x60) || context < 0x550009b8u) return -3;
     uint32_t recipe = context - 0x9b8u;
     if (!ram(recipe, 0x44cc)) return -3;
@@ -104,9 +109,18 @@ int m10v_capture_library(uint32_t context) {
                                 bytes, bytes, width, height, stride};
     uint32_t touched = (height - 1) * stride + width;
     ((cache_fn)0x5383c8a8u)(image.y, touched); ((cache_fn)0x5383c8a8u)(image.chroma, touched);
+    M10V_LOG(110,context,slot,state.slots[slot].film,(width<<16)|height);
     int result = m10v_library_render(&image, &state, slot, (const m10v_library_date *)time,
                                      seed, scratch, scratch_bytes);
+    M10V_LOG(111,context,(uint32_t)result,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].halo_profile<<12),scratch_bytes);
     if (!result) { ((cache_fn)0x5383c8a8u)(image.y, touched); ((cache_fn)0x5383c8a8u)(image.chroma, touched); }
     if (scratch) ((free_fn)0x536af2e4u)(scratch);
     return result;
 }
+#if M10V_DEBUG_MODE
+int m10v_capture_library(uint32_t context) {
+    M10V_LOG(100,context,0,0,0);
+    int result=capture_library_impl(context);
+    M10V_LOG(101,context,(uint32_t)result,0,0);return result;
+}
+#endif

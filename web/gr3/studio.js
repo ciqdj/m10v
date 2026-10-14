@@ -8,6 +8,8 @@ let chosenModel=location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
 let modelLabel=chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
 let settingsTab='imaging';
+let debugMode=false;
+const debugEnabled=()=>debugMode&&state.profile==='native'&&chosenModel==='gr3';
 
 const $ = (id) => document.getElementById(id);
 const fields = [
@@ -177,6 +179,9 @@ function renderLedger() {
   $('prepare-build').disabled = Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('build-firmware').disabled = saving||Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('features-next').disabled=!canConfigure;
+  $('debug-option').hidden=state.profile!=='native'||chosenModel!=='gr3';
+  $('debug-mode').checked=debugMode;
+  $('debug-mode').disabled=saving||Boolean(activeBuildController);
 
 }
 function textNode(tag, value, className = '') {
@@ -500,7 +505,7 @@ async function prepare() {
   $('preflight-result').textContent = '正在核验固件、配方位置与功能补丁…';
   try {
     const report = await (await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/prepare`, {
-      method: 'POST', signal:controller.signal, body: JSON.stringify(state.profile==='native'?{configuration:state.nativeConfig}:{selection:selection()}),
+      method: 'POST', signal:controller.signal, body: JSON.stringify(state.profile==='native'?{configuration:state.nativeConfig,debug_mode:debugEnabled()}:{selection:selection()}),
       headers: { 'Content-Type': 'application/json' },
     })).json();
     if(revision!==state.revision||activeBuildController!==controller)return;
@@ -522,17 +527,18 @@ async function build() {
   const revision=state.revision;
   $('build-firmware').disabled = true;
   $('cancel-build').hidden=false;
+  renderLedger();
   $('build-result').className = 'build-result';
   $('build-result').textContent = '正在构建、重编码并独立回读，约需半分钟…';
   try {
     const response = await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/build`, {
-      method: 'POST', signal:controller.signal, body: JSON.stringify({ ...(state.profile==='native'?{configuration:state.nativeConfig}:{selection:selection()}),
+      method: 'POST', signal:controller.signal, body: JSON.stringify({ ...(state.profile==='native'?{configuration:state.nativeConfig,debug_mode:debugEnabled()}:{selection:selection()}),
         accepted_configuration_sha256: state.preparation.configuration_sha256 }),
       headers: { 'Content-Type': 'application/json' },
     });
     if(revision!==state.revision||activeBuildController!==controller){notice('构建期间方案已变化，已放弃旧方案下载。请重新预检。',true);return;}
     await download(response, state.preparation.filename||(chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
-    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。相机接受与成像仍需真机验证。';
+    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。';
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
     $('build-result').className = 'build-result error';
@@ -652,3 +658,5 @@ try {
   renderFeatures();
   if (!state.runtime&&state.profile==='custom') notice('构建组件尚未就绪，固件导出会被阻止。', true);
 } catch (error) { notice(`工作区载入失败：${error.message}`, true); }
+
+$('debug-mode').addEventListener('change',()=>{debugMode=$('debug-mode').checked;invalidate(false);});
