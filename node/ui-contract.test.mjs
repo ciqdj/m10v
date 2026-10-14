@@ -79,7 +79,7 @@ test('GR IV product UI uses only namespaced APIs and exposes latest feature surf
   assert.match(html, /gr4-hero/);
   assert.doesNotMatch(html, /(?:href|src)="\/(?:styles\.css|app\.js|calibration-ui\.js)"/);
   assert.doesNotMatch(html, /m10v-back/);
-  assert.match(html, /GR IV 编辑器/);
+  assert.match(html, /GR IV 固件工作室/);
   assert.doesNotMatch(app, /["`]\/api\/(?!gr4\/)/);
   assert.match(app, /X-M10V-Token/);
 });

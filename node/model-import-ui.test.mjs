@@ -28,3 +28,10 @@ test('a rejected GR II upload cannot leave a previous successful proof visible',
   node('firmware').files=[{arrayBuffer:async()=>new ArrayBuffer(4)}];await context.inspect();
   assert.equal(node('report').hidden,true);assert.equal(node('notice').textContent,'unsupported firmware identity');
 });
+test('GR II desk rejects firmware belonging to another model before exposing its report',async()=>{
+ const app=await readFile(new URL('../web/gr2/inspect.js',import.meta.url),'utf8'),nodes=new Map();
+ const node=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,disabled:false,textContent:'',files:[],replaceChildren(){},addEventListener(){}});return nodes.get(id);};
+ const context=vm.createContext({document:{getElementById:node,createElement:()=>({append(){}})},fetch:async url=>({ok:true,json:async()=>url.endsWith('status')?{session_token:'token'}:{model:'GR IV',public_version:'1.11',proof:{},resources:[],sections:[]}})});
+ vm.runInContext(app,context);node('firmware').files=[{arrayBuffer:async()=>new ArrayBuffer(4)}];await context.inspect();
+ assert.equal(node('report').hidden,true);assert.match(node('notice').textContent,/GR IV.*GR II/);
+});

@@ -11,6 +11,7 @@ async function inspect(local=false){
     const response=await fetch(local?'/api/platform/inspect-official':'/api/platform/inspect',{
       method:'POST',headers:{'X-M10V-Token':token},body:local?JSON.stringify({model:'gr2'}):await file.arrayBuffer()});
     const result=await response.json();if(!response.ok)throw new Error(result.error);
+    if(result.model!=='GR II')throw new Error(`已识别 ${result.model}，请使用对应机型工作台；当前工作台仅支持 GR II。`);
     $('identity').textContent=`${result.model} · ${result.public_version}`;
     $('hash').textContent=`SHA-256 ${result.sha256}`;
     $('proof').textContent=result.proof.byte_exact_roundtrip?'官方身份与原样往返检查通过。离线检查不代表实机验收。':'官方固件身份检查通过。';

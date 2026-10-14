@@ -5,14 +5,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>m10v · GR IV 编辑器</title>
+  <title>GR IV 固件工作室 · M10V</title>
   <link rel="stylesheet" href="/shared/product.css">
   <link rel="stylesheet" href="/gr4/styles.css">
   <link rel="stylesheet" href="/gr4/studio-theme.css">
   <script src="/gr4/calibration-ui.js" defer></script>
   <script src="/gr4/app.js" defer></script>
-</head>
-<body>
+<link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/shared/model-studio.css"><script type="module" src="/shared/model-studio.js"></script></head>
+<body data-studio-model="gr4">
   <header class="product-topbar">
     <a class="product-brand" href="/"><strong>m10v</strong><span>FIRMWARE STUDIO</span></a>
     <nav class="model-switch" aria-label="切换机型"><a href="/gr3/">GR III</a><a class="active" href="/gr4/">GR IV</a></nav>
@@ -100,7 +100,7 @@
       <section id="build-panel" class="build-panel panel product-panel" hidden>
         <h2>生成新固件</h2>
         <input id="project-title" type="text" hidden>
-        <div class="build-controls"><div class="build-version-field"><label class="field-label version-label" for="build-version">新固件版本 <span id="suggested-version" class="muted" hidden></span></label><input id="build-version" class="text-input mono" placeholder="自动分配" autocomplete="off" disabled></div><div class="build-actions"><div class="save-row"><span id="save-status" class="muted">已保存</span><button id="save-project" class="button secondary" type="button" disabled>保存修改</button></div><label class="toggle build-option"><input id="allow-older" type="checkbox" checked disabled><span class="toggle-track"></span><span>允许低版本固件</span></label><button id="build-firmware" class="button primary" type="button" disabled>生成固件</button></div></div>
+        <div class="build-controls"><div class="build-version-field"><label class="field-label version-label" for="build-version">新固件版本 <span id="suggested-version" class="muted" hidden></span></label><input id="build-version" class="text-input mono" placeholder="自动分配" autocomplete="off" disabled></div><div class="build-actions"><div class="save-row"><span id="save-status" class="muted">已保存</span><button id="save-project" class="button secondary" type="button" disabled>保存修改</button></div><label class="toggle build-option"><input id="allow-older" type="checkbox" checked disabled><span class="toggle-track"></span><span>允许低版本固件</span></label><button id="build-firmware" class="button primary" type="button" disabled>保存固件 →</button></div></div>
         <div id="capability-summary" class="capability-summary status-inline" hidden></div><p id="build-note" class="build-note" hidden></p><div id="build-result" class="build-result" hidden></div>
       </section>
       <section class="history-summary panel product-panel" aria-label="固件历史"><h2>固件历史</h2><button id="open-history-card" class="baseline-card" type="button" aria-haspopup="dialog"><span class="field-label">当前基线</span><strong id="history-baseline-version">暂无基线</strong><span id="history-baseline-name" class="muted"></span><span id="history-baseline-sha" class="mono muted" hidden></span><span class="baseline-open">版本记录 <span aria-hidden="true">↗</span></span></button></section>

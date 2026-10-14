@@ -90,7 +90,7 @@ function notice(message, error = false) {
   clearTimeout(noticeTimer);
   const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
   if (dialog) dialog.prepend($("notice"));
-  else $("editor-workspace").before($("notice"));
+  else { const stage = document.querySelector(".model-studio .stage"); if (stage) stage.prepend($("notice")); else $("editor-workspace").before($("notice")); }
   $("notice").textContent = uiText(message);
   $("notice").className = "notice" + (error ? " error" : "");
   $("notice").setAttribute("role", error ? "alert" : "status");
@@ -822,7 +822,7 @@ for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListene
   if ($("notice").parentElement === dialog) {
     const remaining = [...document.querySelectorAll("dialog[open]")].at(-1);
     if (remaining) remaining.prepend($("notice"));
-    else $("editor-workspace").before($("notice"));
+    else { const stage = document.querySelector(".model-studio .stage"); if (stage) stage.prepend($("notice")); else $("editor-workspace").before($("notice")); }
   }
 });
 document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); if (state.project) $("save-project").click(); } });

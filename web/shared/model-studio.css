@@ -1,0 +1,23 @@
+/* Model adapters keep the GR III desk shell and retain their editing controls. */
+.model-studio .model-settings{display:grid;gap:16px;margin-top:24px;min-width:0}
+body[data-studio-model="gr4"] .model-settings{grid-template-columns:180px minmax(0,1fr)}
+.model-studio .sidebar{min-height:0;padding:0}
+.model-studio .editor{min-width:0;padding:20px 16px}
+.model-studio .empty-editor{min-height:360px}
+.model-studio .gr4-desk-label{display:none}
+.model-studio .source-summary,.model-studio .build-panel{border:0;padding:22px 0;background:transparent}
+.model-studio .source-summary h1{font-size:24px}
+.model-studio .source-actions{flex-wrap:wrap}
+.model-studio .source-actions .full{width:auto}
+.model-studio .history-summary{margin-top:24px;border:0;padding:0;background:transparent}
+.model-studio .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px}
+.model-studio .file-button{display:none}
+.model-studio #hash{overflow-wrap:anywhere;color:var(--muted);font-size:11px}
+.model-studio .table-scroll{max-height:430px;overflow:auto}
+.model-studio table{width:100%;border-collapse:collapse;font-size:12px}
+.model-studio td,.model-studio th{text-align:left;padding:12px;border-bottom:1px solid var(--line)}
+.model-studio td{font-family:monospace;overflow-wrap:anywhere;max-width:240px}
+body[data-studio-model="gr4"] .topbar .more-menu{margin-left:10px}
+@media(max-width:900px){body[data-studio-model="gr4"] .model-settings{grid-template-columns:1fr}.model-studio .function-nav{display:flex;flex-wrap:wrap}.model-studio .function-button{flex:1}.model-studio .editor{padding:18px 12px}}
+.model-studio .parameter-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+@media(min-width:1600px){.model-studio .parameter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
