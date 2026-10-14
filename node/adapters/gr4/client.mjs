@@ -13,10 +13,13 @@ export function createGr4Client(options = {}) {
   const python = options.python || process.env.M10V_PYTHON312 ||
     (existsSync(bundledPython) ? bundledPython : '/opt/homebrew/bin/python3.12');
   const worker = path.resolve(options.worker || defaultWorker);
-  const timeoutMs = options.timeoutMs || 60_000;
   return Object.freeze({
     request(operation, payload = {}, workspace = process.cwd()) {
       validateGr4Operation(operation, payload);
+      // Cold official five-slot compilation and independent readback exceed
+      // one minute. Keep read deadlines short without killing valid builds.
+      const timeoutMs = ['build','rollback','history_rollback'].includes(operation) ?
+        (options.buildTimeoutMs ?? options.timeoutMs ?? 300_000) : (options.timeoutMs ?? 60_000);
       return new Promise((resolve, reject) => {
         const child = spawn(python, [worker], {
           cwd: path.dirname(worker), detached: process.platform !== 'win32',

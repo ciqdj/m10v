@@ -4,7 +4,7 @@
 
 **你的胶卷，你的 GR。**
 
-面向 **RICOH GR III / GR IIIx** 的固件定制工作台。
+面向 **RICOH GR III / GR IIIx** 的原生胶卷工作台，并提供 **GR IV** 原厂编辑工具和 **GR II** 固件检查。
 
 [功能](#功能) · [开始使用](#开始使用) · [名字的故事](#名字的故事) · [开发与验证](#开发与验证) · [致谢](#致谢)
 
@@ -42,9 +42,12 @@
 | --- | --- | --- |
 | **GR III** | Street Edition 2.10 | `fwdc239b.bin` |
 | **GR IIIx** | 1.60 | `fwdc243b.bin` |
-| GR II / GR IV | 首批未开放 | — |
+| **GR IV** | 1.11（内部 1.11.10.7）；原厂编辑器，原生胶卷库仍在移植 | `fwdc248b.bin` |
+| **GR II** | 3.00；组件、资源与原样往返只读检查 | 修改导出未开放 |
 
-部分原厂工具目前仅支持 GR III，包括配方参数、原厂名称与图标、负片颗粒、RAW 降噪、画幅比例和水平仪。工作台按机型显示可用状态。
+GR III 工作台支持配方参数、原厂名称与图标、负片颗粒、RAW 降噪、画幅比例和水平仪等工具；GR IV 的自定义槽位编辑在独立编辑器中提供。工作台按机型显示可用状态。
+
+GR IV 使用独立编辑区，支持参考核心的自定义滤镜参数、名称与图标、裁切和关机图案；不表示 GR III 的 65 卷原生 JPEG 运行体已移植。GR II 已解析嵌套 UNITY 容器和 121 项资源，但修改后的更新校验与原生接口尚未证明。[查看两款机型的逆向证据](docs/research/gr4-gr2-port-evidence.md)。
 
 ### 使用边界
 
@@ -73,6 +76,8 @@ macOS 可通过 Homebrew 安装 LLVM：
 brew install llvm
 ```
 
+GR IV 参考编辑器还需要 LLD：`brew install lld`。导入后可在设置中查看编译、链接和 ARM ELF 预检结果。
+
 构建器会查找 Homebrew 的 LLVM；其他安装位置可用 `M10V_LLVM_CLANG` 指定 **clang 的完整路径**。
 
 ### 2. 放入官方固件
@@ -82,7 +87,9 @@ brew install llvm
 ```text
 bin/
 ├── fwdc239b-gr3-official.bin       # GR III Street Edition 2.10
-└── fwdc243b-gr3x-official.bin      # GR IIIx 1.60
+├── fwdc243b-gr3x-official.bin      # GR IIIx 1.60
+├── fwdc248b-gr4-officical.bin      # GR IV 1.11，保留现有本地文件名
+└── rg2_v003/rg2_v003.frm           # GR II 3.00
 ```
 
 部分历史测试仍读取根目录别名，可创建符号链接：
@@ -115,7 +122,7 @@ npm start
 node scripts/sync-grlife-runtime.mjs
 ```
 
-该路径需要 Python 3.12；可通过 `M10V_PYTHON` 指定解释器。GR IV 参考核心及其 Python 依赖保留在 `vendor/gr4/`，但 GR IV 不是首批开放机型。为保持源码仓库轻量，三份大体积 GR IV 校准 DNG 样片留在本机，不随 Git 分发；启用相关校准测试前，需从参考项目恢复，文件名与哈希见 `vendor/gr4/PROVENANCE.json`。各模块来源与许可见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+该路径需要 Python 3.12；可通过 `M10V_PYTHON` 指定解释器。GR IV 参考核心及其 Python 依赖保留在 `vendor/gr4/`。为保持源码仓库轻量，三份大体积 GR IV 校准 DNG 样片留在本机，不随 Git 分发；启用相关校准测试前，需从参考项目恢复，文件名与哈希见 `vendor/gr4/PROVENANCE.json`。各模块来源与许可见 [第三方说明](THIRD_PARTY_NOTICES.md)。
 
 </details>
 

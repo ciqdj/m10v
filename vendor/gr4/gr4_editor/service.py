@@ -433,6 +433,10 @@ class Editor(XmpEditorMixin):
                 patch_report = {"backend": "generic-preserve", "feature_writes": False,
                                 "limitations": ["未注册的输入布局仅保留原有裁切、关机和图标资源"]}
             elif filter_backend:
+                # Availability of the public backend does not mean it was
+                # selected. This path compiles a filter registry and has no
+                # frozen crop plan for the public crop readback checks.
+                public_backend = False
                 baseline_shutdown = validate_draft(None, read_shutdown(image))
                 if project["crops"] != project["original_crops"] or project["shutdown"] != baseline_shutdown:
                     raise ValueError("当前滤镜布局沿用公开版固件资源；裁切和关机图案请在公开版已适配输入上编辑")

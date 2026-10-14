@@ -10,14 +10,22 @@ def rebuild_resources(patch, icon_bytes, rows):
     if columns > 255:
         raise ValueError("颜色 profile 数量超过原生字节范围")
     tables = {}
+    source_columns = 34 if getattr(patch, 'official_base', False) else 37
+    if getattr(patch, 'official_base', False):
+        from .firmware import _Memory
+        native_memory = _Memory(bytes(patch.image))
+    else:
+        native_memory = None
     for family, stride, low, high in TABLES:
-        if patch.word(stride) != 0xE3A02025:
-            raise ValueError("资源重建需要规范 .27 的 37 列颜色表")
+        if patch.word(stride) != 0xE3A02000 | source_columns:
+            raise ValueError(f"资源重建需要已验证的 {source_columns} 列颜色表")
         address = _half(patch.word(low)) | _half(patch.word(high)) << 16
-        pointers = list(struct.unpack("<111I", _read(patch.image, address, 444)))
+        raw = (native_memory.read(address, 12 * source_columns) if native_memory else
+               _read(patch.image, address, 12 * source_columns))
+        pointers = list(struct.unpack(f"<{3 * source_columns}I", raw))
         tables[family] = []
         for hardware in range(3):
-            native = pointers[hardware * 37:hardware * 37 + 34]
+            native = pointers[hardware * source_columns:hardware * source_columns + 34]
             tables[family].extend(native + [native[11]] * (columns - 34))
 
     # Text 837 is the first custom name; 838/839 are the existing 5:4 and

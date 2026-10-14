@@ -13,6 +13,23 @@ from those files; it is also covered by this project's GPL-2.0-only license.
 
 See `LICENSE`. The user's official firmware is not included in this source tree.
 
+## GR IV official-input compatibility and GR II container research
+
+M10V adds an authored `vendor/gr4/gr4_editor/m10v_official_entries.py` compatibility
+module and local patches to the vendored `slots.py` and `registry_resources.py`.
+They preserve official 1.11.10.7 entry instructions and read its 34-column color
+tables through the verified startup RAM mapping, rather than assuming the older
+research image's branch wrappers and 37-column ROM tables. Original import hashes
+remain in `vendor/gr4/PROVENANCE.json`; local modifications are recorded separately.
+These changes retain GPL-2.0-only licensing.
+
+GR II's UNITY encoding facts were investigated using the public
+[gr2-boot research](https://github.com/lc2425150/ricoh-gr2-boot-screen-mod), then
+independently validated against the user's official image. Its source code was
+not copied. M10V's decoder is authored here, including nested containers and the
+independently established 512-byte resource-volume offset. See the model-port
+research report for exact input hashes and research checkout provenance.
+
 ## GRLife compatibility data and local runtime
 
 `web/gr3/film-catalog.json` contains 32 fitted film entries and camera icon pixels

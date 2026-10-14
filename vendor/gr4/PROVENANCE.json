@@ -202,5 +202,25 @@
   "excluded_roots": [
     "data",
     "gr4_editor/server.py"
-  ]
+  ],
+  "local_modifications": {
+    "gr4_editor/slots.py": {
+      "upstream_sha256": "d898edb5a7217729a81977070ac8c571685f3b6a32837fd6b64fbb7cd97491b4",
+      "local_sha256": "b469742aed47f24cc1792943a12d719045245d8477e9a41160ce42016e6bfb99",
+      "reason": "M10V official 1.11.10.7 entry continuations and 34-column startup-mapped native color tables"
+    },
+    "gr4_editor/registry_resources.py": {
+      "upstream_sha256": "09977b72b9e2b7b6cf6e91ad67c4e194668a212c57b060d3624f3b3491a9d59b",
+      "local_sha256": "c2a7fbd6905c023054a6e49d72d5434d07a8deb89d2102555c73417c0e9589f9",
+      "reason": "M10V official 1.11.10.7 entry continuations and 34-column startup-mapped native color tables"
+    },
+    "gr4_editor/service.py": {
+      "upstream_sha256": "c98536554009af5b400362ba35a293d6b248e3326e89b8945c3ea2a243031359",
+      "local_sha256": "bbfedab7db868a154ff8ea8ce2578f62566465686f28255229d18e5fc5714ac8",
+      "reason": "Use crop verification only when the public crop compiler is selected, not for native filter-registry builds"
+    }
+  },
+  "local_authored_files": {
+    "gr4_editor/m10v_official_entries.py": "ed0c31085ce278d40abc3e2bc1e8f627b5c0938691986fcf51bdd556202a5234"
+  }
 }

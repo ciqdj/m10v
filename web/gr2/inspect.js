@@ -5,7 +5,7 @@ function row(values){const tr=document.createElement('tr');for(const value of va
 async function inspect(local=false){
   if(busy)return;
   const file=$('firmware').files[0];if(!local&&!file)return;
-  busy=true;$('local').disabled=true;$('firmware').disabled=true;$('notice').textContent='正在校验固件内容…';
+  busy=true;$('report').hidden=true;$('local').disabled=true;$('firmware').disabled=true;$('notice').textContent='正在校验固件内容…';
   try{
     await ready;
     const response=await fetch(local?'/api/platform/inspect-official':'/api/platform/inspect',{
