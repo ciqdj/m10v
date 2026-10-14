@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-export const GR4_ROUTE_INVENTORY = new Set(['status', 'settings', 'import', 'project',
+export const GR4_ROUTE_INVENTORY = new Set(['status', 'settings', 'import', 'import-official', 'project',
   'project-import', 'export', 'original', 'add-filter', 'remove-filter', 'xmp', 'icon',
   'calibration-state', 'calibration-output', 'calibration/register', 'calibration/run',
   'crop-preview', 'shutdown-item', 'shutdown-image', 'shutdown-export', 'toolchain',
@@ -56,7 +56,11 @@ export async function handleGr4Request({ request, response, runtime, token, read
       return send(response, 200, bytes, 'application/octet-stream', 'fwdc248b-original.bin'), true;
     }
     if (request.method === 'POST') {
-      const body = await readBody(request, 192 * 1024 * 1024);
+      const body = await readBody(request, route === 'import-official' ? 4096 : 192 * 1024 * 1024);
+      if (route === 'import-official') {
+        if (body.length > 4096) throw new Error('local import request exceeds limit');
+        return send(response, 200, normalizedResult(await runtime.importOfficial())), true;
+      }
       if (binary.has(route)) {
         if (route === 'import') return send(response, 200,
           normalizedResult(await runtime.import(body, payload.name || 'fwdc248b.bin'))), true;
@@ -65,6 +69,7 @@ export async function handleGr4Request({ request, response, runtime, token, read
         payload.filename = payload.name || path.basename(payload.input_path);
       } else payload = { ...payload, ...JSON.parse(body.toString('utf8') || '{}') };
     }
+    if (route === 'import-official') throw new Error('local firmware import requires POST');
     if (route === 'project') payload.project_id = payload.project_id || payload.id;
     if (route === 'export') payload.project_id = payload.id;
     if (route === 'shutdown-export') payload.project_id = payload.project_id;

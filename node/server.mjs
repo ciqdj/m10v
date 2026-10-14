@@ -23,6 +23,7 @@ import { createGr4Adapter } from './adapters/gr4/index.mjs';
 import { gr2Descriptor } from './adapters/gr2/index.mjs';
 import { Gr4Runtime } from './gr4-runtime.mjs';
 import { handleGr4Request } from './gr4-routes.mjs';
+import {inspectModelFirmware,readModelOfficial} from './model-firmware.mjs';
 import { createStorePlan } from './gr3-store-plan.mjs';
 import { runGr3Runtime, runtimeAvailable } from './gr3-runtime.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
@@ -99,8 +100,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
       if (pathname === '/api/platform/adapters') return send(response, 200, {
         schema_version: 1,
         adapters: adapters.list().map((adapter) => ({ ...adapter,
-          capabilities: adapter.supported ? adapters.get(adapter.id).capabilities() : null })),
-        active_workspace: 'gr3', release_models:['gr3','gr3x'], gr4_evidence: 'reference_verified', hardware: 'not_tested',
+          capabilities: typeof adapters.get(adapter.id).capabilities==='function' ? adapters.get(adapter.id).capabilities() : null })),
+        active_workspace: 'gr3', release_models:['gr3','gr3x'], inspection_models:['gr3','gr3x','gr4','gr2'], gr4_evidence: 'reference_verified', hardware: 'not_tested',
       });
       if (pathname === '/api/status') return send(response, 200, {
         session_token: token, can_generate: true, model: 'GR III / GR IIIx', hardware: 'not_tested',
@@ -136,11 +137,11 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       const asset = staticFiles[pathname];
       if (!asset) {
-        if (['/gr3', '/gr3/', '/gr3x', '/gr3x/', '/gr4', '/gr4/'].includes(pathname)) {
+        if (['/gr2', '/gr2/', '/gr3', '/gr3/', '/gr3x', '/gr3x/', '/gr4', '/gr4/'].includes(pathname)) {
           const model = pathname.slice(1, 4);
           return send(response, 200, await readFile(path.join(web, model, 'index.html')), 'text/html; charset=utf-8');
         }
-        const match = /^\/(gr3|gr4|shared)\/([a-zA-Z0-9_./-]+)$/.exec(pathname);
+        const match = /^\/(gr2|gr3|gr4|shared)\/([a-zA-Z0-9_./-]+)$/.exec(pathname);
         if (match && !match[2].includes('..')) {
           const target = path.resolve(web, match[1], match[2]);
           const base = path.resolve(web, match[1]);
@@ -167,7 +168,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const haloMatch = /^\/api\/projects\/([0-9a-f]{64})\/800t\/(prepare|build)$/.exec(pathname);
     const editMatch = /^\/api\/projects\/([0-9a-f]{64})\/edit\/(prepare|build)$/.exec(pathname);
     if (!['/api/import', '/api/backup/inspect', '/api/backup/restore', '/api/gr3/film/fit',
-      '/api/gr3/film-bay/pack','/api/gr3/native-library/import-official'].includes(pathname) &&
+      '/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
       !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch)
       return send(response, 404, { error: 'not found' });
     if (request.headers['x-m10v-token'] !== token ||
@@ -175,9 +176,14 @@ export function createServer(store = new Store(path.join(root, 'data')),
       return send(response, 403, { error: 'authorization failed' });
     try {
       const body = await readBody(request, pathname === '/api/gr3/film-bay/pack' ? 2048 :
+        pathname === '/api/platform/inspect-official' ? 4096 :
         pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
         nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
         sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
+      if(pathname==='/api/platform/inspect'||pathname==='/api/platform/inspect-official'){
+        const bytes=pathname==='/api/platform/inspect'?body:await readModelOfficial(JSON.parse(body.toString('utf8')).model);
+        return send(response,200,await inspectModelFirmware(bytes));
+      }
       if(pathname === '/api/gr3/native-library/import-official') {
         const original=await readNativeOfficial(JSON.parse(body.toString('utf8')).model||'gr3'),record=await store.importOfficial(original);
         return send(response,200,{project_id:record.id,source_sha256:record.sha256});

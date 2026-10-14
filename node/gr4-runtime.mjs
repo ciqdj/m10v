@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createGr4Client } from './adapters/gr4/client.mjs';
+import {readModelOfficial} from './model-firmware.mjs';
 
 const ID = /^[a-z0-9_-]{1,90}$/i;
 const SHA = /^[0-9a-f]{64}$/;
@@ -13,6 +14,7 @@ export class Gr4Runtime {
     this.client = client;
   }
   async ensure() { await mkdir(path.join(this.root, 'inputs'), { recursive: true }); }
+  async importOfficial() { return this.import(await readModelOfficial('gr4'), 'fwdc248b.bin'); }
   checkId(value) { if (!ID.test(value || '')) throw new Error('invalid GR IV identifier'); return value; }
   async import(bytes, filename = 'fwdc248b.bin') {
     if (!Buffer.isBuffer(bytes)) throw new Error('firmware input must be bytes');

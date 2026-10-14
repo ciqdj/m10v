@@ -633,6 +633,9 @@ function render() {
   if (state.history) renderHistory();
 }
 $("import-firmware").onclick = () => { $("firmware-file").value = ""; $("firmware-file").click(); };
+$("import-official").onclick = () => operation("读取本地官方样本…", async () => {
+  acceptProject(await request("/api/gr4/import-official", {}), null);
+});
 $("firmware-file").onchange = () => operation("导入固件…", async () => {
   const file = $("firmware-file").files[0]; if (!file) return;
   await saveDraft();

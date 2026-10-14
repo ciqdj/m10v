@@ -29,6 +29,8 @@ export function createGr4Adapter(options = {}) {
     detect: headerInspection,
     inspect: (context) => client.request('inspect', { input_path: context.inputPath }, context.workspace),
     capabilities: () => ({
+      native_film_library: { status: 'not_ported', can_build: false },
+      filters: { status: 'reference_verified', can_edit: true, max_custom_slots: 16 },
       crop: { status: 'reference_verified', can_edit: true, can_preview: true },
       shutdown: { status: 'reference_verified', can_edit: true, fits: ['contain', 'cover'], max_items: 16 },
       build: { status: 'reference_verified', can_build: true, output: 'fwdc248b.bin',
