@@ -21,6 +21,23 @@ RTOS 为 20,785,856 字节，SHA-256 `a9a9a51530c35819df47dee1cce9f4f560a17eeed1
 
 参考核心已有的菜单证据：列表地址由 `0x533cc78c/0x533cc794` 的 MOVW/MOVT 给出，数量字段在 `0x533cc7a4`；其他数量指令在 `0x533cc8c8`、`0x533bebf0`、`0x53375628`。名称与图标查询入口分别为 `0x5337f824`、`0x53380fac`；色彩 profile 查询入口 `0x53912cf4`，色彩表入口见 `vendor/gr4/gr4_editor/filter_reader.py`。这些是原厂/参考槽位编辑基础，不等于 M10V 原生 65 卷目录已接入。
 
+### 拍摄缓冲 CPU 执行证据
+
+```sh
+.venv/bin/python scripts/analyze_gr4_capture.py --rtos data/research/gr4/RTOS.bin --out data/research/gr4/capture-allocation.json
+.venv/bin/python -m unittest tests.test_gr4_capture
+```
+
+从构造函数的 PC 相对常量确认 recipe 虚表为 `0x53f85050`；虚表第 43 项是分配入口 `0x5370e804`。对官方构造片段 `0x5370ff7c..0x53710084` 与该分配函数执行 Unicorn 检查。Geometry 服务 manager/accessor 及其虚方法被拦截，返回合成的 160×120 缩略尺寸；其余分配算术与描述符写入执行官方 CPU 指令。
+
+主描述符位于 `recipe+0xb0`，format=1，enum 字节=2；模拟 6256×4176/stride6288 和 3120×2088/stride3136 均正确返回。描述符尾部三个 padding 字节没有初始化，保留 A5 哨兵；不能像读取 enumWord 一样将其当成四字节固定值。
+
+两个模拟尺寸下主 Y/C 地址间额外间隔分别为 **905,536 / 451,648 字节**。分配器 `0x5370e928..0x5370e944` 等指令加入 9×16×stride 的工作区，再进行对齐；不是只加固定 64 字节。若据 GR3 参数猜测 GR4 内存布局，会把工作区错误地当成图像平面或产生越界。
+
+拍摄链调用点为 `0x537035c8`，原始 BL 目标 `0x538dd430`。附近的 request 辅助结构偏移由 GR3 的 0x89f8 变为 0x89fc；GR4 的 recipe planner 也不再能通过 GR3 的原始指令序列找到相同入口。因此本证据尚不足以接入 JPEG 运行体；模式准入、完整 request/RAW 生命周期、时钟和持久化需分别追踪。
+
+可定位的候选辅助函数包括 allocator/free `0x538e09b0/0x538e09ec`、cache `0x53a95804`、model root `0x5323ea84` 和 clock `0x533a2584`。这些候选来自正规化指令匹配，尚未验证完整调用契约，不能作为可写 profile 使用。
+
 ## GR II 容器与资源
 
 官方输入 SHA-256：`3643850f2ae74ae967eb336794048f554caa1b11d05b8569824d5719f1838331`，14,033,920 字节。UNITY 魔数位于零偏移，总长度和记录数分别为大端字段 `0x20/0x24`。2048 字节容器头中，从 `0x40` 开始每个记录 64 字节：起点以 512 字节块计，长度为字节数，名称占 12 字节，类型/编码字段在记录 `+30/+31`。
