@@ -1,6 +1,6 @@
-# Ubuntu 24.04 + 宝塔 · m10v.izhaoo.com
+# 宝塔部署 · m10v.izhaoo.com
 
-这是部署模板与操作指南，尚未连接或修改你的阿里云服务器。建议宝塔管理 Nginx／证书，systemd 守护 Node；也可使用宝塔 Node 项目或附带的 PM2 模板。两种进程管理方式任选一种，不要重复启动同一端口。
+支持 Ubuntu 24.04 和 Alibaba Cloud Linux 3。宝塔管理 Nginx／证书，systemd 守护 Node；也可使用宝塔 Node 项目或附带的 PM2 模板。两种进程管理方式任选一种，不要重复启动同一端口。先用 `cat /etc/os-release` 核对实际系统。
 
 ## 1. 域名与网络
 
@@ -10,12 +10,23 @@
 
 ## 2. 安装与下载
 
-在宝塔软件商店安装 Nginx、Node.js 版本管理器，选择 Node 24 LTS，并将它设为命令行版本。终端执行以下命令（需要管理员权限）：
+在宝塔软件商店安装 Nginx，使用 Node.js 版本管理器或已有 PM2 管理器安装 Node 24 LTS，并将它设为命令行版本。这两个管理器互斥，不要为此卸载已有的管理器。终端执行以下命令（需要管理员权限）：
 
 ```bash
 node -v
 sudo apt update
 sudo apt install -y git python3 python3-venv clang build-essential
+```
+
+Alibaba Cloud Linux 3 使用官方系统源安装编译工具；在宝塔软件商店安装「python环境管理器」，再安装 Python 3.12，保留系统 Python：
+
+```bash
+sudo dnf install -y git clang llvm
+```
+
+下载项目，再创建独立虚拟环境。Ubuntu 可以直接使用 `python3`；宝塔 Python 环境使用管理器显示的解释器绝对路径替换它：
+
+```bash
 sudo git clone --branch main https://github.com/zhaoo/m10v.git /www/wwwroot/m10v
 cd /www/wwwroot/m10v
 python3 -m venv .venv
@@ -106,7 +117,9 @@ M10V_LLVM_CLANG=/usr/bin/clang node scripts/export_gr3_m10v_native.mjs builds/se
 M10V_LLVM_CLANG=/usr/bin/clang node scripts/export_gr3_m10v_native.mjs builds/server-gr3x-test --model=gr3x
 ```
 
-本地验证覆盖了公网 Host／Origin 模拟、令牌校验与原有导出路径；尚未验证你的 Ubuntu 编译器、宝塔配置、TLS 或真实云服务器。修改固件的相机刷入和成像仍需实机验收。
+2026-10-14 已在 Alibaba Cloud Linux 3、Node 24、Python 3.12、LLVM 15 环境生成 GR III／GR IIIx 候选，并验证 www 服务用户可构建。柔光的二次幂采样使用位移，避免旧版 LLVM 引入相机中不存在的 ARM 除法辅助函数。修改固件的相机刷入和成像仍需实机验收。
+
+如果宝塔的暂停代理规则生成空配置，先备份该站点的代理文件，再使用 `nginx-location.conf` 补齐。执行 `nginx -t` 确认通过后才重载，并在宝塔核对代理状态。保留原有证书、ACME 验证目录和其他站点的配置。
 
 ## 6. 更新
 
