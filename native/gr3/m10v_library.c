@@ -1,0 +1,348 @@
+/* Original M10V runtime. Existing simulation tables are embedded losslessly
+ * with their source notices; no third-party camera runtime or signed film
+ * package is loaded. Camera services have separately verified ABI boundaries. */
+#include "m10v_library.h"
+#include "halation_core.h"
+#include <stddef.h>
+#include "m10v_legacy_data.h"
+
+typedef struct {
+    char name[24];
+    int16_t contrast, saturation, turn;
+    int8_t lift, bend, cb, cr;
+} film;
+
+/* Original M10V looks, specified in a software Y/CbCr color domain.
+ * Names describe these looks; they do not claim a measured film-stock match. */
+static const film films[33] = {
+    {"M10V Neutral",256,256,0,0,0,0,0},
+    {"Amber Day",268,264,0,2,5,-8,10},
+    {"Cool Dusk",252,238,0,4,-2,12,-5},
+    {"Warm Fade",232,224,0,12,4,-6,8},
+    {"Deep Street",294,244,0,-3,-4,3,1},
+    {"Soft Portrait",238,226,0,8,6,-3,5},
+    {"Ocean Blue",264,272,-8,0,3,10,-6},
+    {"Autumn Copper",270,248,12,2,4,-10,12},
+    {"Muted Olive",242,202,-12,8,1,-5,-3},
+    {"Clear Morning",252,250,0,5,8,1,2},
+    {"Night Cyan",286,236,-4,-2,-3,10,-3},
+    {"Sunset Rose",254,258,8,4,5,-3,12},
+    {"Bleached Noon",278,164,0,5,-2,-2,3},
+    {"Pastel Sky",222,218,0,13,9,4,0},
+    {"Dense Color",290,302,0,-1,1,0,0},
+    {"Earth Tone",264,224,6,6,0,-8,5},
+    {"Silver Mono",270,0,0,1,1,0,0},
+    {"Soft Mono",222,0,0,12,6,0,0},
+    {"Hard Mono",316,0,0,-5,-2,0,0},
+    {"Warm Mono",252,0,0,6,3,-4,5},
+    {"Cold Mono",266,0,0,3,-1,6,-3},
+    {"Green Glass",256,246,-10,4,2,-6,-6},
+    {"Lilac Haze",234,222,8,10,6,7,5},
+    {"Desert Light",274,236,0,8,8,-10,5},
+    {"Urban Steel",272,208,-3,2,-4,8,-4},
+    {"Spring Leaf",246,280,-8,7,4,-3,-3},
+    {"Red Brick",276,270,9,0,1,-5,10},
+    {"Paper White",236,180,0,14,8,0,0},
+    {"Blue Hour",268,216,-6,5,-2,14,-7},
+    {"Golden Shade",244,242,4,10,4,-9,8},
+    {"Low Key Color",304,250,0,-6,-4,2,3},
+    {"High Key Color",230,230,0,17,10,-2,3},
+    {"800T",276,274,-6,2,4,7,-4}
+};
+
+static uint32_t checksum(const m10v_library_state *state) {
+    const uint8_t *bytes = (const uint8_t *)state;
+    uint32_t crc = 0xffffffffu;
+    for (uint32_t i = 0; i < offsetof(m10v_library_state, crc); ++i) {
+        crc ^= bytes[i];
+        for (uint32_t bit = 0; bit < 8; ++bit)
+            crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
+    }
+    return ~crc;
+}
+static void copy_state(m10v_library_state *dst, const m10v_library_state *src) {
+    for (uint32_t i = 0; i < sizeof(*src); ++i)
+        ((uint8_t *)dst)[i] = ((const uint8_t *)src)[i];
+}
+void m10v_library_init(m10v_library_state *state) {
+    if (!state) return;
+    for (uint32_t i = 0; i < sizeof(*state); ++i) ((uint8_t *)state)[i] = 0;
+#ifdef M10V_INITIAL_STATE_BYTES
+    static const uint8_t initial[64] = {M10V_INITIAL_STATE_BYTES};
+    for (uint32_t i = 0; i < sizeof(*state); ++i) ((uint8_t *)state)[i] = initial[i];
+#else
+    state->magic = 0x5630314du; state->version = 2; state->size = sizeof(*state);
+    for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) {
+        state->slots[i].film = (uint16_t)(i == 4 ? 33 : i + 1);
+        state->slots[i].halo_gain=3; state->slots[i].halo_spread=3;
+        state->slots[i].halo_threshold=5; state->slots[i].halo_profile=2;
+    }
+    state->crc = checksum(state);
+#endif
+}
+int m10v_library_valid(const m10v_library_state *state) {
+    if (!state || state->magic != 0x5630314du || state->version != 2 ||
+        state->size != sizeof(*state) || state->reserved || state->stamp > 2 ||
+        state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
+    for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
+        if (!state->slots[i].film || state->slots[i].film > M10V_FILM_COUNT ||
+            state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
+            state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
+    return 1;
+}
+const char *m10v_library_name(uint32_t id) {
+    return !id || id>M10V_FILM_COUNT ? (const char *)0 : id<=33 ? films[id-1].name : legacy_records[id-34].name;
+}
+static int commit(m10v_library_state *state, m10v_library_state *next,
+                  m10v_library_store store, void *context) {
+    if (!store || state->sequence == 0xffffffffu) return M10V_LIBRARY_INVALID;
+    next->sequence = state->sequence + 1; next->crc = checksum(next);
+    if (store(context, next) != 0) return M10V_LIBRARY_STORE_FAILED;
+    copy_state(state, next); return M10V_LIBRARY_OK;
+}
+int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
+                        m10v_library_store store, void *context) {
+    if (!m10v_library_valid(state) || slot >= M10V_SLOT_COUNT || !id || id > M10V_FILM_COUNT)
+        return M10V_LIBRARY_INVALID;
+    m10v_library_state next; copy_state(&next, state); next.slots[slot].film = (uint16_t)id;
+    return commit(state, &next, store, context);
+}
+int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grain, uint32_t soft,
+                         m10v_library_store store, void *context) {
+    if (!m10v_library_valid(state) || slot >= M10V_SLOT_COUNT || grain > 3 || soft > 3)
+        return M10V_LIBRARY_INVALID;
+    m10v_library_state next; copy_state(&next, state);
+    next.slots[slot].grain = (uint8_t)grain; next.slots[slot].soft = (uint8_t)soft;
+    return commit(state, &next, store, context);
+}
+int m10v_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t profile,m10v_library_store store,void *context) {
+    if(!m10v_library_valid(state)||slot>=5||gain>8||spread>8||threshold>8||profile>3)return M10V_LIBRARY_INVALID;
+    m10v_library_state next;copy_state(&next,state);
+    next.slots[slot].halo_gain=(uint8_t)gain;next.slots[slot].halo_spread=(uint8_t)spread;
+    next.slots[slot].halo_threshold=(uint8_t)threshold;next.slots[slot].halo_profile=(uint8_t)profile;
+    return commit(state,&next,store,context);
+}
+int m10v_library_stamp(m10v_library_state *state, uint32_t enabled, uint32_t format,
+                       uint32_t corner, uint32_t color, m10v_library_store store, void *context) {
+    if (!m10v_library_valid(state) || enabled > 2 || format > 3 || corner > 3 || color > 3)
+        return M10V_LIBRARY_INVALID;
+    m10v_library_state next; copy_state(&next, state);
+    next.stamp = (uint8_t)enabled; next.format = (uint8_t)format;
+    next.corner = (uint8_t)corner; next.color = (uint8_t)color;
+    return commit(state, &next, store, context);
+}
+static uint8_t clamp(int value) { return (uint8_t)(value < 0 ? 0 : value > 255 ? 255 : value); }
+static int overlap(const void *a, uint32_t an, const void *b, uint32_t bn) {
+    uintptr_t x = (uintptr_t)a, z = (uintptr_t)b;
+    return x <= UINTPTR_MAX - an && z <= UINTPTR_MAX - bn && x < z + bn && z < x + an;
+}
+static int date_valid(const m10v_library_date *date) {
+    static const uint8_t days[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    if (!date || date->year < 1980 || date->year > 2199 || !date->month || date->month > 12 ||
+        !date->day || date->hour > 23 || date->minute > 59) return 0;
+    uint32_t max = days[date->month - 1];
+    if (date->month == 2 && date->year % 4 == 0 && (date->year % 100 != 0 || date->year % 400 == 0)) ++max;
+    return date->day <= max;
+}
+static void digits(char *dst, uint32_t value, uint32_t count) {
+    while (count) { --count; dst[count] = (char)('0' + value % 10); value /= 10; }
+}
+static uint32_t date_text(char *text, const m10v_library_date *date, uint32_t format, uint32_t mode) {
+    uint32_t n = format == 3 ? 8 : 10;
+    if (format == 1) { digits(text, date->day, 2); text[2] = '.'; digits(text + 3, date->month, 2);
+        text[5] = '.'; digits(text + 6, date->year, 4); }
+    else { uint32_t y = format == 3 ? 2 : 4; digits(text, date->year, y);
+        text[y] = format == 2 ? '-' : '.'; digits(text + y + 1, date->month, 2);
+        text[y + 3] = text[y]; digits(text + y + 4, date->day, 2); }
+    if (mode == 2) { text[n++] = ' '; digits(text + n, date->hour, 2); n += 2;
+        text[n++] = ':'; digits(text + n, date->minute, 2); n += 2; }
+    return n;
+}
+/* Original five-by-seven bitmap glyphs for decimal date/time notation. */
+static const uint8_t glyphs[10][7] = {
+    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
+    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
+    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
+    {14,17,17,15,1,1,14}
+};
+static uint32_t glyph(char c, uint32_t row) {
+    if (c >= '0' && c <= '9') return glyphs[c - '0'][row];
+    if (c == '.') return row == 6 ? 4u : 0u;
+    if (c == '-') return row == 3 ? 14u : 0u;
+    if (c == ':') return row == 2 || row == 4 ? 4u : 0u;
+    return 0;
+}
+static void stamp(m10v_library_image *image, const m10v_library_state *state,
+                   const m10v_library_date *date) {
+    char text[24]; uint32_t count = date_text(text, date, state->format, state->stamp);
+    uint32_t scale = image->width / 1200u; if (!scale) scale = 1;
+    uint32_t tw = count * 6 * scale, th = 8 * scale;
+    uint32_t margin = image->width / 100 + 2;
+    if (tw + margin * 2 >= image->width || th + margin * 2 >= image->height) return;
+    uint32_t left = (state->corner & 1) ? image->width - margin - tw : margin;
+    uint32_t top = (state->corner & 2) ? image->height - margin - th : margin;
+    static const uint8_t colors[4][3] = {{235,128,128},{180,80,185},{82,90,240},{210,16,146}};
+    for (uint32_t pass = 0; pass < 2; ++pass)
+        for (uint32_t i = 0; i < count; ++i)
+            for (uint32_t row = 0; row < 7; ++row)
+                for (uint32_t col = 0; col < 5; ++col) {
+                    if (!(glyph(text[i], row) & (1u << (4 - col)))) continue;
+                    for (uint32_t dy = 0; dy < scale; ++dy) for (uint32_t dx = 0; dx < scale; ++dx) {
+                        uint32_t x = left + (i * 6 + col) * scale + dx + (pass ? 0 : scale);
+                        uint32_t y = top + row * scale + dy + (pass ? 0 : scale);
+                        image->y[y * image->stride + x] = pass ? colors[state->color][0] : 16;
+                        uint32_t at = y * image->stride + (x & ~1u);
+                        image->chroma[at] = pass ? colors[state->color][1] : 128;
+                        image->chroma[at + 1] = pass ? colors[state->color][2] : 128;
+                    }
+                }
+}
+/* Existing tables are decoded exactly; RGB evaluation is an explicitly new
+ * saved-JPEG path, not a claim that it reproduces the stock ISP pixel-for-pixel. */
+int m10v_library_tables(uint32_t id,int16_t *matrix,int16_t *post,uint16_t *curves,uint16_t *knots){
+    if(id<34||id>65||!matrix||!post||!curves||!knots)return -1;
+    const m10v_legacy_record *record=&legacy_records[id-34];
+    uint32_t at=record->offset,end=at+record->size;
+    if(end>sizeof(legacy_bytes))return -1;
+    for(uint32_t i=0;i<9;++i){matrix[i]=record->matrix[i];post[i]=record->post[i];}
+    for(uint32_t bank=0;bank<2;++bank)for(uint32_t channel=0;channel<3;++channel){
+        uint32_t value=0,count=bank?33:256;
+        for(uint32_t i=0;i<count;++i){
+            if(at>=end)return -1;uint32_t byte=legacy_bytes[at++],delta=byte&127;
+            if(byte&128){if(at>=end||legacy_bytes[at]&128)return -1;delta|=(uint32_t)legacy_bytes[at++]<<7;}
+            value+=delta;if(value>16383)return -1;
+            if(bank)knots[channel*33+i]=(uint16_t)value;else curves[channel*256+i]=(uint16_t)value;
+        }
+    }
+    return at==end?0:-1;
+}
+static int rounded(int value,uint32_t shift){
+    int half=1<<(shift-1);return value>=0?(value+half)>>shift:-((-value+half)>>shift);
+}
+static int curve14(const uint16_t *curve,int input){
+    if(input<=0)return curve[0];if(input>=255*8192)return curve[255];
+    uint32_t index=(uint32_t)input>>13,fraction=(uint32_t)input&8191;
+    return curve[index]+rounded((int)(curve[index+1]-curve[index])*(int)fraction,13);
+}
+static void legacy_rgb(uint8_t y,uint8_t cb,uint8_t cr,const int16_t *m,const int16_t *p,const uint16_t *curves,int *out){
+    int u=(int)cb-128,v=(int)cr-128;
+    int rgb[3]={clamp((int)y+rounded(91881*v,16)),clamp((int)y-rounded(22554*u+46802*v,16)),clamp((int)y+rounded(116130*u,16))};
+    int mapped[3];
+    for(uint32_t row=0;row<3;++row)mapped[row]=curve14(curves+256*row,rgb[0]*m[row*3]+rgb[1]*m[row*3+1]+rgb[2]*m[row*3+2]);
+    for(uint32_t row=0;row<3;++row){
+        int color=rounded(mapped[0]*p[row*3]+mapped[1]*p[row*3+1]+mapped[2]*p[row*3+2],9);
+        if(color<0)color=0;if(color>16383)color=16383;out[row]=(color*255+8191)/16383;
+    }
+}
+static int legacy_color(m10v_library_image *image,uint32_t id){
+    int16_t matrix[9],post[9];uint16_t curves[768],knots[99];
+    if(m10v_library_tables(id,matrix,post,curves,knots))return -1;
+    for(uint32_t row=0;row<image->height;++row)for(uint32_t x=0;x<image->width;x+=2){
+        uint32_t at=row*image->stride+x;int a[3],b[3];
+        uint8_t cb=image->chroma[at],cr=image->chroma[at+1];
+        legacy_rgb(image->y[at],cb,cr,matrix,post,curves,a);legacy_rgb(image->y[at+1],cb,cr,matrix,post,curves,b);
+        image->y[at]=clamp(rounded(19595*a[0]+38470*a[1]+7471*a[2],16));
+        image->y[at+1]=clamp(rounded(19595*b[0]+38470*b[1]+7471*b[2],16));
+        int r=a[0]+b[0],g=a[1]+b[1],blue=a[2]+b[2];
+        image->chroma[at]=clamp(128+rounded(-11059*r-21709*g+32768*blue,17));
+        image->chroma[at+1]=clamp(128+rounded(32768*r-27439*g-5329*blue,17));
+    }
+    return 0;
+}
+
+int m10v_library_render(m10v_library_image *image, const m10v_library_state *state,
+                        uint32_t slot, const m10v_library_date *date, uint32_t seed,
+                        uint8_t *scratch, uint32_t scratch_bytes) {
+    if (!image || !m10v_library_valid(state) || slot >= M10V_SLOT_COUNT ||
+        !image->y || !image->chroma || image->width < 2 || image->width > 6144 ||
+        (image->width & 1) || !image->height || image->height > 4096 ||
+        image->stride < image->width || image->stride > 16384 || (image->stride & 1))
+        return M10V_LIBRARY_INVALID;
+    uint32_t bytes = image->stride * image->height;
+    if (bytes > image->y_bytes || bytes > image->chroma_bytes ||
+        (uintptr_t)image->y > UINTPTR_MAX - bytes || (uintptr_t)image->chroma > UINTPTR_MAX - bytes ||
+        overlap(image->y, bytes, image->chroma, bytes) ||
+        overlap(image->y, bytes, state, sizeof(*state)) || overlap(image->chroma, bytes, state, sizeof(*state)) ||
+        overlap(image->y, bytes, image, sizeof(*image)) || overlap(image->chroma, bytes, image, sizeof(*image)) ||
+        (state->stamp && (!date_valid(date) || overlap(image->y, bytes, date, sizeof(*date)) ||
+          overlap(image->chroma, bytes, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
+    const m10v_slot *choice = &state->slots[slot];
+    uint32_t step = 1, gw = image->width, gh = image->height;
+    while (gw > 384 || gh > 256) { step <<= 1; gw = (image->width + step - 1) / step; gh = (image->height + step - 1) / step; }
+    uint32_t cells = gw * gh;
+    uint32_t use_halo = choice->film == 33 && choice->halo_profile && choice->halo_gain;
+    uint32_t needed = ((use_halo ? 6 : 2) * cells + 3) & ~3u;
+    if ((choice->soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
+        (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
+        overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
+        overlap(scratch, needed, image, sizeof(*image)) ||
+        (state->stamp && overlap(scratch, needed, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
+    if (use_halo) {
+        m10v_halo_image preflight = {image->y,image->chroma,image->y_bytes,image->chroma_bytes,
+            image->width,image->height,image->stride,image->stride,M10V_CBCR422};
+        if (m10v_halation(&preflight,0,0,0)) return M10V_LIBRARY_INVALID;
+        if ((uintptr_t)scratch > UINTPTR_MAX-scratch_bytes ||
+            overlap(scratch,scratch_bytes,image->y,image->y_bytes) ||
+            overlap(scratch,scratch_bytes,image->chroma,image->chroma_bytes) ||
+            overlap(scratch,scratch_bytes,state,sizeof(*state)) ||
+            overlap(scratch,scratch_bytes,image,sizeof(*image)) ||
+            (state->stamp && overlap(scratch,scratch_bytes,date,sizeof(*date)))) return M10V_LIBRARY_INVALID;
+    }
+    if(choice->film>33){if(legacy_color(image,choice->film))return M10V_LIBRARY_INVALID;}
+    else {
+    const film *look = &films[choice->film - 1];
+    uint8_t curve[256];
+    for (int v = 0; v < 256; ++v) curve[v] = clamp(128 + ((v - 128) * look->contrast) / 256 +
+        (look->lift * (255 - v)) / 255 + (look->bend * v * (255 - v)) / 16384);
+    for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; x += 2) {
+        uint32_t at = row * image->stride + x;
+        int light = (image->y[at] + image->y[at + 1]) / 2;
+        int weight = 255 - (light > 127 ? 2 * light - 255 : 255 - 2 * light);
+        int cb = image->chroma[at] - 128, cr = image->chroma[at + 1] - 128;
+        image->chroma[at] = clamp(128 + (cb * look->saturation + cr * look->turn) / 256 + look->cb * weight / 255);
+        image->chroma[at + 1] = clamp(128 + (cr * look->saturation - cb * look->turn) / 256 + look->cr * weight / 255);
+        image->y[at] = curve[image->y[at]]; image->y[at + 1] = curve[image->y[at + 1]];
+    }
+    }
+    if (use_halo) {
+        m10v_halo_image halo = {image->y,image->chroma,image->y_bytes,image->chroma_bytes,
+            image->width,image->height,image->stride,image->stride,M10V_CBCR422};
+        static const uint8_t profiles[4]={0,1,3,6};
+        uint32_t control=0x80000000u|choice->halo_gain|((uint32_t)choice->halo_spread<<4)|
+            ((uint32_t)choice->halo_threshold<<8)|((uint32_t)profiles[choice->halo_profile]<<16);
+        if (m10v_halation(&halo,control,scratch,scratch_bytes)) return M10V_LIBRARY_INVALID;
+    }
+    if (choice->soft) {
+        uint8_t *temp = scratch + cells;
+        for (uint32_t i = 0; i < cells; ++i) scratch[i] = 0;
+        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
+            uint8_t v = image->y[row * image->stride + x]; uint32_t at = (row / step) * gw + x / step;
+            v = v > 192 ? (uint8_t)(v - 192) : 0; if (v > scratch[at]) scratch[at] = v;
+        }
+        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
+            uint32_t total = 0;
+            for (int dx = -2; dx <= 2; ++dx) { int xx = (int)x + dx; if (xx >= 0 && xx < (int)gw) total += scratch[y * gw + (uint32_t)xx]; }
+            temp[y * gw + x] = (uint8_t)(total / 5);
+        }
+        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
+            uint32_t total = 0;
+            for (int dy = -2; dy <= 2; ++dy) { int yy = (int)y + dy; if (yy >= 0 && yy < (int)gh) total += temp[(uint32_t)yy * gw + x]; }
+            scratch[y * gw + x] = (uint8_t)(total / 5);
+        }
+        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
+            uint32_t at = row * image->stride + x; uint32_t v = image->y[at];
+            uint32_t bloom = scratch[(row / step) * gw + x / step];
+            image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
+        }
+    }
+    if (choice->grain) for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
+        uint32_t h = seed ^ ((x >> 1) * 0x9e3779b9u) ^ ((row >> 1) * 0x85ebca6bu);
+        h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15;
+        int noise = ((int)(h & 15) - (int)((h >> 4) & 15)) * (int)choice->grain * 3;
+        uint32_t at = row * image->stride + x; int v = image->y[at];
+        int weight = v < 128 ? v : 255 - v;
+        image->y[at] = clamp(v + noise * weight / (16 * 128));
+    }
+    if (state->stamp) stamp(image, state, date);
+    return M10V_LIBRARY_OK;
+}

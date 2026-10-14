@@ -1,0 +1,371 @@
+{
+  "schema": "m10v-gr3-800t-timestamp-hooks/v1",
+  "rtos_sha256": "8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67",
+  "patches": [
+    {
+      "offset": 68816,
+      "expected_hex": "74438055",
+      "replacement_hex": "80438055"
+    },
+    {
+      "offset": 1561340,
+      "expected_hex": "490a00eb",
+      "replacement_hex": "29323deb"
+    },
+    {
+      "offset": 1571880,
+      "expected_hex": "3b3100e3",
+      "replacement_hex": "671b3dea"
+    },
+    {
+      "offset": 1574236,
+      "expected_hex": "bc0301e3",
+      "replacement_hex": "200401e3"
+    },
+    {
+      "offset": 1741764,
+      "expected_hex": "e130a0e3",
+      "replacement_hex": "e630a0e3"
+    },
+    {
+      "offset": 1741776,
+      "expected_hex": "e44394e5",
+      "replacement_hex": "ec4394e5"
+    },
+    {
+      "offset": 1743456,
+      "expected_hex": "e13fa0e3",
+      "replacement_hex": "e63fa0e3"
+    },
+    {
+      "offset": 1743516,
+      "expected_hex": "e16f86e2",
+      "replacement_hex": "e66f86e2"
+    },
+    {
+      "offset": 1743532,
+      "expected_hex": "5c311615",
+      "replacement_hex": "70311615"
+    },
+    {
+      "offset": 1743536,
+      "expected_hex": "5c311605",
+      "replacement_hex": "70311605"
+    },
+    {
+      "offset": 1744452,
+      "expected_hex": "e14f84e2",
+      "replacement_hex": "e64f84e2"
+    },
+    {
+      "offset": 1744468,
+      "expected_hex": "5c311415",
+      "replacement_hex": "70311415"
+    },
+    {
+      "offset": 1744472,
+      "expected_hex": "5c311405",
+      "replacement_hex": "70311405"
+    },
+    {
+      "offset": 1744544,
+      "expected_hex": "3c4084e2",
+      "replacement_hex": "8c4084e2"
+    },
+    {
+      "offset": 1744552,
+      "expected_hex": "e14f44e2",
+      "replacement_hex": "e64f44e2"
+    },
+    {
+      "offset": 1744568,
+      "expected_hex": "80339415",
+      "replacement_hex": "94339415"
+    },
+    {
+      "offset": 1744572,
+      "expected_hex": "80339405",
+      "replacement_hex": "94339405"
+    },
+    {
+      "offset": 1744664,
+      "expected_hex": "c20100e3",
+      "replacement_hex": "cc0100e3"
+    },
+    {
+      "offset": 1744844,
+      "expected_hex": "e12fa0e3",
+      "replacement_hex": "e62fa0e3"
+    },
+    {
+      "offset": 1745108,
+      "expected_hex": "e18f88e2",
+      "replacement_hex": "e68f88e2"
+    },
+    {
+      "offset": 1745248,
+      "expected_hex": "e11fa0e3",
+      "replacement_hex": "e61fa0e3"
+    },
+    {
+      "offset": 1745300,
+      "expected_hex": "e11fa0e3",
+      "replacement_hex": "e61fa0e3"
+    },
+    {
+      "offset": 1745552,
+      "expected_hex": "e12fa0e3",
+      "replacement_hex": "e62fa0e3"
+    },
+    {
+      "offset": 1745672,
+      "expected_hex": "e12fa0e3",
+      "replacement_hex": "e62fa0e3"
+    },
+    {
+      "offset": 1745948,
+      "expected_hex": "e14fa0e3",
+      "replacement_hex": "e64fa0e3"
+    },
+    {
+      "offset": 1746272,
+      "expected_hex": "e14fa0e3",
+      "replacement_hex": "e64fa0e3"
+    },
+    {
+      "offset": 1746296,
+      "expected_hex": "b03594e5",
+      "replacement_hex": "c43594e5"
+    },
+    {
+      "offset": 1746300,
+      "expected_hex": "e14f84e2",
+      "replacement_hex": "e64f84e2"
+    },
+    {
+      "offset": 1746488,
+      "expected_hex": "e14fa0e3",
+      "replacement_hex": "e64fa0e3"
+    },
+    {
+      "offset": 1746508,
+      "expected_hex": "583114e5",
+      "replacement_hex": "6c3114e5"
+    },
+    {
+      "offset": 1746512,
+      "expected_hex": "e14f44e2",
+      "replacement_hex": "e64f44e2"
+    },
+    {
+      "offset": 1746728,
+      "expected_hex": "e11fa0e3",
+      "replacement_hex": "e61fa0e3"
+    },
+    {
+      "offset": 1746928,
+      "expected_hex": "e13fa0e3",
+      "replacement_hex": "e63fa0e3"
+    },
+    {
+      "offset": 1747332,
+      "expected_hex": "e13fa0e3",
+      "replacement_hex": "e63fa0e3"
+    },
+    {
+      "offset": 1747380,
+      "expected_hex": "e11fa0e3",
+      "replacement_hex": "e61fa0e3"
+    },
+    {
+      "offset": 1749104,
+      "expected_hex": "e12fa0e3",
+      "replacement_hex": "e62fa0e3"
+    },
+    {
+      "offset": 1749136,
+      "expected_hex": "c22100e3",
+      "replacement_hex": "cc2100e3"
+    },
+    {
+      "offset": 1749440,
+      "expected_hex": "6fa084e2",
+      "replacement_hex": "71a084e2"
+    },
+    {
+      "offset": 1749472,
+      "expected_hex": "953f83e2",
+      "replacement_hex": "983f83e2"
+    },
+    {
+      "offset": 1749496,
+      "expected_hex": "e1c0a0e3",
+      "replacement_hex": "e6c0a0e3"
+    },
+    {
+      "offset": 1749512,
+      "expected_hex": "4a2085e2",
+      "replacement_hex": "4b2085e2"
+    },
+    {
+      "offset": 1749516,
+      "expected_hex": "95ef86e2",
+      "replacement_hex": "98ef86e2"
+    },
+    {
+      "offset": 1749560,
+      "expected_hex": "e4338ce5",
+      "replacement_hex": "ec338ce5"
+    },
+    {
+      "offset": 1749564,
+      "expected_hex": "8b2f82e2",
+      "replacement_hex": "8c2f82e2"
+    },
+    {
+      "offset": 1749692,
+      "expected_hex": "e13f81e2",
+      "replacement_hex": "e63f81e2"
+    },
+    {
+      "offset": 1749956,
+      "expected_hex": "942101e3",
+      "replacement_hex": "f82101e3"
+    },
+    {
+      "offset": 1875632,
+      "expected_hex": "fe3481e2",
+      "replacement_hex": "d9f23bea"
+    },
+    {
+      "offset": 1878104,
+      "expected_hex": "b34345e3",
+      "replacement_hex": "68fd3bea"
+    },
+    {
+      "offset": 1878472,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "12fd3bea"
+    },
+    {
+      "offset": 1878548,
+      "expected_hex": "b34345e3",
+      "replacement_hex": "05fd3bea"
+    },
+    {
+      "offset": 1878720,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "e0fc3bea"
+    },
+    {
+      "offset": 1878820,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "cdfc3bea"
+    },
+    {
+      "offset": 1879348,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "4ffc3bea"
+    },
+    {
+      "offset": 1879444,
+      "expected_hex": "b34345e3",
+      "replacement_hex": "3dfc3bea"
+    },
+    {
+      "offset": 1879740,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "f9fb3bea"
+    },
+    {
+      "offset": 1880180,
+      "expected_hex": "b35345e3",
+      "replacement_hex": "91fb3bea"
+    },
+    {
+      "offset": 1880600,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "2efb3bea"
+    },
+    {
+      "offset": 1880792,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "04fb3bea"
+    },
+    {
+      "offset": 1881012,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "d3fa3bea"
+    },
+    {
+      "offset": 1894456,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "b8ed3bea"
+    },
+    {
+      "offset": 1894652,
+      "expected_hex": "b38345e3",
+      "replacement_hex": "8ded3bea"
+    },
+    {
+      "offset": 1895540,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "b5ec3bea"
+    },
+    {
+      "offset": 1925568,
+      "expected_hex": "fe3481e2",
+      "replacement_hex": "2bc23bea"
+    },
+    {
+      "offset": 1926544,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "74ce3bea"
+    },
+    {
+      "offset": 1926648,
+      "expected_hex": "b32345e3",
+      "replacement_hex": "60ce3bea"
+    },
+    {
+      "offset": 1927524,
+      "expected_hex": "b38345e3",
+      "replacement_hex": "8bcd3bea"
+    },
+    {
+      "offset": 1928076,
+      "expected_hex": "b35345e3",
+      "replacement_hex": "07cd3bea"
+    },
+    {
+      "offset": 1928288,
+      "expected_hex": "b33345e3",
+      "replacement_hex": "d8cc3bea"
+    },
+    {
+      "offset": 2302652,
+      "expected_hex": "7e1c00eb",
+      "replacement_hex": "6b513aeb"
+    },
+    {
+      "offset": 2331364,
+      "expected_hex": "4f1afdeb",
+      "replacement_hex": "48423aeb"
+    },
+    {
+      "offset": 3829572,
+      "expected_hex": "113300e3",
+      "replacement_hex": "c78834ea"
+    },
+    {
+      "offset": 3832156,
+      "expected_hex": "113300e3",
+      "replacement_hex": "b48634ea"
+    },
+    {
+      "offset": 5329240,
+      "expected_hex": "0e9d06eb",
+      "replacement_hex": "9fd22eeb"
+    }
+  ]
+}

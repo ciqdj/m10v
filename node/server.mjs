@@ -1,0 +1,285 @@
+import { fitXmp } from './gr3-xmp-fit.mjs';
+import { prepareCustomization, buildCustomization } from './gr3-customization.mjs';
+import { stockPresetCapabilities } from './gr3-stock-presets.mjs';
+// Loopback-only web server. GR III exports are rebuilt and verified in memory.
+import { randomBytes } from 'node:crypto';
+import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import { createBackup, inspectBackup, restoreBytes } from './backup.mjs';
+import { inspectOfficial } from './firmware.mjs';
+import { shutdownCatalog } from './features.mjs';
+import { Store } from './storage.mjs';
+import { listSdVolumes, resolveSdVolume } from './sd-volumes.mjs';
+import { prepareOfficialSd } from './sd-write.mjs';
+import { analyzeStreetCandidate, buildStreetCandidate } from './candidate.mjs';
+import { analyzeVersionProbe } from './version-candidate.mjs';
+import { createRegistry } from './platform/adapter-registry.mjs';
+import { createGr3Adapter } from './adapters/gr3/index.mjs';
+import { createGr4Adapter } from './adapters/gr4/index.mjs';
+import { gr2Descriptor } from './adapters/gr2/index.mjs';
+import { Gr4Runtime } from './gr4-runtime.mjs';
+import { handleGr4Request } from './gr4-routes.mjs';
+import { createStorePlan } from './gr3-store-plan.mjs';
+import { runGr3Runtime, runtimeAvailable } from './gr3-runtime.mjs';
+import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
+import { fitCube } from './gr3-lut-fit.mjs';
+import {nativeCatalog,readNativeOfficial,prepareNative,generateNative} from './gr3-native-library.mjs';
+import { prepare800T, build800T } from './gr3-800t-build.mjs';
+
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const web = path.join(root, 'web');
+const MAX_UPLOAD = 128 * 1024 * 1024;
+const staticFiles = {
+  '/': ['index.html', 'text/html; charset=utf-8'],
+  '/guide/': ['guide.html', 'text/html; charset=utf-8'],
+  '/guide': ['guide.html', 'text/html; charset=utf-8'],
+  '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+  '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
+};
+const adapters = createRegistry([createGr3Adapter(), createGr4Adapter(), gr2Descriptor]);
+
+function send(response, status, body, type = 'application/json; charset=utf-8', filename) {
+  const bytes = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
+  response.writeHead(status, {
+    'Content-Type': type, 'Content-Length': bytes.length,
+    'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+    ...(filename ? { 'Content-Disposition': `attachment; filename="${filename}"` } : {}),
+  });
+  response.end(bytes);
+}
+
+async function readBody(request, limit = MAX_UPLOAD) {
+  const header = request.headers['content-length'];
+  if (!/^(0|[1-9][0-9]*)$/.test(header || '')) throw new Error('missing or invalid Content-Length');
+  const size = Number(header);
+  if (!Number.isSafeInteger(size) || size > limit) throw new Error('upload exceeds limit');
+  const chunks = [];
+  let length = 0;
+  for await (const chunk of request) {
+    length += chunk.length;
+    if (length > size) throw new Error('upload exceeds declared length');
+    chunks.push(chunk);
+  }
+  if (length !== size) throw new Error('incomplete upload');
+  return Buffer.concat(chunks, size);
+}
+
+export function createServer(store = new Store(path.join(root, 'data')),
+  sd = { listSdVolumes, resolveSdVolume, prepareOfficialSd },
+  gr4 = new Gr4Runtime(path.join(root, 'data', 'gr4'))) {
+  const token = randomBytes(32).toString('base64url');
+  const server = http.createServer(async (request, response) => {
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    if (request.headers.host !== origin.slice(7)) return send(response, 403, { error: 'invalid host' });
+    if (request.url?.startsWith('/api/gr4/')) {
+      await handleGr4Request({ request, response, runtime: gr4, token, readBody, send, origin });
+      return;
+    }
+    const pathname = request.url;
+    if (!pathname || pathname.includes('?') || pathname.includes('#') || pathname.includes('%') ||
+      pathname.includes('\\') || pathname.includes('..')) return send(response, 404, { error: 'not found' });
+    if (request.method === 'GET') {
+      if(pathname==='/gr3/native-library.html'){response.writeHead(302,{Location:'/gr3/','Cache-Control':'no-store'});response.end();return;}
+
+      if(pathname === '/api/gr3/native-library/catalog') {
+        try {return send(response,200,await nativeCatalog());}catch(error){return send(response,400,{error:error.message});}
+      }
+      if (pathname === '/api/platform/adapters') return send(response, 200, {
+        schema_version: 1,
+        adapters: adapters.list().map((adapter) => ({ ...adapter,
+          capabilities: adapter.supported ? adapters.get(adapter.id).capabilities() : null })),
+        active_workspace: 'gr3', release_models:['gr3','gr3x'], gr4_evidence: 'reference_verified', hardware: 'not_tested',
+      });
+      if (pathname === '/api/status') return send(response, 200, {
+        session_token: token, can_generate: true, model: 'GR III / GR IIIx', hardware: 'not_tested',
+        official_sd_supported: process.platform === 'darwin', candidate_sd_blocked: true,
+        candidate_offline_analysis: true, candidate_export_allowed: true,
+        version_strategy: 'same_version_first', version_probe_available: true,
+        blockers: [
+          'camera_edition_value_and_shutdown_runtime_unverified',
+          'modified_package_acceptance_unverified',
+          'hardware_recovery_not_verified',
+        ],
+        gr3_custom_runtime: await runtimeAvailable(),
+        features: {
+          crop: { status: 'unsupported', can_preview: true, can_generate: false },
+          shutdown: { status: 'verified_export', can_preview: true, can_generate: true },
+        },
+      });
+      if (/^\/api\/projects\/[0-9a-f]{64}\/stock-presets$/.test(pathname)) {
+        try { return send(response, 200, stockPresetCapabilities(await store.readOriginal(pathname.split('/')[3]))); }
+        catch (error) { return send(response, 400, {error:error.message}); }
+      }
+      if (pathname === '/api/sd/volumes') {
+        try { return send(response, 200, await sd.listSdVolumes()); }
+        catch (error) { return send(response, 503, { error: error.message || 'SD scan unavailable' }); }
+      }
+      if (/^\/api\/projects\/[0-9a-f]{64}\/shutdown-catalog$/.test(pathname)) {
+        try { return send(response, 200, shutdownCatalog(await store.readOriginal(pathname.split('/')[3]))); }
+        catch { return send(response, 404, { error: 'official resource catalog unavailable' }); }
+      }
+      if (/^\/api\/projects\/[0-9a-f]{64}$/.test(pathname)) {
+        try { return send(response, 200, inspectOfficial(await store.readOriginal(pathname.split('/').at(-1)))); }
+        catch { return send(response, 404, { error: 'project not found' }); }
+      }
+      const asset = staticFiles[pathname];
+      if (!asset) {
+        if (['/gr3', '/gr3/', '/gr3x', '/gr3x/', '/gr4', '/gr4/'].includes(pathname)) {
+          const model = pathname.slice(1, 4);
+          return send(response, 200, await readFile(path.join(web, model, 'index.html')), 'text/html; charset=utf-8');
+        }
+        const match = /^\/(gr3|gr4|shared)\/([a-zA-Z0-9_./-]+)$/.exec(pathname);
+        if (match && !match[2].includes('..')) {
+          const target = path.resolve(web, match[1], match[2]);
+          const base = path.resolve(web, match[1]);
+          if (target.startsWith(`${base}${path.sep}`)) try {
+            const type = /\.m?js$/.test(target) ? 'text/javascript; charset=utf-8' :
+              target.endsWith('.css') ? 'text/css; charset=utf-8' :
+                target.endsWith('.json') ? 'application/json; charset=utf-8' :
+                target.endsWith('.html') ? 'text/html; charset=utf-8' :
+                  target.endsWith('.png') ? 'image/png' : 'application/octet-stream';
+            return send(response, 200, await readFile(target), type);
+          } catch { /* fall through */ }
+        }
+        return send(response, 404, { error: 'not found' });
+      }
+      return send(response, 200, await readFile(path.join(web, asset[0])), asset[1]);
+    }
+    if (request.method !== 'POST') return send(response, 405, { error: 'method not allowed' });
+    const backupMatch = /^\/api\/projects\/([0-9a-f]{64})\/backup$/.exec(pathname);
+    const sdMatch = /^\/api\/projects\/([0-9a-f]{64})\/sd\/prepare$/.exec(pathname);
+    const candidateMatch = /^\/api\/projects\/([0-9a-f]{64})\/candidates\/shutdown\/analyze$/.exec(pathname);
+    const candidateExportMatch = /^\/api\/projects\/([0-9a-f]{64})\/candidates\/shutdown\/export$/.exec(pathname);
+    const versionMatch = /^\/api\/projects\/([0-9a-f]{64})\/versions\/probe$/.exec(pathname);
+    const nativeMatch = /^\/api\/projects\/([0-9a-f]{64})\/native-library\/(prepare|build)$/.exec(pathname);
+    const haloMatch = /^\/api\/projects\/([0-9a-f]{64})\/800t\/(prepare|build)$/.exec(pathname);
+    const editMatch = /^\/api\/projects\/([0-9a-f]{64})\/edit\/(prepare|build)$/.exec(pathname);
+    if (!['/api/import', '/api/backup/inspect', '/api/backup/restore', '/api/gr3/film/fit',
+      '/api/gr3/film-bay/pack','/api/gr3/native-library/import-official'].includes(pathname) &&
+      !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch)
+      return send(response, 404, { error: 'not found' });
+    if (request.headers['x-m10v-token'] !== token ||
+      (request.headers.origin && request.headers.origin !== origin))
+      return send(response, 403, { error: 'authorization failed' });
+    try {
+      const body = await readBody(request, pathname === '/api/gr3/film-bay/pack' ? 2048 :
+        pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
+        nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
+        sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
+      if(pathname === '/api/gr3/native-library/import-official') {
+        const original=await readNativeOfficial(JSON.parse(body.toString('utf8')).model||'gr3'),record=await store.importOfficial(original);
+        return send(response,200,{project_id:record.id,source_sha256:record.sha256});
+      }
+      if(nativeMatch) {
+        const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
+        if(nativeMatch[2]==='prepare')return send(response,200,prepareNative(original,input.configuration));
+        const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
+        const {candidate,receipt}=await generateNative(original,input.configuration,input.accepted_configuration_sha256,{signal:cancellation.signal});
+        response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
+        return send(response,200,candidate,'application/octet-stream',receipt.filename);
+      }
+      if (pathname === '/api/gr3/film-bay/pack') {
+        return send(response, 410, { error: '旧 SD 胶片库方案已废弃，不可用。' });
+      }
+      if (pathname === '/api/gr3/film/fit') {
+        const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
+        const filename=decodeURIComponent(request.headers['x-m10v-filename']||'Imported LUT.cube');
+        return send(response,200,await (/\.xmp$/i.test(filename)?fitXmp:fitCube)(body,filename,{signal:cancellation.signal}));
+      }
+      if (haloMatch) {
+        const original = await store.readOriginal(haloMatch[1]);
+        const input = JSON.parse(body.toString('utf8'));
+        if (haloMatch[2] === 'prepare') return send(response, 200, prepare800T(original, input.selection));
+        try {
+          const {candidate,receipt} = await build800T(original, input.selection, input.accepted_configuration_sha256);
+          response.setHeader('X-M10V-800T-Receipt', Buffer.from(JSON.stringify({
+            schema:'m10v-gr3-800t-build-download/v1',candidate_sha256:receipt.candidate_sha256,
+            source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,
+            configuration:receipt.configuration,color_provenance:receipt.color_provenance,
+            kernel_sha256:receipt.kernel.codeSha256,adapter_sha256:receipt.adapter_sha256,
+            offline_audit_passed:true,camera_tested:false,dng_preview_may_share_jpeg_effect:true,
+          })).toString('base64'));
+          return send(response, 200, candidate, 'application/octet-stream', 'fwdc239b.bin');
+        } catch (error) {
+          if (error.code === 'M10V_800T_EVIDENCE_REQUIRED')
+            return send(response, 409, { error: error.message, blockers: error.blockers });
+          throw error;
+        }
+      }
+      if (editMatch) {
+        const cancellation=new AbortController();
+        response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
+        const options={signal:cancellation.signal};
+        const original = await store.readOriginal(editMatch[1]);
+        const input = JSON.parse(body.toString('utf8'));
+        const prepared = await prepareCustomization(original, input.selection, options);
+        if (editMatch[2] === 'prepare') return send(response, 200, prepared);
+        if (input.accepted_configuration_sha256 !== prepared.configuration_sha256 || !prepared.ready)
+          return send(response, 409, { error: '方案已变化或预检未通过，请重新预检并确认风险。' });
+        const { candidate, receipt } = await buildCustomization(original, input.selection, input.accepted_configuration_sha256, options);
+        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,audit:receipt.audit})).toString('base64'));
+        return send(response, 200, candidate, 'application/octet-stream', receipt.filename);
+      }
+      if (versionMatch) {
+        const original = await store.readOriginal(versionMatch[1]);
+        return send(response, 200, analyzeVersionProbe(original));
+      }
+      if (candidateMatch) {
+        const original = await store.readOriginal(candidateMatch[1]);
+        return send(response, 200, analyzeStreetCandidate(original, body));
+      }
+      if (candidateExportMatch) {
+        const original = await store.readOriginal(candidateExportMatch[1]);
+        const built = buildStreetCandidate(original, body);
+        return send(response, 200, built.candidate, 'application/octet-stream', 'fwdc239b.bin');
+      }
+      if (sdMatch) {
+        const selection = JSON.parse(body.toString('utf8'));
+        if (!selection || typeof selection.device_identifier !== 'string' ||
+          !/^disk[0-9]+s[0-9]+$/.test(selection.device_identifier))
+          throw new Error('invalid SD device selection');
+        const volume = await sd.resolveSdVolume(selection.device_identifier);
+        const original = await store.readOriginal(sdMatch[1]);
+        return send(response, 200, await sd.prepareOfficialSd(original, volume));
+      }
+      if (pathname === '/api/import') {
+        const record = await store.importOfficial(body);
+        return send(response, 200, { project_id: record.id, ...inspectOfficial(body) });
+      }
+      if (backupMatch) {
+        const original = await store.readOriginal(backupMatch[1]);
+        return send(response, 200, createBackup(original), 'application/zip', 'm10v-gr3-backup.zip');
+      }
+      if (pathname === '/api/backup/inspect') return send(response, 200, inspectBackup(body));
+      const original = restoreBytes(body);
+      const folder = await mkdtemp(path.join(os.tmpdir(), 'm10v-rehearsal-'));
+      try {
+        const trial = new Store(folder);
+        const record = await trial.importOfficial(original);
+        if (!(await trial.readOriginal(record.id)).equals(original)) throw new Error('rehearsal readback differs');
+      } finally { await rm(folder, { recursive: true, force: true }); }
+      const actual = await store.importOfficial(original);
+      return send(response, 200, { project_id: actual.id, original_sha256: actual.sha256,
+        recovery_scope: 'computer_official_package_only', camera_flash_included: false });
+    } catch (error) {
+      return send(response, 400, { error: error.message || 'operation failed' });
+    }
+  });
+  return server;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const server = createServer();
+  server.listen(0, '127.0.0.1', () => {
+    const url = `http://127.0.0.1:${server.address().port}/`;
+    console.log(url);
+    if (process.env.M10V_NO_BROWSER !== '1' && process.platform === 'darwin') {
+      const child = spawn('open', [url], { stdio: 'ignore' });
+      child.on('error', (error) => console.error(`无法自动打开浏览器：${error.message}`));
+    }
+  });
+}

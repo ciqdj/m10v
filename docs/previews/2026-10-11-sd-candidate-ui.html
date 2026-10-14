@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>m10v · GR III 固件工作台</title>
+  <link rel="stylesheet" href="../../web/styles.css">
+  
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span>m10v</span><small>GR III 固件工作台</small></div>
+      <nav aria-label="主导航">
+        <a href="#home" class="selected">⌂ <span>首页</span></a>
+        <a href="#report">▤ <span>固件报告</span></a>
+        <a href="#backup">↺ <span>备份与恢复</span></a>
+        <a href="#features">▦ <span>功能工作台</span></a>
+      </nav>
+      <div class="sidebar-foot">本地分析 · 安全可控<br>不连接相机</div>
+    </aside>
+    <main id="home">
+      <header class="masthead">
+        <div><p class="eyebrow">M10V / LOCAL FIRMWARE LAB</p><h1>GR III 固件工作台</h1>
+          <p class="lede">分析官方固件，保留可验证的电脑端备份。</p></div>
+        <span class="local-pill">● 仅本机运行</span>
+      </header>
+
+      <section class="identity card" aria-labelledby="identity-title">
+        <div class="identity-icon">▤</div>
+        <div class="identity-main">
+          <div class="title-row"><h2 id="identity-title">尚未导入固件</h2><span id="verified-badge" class="badge neutral">等待校验</span></div>
+          <p id="version-line" class="muted">请选择你持有的 GR III 官方 fwdc239b.bin</p>
+          <p class="hash-line"><span>SHA-256</span><code id="firmware-sha">—</code></p>
+        </div>
+        <div class="identity-action">
+          <label id="firmware-picker" for="firmware-file" class="button primary">选择官方固件</label>
+          <input id="firmware-file" type="file" accept=".bin,application/octet-stream">
+          <small>文件只在本机服务中处理</small>
+        </div>
+      </section>
+
+      <div id="status-message" class="message" role="status" aria-live="polite"></div>
+
+      <div class="content-grid">
+        <section id="report" class="card partition-card" aria-labelledby="report-title">
+          <div class="section-heading"><div><span class="section-icon">▱</span><h2 id="report-title">固件分区结构</h2></div><span id="partition-count" class="count">等待导入</span></div>
+          <div class="table-wrap"><table><thead><tr><th>分区</th><th>字节长度</th><th>SHA-256</th></tr></thead><tbody id="partition-body"><tr><td colspan="3" class="empty-cell">导入官方固件后显示完整分区报告</td></tr></tbody></table></div>
+        </section>
+
+        <section id="backup" class="card backup-card" aria-labelledby="backup-title">
+          <div class="section-heading"><div><span class="section-icon">↺</span><h2 id="backup-title">备份与恢复</h2></div></div>
+          <p>导出带哈希清单的电脑端备份，并在新数据目录演练恢复。</p>
+          <div class="button-row"><button id="export-backup" class="button primary" disabled>导出电脑端备份</button>
+            <label id="backup-picker" for="backup-file" class="button secondary">验证备份包</label><input id="backup-file" type="file" accept=".zip,application/zip"></div>
+          <button id="restore-backup" class="text-action" disabled>恢复 m10v 项目并重新校验</button>
+          <div id="backup-result" class="subtle-result" aria-live="polite">尚未验证备份包。</div>
+          <div class="notice"><strong>恢复范围</strong><span>不包含相机内部 Flash 备份，无法保证刷写故障后恢复相机。</span></div>
+        </section>
+      </div>
+
+      <section class="card backup-card" aria-label="官方固件写卡预览"><div class="section-heading"><div><span class="section-icon">▣</span><h2>官方固件写入 SD 卡</h2></div><span class="badge amber">仅官方原包</span></div><p>选择可移动 SD 卡，将已校验的 fwdc239b.bin 写入卡根目录，并回读 SHA-256。</p><div class="button-row"><select class="button secondary"><option>选择 SD 卡 · disk7s1 · 64 GB</option></select><button class="button primary">写入官方包到 SD 卡</button></div><div class="subtle-result">写卡后将显示实际回读哈希；这不代表相机已更新。</div><div class="notice"><strong>相机更新</strong><span>安全退出 SD 卡，再按理光官方步骤在相机菜单中执行更新。相机端结果需单独确认。</span></div></section>
+
+      <section id="features" class="features" aria-label="功能研究状态">
+        <article class="card feature-card"><div class="feature-head"><span class="feature-symbol">⌗</span><span id="crop-status" class="badge amber">研究中 · 暂不可生成</span></div>
+          <h2>自定义裁切比例</h2><p>输入比例查看画幅草稿。此预览不代表 GR III 的原生裁切几何。</p>
+          <form id="crop-form" class="draft-form"><label for="crop-ratio">宽:高</label><div class="draft-row"><input id="crop-ratio" type="text" inputmode="decimal" value="5:4" maxlength="32" aria-describedby="crop-result"><button class="button secondary" type="submit">预览比例</button></div></form>
+          <div class="preview-stage crop-stage"><div id="crop-frame" class="crop-frame" aria-label="裁切比例预览"></div></div>
+          <div id="crop-result" class="draft-result">仅几何草稿，未写入固件。</div></article>
+        <article class="card feature-card"><div class="feature-head"><span class="feature-symbol">▧</span><span id="shutdown-status" class="badge amber">研究中 · 暂不可生成</span></div>
+          <h2>关机画面</h2><p>官方 BIN 中的命名 JPEG 可只读预览；相机实际选择逻辑尚未验证。</p>
+          <div id="shutdown-catalog" class="resource-catalog">导入官方固件后显示命名资源。</div>
+          <label for="shutdown-draft" class="button secondary draft-picker">选择自己的图片预览</label><input id="shutdown-draft" type="file" accept="image/jpeg,image/png">
+          <div class="preview-stage image-stage"><img id="shutdown-preview" alt="自选关机画面草稿预览" hidden></div>
+          <div id="shutdown-result" class="draft-result">已选择 720×480 JPEG；可在本机分析候选包。</div><button class="button secondary">运行离线候选分析</button><div class="subtle-result">候选 SHA-256 · 仅本机静态校验通过 · 相机验收与恢复尚未验证；修改版 BIN 不可导出或写卡。</div></article>
+      </section>
+
+      <section class="locked" aria-label="固件生成状态"><span class="lock-symbol">♙</span><div><strong>修改固件导出已锁定</strong>
+        <p>关键校验修复与相机端恢复路径尚未验证。当前仅开放分析、草稿预览和电脑端备份。</p></div></section>
+      <footer>m10v · GR III · 离线研究工具</footer>
+    </main>
+  </div>
+</body>
+</html>

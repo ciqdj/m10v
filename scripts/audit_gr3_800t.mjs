@@ -1,0 +1,12 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { audit800TCandidate } from '../node/gr3-800t-audit.mjs';
+const args=process.argv.slice(2),flag=args.indexOf('--prepared');
+const preparedPath=flag>=0?args.splice(flag,2)[1]:null;
+const [sourcePath, candidatePath, expectedPath, reportPath] = args;
+if (!sourcePath || !candidatePath || !expectedPath) throw new Error('Usage: node scripts/audit_gr3_800t.mjs official.bin candidate.bin locally-retained.expected.json [report.json]');
+const [source, candidate, plan] = await Promise.all([readFile(sourcePath), readFile(candidatePath), readFile(expectedPath, 'utf8')]);
+const prepared=preparedPath?JSON.parse(await readFile(preparedPath,'utf8')):null;
+const report = audit800TCandidate(source, candidate, JSON.parse(plan),prepared);
+const output = JSON.stringify(report, null, 2) + '\n';
+if (reportPath) await writeFile(reportPath, output);
+process.stdout.write(output);

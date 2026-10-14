@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
+  <title>GR III / GR IIIx 固件工作室 · M10V</title>
+  <link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/gr3/native-library-embedded.css">
+  <script type="module" src="/gr3/studio.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">M10V <small>FIRMWARE STUDIO</small></a>
+    <nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><span class="current" id="studio-model-status" aria-current="page">GR III / GR IIIx</span><a href="/guide/">说明</a><span class="unavailable" aria-disabled="true">GR IV · 未开放</span></nav>
+  </header>
+  <section class="hero"><div class="hero-inner">
+    <p class="kicker">RICOH GR III / GR IIIx · ONE STUDIO</p><h1>导入，调色，带走。</h1>
+    <p>导入固件 → 设置方案 → 保存固件 · 同一份来源，同一个工作台</p>
+    <div class="hero-rule"><span>65 FILMS / 5 SLOTS</span><span>GR III / GR IIIx</span></div>
+  </div></section>
+  <main class="studio">
+    <aside class="steps" aria-label="工作台导航">
+      <p class="section-kicker">M10V / EDIT DESK</p>
+      <button class="step active" data-step="source"><b>01</b><span>导入固件<small>官方文件 · 身份核验</small></span></button>
+      <button class="step" data-step="features"><b>02</b><span>设置方案<small>影像 · 胶卷 · 800T</small></span></button>
+      <button class="step" data-step="build"><b>03</b><span>保存固件<small>构建 · 回读 · 下载</small></span></button>
+      <div class="steps-foot"><strong>你的影像方案</strong><p>随时切换区域，右侧方案清单持续显示当前状态。</p></div>
+    </aside>
+    <div class="stage">
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section class="page" data-page="camera" hidden>
+        <div class="page-head"><p>BODY PROFILE / 机型档案</p><h2>GR III 的工作边界。</h2><span>固件包必须与机型、版本完全匹配。</span></div>
+        <div class="camera-grid">
+          <button class="camera-card selected" type="button"><span>SUPPORTED BUILD</span><strong>GR III<br>Street Edition</strong><small>Firmware 2.10 · fwdc239b.bin</small><em>✓ 当前机型</em></button>
+          <div class="camera-card muted"><span>OTHER BODY</span><strong>GR III<br>其他版本</strong><small>当前样本不能证明机身版本兼容</small><em>等待独立验证</em></div>
+          <div class="camera-card muted" aria-disabled="true"><span>SEPARATE WORKFLOW</span><strong>GR IV</strong><small>进入 GR IV 专属工作区</small><em>首批未开放</em></div>
+        </div>
+        <div class="stage-actions"><a class="quiet-link" href="/">← 返回机型入口</a><button class="primary" id="camera-next">打开影像方案 <span>→</span></button></div>
+      </section>
+      <section class="page" data-page="features" hidden>
+        <div class="page-head"><p>LOOK DESK / 影像方案</p><h2>建立你的街头方案。</h2><span>影像定制与胶卷库共享官方来源和保存出口，随时切换查看。</span></div>
+        <div class="settings-tabs" role="tablist" aria-label="设置方案"><button id="tab-imaging" role="tab" aria-selected="true">影像方案</button><button id="tab-library" role="tab" aria-selected="false">胶卷库 · 含 800T</button></div>
+        <div class="unified-looks"><button id="use-native-plan"><strong>M10V 胶卷库</strong><span>65 卷内置 · 机内换槽 · 颗粒 / 柔光 / 时间戳</span></button><button id="use-800t-plan"><strong>800T</strong><span>冷色暗部与暖红高光 · 加入五槽方案</span></button></div>
+        <p id="active-plan-note" class="scheme-note" role="status">当前保存：影像定制方案</p>
+        <div id="imaging-settings" role="tabpanel" aria-labelledby="tab-imaging">
+        <div class="toolbar"><span id="selection-count">已选择 0 项功能</span><div><button class="outline" id="undo-edit" disabled>撤销</button><button class="outline" id="redo-edit" disabled>重做</button></div></div>
+        <div id="feature-list" class="feature-list"></div>
+        </div><div id="native-editor" role="tabpanel" aria-labelledby="tab-library" hidden></div>
+        <div class="stage-actions"><button class="outline" data-back="source">返回导入固件</button><button class="primary" id="features-next" disabled>继续保存固件 <span>→</span></button></div>
+      </section>
+      <section class="page" data-page="source">
+        <div class="page-head"><p>SOURCE DESK / 固件来源</p><h2>核验官方文件。</h2><span>导入对应机型的官方 BIN，系统自动识别机型和版本。</span></div>
+        <label class="dropzone" id="dropzone" for="firmware-file"><span class="drop-icon">＋</span><strong>选择官方 BIN，或拖到这里</strong><small>支持 GR III 与 GR IIIx · 导入后自动识别机型</small></label>
+        <input type="file" id="firmware-file" accept=".bin,application/octet-stream" hidden>
+        <div id="source-report" class="source-report" hidden></div>
+        <div class="local-source-picker"><label for="local-source-model">或选择官方样本</label><div><select id="local-source-model"><option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option></select><button type="button" class="outline" id="use-local-source">使用官方包 →</button></div></div>
+        <div class="source-actions"><button class="outline" id="download-backup" disabled>下载官方固件备份</button><span>导出前请保存官方原包与生成记录。</span></div>
+        <div class="stage-actions"><a class="outline" href="/">返回机型选择</a><button class="primary" id="source-next" disabled>继续设置方案 <span>→</span></button></div>
+      </section>
+      <section class="page" data-page="build" hidden>
+        <div class="page-head"><p>BUILD DESK / 构建台</p><h2>保存你的固件方案。</h2><span>保存前自动核验固件与方案，完成后下载对应机型的 BIN。</span></div>
+        <div class="build-summary"><div><small>MODEL</small><strong id="build-model">等待导入固件</strong></div><div><small>FEATURES</small><strong id="build-feature-count">—</strong></div><div><small>构建状态</small><strong id="runtime-state">读取中</strong></div></div>
+        <div id="build-details" class="build-details"></div>
+        <button class="outline wide" id="prepare-build" hidden>核验方案 →</button>
+        <div id="preflight-result" class="preflight-result" role="status">保存时自动核验来源和方案。</div>
+
+        <button class="primary wide" id="build-firmware" disabled>保存固件 →</button>
+        <button class="outline wide" id="cancel-build" hidden>取消当前构建</button>
+        <div id="build-result" class="build-result" role="status" aria-live="polite"></div>
+        <div class="stage-actions"><button class="outline" data-back="features">返回设置方案</button></div>
+      </section>
+
+    </div>
+    <aside class="plan-rail" aria-label="当前方案清单"><p class="section-kicker">LIVE LEDGER / 方案清单</p><h2>当前工作台</h2><div id="plan-ledger" class="plan-ledger"></div><button type="button" class="primary rail-action" id="open-build-desk">继续保存固件 ↗</button><p class="rail-note">预览仅说明浏览器中的近似色彩。机内成像与刷入结果需要实机验证。</p></aside>
+  </main>
+  <dialog id="recipe-dialog" class="recipe-dialog"><form method="dialog" id="recipe-form">
+    <div class="dialog-head"><p>M10V / SLOT WORKBENCH</p><button class="dialog-close" value="cancel" aria-label="关闭">×</button><h2>编辑机内影像档位</h2><span id="dialog-slot-label"></span></div>
+    <div class="dialog-body">
+      <p class="field-title">选择配方来源</p>
+      <div class="source-tabs">
+        <label><input type="radio" name="recipe-source" value="community_reference" checked><span><strong>社区配方</strong><small>仅显示基底匹配的模板</small></span></label>
+        <label><input type="radio" name="recipe-source" value="manual"><span><strong>手动配方</strong><small>从原厂基底开始</small></span></label>
+        <label><input type="radio" name="recipe-source" value="json"><span><strong>导入配方 JSON</strong><small>读取名称与九项参数</small></span></label>
+      </div>
+      <div id="community-field" class="form-block"><label for="community-select">社区配方</label><select id="community-select"></select></div>
+      <div id="json-field" class="form-block" hidden><label for="recipe-json">选择配方 JSON</label><input id="recipe-json" type="file" accept=".json,application/json"><small>支持 cameraName 与九项 parameters。</small></div>
+      <div class="form-block"><label for="recipe-name">配方名称（机内英文）</label><input id="recipe-name" maxlength="11" autocomplete="off"><small>1–11 个字符；英文字母、数字、空格与连字符。</small></div>
+      <div class="parameters-head"><strong>可调参数 9 / 9</strong><span>取值范围 −4 至 +4</span></div>
+      <div id="recipe-parameters" class="recipe-parameters"></div>
+      <div class="form-block"><label for="recipe-icon-mode">机内图标</label><select id="recipe-icon-mode"><option value="original">保留原厂图标</option><option value="preset">使用社区配方图标</option></select></div>
+    </div>
+    <div class="dialog-actions"><button class="outline" value="cancel">取消</button><button class="primary" id="apply-recipe" value="apply">应用到此位置</button></div>
+  </form></dialog>
+  <dialog id="firmware-disclaimer" class="firmware-disclaimer" aria-labelledby="disclaimer-title" aria-describedby="disclaimer-summary">
+    <p class="disclaimer-kicker">保存前，请了解风险</p>
+    <h2 id="disclaimer-title">刷入修改固件可能导致变砖。</h2>
+    <p id="disclaimer-summary">这是非官方修改固件。刷入后可能出现无法启动、功能异常、数据丢失或设备损坏，可能需要维修，且无法保证恢复。</p>
+    <p>当前固件通过离线校验，尚未完成 GR III／GR IIIx 的实机验证。生成成功不代表相机能够安全刷入或正常工作。</p>
+    <ul><li>备份照片、设置和官方固件。</li><li>确认固件与相机型号、版本匹配，并保持充足电量。</li><li>自行评估并决定是否刷入，M10V 不保证刷入成功或无风险。</li></ul>
+    <div class="disclaimer-target" id="disclaimer-target"></div>
+    <div class="disclaimer-actions"><button type="button" class="outline" id="disclaimer-cancel" autofocus>返回检查</button><button type="button" class="primary" id="disclaimer-confirm">我理解风险，继续保存</button></div>
+  </dialog>
+</body>
+</html>

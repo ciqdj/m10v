@@ -1,0 +1,36 @@
+/* m10v's original dark edit desk for the GR IV model-specific workflow. */
+:root{--bg:#0d0e0e;--paper:#171819;--ink:#f1eee8;--muted:#aaa8a3;--line:#3a3b3b;--accent:#d6ad69;--accent-soft:#29241d;--warn:#d8ab6f;--warn-soft:#30251a;--danger:#efaaa0;--radius:0;--product-bg:#0d0e0e;--product-paper:#171819;--product-ink:#f1eee8;--product-muted:#aaa8a3;--product-line:#3a3b3b;--product-accent:#d6ad69;--product-accent-dark:#d6ad69;--product-ok:#9bb6a1;--product-warn:#d8ab6f;--product-radius:0;--product-shadow:none;color-scheme:dark}
+html,body,body{background:#0d0e0e;color:#f1eee8}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline-color:#d6ad69}
+a,a:hover{color:#d6ad69}
+.product-topbar{min-height:68px;background:#0b0c0c;border-bottom-color:#343332}
+.product-brand strong{font-size:30px;font-weight:800;color:#d6ad69}.product-brand span{color:#b7afa3;font:600 10px ui-monospace,monospace;letter-spacing:.18em}
+.model-switch{height:68px;padding:0;border:0;border-radius:0;background:transparent;gap:0}.model-switch a{display:grid;place-items:center;height:100%;padding:0 19px;border-radius:0;border-bottom:2px solid transparent;color:#aaa8a2;font-size:12px}.model-switch a.active{background:#211e18;border-color:#d6ad69;color:#f0d397}
+.local-state:before{border-radius:0;background:#d6ad69}
+.product-topbar .button.quiet{border:1px solid #5e584e;border-radius:0;color:#d8cbb7}
+.gr4-hero{height:220px;border-bottom:1px solid #69563b;background:linear-gradient(90deg,#0b0c0c 0%,#0b0c0ce8 28%,#0b0c0c4f 100%),url('/gr3/gr3-street-photo.png') center 54%/cover}
+.gr4-hero>div{display:flex;flex-direction:column;justify-content:center;width:min(1560px,100%);height:100%;margin:auto;padding:20px clamp(18px,3vw,42px)}
+.gr4-hero p,.gr4-desk-label span,.gr4-rail-label span{margin:0;color:#d6ad69;font:11px ui-monospace,monospace;letter-spacing:.17em}
+.gr4-hero h1{margin:17px 0 6px;font:400 clamp(30px,3.2vw,47px) Georgia,"Songti SC",serif}.gr4-hero div>span{color:#d4d0c7;font-size:12px}
+.workspace.product-workspace{gap:14px;padding-top:28px;grid-template-columns:230px minmax(0,1fr) 270px}
+.panel.product-panel,.panel,.modal{border:1px solid #44413b;border-radius:0;background:#171819;box-shadow:none;color:#f1eee8}
+.sidebar{min-height:670px}.gr4-desk-label{padding:23px 19px 13px}.gr4-desk-label strong,.gr4-rail-label strong{display:block;margin-top:9px;font:400 23px Georgia,"Songti SC",serif}.gr4-desk-label small{display:block;margin-top:9px;color:#a4a19a;font-size:11px;line-height:1.6}
+.function-nav{gap:0;padding:8px 11px 15px}.function-button{padding:15px 12px;border:0;border-bottom:1px solid #33312d;border-radius:0;color:#aaa8a3;font-size:12px}.function-button:hover,.function-button.active,.filter-row:hover,.filter-row.active{background:#25221c;color:#f0d397}.function-button.active{box-shadow:inset 3px 0 #d6ad69;border-bottom-color:#60513b}.function-button:disabled{color:#77736d}
+.gr4-rail-label{padding:0 2px 3px}.gr4-rail-label strong{font-size:23px}
+.firmware-rail{gap:14px}.source-summary,.build-panel,.history-summary{padding:21px}.source-summary h2,.build-panel h2,.history-summary h2{color:#d6ad69;font:11px ui-monospace,monospace;letter-spacing:.1em}.source-summary h1{color:#f1eee8}
+.editor{padding:30px}.editor-header{padding-bottom:20px;border-bottom:1px solid #45413a}.editor-header h2{font:400 28px Georgia,"Songti SC",serif}.eyebrow{color:#d6ad69}
+.section-heading h2,.section-heading h3,.filter-row strong,.calibration strong,.empty-editor h2{color:#f1eee8}.muted,.field-label,.field-help,.filter-row small,.empty-editor>p{color:#aaa8a3}.count{color:#d6ad69}
+.button,.icon-button,.text-input,.search,.filter-row,.preset-icon,.crop-frame,.shutdown-preview,.calibration,.callout,.badge,.baseline-card,.feature-pending,.notice{border-radius:0}
+.button.primary{background:#d6ad69;border-color:#d6ad69;color:#17140e}.button.primary:hover:not(:disabled){background:#edca8f;border-color:#edca8f}.button.secondary,.icon-button{background:#262625;border-color:#706658;color:#f1eee8}.button.secondary:hover:not(:disabled),.icon-button:hover:not(:disabled){background:#332a1e;border-color:#d6ad69;color:#f0d397}.button.quiet{color:#c8c3b9}.button.quiet:hover:not(:disabled){background:#29241d;color:#f0d397}.button:disabled,.text-input:disabled{background:#212222;border-color:#363737;color:#7f807b}.button.quiet:disabled{background:transparent;color:#7f807b}
+.text-input,.search,select,input:not([type=checkbox]):not([type=radio]):not([type=file]){background:#202123;border-color:#5b564e;color:#f1eee8}.text-input::placeholder,.search input::placeholder{color:#87847d}.search:focus-within,.text-input:focus{border-color:#d6ad69}.search input{background:transparent;border:0}
+.filter-row{color:#f1eee8}.filter-row.active{border-color:#8d734e}.filter-row .filter-index{color:#a6977b}.filter-section{border-color:#3a3b3b}
+.identity-section,.parameter-section,.xmp-section,.edit-footer{border-color:#44413b}.calibration,.callout,.notice,.empty-editor-icon{background:#20201e;border-color:#514b41;color:#cfc7ba}.calibration p,.calibration-step,.calibration-metrics,.calibration-previews figcaption{color:#b4aea3}.calibration-symbol,.calibration-step{background:#282725;border-color:#5c554a;color:#d6ad69}.calibration.warning,.callout.warning,.notice.warning{background:#30251a;border-color:#70593b;color:#deb985}.notice.error{background:#301f1d;border-color:#90514a;color:#efaaa0}
+.crop-frame{background:#252625;border-color:#665e51}.crop-frame>div{background:#555044;border-color:#b4a17f}.shutdown-thumbnail{border-color:#555}.preset-icon{border-color:#625d54}.empty-editor-icon{color:#d6ad69}.empty-editor{min-height:600px}
+.modal{border-color:#8e795d}.modal::backdrop{background:#050505bc}.modal-header{border-color:#44413b}.modal h2{color:#f1eee8}.modal-footer{border-color:#44413b}.busy-overlay{background:#050505b8}
+.baseline-card{background:#20201e;border-color:#514b41;color:#f1eee8}.baseline-card:hover{border-color:#d6ad69;background:#29241d}.history-summary .baseline-open{color:#d6ad69}
+@media(max-width:1100px){.workspace.product-workspace{grid-template-columns:200px minmax(0,1fr)}.firmware-rail{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.gr4-rail-label{grid-column:1/-1}}
+@media(max-width:720px){.product-topbar{gap:10px}.model-switch{height:44px}.model-switch a{padding:0 10px}.gr4-hero{height:195px}.workspace.product-workspace{display:block;padding:14px}.workspace.product-workspace>*+*{margin-top:14px}.function-nav{display:flex;overflow-x:auto}.function-button{flex:0 0 auto}.gr4-desk-label{padding-bottom:4px}.sidebar{min-height:0}.firmware-rail{display:grid;grid-template-columns:1fr}.gr4-rail-label{grid-column:auto}.editor{padding:21px 18px}}
+.icon-button:disabled,.button.secondary:disabled{background:#242321;border-color:#48443d;color:#858078}
+.filter-section .icon-button:disabled{color:#aaa393}
+.filter-section .search{background:#202123;border-color:#4b4944}
+.filter-section .search input:disabled{background:transparent;color:#a7a39b}

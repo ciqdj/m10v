@@ -1,0 +1,65 @@
+import {createHash} from 'node:crypto';
+import {readFile,mkdtemp,rm,access} from 'node:fs/promises';
+import {promisify} from 'node:util';
+import {execFile} from 'node:child_process';
+import path from 'node:path';
+import os from 'node:os';
+import {fileURLToPath} from 'node:url';
+import {normalizeConfiguration} from '../web/gr3/native-library-state.mjs';
+import {inspectOfficial} from './firmware.mjs';
+import {buildNativeLibrary} from './gr3-m10v-native-build.mjs';
+const root=fileURLToPath(new URL('..',import.meta.url));
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const officialHash='d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4';
+const run=promisify(execFile);
+export async function nativeCatalog(){
+ const source=await readFile(path.join(root,'native/gr3/m10v_library.c'),'utf8');
+ const films=[...source.matchAll(/\{"([^"\n]+)",(-?\d+),(-?\d+),(-?\d+),(-?\d+),(-?\d+),(-?\d+),(-?\d+)\}/g)].map((m,i)=>({id:i+1,name:m[1]}));
+ if(films.length!==33)throw Error('M10V 原生目录不完整');
+ const legacy=JSON.parse(await readFile(path.join(root,'web/gr3/film-catalog.json'),'utf8')).looks;
+ films.forEach(f=>f.group='M10V');
+ films.push(...legacy.map((f,i)=>({id:34+i,name:f.name,group:f.group||'胶片模拟',legacy_id:f.id,color_path:'saved-jpeg-rgb-tables'})));
+ const icons=JSON.parse(await readFile(path.join(root,'web/gr3/film-icons/catalog.json'),'utf8'));
+ if(icons.length!==films.length||icons.some((v,i)=>v.id!==films[i].id||v.name!==films[i].name))throw Error('M10V 图标目录与胶卷不同步');
+ films.forEach((f,i)=>Object.assign(f,{icon_url:icons[i].icon_url,icon_color:icons[i].color}));
+ let available=false;try{available=hash(await readFile(path.join(root,'fwdc239b-offical.bin')))===officialHash;}catch{}
+ return {local_sources:['gr3','gr3x'],films,external_film_pack:false,camera_tested:false,local_source_available:available,
+  scope:'保存的静态 JPEG；取景和机内 RAW 再开发尚未接入',slot_tone_ids:[12,18,19,20,21]};
+}
+export async function readNativeOfficial(model='gr3'){
+ const profiles={gr3:['bin/fwdc239b-gr3-official.bin',officialHash],gr3x:['bin/fwdc243b-gr3x-official.bin','708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7']};
+ if(!profiles[model])throw Error('首批仅开放 GR III 和 GR IIIx');
+ const [file,expected]=profiles[model];const b=await readFile(path.join(root,file));if(hash(b)!==expected)throw Error('本地官方固件摘要不匹配');return b;
+}
+export function initialState(configuration){
+ const c=normalizeConfiguration(configuration),b=Buffer.alloc(64);b.writeUInt32LE(0x5630314d);b.writeUInt16LE(2,4);b.writeUInt16LE(64,6);
+ c.slots.forEach((s,i)=>{b.writeUInt16LE(s.film,12+i*8);b[14+i*8]=s.grain;b[15+i*8]=s.soft;b[16+i*8]=s.halo.gain;b[17+i*8]=s.halo.spread;b[18+i*8]=s.halo.threshold;b[19+i*8]=s.halo.profile;});
+ b[52]=c.stamp;b[53]=c.format;b[54]=c.corner;b[55]=c.color;
+ let crc=0xffffffff;for(const byte of b.subarray(0,60)){crc^=byte;for(let k=0;k<8;k++)crc=(crc>>>1)^(0xedb88320&-(crc&1));}
+ b.writeUInt32LE(~crc>>>0,60);return b;
+}
+export function prepareNative(source,value){
+ const report=inspectOfficial(source);
+ const configuration=normalizeConfiguration(value),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration}));
+ return {schema:'m10v-native-library-plan/v1',ready:true,source_sha256:report.sha256,configuration,configuration_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
+  initial_state_hex:initialState(configuration).toString('hex'),film_count:65,active_slots:5,camera_tested:false,external_film_pack:false,
+  scope:'静态 JPEG 色彩、颗粒、柔光与时间戳；五槽机内替换并持久化。取景和 RAW 再开发未接入。',
+  initial_settings_policy:'首次无有效 M10V 记录时使用网页默认值；已有机内 M10V 记录优先。'};
+}
+let building=false;
+export async function generateNative(source,value,accepted,{signal}={}){
+ const plan=prepareNative(source,value);if(accepted!==plan.configuration_sha256)throw Error('配置已变化，请重新预检');
+ if(building)throw Error('另一个 M10V 原生固件正在构建，请稍后重试');
+ building=true;let folder;
+ try{
+  folder=await mkdtemp(path.join(os.tmpdir(),'m10v-native-export-'));
+  let python=path.join(root,'.venv/bin/python');try{await access(python);}catch{python='python3';}
+  await run(python,['scripts/build_gr3_m10v_library.py','--out',folder,'--initial-state-hex',plan.initial_state_hex],{cwd:root,signal,timeout:120000,maxBuffer:2*1024*1024});
+  const manifest=JSON.parse(await readFile(path.join(folder,'m10v-library-arm.json'),'utf8'));
+  if(manifest.initial_state_hex!==plan.initial_state_hex)throw Error('ARM 初始配置回读不同');
+  const runtime=await readFile(path.join(folder,'m10v-library-arm.bin'));
+  const result=buildNativeLibrary(source,runtime,manifest);
+  return {...result,manifest,runtime,receipt:{...result.receipt,configuration:plan.configuration,configuration_sha256:plan.configuration_sha256,
+   model:plan.model,public_version:plan.public_version,filename:plan.filename,initial_state_hex:plan.initial_state_hex,initial_settings_policy:plan.initial_settings_policy}};
+ }finally{if(folder)await rm(folder,{recursive:true,force:true});building=false;}
+}

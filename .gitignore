@@ -1,0 +1,27 @@
+/fwdc239b.bin
+/fwdc239b-modify.bin
+/.runtime/
+/data/
+/.venv/
+/node_modules/
+/dist/
+/builds/
+/coverage/
+/__pycache__/
+**/__pycache__/
+*.py[cod]
+.DS_Store
+/.superpowers/
+
+# Firmware inputs, local credentials and session exports are never published.
+/bin/
+/fwdc239b-offical.bin
+.env
+.env.*
+!.env.example
+/.session-export/
+*.pem
+*.key
+
+# Optional GR IV raw calibration photographs remain local.
+/vendor/gr4/gr4_editor/assets/calibration/samples/*.DNG

@@ -1,0 +1,137 @@
+<!doctype html>
+<!-- Copyright (C) 2026 DoYitNow. SPDX-License-Identifier: GPL-2.0-only -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>m10v · GR IV 编辑器</title>
+  <link rel="stylesheet" href="/shared/product.css">
+  <link rel="stylesheet" href="/gr4/styles.css">
+  <link rel="stylesheet" href="/gr4/studio-theme.css">
+  <script src="/gr4/calibration-ui.js" defer></script>
+  <script src="/gr4/app.js" defer></script>
+</head>
+<body>
+  <header class="product-topbar">
+    <a class="product-brand" href="/"><strong>m10v</strong><span>FIRMWARE STUDIO</span></a>
+    <nav class="model-switch" aria-label="切换机型"><a href="/gr3/">GR III</a><a class="active" href="/gr4/">GR IV</a></nav>
+    <div class="product-actions"><span class="local-state">LOCAL WORKSPACE</span><details id="more-menu" class="more-menu"><summary class="button quiet">项目菜单</summary><div class="more-actions"><button id="open-setup" class="button quiet" type="button">设置</button><button id="open-drafts" class="button quiet" type="button">已保存项目</button><button id="import-project" class="button quiet" type="button">导入项目</button><button id="export-project" class="button quiet" type="button" disabled>导出编辑备份</button><button id="download-original" class="button quiet" type="button" disabled>备份原始固件</button><button id="refresh-status" class="button quiet" type="button">刷新状态</button></div></details></div>
+  </header>
+  <section class="gr4-hero"><div><p>RICOH GR IV / M10V EDIT DESK</p><h1>为下一次出街，准备好相机。</h1><span>滤镜 · 裁切比例 · 关机图案　/　独立机型工作区</span></div></section>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <main id="editor-workspace" class="workspace product-workspace">
+    <input id="firmware-file" type="file" accept=".bin,application/octet-stream" hidden>
+    <input id="project-file" type="file" accept=".json,application/json" hidden>
+    <aside class="sidebar panel product-panel">
+      <div class="gr4-desk-label"><span>01 / CREATIVE TOOLS</span><strong>影像工具台</strong><small>选择一个区域，直接编辑对应内容。</small></div>
+      <nav class="function-nav" aria-label="编辑功能">
+        <button id="nav-filters" class="function-button active" type="button" aria-pressed="true" aria-controls="filter-section editor-content">◈　滤镜档案</button>
+        <button id="nav-crops" class="function-button" type="button" aria-pressed="false" aria-controls="crop-section crop-editor">▣　画幅裁切</button>
+        <button id="nav-shutdown" class="function-button" type="button" aria-pressed="false" aria-controls="shutdown-section shutdown-editor">◉　关机画面</button>
+      </nav>
+      <section id="filter-section" class="filter-section">
+        <div class="section-heading"><h2>影像控制 <span id="filter-count" class="count">0</span></h2><button id="add-filter" class="icon-button" type="button" aria-label="新增滤镜" disabled>＋</button></div>
+        <label class="search"><span aria-hidden="true">⌕</span><input id="filter-search" type="search" placeholder="搜索滤镜" aria-label="搜索滤镜" disabled></label>
+        <div id="filter-list" class="filter-list" aria-label="滤镜列表"><p class="list-empty">暂无滤镜</p></div>
+      </section>
+      <section id="crop-section" class="filter-section" hidden>
+        <div class="section-heading"><h2>裁切比例 <span id="crop-count" class="count">0</span></h2><button id="add-crop" class="button small secondary" type="button" disabled>新增比例</button></div>
+        <div id="crop-list" class="filter-list" aria-label="裁切比例列表"><p class="list-empty">暂无比例</p></div>
+      </section>
+      <section id="shutdown-section" class="filter-section" hidden>
+        <div class="section-heading"><h2>关机图案 <span id="shutdown-count" class="count">0 / 16</span></h2><button id="add-shutdown" class="icon-button" type="button" aria-label="新增关机图案" disabled>＋</button></div>
+        <div id="shutdown-list" class="filter-list" aria-label="关机图案列表"><p class="list-empty">暂无图案</p></div>
+      </section>
+    </aside>
+
+    <section class="editor panel product-panel" aria-label="固件功能编辑">
+      <div id="empty-editor" class="empty-editor">
+        <span class="empty-editor-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4H8a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V11L19 4Z"/><path d="M19 4v7h7M11 17h10M11 22h7"/></svg></span>
+        <h2>等待载入</h2>
+        <p>导入后即可开始编辑</p>
+      </div>
+      <div id="editor-content" hidden>
+        <div class="editor-header"><div><p class="eyebrow">影像控制</p><h2 id="editor-name"></h2><p id="editor-subtitle" class="muted"></p></div><button id="filter-details" class="button quiet" type="button">详情</button></div>
+        <section class="identity-section">
+          <div id="icon-preview" class="preset-icon large" aria-label="预设图标预览"></div>
+          <div class="identity-fields"><label class="field-label" for="filter-name">滤镜名称</label><input id="filter-name" class="text-input" type="text" autocomplete="off"><p id="name-help" class="field-help" hidden></p><div class="inline-actions"><button id="change-icon" class="button small secondary" type="button">更换图标</button><button id="replace-filter" class="button small quiet" type="button">替换滤镜</button><button id="remove-filter" class="button small quiet danger" type="button" disabled>删除</button></div><input id="icon-file" type="file" accept="image/png,image/bmp,image/jpeg" hidden></div>
+        </section>
+        <section class="parameter-section">
+          <div class="section-heading"><h3>参数字段</h3><span id="parameter-status" class="badge neutral">等待读取</span></div>
+          <div id="parameters" class="parameter-grid" tabindex="0" role="region" aria-label="参数字段，可向下滚动"></div>
+        </section>
+        <section class="xmp-section">
+          <div class="section-heading"><h3>XMP 转换与校色</h3><div class="inline-actions"><button id="calibration-settings" class="button small quiet" type="button">设置</button><button id="import-xmp" class="button small secondary" type="button">导入 XMP</button></div><input id="xmp-file" type="file" accept=".xmp,application/xml,text/xml" hidden></div>
+          <div id="calibration" class="calibration"></div>
+        </section>
+        <div class="edit-footer"><label class="toggle"><input id="filter-visible" type="checkbox"><span class="toggle-track"></span><span>显示在相机菜单</span></label><div class="reorder"><button id="move-up" class="icon-button" type="button" aria-label="将滤镜上移" title="上移">↑</button><button id="move-down" class="icon-button" type="button" aria-label="将滤镜下移" title="下移">↓</button></div></div>
+      </div>
+      <div id="crop-editor" hidden>
+        <div class="editor-header"><div><p class="eyebrow">裁切比例</p><h2 id="crop-editor-name"></h2><p id="crop-editor-subtitle" class="muted" hidden></p></div></div>
+        <div class="crop-fields">
+          <div><label class="field-label" for="crop-name">名称</label><input id="crop-name" class="text-input" type="text" autocomplete="off" maxlength="64"></div>
+          <div><label class="field-label" for="crop-width">比例（宽 : 高）</label><div class="crop-ratio-inputs"><input id="crop-width" class="text-input mono" type="number" inputmode="decimal" min="0" step="any" placeholder="宽" autocomplete="off" aria-label="比例宽" aria-describedby="crop-preview-status"><span aria-hidden="true">:</span><input id="crop-height" class="text-input mono" type="number" inputmode="decimal" min="0" step="any" placeholder="高" autocomplete="off" aria-label="比例高" aria-describedby="crop-preview-status"><button id="confirm-crop" class="button secondary" type="button" disabled>确认</button></div></div>
+        </div>
+        <p id="crop-preview-status" class="callout" role="status" aria-live="polite" hidden></p>
+        <section class="crop-geometry-section"><div class="section-heading"><h3>裁切预览</h3></div><div id="crop-frame" class="crop-frame" aria-label="裁切预览"><div id="crop-frame-inner"></div></div></section>
+        <div class="edit-footer"><button id="remove-crop" class="button small quiet danger" type="button" disabled>删除比例</button><div class="reorder"><button id="crop-move-up" class="icon-button" type="button" aria-label="将裁切比例上移" title="上移" disabled>↑</button><button id="crop-move-down" class="icon-button" type="button" aria-label="将裁切比例下移" title="下移" disabled>↓</button></div></div>
+      </div>
+      <div id="shutdown-editor" hidden>
+        <div class="editor-header"><div><p class="eyebrow">关机图案</p><h2 id="shutdown-editor-name">关机图案</h2><p id="shutdown-editor-subtitle" class="muted"></p></div></div>
+        <div class="shutdown-layout">
+          <section class="shutdown-preview-section" aria-label="图案预览">
+            <div id="shutdown-preview" class="shutdown-preview"><img id="shutdown-preview-image" alt="关机图案预览" hidden><p id="shutdown-preview-empty">暂无预览</p></div>
+            <div class="shutdown-preview-caption"><span id="shutdown-preview-name"></span></div>
+          </section>
+          <section class="shutdown-fields">
+            <label class="field-label" for="shutdown-name">图案名称</label><input id="shutdown-name" class="text-input" type="text" maxlength="24" autocomplete="off" disabled>
+            <div class="inline-actions"><button id="replace-shutdown-image" class="button small secondary" type="button" disabled>更换图片</button></div>
+            <div class="shutdown-fit-row"><label class="field-label" for="shutdown-fit">显示方式</label><select id="shutdown-fit" class="text-input" disabled><option value="contain">完整显示</option><option value="cover">铺满画面</option></select></div>
+          </section>
+        </div>
+        <p id="shutdown-check-status" class="callout" role="status" aria-live="polite" hidden></p>
+        <div class="edit-footer shutdown-footer"><button id="remove-shutdown-item" class="button small quiet danger" type="button" disabled>删除图案</button><div class="reorder"><button id="shutdown-move-up" class="icon-button" type="button" aria-label="将关机图案上移" title="上移" disabled>↑</button><button id="shutdown-move-down" class="icon-button" type="button" aria-label="将关机图案下移" title="下移" disabled>↓</button></div></div>
+      </div>
+    </section>
+    <aside class="firmware-rail" aria-label="固件与生成">
+      <div class="gr4-rail-label"><span>02 / BUILD LEDGER</span><strong>固件清单</strong></div>
+      <section id="source-summary" class="source-summary panel product-panel" aria-label="当前固件"><h2>当前固件</h2><h1 id="source-meta">未载入</h1><p id="source-name" class="muted"></p><span id="source-sha" class="mono muted"></span><div class="source-actions"><button id="import-firmware" class="button secondary full" type="button">导入固件</button><button id="resume-edit" class="button quiet full" type="button" hidden>继续上次编辑</button></div></section>
+      <section id="build-panel" class="build-panel panel product-panel" hidden>
+        <h2>生成新固件</h2>
+        <input id="project-title" type="text" hidden>
+        <div class="build-controls"><div class="build-version-field"><label class="field-label version-label" for="build-version">新固件版本 <span id="suggested-version" class="muted" hidden></span></label><input id="build-version" class="text-input mono" placeholder="自动分配" autocomplete="off" disabled></div><div class="build-actions"><div class="save-row"><span id="save-status" class="muted">已保存</span><button id="save-project" class="button secondary" type="button" disabled>保存修改</button></div><label class="toggle build-option"><input id="allow-older" type="checkbox" checked disabled><span class="toggle-track"></span><span>允许低版本固件</span></label><button id="build-firmware" class="button primary" type="button" disabled>生成固件</button></div></div>
+        <div id="capability-summary" class="capability-summary status-inline" hidden></div><p id="build-note" class="build-note" hidden></p><div id="build-result" class="build-result" hidden></div>
+      </section>
+      <section class="history-summary panel product-panel" aria-label="固件历史"><h2>固件历史</h2><button id="open-history-card" class="baseline-card" type="button" aria-haspopup="dialog"><span class="field-label">当前基线</span><strong id="history-baseline-version">暂无基线</strong><span id="history-baseline-name" class="muted"></span><span id="history-baseline-sha" class="mono muted" hidden></span><span class="baseline-open">版本记录 <span aria-hidden="true">↗</span></span></button></section>
+    </aside>
+  </main>
+  <dialog id="history-workspace" class="modal history-modal" aria-labelledby="history-title"><section class="history-panel"><div class="history-heading"><div><h1 id="history-title">版本记录</h1></div><div class="history-heading-actions"><button id="refresh-history" class="button secondary" type="button">刷新记录</button><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div></div><div id="history-result" class="build-result" role="status" hidden></div><div id="history-list"><p class="list-empty">正在读取记录…</p></div></section></dialog>
+  <dialog id="history-detail-dialog" class="modal wide" aria-labelledby="history-detail-title"><div class="modal-header"><h2 id="history-detail-title">版本详情</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><div id="history-detail-content"></div></dialog>
+  <dialog id="draft-dialog" class="modal"><div class="modal-header"><h2>已保存的编辑</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><label class="field-label" for="local-projects">选择编辑记录</label><select id="local-projects" class="text-input"><option value="">选择记录</option></select><div class="modal-footer"><button class="button secondary" type="button" data-close-dialog>取消</button><button id="load-draft" class="button primary" type="button">继续编辑</button></div></dialog>
+  <dialog id="rollback-dialog" class="modal"><form id="rollback-form"><div class="modal-header"><h2>生成回退固件</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><div class="rollback-summary"><div><span>恢复内容</span><strong id="rollback-source"></strong></div><div><span>当前输入</span><strong id="rollback-current"></strong></div></div><label class="field-label" for="rollback-version">新固件版本</label><input id="rollback-version" class="text-input mono" required autocomplete="off"><div class="modal-footer"><button class="button secondary" type="button" data-close-dialog>取消</button><button class="button primary" type="submit">生成回退固件</button></div></form></dialog>
+
+  <dialog id="allow-older-warning-dialog" class="modal" aria-labelledby="allow-older-warning-title" aria-describedby="allow-older-warning-text"><div class="modal-header"><h2 id="allow-older-warning-title">允许固件回退</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><p id="allow-older-warning-text" class="callout warning">刷入低版本回退固件前，请将设置恢复出厂，“相机设置-重设-重设为出厂设置”，否则可能会造成因功能丢失导致的菜单卡死。</p><div class="modal-footer"><button class="button primary" type="button" data-close-dialog>知道了</button></div></dialog>
+
+  <dialog id="risk-dialog" class="modal risk-dialog" aria-labelledby="risk-title" aria-describedby="risk-summary risk-detail"><div class="modal-header"><h2 id="risk-title">操作确认</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><p id="risk-summary" class="risk-summary"></p><p id="risk-detail" class="field-help">生成的文件不会自动写入相机。请在继续前确认版本、备份和恢复条件。</p><label class="risk-ack"><input id="risk-ack" type="checkbox"><span>我已了解上述操作风险</span></label><div class="modal-footer risk-footer"><div class="inline-actions"><button id="risk-cancel" class="button secondary" type="button">取消</button><button id="risk-confirm" class="button primary" type="button" disabled>继续</button></div></div></dialog>
+  <dialog id="shutdown-dialog" class="modal"><form id="shutdown-form"><div class="modal-header"><h2 id="shutdown-dialog-title">添加关机图案</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><div id="shutdown-dialog-name"><label class="field-label" for="new-shutdown-name">名称</label><input id="new-shutdown-name" class="text-input" required maxlength="24" autocomplete="off"></div><label class="field-label" for="shutdown-dialog-source">图片来源</label><select id="shutdown-dialog-source" class="text-input"><option value="upload">上传图片</option></select><div id="shutdown-dialog-upload" class="shutdown-dialog-upload"><button id="choose-shutdown-file" class="button secondary" type="button">选择图片</button><span id="shutdown-dialog-file-name" class="field-help">尚未选择图片</span><input id="shutdown-file" type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff" hidden></div><p id="shutdown-dialog-note" class="field-help"></p><div class="modal-footer"><button class="button secondary" type="button" data-close-dialog>取消</button><button id="confirm-shutdown" class="button primary" type="submit">添加</button></div></form></dialog>
+  <dialog id="filter-dialog" class="modal"><form id="filter-form"><div class="modal-header"><h2 id="filter-dialog-title">添加滤镜</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><label class="field-label" for="template-select">模板</label><select id="template-select" class="text-input" required></select><label class="field-label" for="new-filter-name">名称</label><input id="new-filter-name" class="text-input" required maxlength="64"><p id="filter-dialog-note" class="field-help"></p><div class="modal-footer"><button class="button secondary" type="button" data-close-dialog>取消</button><button id="confirm-filter" class="button primary" type="submit">添加</button></div></form></dialog>
+  <dialog id="details-dialog" class="modal wide"><div class="modal-header"><h2 id="details-title">滤镜详情</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div><div id="details-content" class="details-content"></div></dialog>
+  <dialog id="calibration-dialog" class="modal">
+    <div class="modal-header"><h2 id="setup-title">设置</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+    <p id="calibration-dialog-status" class="callout"></p>
+    <label class="field-label" for="calibration-engine">转换方式</label>
+    <select id="calibration-engine" class="text-input"><option value="offline">本地模拟（默认）</option><option value="lightroom">Lightroom Classic</option></select>
+    <p id="calibration-engine-status" class="field-help"></p>
+    <label class="field-label">参考样片</label>
+    <button id="choose-dng" class="button secondary" type="button">选择 DNG</button><input id="dng-files" type="file" accept=".dng,.DNG" multiple hidden>
+    <p id="dng-selection" class="field-help">至少 3 张支持机型的相机原始 DNG，含 1 张独立检查样片。</p>
+    <label class="field-label" for="calibration-heldout">独立检查样片</label><select id="calibration-heldout" class="text-input"><option value="">先选择样片</option></select>
+    <button id="register-calibration" class="button secondary" type="button" disabled>保存样片</button>
+    <details class="calibration-environment"><summary>生成工具链</summary><p id="toolchain-status" class="field-help"></p><label class="field-label" for="toolchain-clang">clang 路径</label><input id="toolchain-clang" class="text-input" placeholder="LLVM 或 NDK 的 clang"><label class="field-label" for="toolchain-lld">LLD 路径（可选）</label><input id="toolchain-lld" class="text-input" placeholder="ld.lld"><button id="save-toolchain" class="button secondary" type="button">检查并保存</button></details>
+    <div class="modal-footer"><button id="run-calibration" class="button secondary" type="button" hidden>重新转换</button><button class="button primary" type="button" data-close-dialog>完成</button></div>
+  </dialog>
+  <div id="busy-overlay" class="busy-overlay" hidden><div class="busy-card"><span class="spinner" aria-hidden="true"></span><strong id="busy-label">正在处理…</strong></div></div>
+  <noscript><p class="notice error">此本地工具需要启用 JavaScript。</p></noscript>
+</body>
+</html>

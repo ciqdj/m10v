@@ -1,0 +1,408 @@
+{
+  "schema": "m10v-gr3-800t-static-contract/v1",
+  "rtos_sha256": "8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67",
+  "anchors": [
+    {
+      "address": 1399624784,
+      "bytes": "5038e7e7",
+      "meaning": "CPU converter extracts Cr from input byte2"
+    },
+    {
+      "address": 1399624804,
+      "bytes": "7030efe6",
+      "meaning": "CPU converter extracts unsigned Y byte0"
+    },
+    {
+      "address": 1399624808,
+      "bytes": "5004e7e7",
+      "meaning": "CPU converter extracts Cb byte1"
+    },
+    {
+      "address": 1399624832,
+      "bytes": "c76a76ee",
+      "meaning": "Cr minus128"
+    },
+    {
+      "address": 1399624848,
+      "bytes": "476a36ee",
+      "meaning": "Cb minus128"
+    },
+    {
+      "address": 1399625040,
+      "bytes": "00000043",
+      "meaning": "128.0 f32 neutral"
+    },
+    {
+      "address": 1399624760,
+      "bytes": "5004efe7",
+      "meaning": "repacker extracts Cb/Cr halfword"
+    },
+    {
+      "address": 1399624768,
+      "bytes": "1038dfe7",
+      "meaning": "repacker places Cb/Cr at bits16..31"
+    },
+    {
+      "address": 1399680472,
+      "bytes": "020053e3",
+      "meaning": "fill dispatcher recognizes UI format2"
+    },
+    {
+      "address": 1399680488,
+      "bytes": "010053e3",
+      "meaning": "fill dispatcher recognizes UI format1"
+    },
+    {
+      "address": 1399680608,
+      "bytes": "60ffffeb",
+      "meaning": "UI format1 calls semiplanar422 fill"
+    },
+    {
+      "address": 1399680040,
+      "bytes": "b6a1dbe1",
+      "meaning": "422 fill takes repacked Cb/Cr halfword"
+    },
+    {
+      "address": 1399679764,
+      "bytes": "b220c3e0",
+      "meaning": "CPU stores Cb/Cr halfword little endian"
+    },
+    {
+      "address": 1399617140,
+      "bytes": "00c0c4e5",
+      "meaning": "adapter writes low descriptor format"
+    },
+    {
+      "address": 1399617252,
+      "bytes": "080084e5",
+      "meaning": "adapter writes combined chroma pointer"
+    },
+    {
+      "address": 1406905920,
+      "bytes": "01020102",
+      "meaning": "UI types1/2 map low422/420 formats1/2"
+    },
+    {
+      "address": 1406905924,
+      "bytes": "02020101",
+      "meaning": "UI types1/2 map combined address mode2"
+    },
+    {
+      "address": 1399686692,
+      "bytes": "b270d8e0",
+      "meaning": "420 consumer reads two Y samples"
+    },
+    {
+      "address": 1399686700,
+      "bytes": "b240d9e0",
+      "meaning": "420 consumer reads Cb/Cr pair"
+    },
+    {
+      "address": 1397814600,
+      "bytes": "90e89fe5",
+      "meaning": "JPEG config vptr literal load"
+    },
+    {
+      "address": 1397814764,
+      "bytes": "b8e984e5",
+      "meaning": "JPEG config vptr R+9b8"
+    },
+    {
+      "address": 1397811792,
+      "bytes": "115e80e2",
+      "meaning": "copy primary YCbCr descriptor to extra descriptor"
+    },
+    {
+      "address": 1397811828,
+      "bytes": "f03984e5",
+      "meaning": "JPEG request pointer"
+    },
+    {
+      "address": 1397811836,
+      "bytes": "ec2984e5",
+      "meaning": "ShootingInfo pointer"
+    },
+    {
+      "address": 1397811852,
+      "bytes": "f41984e5",
+      "meaning": "main JPEG descriptor pointer"
+    },
+    {
+      "address": 1397811876,
+      "bytes": "005a84e5",
+      "meaning": "extra JPEG descriptor pointer"
+    },
+    {
+      "address": 1397830292,
+      "bytes": "b537d1e5",
+      "meaning": "record image format enum"
+    },
+    {
+      "address": 1397830536,
+      "bytes": "0120a0e3",
+      "meaning": "JPEG-only initial flags"
+    },
+    {
+      "address": 1397830556,
+      "bytes": "0d30c0e5",
+      "meaning": "RAW-only initial flags"
+    },
+    {
+      "address": 1397830508,
+      "bytes": "0130a0e3",
+      "meaning": "RAW+JPEG initial flags"
+    },
+    {
+      "address": 1397780072,
+      "bytes": "383094e5",
+      "meaning": "RAW request pointer"
+    },
+    {
+      "address": 1397780076,
+      "bytes": "0d30d3e5",
+      "meaning": "RAW encode gate"
+    },
+    {
+      "address": 1397780096,
+      "bytes": "61feffeb",
+      "meaning": "RAW encode dispatch"
+    },
+    {
+      "address": 1397778580,
+      "bytes": "049095e5",
+      "meaning": "RAW source pointer"
+    },
+    {
+      "address": 1397778500,
+      "bytes": "960006e0",
+      "meaning": "RAW declared pixels"
+    },
+    {
+      "address": 1397778512,
+      "bytes": "8660a0e1",
+      "meaning": "RAW declared byte extent"
+    },
+    {
+      "address": 1399209908,
+      "bytes": "2030d4e5",
+      "meaning": "main JPEG enable"
+    },
+    {
+      "address": 1399209948,
+      "bytes": "2330d4e5",
+      "meaning": "extra JPEG enable"
+    },
+    {
+      "address": 1399210924,
+      "bytes": "fcfdffeb",
+      "meaning": "main encode"
+    },
+    {
+      "address": 1399210892,
+      "bytes": "04feffeb",
+      "meaning": "extra encode"
+    },
+    {
+      "address": 1399208692,
+      "bytes": "10a0d4e5",
+      "meaning": "output coding parameter byte"
+    },
+    {
+      "address": 1397770564,
+      "bytes": "509506eb",
+      "meaning": "macro waits after send"
+    },
+    {
+      "address": 1397813360,
+      "bytes": "700e00eb",
+      "meaning": "recipe chooses planner"
+    },
+    {
+      "address": 1397813364,
+      "bytes": "1c0084e5",
+      "meaning": "recipe sequence pointer"
+    },
+    {
+      "address": 1397813368,
+      "bytes": "185084e5",
+      "meaning": "recipe mode at +18"
+    },
+    {
+      "address": 1397810908,
+      "bytes": "40c984e5",
+      "meaning": "BackResize source R+70"
+    },
+    {
+      "address": 1397810912,
+      "bytes": "440984e5",
+      "meaning": "BackResize destination R+b0"
+    },
+    {
+      "address": 1397749024,
+      "bytes": "50fdffeb",
+      "meaning": "BackResize selects execution mode"
+    },
+    {
+      "address": 1397749048,
+      "bytes": "55ffffea",
+      "meaning": "BackResize actual handler"
+    },
+    {
+      "address": 1397747224,
+      "bytes": "043081e5",
+      "meaning": "main JPEG aliases developed Y source"
+    },
+    {
+      "address": 1397747232,
+      "bytes": "083081e5",
+      "meaning": "main JPEG aliases developed chroma source"
+    },
+    {
+      "address": 1397746624,
+      "bytes": "58b406eb",
+      "meaning": "BackResize hardware service send"
+    },
+    {
+      "address": 1397746724,
+      "bytes": "98ac06eb",
+      "meaning": "BackResize waits completion event"
+    },
+    {
+      "address": 1397746736,
+      "bytes": "67ac06eb",
+      "meaning": "BackResize clears completion event"
+    },
+    {
+      "address": 1397759748,
+      "bytes": "181096e5",
+      "meaning": "Develop reads primary output Y"
+    },
+    {
+      "address": 1397759760,
+      "bytes": "1c0096e5",
+      "meaning": "Develop reads primary output chroma"
+    },
+    {
+      "address": 1397812168,
+      "bytes": "849984e5",
+      "meaning": "Develop configured output Y"
+    },
+    {
+      "address": 1397812172,
+      "bytes": "885984e5",
+      "meaning": "Develop configured output chroma"
+    },
+    {
+      "address": 1397877620,
+      "bytes": "aabeffeb",
+      "meaning": "scheduler config setup"
+    },
+    {
+      "address": 1397877648,
+      "bytes": "5fbdffeb",
+      "meaning": "scheduler obtains module config"
+    },
+    {
+      "address": 1397877740,
+      "bytes": "4d3406eb",
+      "meaning": "scheduler module send"
+    },
+    {
+      "address": 1397883024,
+      "bytes": "14208ae5",
+      "meaning": "scheduler increments process index"
+    },
+    {
+      "address": 1397882680,
+      "bytes": "0a0051e3",
+      "meaning": "scheduler recognizes wait kind 10"
+    },
+    {
+      "address": 1397882648,
+      "bytes": "ac0595e5",
+      "meaning": "scheduler moves recipe out of active queue at wait"
+    },
+    {
+      "address": 1397775736,
+      "bytes": "39ff2fe1",
+      "meaning": "generic module calls concrete process handler"
+    },
+    {
+      "address": 1397775912,
+      "bytes": "0520a0e1",
+      "meaning": "generic module callback after process returns"
+    },
+    {
+      "address": 1397881064,
+      "bytes": "2c0040e2",
+      "meaning": "owner callback thunk"
+    },
+    {
+      "address": 1397880160,
+      "bytes": "f2edffeb",
+      "meaning": "owner records completed process"
+    },
+    {
+      "address": 1397861836,
+      "bytes": "2030c0e5",
+      "meaning": "completion flag R+20+module"
+    },
+    {
+      "address": 1397861872,
+      "bytes": "571e00eb",
+      "meaning": "completion reactivates recipe"
+    },
+    {
+      "address": 1392509644,
+      "bytes": "60019fe5",
+      "meaning": "original startup translation mapping"
+    },
+    {
+      "address": 1392509648,
+      "bytes": "100f02ee",
+      "meaning": "original startup translation mapping"
+    },
+    {
+      "address": 1392509656,
+      "bytes": "500f02ee",
+      "meaning": "original startup translation mapping"
+    },
+    {
+      "address": 1392510004,
+      "bytes": "00400053",
+      "meaning": "original startup translation mapping"
+    },
+    {
+      "address": 1392510008,
+      "bytes": "55555555",
+      "meaning": "original startup translation mapping"
+    },
+    {
+      "address": 1392530688,
+      "bytes": "26c80154",
+      "meaning": "original startup translation mapping"
+    }
+  ],
+  "chroma": {
+    "order": "CbCr",
+    "encoding": "unsigned8",
+    "neutral": 128,
+    "addressMode": 2
+  },
+  "recipeModes": [
+    0,
+    1,
+    5,
+    6,
+    7,
+    8,
+    12
+  ],
+  "supported": "exact still recipe; synchronous main-JPEG source modification; runtime CFA/scratch bounds and nonoverlap",
+  "limits": [
+    "Actual updater/boot/capture/cache timing requires camera testing",
+    "Unsupported recipe, invalid geometry, allocation failure or CFA alias skips the effect",
+    "DNG JPEG previews may share developed pixels and show halation; CFA is excluded",
+    "No live-view or in-camera RAW redevelopment halation support"
+  ]
+}

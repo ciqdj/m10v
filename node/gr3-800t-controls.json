@@ -1,0 +1,60 @@
+{
+  "schema": "m10v-gr3-800t-camera-controls/v2",
+  "tone": 18,
+  "menu": "800T / Detailed Settings",
+  "storage": "current record private32 + C:\\M10V8CFG.BIN",
+  "fields": [
+    {
+      "id": 18,
+      "label": "红晕强度",
+      "range": [
+        0,
+        8
+      ],
+      "default": 3
+    },
+    {
+      "id": 19,
+      "label": "扩散范围",
+      "range": [
+        0,
+        8
+      ],
+      "default": 3
+    },
+    {
+      "id": 20,
+      "label": "高光阈值",
+      "range": [
+        0,
+        8
+      ],
+      "default": 5
+    },
+    {
+      "id": 21,
+      "label": "红晕档位",
+      "range": [
+        0,
+        3
+      ],
+      "default": 2
+    },
+    {
+      "id": 22,
+      "label": "颗粒感",
+      "range": [
+        0,
+        3
+      ],
+      "default": 0
+    }
+  ],
+  "pipelinePatches": [],
+  "limits": [
+    "Only the Bleach-based 800T slot exposes dedicated controls",
+    "Original color sliders retain their stock meaning",
+    "Still JPEG capture; no live halation or RAW redevelopment",
+    "SD persistence and physical menu rendering require camera testing"
+  ]
+}
