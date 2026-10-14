@@ -267,8 +267,13 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         (state->stamp && (!date_valid(date) || overlap(image->y, bytes, date, sizeof(*date)) ||
           overlap(image->chroma, bytes, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
     const m10v_slot *choice = &state->slots[slot];
-    uint32_t step = 1, gw = image->width, gh = image->height;
-    while (gw > 384 || gh > 256) { step <<= 1; gw = (image->width + step - 1) / step; gh = (image->height + step - 1) / step; }
+    uint32_t shift = 0, gw = image->width, gh = image->height;
+    /* Power-of-two sampling must not depend on an ARM division runtime. */
+    while (gw > 384 || gh > 256) {
+        ++shift;
+        uint32_t mask = (1u << shift) - 1;
+        gw = (image->width + mask) >> shift; gh = (image->height + mask) >> shift;
+    }
     uint32_t cells = gw * gh;
     uint32_t use_halo = choice->film == 33 && choice->halo_profile && choice->halo_gain;
     uint32_t needed = ((use_halo ? 6 : 2) * cells + 3) & ~3u;
@@ -316,7 +321,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         uint8_t *temp = scratch + cells;
         for (uint32_t i = 0; i < cells; ++i) scratch[i] = 0;
         for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
-            uint8_t v = image->y[row * image->stride + x]; uint32_t at = (row / step) * gw + x / step;
+            uint8_t v = image->y[row * image->stride + x]; uint32_t at = (row >> shift) * gw + (x >> shift);
             v = v > 192 ? (uint8_t)(v - 192) : 0; if (v > scratch[at]) scratch[at] = v;
         }
         for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
@@ -331,7 +336,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         }
         for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
             uint32_t at = row * image->stride + x; uint32_t v = image->y[at];
-            uint32_t bloom = scratch[(row / step) * gw + x / step];
+            uint32_t bloom = scratch[(row >> shift) * gw + (x >> shift)];
             image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
         }
     }
