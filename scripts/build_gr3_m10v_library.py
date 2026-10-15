@@ -112,13 +112,15 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
         'm10v_icon_': {'m10v_icon_pixels'},
+        'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
+        'm10v_sd_camera_': {'m10v_sd_camera_item','m10v_sd_camera_install'},
         'm10v_debug_': {'m10v_debug_log'},
     }[prefix]
     if set(symbols) != required or not image_sections: raise ValueError('runtime API incomplete')
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False):
     if type(debug_mode) is not bool or not isinstance(debug_build_id,int) or not 0<=debug_build_id<=0xffffffff:
         raise ValueError('invalid debug build options')
     if initial_state_hex is None:
@@ -179,7 +181,15 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += bytes(camera_base - base - len(image)) + camera
         symbols.update(camera_symbols)
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
-        debug_flags = [f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u']
+        if sd_library:
+            subprocess.run(['node','scripts/generate_gr3_sd_contract.mjs','--check'],cwd=ROOT,check=True,capture_output=True)
+            for sd_source,sd_prefix in [('m10v_sd_library.c','m10v_sd_'),('m10v_sd_camera.c','m10v_sd_camera_')]:
+                sd_obj=folder/(sd_source+'.o')
+                subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3'/sd_source),'-o',str(sd_obj)],check=True,capture_output=True)
+                sd_base=(base+len(image)+15)&~15
+                sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
+                image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
+        debug_flags = [f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}']
         if debug_mode:
             debug_obj = folder / 'debug.o'
             subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_debug.c'),'-o',str(debug_obj)],check=True,capture_output=True)
@@ -217,6 +227,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             *[str(i) for i in range(9)],'Off','Weak','Natural','Strong',
             *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]]
         if len(texts) != 125: raise ValueError('private resource inventory differs')
+        if sd_library:texts+=['Empty','Previous page','Next page','SD Film Library']
+        last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
         for index, text in enumerate(texts):
@@ -274,7 +286,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             ldr r3,[r3,r7,lsl #2]
             ldr pc,=0x5339710c
             .ltorg
-        ''')
+        '''.replace('#910',f'#{last_resource}'))
         subprocess.run([compiler, *FLAGS, '-c', str(resource_asm), '-o', str(resource_obj)], check=True, capture_output=True)
         resource_code_base = (base + len(image) + 15) & ~15
         resource_code, resource_symbols = link_object(resource_obj.read_bytes(), resource_code_base,
@@ -364,6 +376,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'flags': FLAGS, 'debug_compile_flags': debug_flags, 'firmware_artifact': False, 'camera_tested': False,
                 'abi': 'M10V state64 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
+    manifest['sd_library']=sd_library
+    if sd_library:
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','scripts/generate_gr3_sd_contract.mjs']})
     manifest['debug_mode']=debug_mode
     manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
         'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'],
@@ -372,7 +387,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if initial_offset < 0 or bytes(image).find(initial, initial_offset+1) >= 0: raise ValueError('initial state not uniquely embedded')
     manifest['initial_state_hex'] = initial.hex()
     manifest['initial_state_offset'] = initial_offset
-    manifest['resources'] = {'first_id': 786, 'last_id': 910, 'table': resource_base,
+    manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
     manifest['icons']={'first_id':671,'last_id':735,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
     (out / 'm10v-library-arm.bin').write_bytes(image)
@@ -385,6 +400,7 @@ if __name__ == '__main__':
     parser.add_argument('--out', type=Path, default=ROOT / 'builds/gr3-m10v-library')
     parser.add_argument('--base',type=lambda v:int(v,0),default=0x540b6000)
     parser.add_argument('--initial-state-hex')
+    parser.add_argument('--sd-library',action='store_true')
     parser.add_argument('--debug',action='store_true')
     parser.add_argument('--debug-build-id',type=lambda v:int(v,0),default=0)
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library), indent=2))

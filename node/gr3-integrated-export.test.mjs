@@ -33,9 +33,9 @@ test('final joined firmware contains all selected components and rejects repaire
  assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.equal(result.manifest.base,0x540ba000);
  assert.ok(result.receipt.composition.verified);
- assert.equal(result.receipt.composition.aspect_resource_id,911);
+ assert.equal(result.receipt.composition.aspect_resource_id,915);
  assert.equal(result.receipt.composition.native_resource_range[0],786);
- assert.equal(result.receipt.composition.native_resource_range[1],910);
+ assert.equal(result.receipt.composition.native_resource_range[1],914);
  assert.equal(sum32(result.candidate),0);
  const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
  let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);

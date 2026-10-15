@@ -68,15 +68,16 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
    const stock=original.rtos.subarray(off,off+4),addition=c.rtos.subarray(off,off+4);
    if(addition.equals(stock))continue;
    const current=rtos.subarray(off,off+4),address=LOAD+off;
+   const nativeBound=(0xe3003000|manifest.resources.last_id)>>>0;
    const router=e.aspect&&[0x533966d4,0x533970ec].includes(address);
-   need(current.equals(stock)||(router&&current.readUInt32LE()===0xe300338e),'camera components overlap native patch at '+address.toString(16));
+   need(current.equals(stock)||(router&&current.readUInt32LE()===nativeBound),'camera components overlap native patch at '+address.toString(16));
    addition.copy(rtos,off);stockWords++;
   }
   need(rtos.subarray(original.rtos.length,COMPONENT_END-LOAD).every(v=>v===0),'camera component allocation overlaps native module');
   c.rtos.subarray(original.rtos.length).copy(rtos,original.rtos.length);
   if(e.aspect){
    need(rtos.readUInt32LE(0x540b97e8-LOAD)===2,'component must disable its timestamp renderer');
-   for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');rtos.writeUInt32LE(after,off);}
+   for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');const id=manifest.resources.last_id+(after===0xe300338e?0:1);rtos.writeUInt32LE(((after&0xfffff000)|id)>>>0,off);}
   }
  }
  if(e.negativeGrain){
@@ -93,7 +94,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
  return {target,nativeReceipt,composition:{schema:'m10v-gr3-integrated-components/v1',verified:true,extensions:e,
   component_variant:variant(e)||null,component_rtos_sha256:c?sha(c.rtos):null,
   component_range:c?[COMPONENT_BASE,COMPONENT_END]:null,native_range:[manifest.base,manifest.base+runtime.length],
-  native_resource_range:[786,910],aspect_resource_id:e.aspect?911:null,
+  native_resource_range:[786,manifest.resources.last_id],aspect_resource_id:e.aspect?manifest.resources.last_id+1:null,
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
   raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,

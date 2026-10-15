@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
+<title>m10v · SD 胶卷库</title><link rel="icon" type="image/svg+xml" href="/shared/m10v-logo.svg"><link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/shared/brand.css"><link rel="stylesheet" href="/gr3/sd-library.css"><script type="module" src="/gr3/sd-library.js"></script></head>
+<body>
+<header class="topbar"><a class="brand m10v-brand" href="/gr3/"><img class="m10v-mark" src="/shared/m10v-logo.svg" width="42" height="35" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>SD 胶卷库</span></a><nav class="model-nav" aria-label="主导航"><a href="/gr3/">固件工作台</a><a href="/guide/">说明</a></nav></header>
+<main class="sd-main">
+<section class="sd-intro"><p class="kicker">GR III · FILMS TO GO</p><h1>把胶卷库，带进相机。</h1><p>将喜欢的胶卷装进 SD 卡，在机内随时替换五个影像风格槽。</p><div class="sd-note"><strong>需要配套的 M10V SD 胶卷库固件</strong><p>本页仅支持 GR III 2.10。旧版内置胶卷库固件不读取 SD 文件，GR IIIx 暂不支持。当前为离线验证候选，尚待真机验收。</p><a href="/gr3/">前往固件工作台 →</a></div></section>
+<section aria-labelledby="film-heading"><div class="sd-heading"><div><p class="kicker">01 / SELECT</p><h2 id="film-heading">选择胶卷</h2></div><div class="sd-actions"><button id="sd-all" disabled>全选</button><button id="sd-none" disabled>清空</button></div></div>
+<p>默认全选，也可只带走喜欢的几卷。卡上的胶卷数量不受五个活动槽位限制。</p><div id="sd-films" aria-busy="true"></div></section>
+<section class="sd-guide" aria-labelledby="guide-heading"><p class="kicker">02 / LOAD</p><h2 id="guide-heading">放进相机</h2><ol><li>解压下载的 ZIP，将 <code>SD/M10V</code> 文件夹复制到 SD 卡根目录，与 <code>DCIM</code> 并列。更新时只替换 <code>FILMS.M10</code>，保留其他文件。</li><li>机内进入 <strong>MENU → Image Control → M10V Library</strong>，通过 <strong>Choose Slot</strong> 选择要替换的槽位。</li><li>返回库菜单，进入 <strong>SD Film Library</strong>，使用 <strong>Previous page / Next page</strong> 翻页，选卷后按 OK 装入。Back 返回，Done 退出。</li></ol><p>装入成功后，重启或换卡仍保留。损坏、不兼容或保存失败时保持原槽；不会修改其他槽的质感和时间戳设置。</p></section>
+<div class="sd-download"><div><strong id="sd-count">正在读取胶卷目录…</strong><p id="sd-status" role="status" aria-live="polite"></p></div><button id="sd-download" class="primary" disabled>下载 SD 胶卷库 ↓</button></div>
+</main></body></html>

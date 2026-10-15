@@ -1,3 +1,4 @@
+import {exportSdFilms} from './gr3-sd-film-export.mjs';
 import { fitXmp } from './gr3-xmp-fit.mjs';
 import { prepareCustomization, buildCustomization } from './gr3-customization.mjs';
 import { stockPresetCapabilities } from './gr3-stock-presets.mjs';
@@ -179,18 +180,19 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const haloMatch = /^\/api\/projects\/([0-9a-f]{64})\/800t\/(prepare|build)$/.exec(pathname);
     const editMatch = /^\/api\/projects\/([0-9a-f]{64})\/edit\/(prepare|build)$/.exec(pathname);
     if (!['/api/import', '/api/backup/inspect', '/api/backup/restore', '/api/gr3/film/fit',
-      '/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
+      '/api/gr3/sd-library/export','/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
       !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch)
       return send(response, 404, { error: 'not found' });
     if (request.headers['x-m10v-token'] !== token ||
       (request.headers.origin && request.headers.origin !== origin))
       return send(response, 403, { error: 'authorization failed' });
     try {
-      const body = await readBody(request, pathname === '/api/gr3/film-bay/pack' ? 2048 :
+      const body = await readBody(request, ['/api/gr3/sd-library/export','/api/gr3/film-bay/pack'].includes(pathname) ? 2048 :
         pathname === '/api/platform/inspect-official' ? 4096 :
         pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
         nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
         sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
+      if(pathname==='/api/gr3/sd-library/export'){const {zip}=exportSdFilms(JSON.parse(body.toString('utf8')));return send(response,200,zip,'application/zip','M10V-SD-films.zip');}
       if(pathname==='/api/platform/inspect'||pathname==='/api/platform/inspect-official'){
         const bytes=pathname==='/api/platform/inspect'?body:await readModelOfficial(JSON.parse(body.toString('utf8')).model);
         return send(response,200,await inspectModelFirmware(bytes));

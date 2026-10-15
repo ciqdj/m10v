@@ -7,6 +7,12 @@
  */
 #include "m10v_library.h"
 #include "m10v_debug.h"
+#ifndef M10V_SD_LIBRARY
+#define M10V_SD_LIBRARY 0
+#endif
+#if M10V_SD_LIBRARY
+#include "m10v_sd_library.h"
+#endif
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -25,7 +31,7 @@ static uint8_t *model(void) {
 static int supported(const uint8_t *m) {
     return (uintptr_t)m == 0x55068200u && m[0x1b] == 0;
 }
-static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= 14 ? m[0x1d] : 0; }
+static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= (M10V_SD_LIBRARY ? 46 : 14) ? m[0x1d] : 0; }
 static uint32_t slot(const uint8_t *m) {
     /* Byte 0x1e is padding after the stock last member at 0x1c. Keep
      * the original m[0] entry snapshot intact for stock cancellation. */
@@ -36,7 +42,12 @@ static uint32_t slot(const uint8_t *m) {
 uint32_t m10v_menu_count(uint32_t address) {
     const uint8_t *m = (const uint8_t *)(uintptr_t)address;
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x80u))(address);
-    return counts[mode(m)];
+    uint32_t group=mode(m);
+#if M10V_SD_LIBRARY
+    if(group>=15)return 10;
+    if(group==1)return 7;
+#endif
+    return counts[group];
 }
 uint32_t m10v_menu_max_count(void) { return 33; }
 uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
@@ -44,13 +55,25 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!supported(m)) return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     uint32_t group = mode(m);
     if (!group) return index == 12 ? 128 : ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
+#if M10V_SD_LIBRARY
+    if(group>=15){
+        if(index<8){uint32_t id=m10v_sd_camera_item(group-15,index);return id?512+id:600;}
+        return index==8?601:index==9?602:0;
+    }
+    if(group==1&&index==6)return 603;
+#endif
     if (index >= counts[group]) return 0;
     static const uint8_t first[15] = {0,129,144,176,180,184,208,192,196,200,218,224,224,224,233};
     if(group==2)return index==0?213:256+index-1;
     if(group==1&&index==5)return 214;
     return first[group]+index;
 }
+static uint32_t film_resource(uint32_t film);
 static uint32_t resource(uint32_t tone) {
+#if M10V_SD_LIBRARY
+    if(tone>=545&&tone<=577)return film_resource(tone-512);
+    if(tone>=600&&tone<=603)return 911+tone-600;
+#endif
     if(tone>=256&&tone<288)return 879+tone-256;
     if(tone==214)return 861;
     if(tone>=218&&tone<222)return 862+tone-218;
@@ -94,6 +117,9 @@ uint32_t m10v_menu_value_name(uint32_t translator, uint32_t value) {
     return ((call2_fn)(M10V_NATIVE_BASE + 0x20u))(translator, value);
 }
 uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
+#if M10V_SD_LIBRARY
+    if(tone>=545&&tone<=577)return 670+tone-512;
+#endif
     if(tone>=144 && tone<176)return 671+tone-144;
     if(tone==213)return 703;
     if(tone>=256 && tone<288)return 704+tone-256;
@@ -110,6 +136,14 @@ uint32_t m10v_menu_value_icon(uint32_t translator, uint32_t value) {
 uint32_t m10v_menu_focus(uint32_t controller, uint32_t index) {
     uint8_t *m = model();
     M10V_LOG(30,controller,index,m[0],(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
+#if M10V_SD_LIBRARY
+    if(mode(m)>=15){
+        uint32_t id=index<8?m10v_sd_camera_item(mode(m)-15,index):0;
+        __atomic_fetch_and(m+0x1f,1,__ATOMIC_RELAXED);
+        __atomic_fetch_or(m+0x1f,(uint8_t)(id<<1),__ATOMIC_RELAXED);
+        return 0;
+    }
+#endif
     uint32_t result=0;
     if (!(supported(m) && (mode(m) || index == 12)))
         result=((call2_fn)(M10V_NATIVE_BASE + 0xa0u))(controller, index);
@@ -135,6 +169,13 @@ static void redraw(uint32_t controller) {
             else if(group==13)selected=v->halo_threshold;else if(group==14)selected=v->halo_profile;
         }
     }
+#if M10V_SD_LIBRARY
+    if(group>=15){
+        uint32_t id=m10v_sd_camera_item(group-15,0);
+        __atomic_fetch_and(m+0x1f,1,__ATOMIC_RELAXED);
+        __atomic_fetch_or(m+0x1f,(uint8_t)(id<<1),__ATOMIC_RELAXED);
+    }
+#endif
     ((call2_fn)0x53395430u)(view, selected);
     M10V_LOG(51,controller,selected,group,target);
 }
@@ -160,14 +201,35 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
         for (uint32_t i = 0; i < 5; ++i) if (active == tones[i]) m[0x1e] = (uint8_t)active;
         m[0x1d] = 1; redraw(controller); return 0;
     }
-    if (index == counts[group]) {
+#if M10V_SD_LIBRARY
+    if(group>=15){
+        if(index==10){m[0x1d]=1;redraw(controller);return 0;}
+        if(index==11){m[0x1d]=0;return ((get_fn)(M10V_NATIVE_BASE+0x60u))(controller);}
+        if(index==8||index==9){
+            uint32_t next=index==8?(group>15?group-1:group):(group<46?group+1:group);
+            if(next!=group&&m10v_sd_camera_item(next-15,0)){m[0x1d]=(uint8_t)next;redraw(controller);}
+            return 0;
+        }
+        uint32_t cached=__atomic_load_n(m+0x1f,__ATOMIC_RELAXED)>>1;
+        uint32_t current=index<8?m10v_sd_camera_item(group-15,index):0;
+        if(!cached||cached!=current||m10v_sd_camera_install(group-15,index,cached,slot(m))){failure(controller);return 0;}
+        ((call2_fn)(M10V_NATIVE_BASE+0x00u))((uint32_t)(uintptr_t)m,tones[slot(m)]);
+        m[0x1d]=1;redraw(controller);return 0;
+    }
+    if(group==1&&index==6){
+        if(!m10v_sd_camera_item(0,0)){failure(controller);return 0;}
+        m[0x1d]=15;redraw(controller);return 0;
+    }
+#endif
+    uint32_t group_count=m10v_menu_count((uint32_t)(uintptr_t)m);
+    if (index == group_count) {
         m[0x1d] = group==1?0:group>=11?10:group==10?1:group>=7?5:1;
         redraw(controller); return 0;
     }
-    if (index == (uint32_t)counts[group] + 1) {
+    if (index == group_count + 1) {
         m[0x1d] = 0; return ((get_fn)(M10V_NATIVE_BASE + 0x60u))(controller);
     }
-    if (index >= counts[group]) return 0;
+    if (index >= group_count) return 0;
     if (group == 1) { m[0x1d] = (uint8_t)(index==5?10:index == 4 ? 6 : index + 2); redraw(controller); return 0; }
     if (group == 6) {
         m[0x1e] = tones[index];
@@ -230,7 +292,11 @@ uint32_t m10v_menu_key(uint32_t controller,uint32_t event) {
 #endif
 uint32_t m10v_menu_enter(uint32_t controller) {
     M10V_LOG(10,controller,0,0,0);
-    uint8_t *m = model(); if (supported(m)) { m[0x1d] = 0; m[0x1e] = 0; }
+    uint8_t *m = model(); if (supported(m)) { m[0x1d] = 0; m[0x1e] = 0;
+#if M10V_SD_LIBRARY
+    __atomic_fetch_and(m+0x1f,1,__ATOMIC_RELAXED);
+#endif
+ }
     uint32_t result=((get_fn)(M10V_NATIVE_BASE + 0xb0u))(controller);
     M10V_LOG(11,controller,result,m[0],m[0x1d]);return result;
 }
