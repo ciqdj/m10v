@@ -137,6 +137,16 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(menu[-1]['sequence'],70)
         self.assertEqual(len([r for r in records if r['channel']=='capture']),1)
 
+    def test_persisted_capture_settings_and_source_decode_after_reader_restart(self):
+        self.assertEqual(self.log(112,a=1,b=202534,c=4,d=2),1)
+        self.assertEqual(self.log(113,a=1,b=2,c=4,d=3),1)
+        from scripts.read_gr3_debug_log import decode_logs
+        result=decode_logs(list(self.files.values()))
+        settings=next(r for r in result['records'] if r['event']==112)
+        self.assertEqual(settings['settings'],dict(slot=1,gain=6,spread=2,threshold=7,grain=1,soft=3,sequence=4,renderer_revision=2))
+        source=next(r for r in result['records'] if r['event']==113)
+        self.assertEqual(source['provenance'],dict(slot=1,source='migrated-v2',sequence=4,journal_namespace=3))
+
     def test_partial_write_preserves_previous_checkpoint(self):
         self.assertEqual(self.log(30),1);self.fail_write=True
         self.assertEqual(self.log(31),0)

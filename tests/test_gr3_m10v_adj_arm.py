@@ -137,7 +137,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.assertFalse(self.files)
                 self.assertLess(self.tone,128)
                 self.call('m10v_menu_confirm',redraw.CONTROLLER)
-                payload=self.files['M10V2B.bin']
+                payload=self.files['M10V3B.bin']
                 self.assertEqual(struct.unpack_from('<H',payload,20)[0],film)
                 self.assertEqual(self.tone,18)
                 self.assertEqual(self.u.mem_read(redraw.MODEL+0x1d,1),b'\x01')
@@ -150,7 +150,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 payload=bytearray(initial)
                 struct.pack_into('<H',payload,20,film)
                 struct.pack_into('<I',payload,60,zlib.crc32(payload[:60]))
-                self.files={'M10V2B.bin':bytes(payload)}
+                self.files={'M10V3B.bin':bytes(payload)}
                 before=dict(self.files)
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
                 self.call(0x531ac074,redraw.CONTROLLER)
