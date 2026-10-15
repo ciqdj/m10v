@@ -91,6 +91,16 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const pathname = request.url;
     if (!pathname || pathname.includes('?') || pathname.includes('#') || pathname.includes('%') ||
       pathname.includes('\\') || pathname.includes('..')) return send(response, 404, { error: 'not found' });
+    if(pathname==='/hooks/github'){
+      if(request.method!=='POST')return send(response,405,{error:'POST required'});
+      try{
+        const body=await readBody(request,1024*1024);
+        const upstream=await fetch('http://127.0.0.1:3001/hooks/github',{method:'POST',body,
+          headers:{'Content-Type':'application/json','X-Hub-Signature-256':request.headers['x-hub-signature-256']||'',
+            'X-GitHub-Event':request.headers['x-github-event']||''},signal:AbortSignal.timeout(5000)});
+        return send(response,upstream.status,await upstream.json());
+      }catch{return send(response,503,{error:'deployment receiver unavailable'});}
+    }
     if (request.method === 'GET') {
       if(pathname==='/gr3/native-library.html'){response.writeHead(302,{Location:'/gr3/','Cache-Control':'no-store'});response.end();return;}
 
