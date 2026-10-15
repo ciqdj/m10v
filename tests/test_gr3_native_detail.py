@@ -25,7 +25,7 @@ class NativeDetailTests(unittest.TestCase):
    descriptor=resources['descriptors'][resource_id-resources['first_id']]-base
    length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
    labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
-  self.assertEqual(labels,['Halation Gain','Halation Spread','Highlight Gate','Grain','Soft Diffusion'])
+  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','柔光'])
 
 class StockDetailArmTests(NativeDetailTests):
  @classmethod
@@ -75,7 +75,9 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
    elif a==0x536af2a8:result=0x55009000 if allocation else 0;calls.append(('alloc',args[0]))
    elif a==0x532c282c:calls.append(('stock_reset',))
    elif a==0x5339ee0c:calls.append(('current',args[1]))
-   elif a==0x5339f194:calls.append(('range',args[1],args[2]))
+   elif a==0x5339f194:
+    from unicorn.arm_const import UC_ARM_REG_SP
+    calls.append(('range',args[1],args[2]));calls.append(('scale',args[3],struct.unpack('<I',uc.mem_read(uc.reg_read(UC_ARM_REG_SP)+16,4))[0]))
    elif a==0x5339f1f0:calls.append(('default',args[1]))
    elif a==0x533abeb0:
     ptr=struct.unpack('<I',uc.mem_read(args[1],4))[0];calls.append(('closure',struct.unpack('<III',uc.mem_read(ptr,12))))
@@ -162,6 +164,16 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
     self.execute(u,0x531b05c4,ui)
     self.assertIn(('range',0,8 if field<3 else 3),calls)
     self.assertIn(('closure',(0x531b0fd0,0,ui)),calls)
+ def test_texture_sliders_use_stock_grain_tick_art_and_spacing(self):
+  # Official grain0x531ae898 uses max3, pitch120, scale resource57.
+  for address,word in ((0x531ae868,0xe3a03039),(0x531ae88c,0xe3a02003),(0x531ae890,0xe3a03078)):
+   self.assertEqual(struct.unpack_from("<I",self.rtos,address-0x53000000)[0],word)
+  for field in range(5):
+   u,ui,slider,calls,state=self.machine(field=field)
+   self.execute(u,0x531b05c4,ui)
+   self.assertIn(('scale',45 if field<3 else 120,560 if field<3 else 57),calls)
+   self.assertIn(('range',0,8 if field<3 else 3),calls)
+
  def test_stock_current_reads_five_independent_fields(self):
   for field,expected in enumerate((3,4,5,1,2)):
    u,ui,slider,calls,state=self.machine(field=field);self.execute(u,0x531b03cc,ui)
@@ -195,7 +207,7 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   # Real row dispatcher loops through all stock rows, so start at the private
   # branch with its original saved-frame contract and a sentinel continuation.
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
-  for field,text in enumerate(('3/8','4/8','5/8','Weak','Mid')):
+  for field,text in enumerate(('3/8','4/8','5/8','弱','中')):
    u,ui,slider,calls,state=self.machine(field=field)
    u.reg_write(UC_ARM_REG_R3,18+field);u.reg_write(UC_ARM_REG_R4,10+field);u.reg_write(UC_ARM_REG_R5,ui)
    u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_LR,0x57000000)

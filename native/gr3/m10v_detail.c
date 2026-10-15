@@ -58,10 +58,10 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==3){
   v=value(old,field);uint16_t text[8]={0};
   if(field<3){text[0]=(uint16_t)('0'+v);text[1]='/';text[2]='8';}
-  else if(!v){text[0]='O';text[1]='f';text[2]='f';}
-  else if(v==1){text[0]='W';text[1]='e';text[2]='a';text[3]='k';}
-  else if(v==2){text[0]='M';text[1]='i';text[2]='d';}
-  else {text[0]='H';text[1]='i';text[2]='g';text[3]='h';}
+  else if(!v){text[0]=0x5173;text[1]=0x95ed;}
+  else if(v==1){text[0]=0x5f31;}
+  else if(v==2){text[0]=0x4e2d;}
+  else {text[0]=0x5f3a;}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x194);if(!ram(list,4))return 0;
   uint32_t row=((fn2)0x53394758u)(list,arg&65535);if(!ram(row,4))return 0;
   ((text_fn)0x5339e2f8u)(row,0x1e3,text);return 1;

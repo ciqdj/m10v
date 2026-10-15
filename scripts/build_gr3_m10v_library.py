@@ -219,14 +219,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if len(names) != 33 or len(set(names)) != 33: raise ValueError('original catalog names incomplete')
         texts = names[:32] + [f'M10V Slot {i}' for i in range(1, 6)] + [
             'M10V Film Library', 'Save failed. Try again.', 'M10V Library',
-            'Choose Film', 'Grain', 'Soft Diffusion', 'Timestamp', 'Choose Slot',
+            'Choose Film', '颗粒', '柔光', 'Timestamp', 'Choose Slot',
             'Grain Off', 'Grain Weak', 'Grain Medium', 'Grain Strong',
             'Diffusion Off', 'Diffusion Weak', 'Diffusion Medium', 'Diffusion Strong',
             'Timestamp Off', 'Date Only', 'Date and Time', 'Date Format', 'Stamp Corner', 'Stamp Color', 'Back',
             'YYYY.MM.DD', 'DD.MM.YYYY', 'YYYY-MM-DD', 'YY.MM.DD',
             'Top Left', 'Top Right', 'Bottom Left', 'Bottom Right',
             'White', 'Orange', 'Red', 'Yellow', 'Back', 'Done', names[32],
-            '800T Halation','Halation Gain','Halation Spread','Highlight Gate','Halation Profile',
+            '800T Halation','光晕强度','扩散范围','高光阈值','Halation Profile',
             *[str(i) for i in range(9)],'Off','Weak','Natural','Strong',
             *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]]
         if len(texts) != 125: raise ValueError('private resource inventory differs')

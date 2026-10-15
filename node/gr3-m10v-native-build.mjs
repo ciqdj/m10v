@@ -132,7 +132,9 @@ function checkDetail(runtime,manifest,raw) {
     if(a===0x531ad01c)word=0xe1a00006;
     if(a===0x531ad020)word=branch(at,d.entries.default,true);
     if(a===0x531ad024)word=0xe1a00000;
+    if(a===0x531ad03c&&maximum===3)word=0xe3a03039;
     if(a===0x531ad060)word=(0xe3a02000|maximum)>>>0;
+    if(a===0x531ad064&&maximum===3)word=0xe3a03078;
     need(code.readUInt32LE(at-target)===word,'native detail slider relocation differs at '+a.toString(16)+' expected '+word.toString(16)+' got '+code.readUInt32LE(at-target).toString(16));
    }
    const guard=0x531ad0b4-start;

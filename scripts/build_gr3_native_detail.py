@@ -68,7 +68,10 @@ def build_detail(base,symbols):
    if a==0x531ad01c:w=0xe1a00006
    if a==0x531ad020:w=branch(at,default,True)
    if a==0x531ad024:w=0xe1a00000
+   # Match the stock grain slider: resource 57 and 120-pixel tick pitch.
+   if a==0x531ad03c and maximum==3:w=0xe3a03039
    if a==0x531ad060:w=0xe3a02000|maximum
+   if a==0x531ad064 and maximum==3:w=0xe3a03078
    output+=struct.pack('<I',w)
   return data(output,'stock slider clone '+str(maximum))
  slider8=clone(8);slider3=clone(3)
