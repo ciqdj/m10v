@@ -42,3 +42,15 @@ test('public hook proxy reaches signature receiver without exposing the browser 
   assert.equal((await fetch(url)).status,405);
  }finally{await new Promise(r=>app.close(r));await new Promise(r=>receiver.close(r));await rm(dir,{recursive:true,force:true});}
 });
+test('receiver restores interrupted deployments and persists failures',async()=>{
+ const {writeFile}=await import('node:fs/promises');
+ const dir=await mkdtemp(path.join(os.tmpdir(),'m10v-hook-restart-'));
+ await writeFile(path.join(dir,'state.json'),JSON.stringify({pending:null,running:sha,deployed:null,lastResult:null}));
+ let called=false;
+ const server=createReceiver({secret,stateDir:dir,deploy:async value=>{assert.equal(value,sha);called=true;throw Error('build failed');}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{
+  let state;for(let i=0;i<100;i++){state=JSON.parse(await readFile(path.join(dir,'state.json')));if(state.lastResult)break;await new Promise(r=>setTimeout(r,5));}
+  assert.equal(called,true);assert.equal(state.deployed,null);assert.equal(state.running,null);assert.equal(state.lastResult.ok,false);assert.match(state.lastResult.error,/build failed/);
+ }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
+});
