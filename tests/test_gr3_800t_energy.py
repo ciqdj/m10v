@@ -21,6 +21,32 @@ class EnergyTests(unittest.TestCase):
         self.assertEqual(self.render(im,state,s),0)
         return bytes(y[:im.y_bytes]),bytes(c[:im.chroma_bytes])
 
+    def test_cyan_scan_grade_is_visible_in_neutral_midtones_not_white_core(self):
+        y,c=self.run_image(gain=0)
+        self.assertGreaterEqual(c[0],132)
+        self.assertLessEqual(c[1],122)
+        def white(y,c,w,h):
+            for i in range(w*h):y[i]=255
+        y,c=self.run_image(gain=0,scene=white)
+        self.assertEqual(c[:2],bytes([128,128]))
+
+    def test_native_resolution_lamp_has_visible_broad_red_fringe(self):
+        # Same coarse grid as6000x4000, efficient contiguous planes for full size.
+        from unittest.mock import patch
+        def image(width,height,padding=0):
+            n=width*height;y=(C.c_uint8*n)();c=(C.c_uint8*n)()
+            C.memset(y,64,n);C.memset(c,128,n)
+            return harness.Image(y,c,n,n,width,height,width),y,c,None
+        def lamp(y,c,w,h):
+            for row in range(h//2-8,h//2+8):
+                for x in range(w//2-8,w//2+8):y[row*w+x]=235
+        with patch.object(self,'image',image):
+            off=self.run_image(gain=0,width=6000,height=4000,scene=lamp)[1]
+            on=self.run_image(gain=3,width=6000,height=4000,scene=lamp)[1]
+        at=2000*6000+3000+8+16+1
+        self.assertGreaterEqual(on[at]-off[at],3,'broad red fringe quantized away at native resolution')
+        self.assertEqual(on[:2],off[:2],'dark background must not become a halo source')
+
     def test_five_parameter_transaction_is_atomic_on_store_failure(self):
         self.assertTrue(hasattr(self.lib,'m10v_library_detail'), 'missing atomic five-field transaction')
         fn=self.lib.m10v_library_detail

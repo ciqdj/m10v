@@ -91,7 +91,10 @@ static void m10v_800t_effects(m10v_library_image *im,const m10v_slot *choice,uin
 
         uint32_t at=row*im->stride+x,y0=im->y[at],y1=im->y[at+1],peak=y0>y1?y0:y1;
         uint32_t protect=(255-peak)*4;if(protect>255)protect=255;
-        uint32_t scatter=gain?energy_sample(halo,gw,gh,x,row,shift):0;
+        /* Broad halo needs its own exposure gain: cell integration plus repeated
+         * normalized blur otherwise rounds real6000px lamp fringes to zero.
+         * Keep fine gain unchanged; maximum sum17*49928*8*255 fits uint32. */
+        uint32_t scatter=gain?16u*energy_sample(halo,gw,gh,x,row,shift):0;
         if(fine) {
             uint32_t mid=head+distance,bot=head+2*distance;if(mid>=lines)mid-=lines;if(bot>=lines)bot-=lines;
             uint32_t near=0;

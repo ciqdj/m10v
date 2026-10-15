@@ -48,7 +48,7 @@ static const film films[33] = {
     {"Golden Shade",244,242,4,10,4,-9,8},
     {"Low Key Color",304,250,0,-6,-4,2,3},
     {"High Key Color",230,230,0,17,10,-2,3},
-    {"800T",248,238,0,2,5,3,-2}
+    {"800T",264,238,0,1,3,10,-16}
 };
 
 static uint32_t checksum(const m10v_library_state *state) {
@@ -314,6 +314,12 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         int light = (image->y[at] + image->y[at + 1]) / 2;
         int weight = 255 - (light > 127 ? 2 * light - 255 : 255 - 2 * light);
         int cb = image->chroma[at] - 128, cr = image->chroma[at + 1] - 128;
+        /* Cyan scan-style midtones, retaining neutral white and red emitters.
+         * The grade must not subtract the red exposure just added by halo. */
+        if(choice->film==33 && cr>8) {
+            int keep=40-cr;if(keep<0)keep=0;
+            weight=(weight*keep)>>5;
+        }
         image->chroma[at] = clamp(128 + (cb * look->saturation + cr * look->turn) / 256 + look->cb * weight / 255);
         image->chroma[at + 1] = clamp(128 + (cr * look->saturation - cb * look->turn) / 256 + look->cr * weight / 255);
         image->y[at] = curve[image->y[at]]; image->y[at + 1] = curve[image->y[at + 1]];

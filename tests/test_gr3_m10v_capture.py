@@ -162,7 +162,7 @@ class M10VCaptureTests(unittest.TestCase):
         h.capture_events.clear()
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         rows=[e for e in h.capture_events if e[0]==112]
-        self.assertEqual(rows,[(112,1,6|(2<<4)|(7<<8)|(1<<12)|(3<<16),4,2)])
+        self.assertEqual(rows,[(112,1,6|(2<<4)|(7<<8)|(1<<12)|(3<<16),4,3)])
 
     def test_official_capture_metadata_date_wins_over_unready_or_different_ui_date(self):
         for ready in (0,1):
@@ -188,7 +188,8 @@ class M10VCaptureTests(unittest.TestCase):
             self.assertEqual(h.call(u,'m10v_capture_library',context),0)
             clock = [e for e in h.capture_events if e[0] == 120]
             self.assertEqual(clock,[(120,context,status,2,0x55006000)])
-            self.assertEqual([e[0] for e in h.capture_events],[100,113,120,110,112,111,101])
+            self.assertEqual([e[0] for e in h.capture_events],[100,113,120,110,112,114,111,101])
+            self.assertEqual([e[1:] for e in h.capture_events if e[0]==114],[(12168,9,128*96,216)])
             self.assertEqual(h.capture_events[-1][2],0)
 
     def test_capture_diagnoses_migrated_and_saved_journal_sources(self):

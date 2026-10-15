@@ -48,7 +48,7 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   for a,n in ((0x53000000,0x1400000),(0x55000000,0x10000),(0x57000000,0x10000)):u.mem_map(a,n)
   u.mem_write(0x53000000,self.rtos);u.mem_write(self.manifest['base'],self.runtime)
   d=self.manifest['detail'];e=d['entries']
-  for a,name,link in [(0x531afa24,'table_ip',True),(0x531afacc,'table_r3',True),(0x531affa8,'table_ip',True),(0x531b01f8,'table_selected',True),(0x531b000c,'row',False),(0x531b03f8,'current',False),(0x531b05e4,'setup',False),(0x531b0bf4,'callback',False),(0x531acd24,'reset',True)]:u.mem_write(a,struct.pack('<I',branch(a,e[name],link)))
+  for a,name,link in [(0x531afc20,'capacity',True),(0x531afa24,'table_ip',True),(0x531afacc,'table_r3',True),(0x531affa8,'table_ip',True),(0x531b01f8,'table_selected',True),(0x531b000c,'row',False),(0x531b03f8,'current',False),(0x531b05e4,'setup',False),(0x531b0bf4,'callback',False),(0x531acd24,'reset',True)]:u.mem_write(a,struct.pack('<I',branch(a,e[name],link)))
   for a,w in [(0x531b0248,movw(3,d['captions']&65535)),(0x531b024c,movw(3,d['captions']>>16,True))]:u.mem_write(a,struct.pack('<I',w))
   ui=0x55004000;slider=0x55006000
   u.mem_write(ui+0x198,bytes([tone,0,8,0,0,0,1]))
@@ -99,6 +99,49 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   u.emu_start(entry,0x57000000,count=300000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x57000000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp)
   return u.reg_read(UC_ARM_REG_R0)
+ def test_real_detail_list_constructor_enumerates_all_settings_before_tone_selection(self):
+  # FN constructs the page with stock tone11 before reading the actual tone.
+  # Its list initializer enumerates 3 settings x12 kinds, not just setting0.
+  from unicorn import UC_HOOK_CODE
+  from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R2,UC_ARM_REG_PC,UC_ARM_REG_LR
+  for tone in (11,12,18,21):
+   u,ui,slider,calls,state=self.machine(tone=tone)
+   observed=[]
+   def services(uc,a,n,data):
+    if a==0x536af31c:
+     observed.append(('allocate',uc.reg_read(UC_ARM_REG_R0)));uc.reg_write(UC_ARM_REG_R0,0x5500c000)
+    elif a==0x53394610:observed.append(('rows',uc.reg_read(UC_ARM_REG_R2)))
+    elif a in (0x536af358,0x533958a8,0x533958b4,0x53394b38,0x531ac8d8):pass
+    elif a==0x53820074:raise AssertionError('stock stack canary failed')
+    else:return
+    uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+   u.hook_add(UC_HOOK_CODE,services)
+   self.execute(u,0x531afbe0,ui)
+   expected=16
+   self.assertEqual(observed,[('allocate',expected),('rows',expected)])
+
+ def test_visibility_index_uses_stock_lr_stride_in_all_three_settings(self):
+  for setting in range(3):
+   for kind in range(12):
+    u,ui,slider,calls,state=self.machine(tone=11)
+    p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
+    expected=sum(self.rtos[p-0x53000000+i*2]!=1 for i in range(n))
+    self.assertEqual(self.execute(u,0x531afab8,ui,setting,kind),expected)
+
+ def test_whole_row_dispatcher_in_all_settings_preserves_private_and_stock_rows(self):
+  from unicorn import UC_HOOK_CODE
+  from unicorn.arm_const import UC_ARM_REG_PC,UC_ARM_REG_LR
+  handlers=set(struct.unpack_from('<18I',self.rtos,0x1b0010))
+  for tone in (11,12,18,19,20,21):
+   for setting in range(3):
+    u,ui,slider,calls,state=self.machine(tone=tone)
+    u.mem_write(ui+0x199,bytes([setting]));u.mem_write(ui+0x19e,bytes([16]))
+    def widgets(uc,a,n,data):
+     if a in handlers:uc.reg_write(UC_ARM_REG_PC,0x531b0064)
+     elif a==0x5339e274:uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+    u.hook_add(UC_HOOK_CODE,widgets);self.execute(u,0x531aff84,ui)
+    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 5)
+
  def test_stock_count_and_selector_resolve_each_carrier_dynamically(self):
   for tone in (12,18,19,20,21):
    for film in (33,34):

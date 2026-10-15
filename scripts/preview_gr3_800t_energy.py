@@ -25,6 +25,9 @@ def preview(source,out,baseline='21b4247'):
     with tempfile.TemporaryDirectory() as directory:
         d=Path(directory)
         (d/'old.c').write_bytes(subprocess.check_output(['git','show',baseline+':native/gr3/m10v_library.c'],cwd=ROOT))
+        # Header-only renderer must come from the same baseline, not today's tree.
+        old_header=subprocess.run(['git','show',baseline+':native/gr3/halation_energy.h'],cwd=ROOT,capture_output=True)
+        if old_header.returncode==0:(d/'halation_energy.h').write_bytes(old_header.stdout)
         for version,code in [('old',d/'old.c'),('new',ROOT/'native/gr3/m10v_library.c')]:
             binary=d/(version+'.dylib')
             subprocess.run(['clang','-O2','-dynamiclib','-I',str(ROOT/'native/gr3'),str(code),str(ROOT/'native/gr3/halation_core.c'),'-o',str(binary)],check=True,capture_output=True)

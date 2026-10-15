@@ -35,8 +35,13 @@ def build_detail(base,symbols):
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:
   text='push {r0-r12,lr};mrs r0,cpsr;push {r0,r1};'+f'ldr r0,[sp,#{8+(0 if ui=="r0" else 16)}];bl {hex(symbols["m10v_detail_table"])};'
   offset=8+(12 if reg=='r3' else 48)
-  text+=f'str r0,[sp,#{offset}];pop {{r0,r1}};msr cpsr_fs,r0;pop {{r0-r12,pc}};'
+  text+=f'str r0,[sp,#{offset}];pop {{r0,r1}};msr cpsr_fs,r0;'
+  # Both ip sites have live lr=12. BL destroys it before entering this shim.
+  if reg=='ip':text+='mov lr,#12;'
+  text+='pop {r0-r12,pc};'
   entries[name]=stub(text,name)
+ # Constructor runs before actual tone selection; allocate stock max11+5.
+ entries['capacity']=stub('mov r0,#16;bx lr','detail constructor capacity')
  control=symbols['m10v_detail_control']
  # The C gate checks actual ui[0x198] tone + film33, never the old kind8 gate.
  # Private IDs can only originate in our validated list, but all dispatches

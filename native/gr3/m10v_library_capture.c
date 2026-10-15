@@ -157,7 +157,20 @@ int m10v_capture_library(uint32_t context) {
     ((cache_fn)0x5383c8a8u)(image.y, touched); ((cache_fn)0x5383c8a8u)(image.chroma, touched);
     M10V_LOG(110,context,slot,state.slots[slot].film,(width<<16)|height);
     M10V_LOG(112,slot,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|
-        ((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].grain<<12)|((uint32_t)state.slots[slot].soft<<16),state.sequence,2);
+        ((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].grain<<12)|((uint32_t)state.slots[slot].soft<<16),state.sequence,3);
+#if M10V_DEBUG_MODE
+    if(state.slots[slot].film==33 && state.slots[slot].halo_gain) {
+        uint32_t peak=0,active=0,gate=176+8u*state.slots[slot].halo_threshold;
+        for(uint32_t row=0;row<height;++row)for(uint32_t x=0;x<width;++x) {
+            uint32_t light=image.y[row*stride+x];
+            int red=(int)light+((359*((int)image.chroma[row*stride+(x&~1u)+1]-128))>>8)-24;
+            if(red>255)red=255;if(red>(int)light)light=(uint32_t)red;
+            if(light>peak)peak=light;if(light>gate)++active;
+        }
+        uint32_t excess=peak>gate?peak-gate:0;
+        M10V_LOG(114,excess*excess*8,active,width*height,gate);
+    }
+#endif
     int result = m10v_library_render(&image, &state, slot, (const m10v_library_date *)time,
                                      seed, scratch, scratch_bytes);
     M10V_LOG(111,context,(uint32_t)result,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].halo_profile<<12),scratch_bytes);
