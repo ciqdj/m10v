@@ -13,3 +13,5 @@ GitHub Actions push/main → 签名 Git bundle → 现有 HTTPS `/hooks/github` 
 接收器和更新脚本位于 root 所有的 `/usr/local/lib/m10v-deploy`，普通应用重启不会中断部署。修改这些受控文件后需要重新安装；常规业务提交无需重新配置。
 
 服务器到 GitHub 的连接不稳定，因此 Actions 从固定初始提交 `f34a53636bae0bb9939d4ae9f5057b1d2c005762` 创建增量 Git bundle，通过 HTTPS 携带原始请求体签名投递，并有限重试。服务器验证 bundle 前置对象、目标 SHA 和 fast-forward 关系后导入，自动部署无需主动访问 GitHub。JSON 请求体上限 32 MiB，超过上限工作流明确失败。签名事件 `m10v-status` 仅返回当前部署队列状态，不执行部署。
+
+查看自动发布结果：[Deploy Baota Actions](https://github.com/zhaoo/m10v/actions/workflows/deploy-baota.yml)。只向 `main` 推送时自动发布；同步 `develop` 不会重复部署。也可在 Actions 页面选择 Run workflow 对 main 重试。绿色表示状态接口已确认对应提交部署完成，红色保留具体构建或网络错误。
