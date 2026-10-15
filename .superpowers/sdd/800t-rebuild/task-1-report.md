@@ -39,3 +39,7 @@ All snapshots embedded in the builder are from exact officialGRIII2.10 bytes and
 - Save failure in the regular callback retains its error caption. Reset invokes the original caller's remaining lifecycle; any later user navigation/redraw can replace that caption as normal.
 
 Final focused web route rerun on the stable source tree passed (1/1,33seconds), covering normal/debug firmware export, explicit GRIIIx rejection,45 independently verified native hooks, and RAWNR/old-extension composition. `git diff --check` passed before commit.
+
+## Review correction — caption resource IDs
+
+Independent review found the five caption IDs were each one resource too high. Added a RED test decoding actual embedded UTF16 runtime descriptors (it showed Spread/Gate/Profile/Soft/Timestamp), then corrected builder and independent Node expected IDs to `[862,863,864,827,828]`. New decoded captions are exactly Gain/Spread/Gate/Grain/Soft Diffusion. Focused detail suite16/16 and Node native build/audit1/1 pass after correction.

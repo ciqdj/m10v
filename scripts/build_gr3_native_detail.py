@@ -29,7 +29,7 @@ def build_detail(base,symbols):
  table_address=data(table,'dynamic 800T detail tables')
  # Existing resource extension occupies IDs786..910. Reuse its text descriptors
  # for three captions, Grain and Soft Diffusion, avoiding another global hook.
- caption_ids=[863,864,865,828,829]
+ caption_ids=[862,863,864,827,828]
  captions=data(STOCK_CAPTIONS+b''.join(struct.pack('<HH',i,i) for i in caption_ids),'detail caption pairs')
  # Each call site has already saved LR in the genuine stock prologue.
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:

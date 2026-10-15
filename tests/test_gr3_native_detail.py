@@ -16,6 +16,17 @@ class NativeDetailTests(unittest.TestCase):
   self.assertEqual(self.manifest['detail']['backend'],'m10v_camera_library_detail')
 
 
+ def test_caption_pairs_resolve_actual_runtime_resources(self):
+  base=self.manifest['base'];at=self.manifest['detail']['captions']-base
+  ids=[struct.unpack_from('<H',self.runtime,at+72+i*4)[0] for i in range(5)]
+  labels=[]
+  resources=self.manifest['resources']
+  for resource_id in ids:
+   descriptor=resources['descriptors'][resource_id-resources['first_id']]-base
+   length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
+   labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
+  self.assertEqual(labels,['Halation Gain','Halation Spread','Highlight Gate','Grain','Soft Diffusion'])
+
 class StockDetailArmTests(NativeDetailTests):
  @classmethod
  def setUpClass(cls):

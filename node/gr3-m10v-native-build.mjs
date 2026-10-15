@@ -99,7 +99,7 @@ function checkDetail(runtime,manifest,raw) {
   JSON.stringify(d.ids)==='[18,19,20,21,22]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion']), 'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
  const table=read(d.tables,288),captions=read(d.captions,92);
- const expectedIds=[863,864,865,828,829];
+ const expectedIds=[862,863,864,827,828];
  for(let i=0;i<5;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
