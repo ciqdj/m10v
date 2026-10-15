@@ -17,7 +17,7 @@ typedef uint32_t (*root_fn)(void);
 static const uint8_t tones[5] = {12,18,19,20,21};
 /* The persistent catalog keeps IDs 1..65 for existing journals. Only the
  * curated 800T and original 32 simulations are offered for replacement. */
-static const uint8_t counts[15] = {13,6,33,4,4,7,5,4,4,4,4,9,9,9,4};
+static const uint8_t counts[15] = {13,6,33,4,4,7,5,4,4,4,3,9,9,9,0};
 static uint8_t *model(void) {
     uint32_t root = ((root_fn)0x5320ad88u)();
     return (uint8_t *)(uintptr_t)((get_fn)0x5320ba9cu)(root);
@@ -25,7 +25,7 @@ static uint8_t *model(void) {
 static int supported(const uint8_t *m) {
     return (uintptr_t)m == 0x55068200u && m[0x1b] == 0;
 }
-static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= 14 ? m[0x1d] : 0; }
+static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= 13 ? m[0x1d] : 0; }
 static uint32_t slot(const uint8_t *m) {
     /* Byte 0x1e is padding after the stock last member at 0x1c. Keep
      * the original m[0] entry snapshot intact for stock cancellation. */
