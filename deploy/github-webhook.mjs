@@ -1,6 +1,6 @@
 import http from 'node:http';
 import {createHmac,timingSafeEqual} from 'node:crypto';
-import {readFileSync,writeFileSync,mkdirSync,renameSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,renameSync,existsSync,rmSync} from 'node:fs';
 import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -15,6 +15,12 @@ export function verifyDelivery(body,headers,secret){
  let p;try{p=JSON.parse(body);}catch{return {status:400};}
  if(p.repository?.full_name!=='zhaoo/m10v'||p.ref!=='refs/heads/main'||p.deleted)return {status:202,ignored:true};
  if(!/^[0-9a-f]{40}$/.test(p.after||'')||/^0+$/.test(p.after))return {status:400};
+ if(p.bundle!==undefined){
+  if(typeof p.bundle!=='string'||!p.bundle.length||p.bundle.length>32*1024*1024||p.bundle.length%4||!/^[A-Za-z0-9+/]+={0,2}$/.test(p.bundle))return {status:400};
+  const bundle=Buffer.from(p.bundle,'base64');
+  if(!bundle.subarray(0,16).toString().startsWith('# v2 git bundle')&&!bundle.subarray(0,16).toString().startsWith('# v3 git bundle'))return {status:400};
+  return {status:202,sha:p.after,bundle};
+ }
  return {status:202,sha:p.after};
 }
 export function createReceiver({secret,stateDir,deploy}){
@@ -26,9 +32,10 @@ export function createReceiver({secret,stateDir,deploy}){
  async function drain(){
   if(active)return;active=true;
   try{while(state.pending){const sha=state.pending;state.pending=null;state.running=sha;save();
-   try{await deploy(sha);state.deployed=sha;state.lastResult={sha,ok:true,time:new Date().toISOString()};}
+   const bundle=path.join(stateDir,sha+'.bundle');
+   try{await deploy(sha,existsSync(bundle)?bundle:null);state.deployed=sha;state.lastResult={sha,ok:true,time:new Date().toISOString()};}
    catch(error){state.lastResult={sha,ok:false,error:String(error.message).slice(-1200),time:new Date().toISOString()};}
-   state.running=null;save();
+   state.running=null;save();rmSync(bundle,{force:true});
   }}finally{active=false;}
  }
  const server=http.createServer(async(req,res)=>{
@@ -36,8 +43,10 @@ export function createReceiver({secret,stateDir,deploy}){
   if(req.method!=='POST'||req.url!=='/hooks/github')return reply(404,{error:'not found'});
   try{
    const chunks=[];let bytes=0;
-   for await(const chunk of req){bytes+=chunk.length;if(bytes>1024*1024)return reply(413,{error:'payload too large'});chunks.push(chunk);}
+   for await(const chunk of req){bytes+=chunk.length;if(bytes>32*1024*1024)return reply(413,{error:'payload too large'});chunks.push(chunk);}
    const result=verifyDelivery(Buffer.concat(chunks),req.headers,secret);
+   if(req.headers['x-github-event']==='m10v-status'&&result.ignored&&result.status===202)return reply(200,state);
+   if(result.bundle&&result.sha!==state.deployed){const file=path.join(stateDir,result.sha+'.bundle');writeFileSync(file+'.tmp',result.bundle,{mode:0o600});renameSync(file+'.tmp',file);}
    if(result.sha&&result.sha!==state.deployed&&result.sha!==state.running){state.pending=result.sha;save();}
    reply(result.status,{accepted:result.status<300,queued:!!result.sha,ignored:!!result.ignored});
    if(result.sha)setImmediate(drain);
@@ -50,9 +59,9 @@ export function createReceiver({secret,stateDir,deploy}){
 if(process.argv[1]&&fileURLToPath(import.meta.url)===path.resolve(process.argv[1])){
  const secret=readFileSync('/etc/m10v-deploy/secret','utf8').trim();
  if(secret.length<32)throw Error('webhook secret must have at least 32 characters');
- const deploy=sha=>new Promise((resolve,reject)=>{
+ const deploy=(sha,bundle)=>new Promise((resolve,reject)=>{
   console.log('DEPLOY_START',sha);
-  execFile('bash',['/usr/local/lib/m10v-deploy/update-server.sh','--deploy',sha],{timeout:600000,maxBuffer:2*1024*1024},(error,stdout,stderr)=>{
+  execFile('bash',['/usr/local/lib/m10v-deploy/update-server.sh','--deploy',sha,...(bundle?[bundle]:[])],{timeout:600000,maxBuffer:2*1024*1024},(error,stdout,stderr)=>{
    console.log(stdout);if(stderr)console.error(stderr);
    if(error){console.error('DEPLOY_FAILED',sha);reject(error);}else{console.log('DEPLOY_FINISHED',sha);resolve();}
   });

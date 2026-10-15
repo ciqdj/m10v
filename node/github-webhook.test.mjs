@@ -54,3 +54,16 @@ test('receiver restores interrupted deployments and persists failures',async()=>
   assert.equal(called,true);assert.equal(state.deployed,null);assert.equal(state.running,null);assert.equal(state.lastResult.ok,false);assert.match(state.lastResult.error,/build failed/);
  }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
 });
+test('signed bundle is persisted and passed to fixed deployment executor',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'m10v-hook-bundle-'));let seen;
+ const bundle=Buffer.from('# v2 git bundle\nfixture');
+ const b=Buffer.from(JSON.stringify({...JSON.parse(payload()),bundle:bundle.toString('base64')}));
+ const server=createReceiver({secret,stateDir:dir,deploy:async(value,file)=>{assert.equal(value,sha);assert.deepEqual(await readFile(file),bundle);seen=true;}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{
+  const response=await fetch(`http://127.0.0.1:${server.address().port}/hooks/github`,{method:'POST',headers:headers(b),body:b});assert.equal(response.status,202);
+  const status=await fetch(`http://127.0.0.1:${server.address().port}/hooks/github`,{method:'POST',headers:{...headers(b),'x-github-event':'m10v-status'},body:b});assert.equal(status.status,200);assert.ok('deployed' in await status.json());
+  for(let i=0;i<100&&!seen;i++)await new Promise(r=>setTimeout(r,5));assert.equal(seen,true);
+  const bad=Buffer.from(JSON.stringify({...JSON.parse(payload()),bundle:'not a bundle'}));assert.equal(verifyDelivery(bad,headers(bad),secret).status,400);
+ }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
+});
