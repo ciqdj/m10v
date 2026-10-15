@@ -19,14 +19,17 @@ if name=='git':
   print(' M server-edit' if os.getenv('FAKE_DIRTY') else '',end='')
  elif a[0]=='branch':print('main')
  elif a[0]=='rev-parse':print(os.environ['FAKE_EXPECTED'] if (a[1]=='origin/main' or a[1].startswith('refs/m10v/releases/')) else (root/'head').read_text())
- elif a[0]=='merge':(root/'head').write_text(a[-1])
+ elif a[0]=='merge':
+  (root/'head').write_text(a[-1]);(root/'release-source').write_text('source')
  elif a[0]=='reset':(root/'head').write_text(a[-1])
  elif 'fetch' in a and os.getenv('FAKE_FETCH_FAILURES'):
   count=root/'fetch-count';n=int(count.read_text()) if count.exists() else 0;count.write_text(str(n+1))
   if n<int(os.environ['FAKE_FETCH_FAILURES']):sys.exit(128)
 elif name=='systemctl':
  if a[0]=='show':print('www' if a[3]=='User' else str(root))
-elif name=='runuser':sys.exit(int(os.getenv('FAKE_BUILD_FAIL','0')))
+elif name=='runuser':
+ if os.getenv('FAKE_REQUIRE_READABLE') and not ((root/'release-source').stat().st_mode & 4):sys.exit(13)
+ sys.exit(int(os.getenv('FAKE_BUILD_FAIL','0')))
 elif name=='flock':sys.exit(int(os.getenv('FAKE_LOCK_FAIL','0')))
 elif name=='curl':Path(a[a.index('-o')+1]).write_text('<input id="debug-mode">')
 '''
@@ -76,6 +79,10 @@ class BaotaPublishTests(unittest.TestCase):
   r=self.run_script('--deploy',AFTER,FAKE_FETCH_FAILURES='5');self.assertNotEqual(r.returncode,0)
   self.assertEqual((self.root/'head').read_text(),BEFORE);self.assertNotIn("'merge',",self.trace())
   self.assertEqual((self.root/'fetch-count').read_text(),'3')
+ def test_restrictive_ssh_umask_does_not_hide_deployed_sources(self):
+  r=subprocess.run(['bash','-c','umask 077; exec bash "$1" --deploy "$2"','ssh-fixture',str(SCRIPT),AFTER],env={**self.env,'FAKE_REQUIRE_READABLE':'1'},capture_output=True,text=True)
+  self.assertEqual(r.returncode,0,r.stderr)
+  self.assertTrue((self.root/'release-source').stat().st_mode & 4)
  def test_success_checks_builds_restart_and_exact_commit(self):
   r=self.run_script('--deploy',AFTER);self.assertEqual(r.returncode,0,r.stderr)
   self.assertEqual((self.root/'head').read_text(),AFTER);self.assertIn('DEPLOY_OK commit='+AFTER,r.stdout)

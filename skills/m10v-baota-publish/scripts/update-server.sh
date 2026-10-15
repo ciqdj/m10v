@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run on the existing Baota host; preserve firmware inputs, settings and venv.
 set -Eeuo pipefail
+# Sources must remain readable by the www service even when SSH uses umask 077.
+umask 022
 trap 'printf "RELEASE_ERROR line=%s\n" "$LINENO" >&2' ERR
 mode=${1:---check}
 expected=${2:-}
