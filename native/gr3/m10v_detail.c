@@ -56,7 +56,9 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   return 1;
  }
  if(op==3){
-  v=value(old,field);uint16_t text[8]={0};
+  v=value(old,field);uint16_t text[8];
+  /* Explicit volatile stores prevent older clang from requiring __aeabi_memclr. */
+  for(uint32_t i=0;i<8;i++)((volatile uint16_t *)text)[i]=0;
   if(field<3){text[0]=(uint16_t)('0'+v);text[1]='/';text[2]='8';}
   else if(!v){text[0]=0x5173;text[1]=0x95ed;}
   else if(v==1){text[0]=0x5f31;}

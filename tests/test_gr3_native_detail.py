@@ -9,6 +9,16 @@ class NativeDetailTests(unittest.TestCase):
   cls.folder=tempfile.TemporaryDirectory(); build(cls.folder.name)
   cls.manifest=json.loads((Path(cls.folder.name)/'m10v-library-arm.json').read_text())
   cls.runtime=(Path(cls.folder.name)/'m10v-library-arm.bin').read_bytes()
+ @unittest.skipUnless(Path('/usr/bin/clang').is_file(),'system clang unavailable')
+ def test_system_clang_links_freestanding_detail_without_eabi_helpers(self):
+  import os
+  from unittest.mock import patch
+  # Linux/system clang can lower aggregate zero initialization to __aeabi_memclr
+  # even with -ffreestanding -fno-builtin; no compiler runtime exists on camera.
+  with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'M10V_LLVM_CLANG':'/usr/bin/clang'}):
+   manifest=build(folder,debug_mode=True)
+   self.assertIn('m10v_detail_control',manifest['symbols'])
+
  def test_five_controls_integrated_with_unified_runtime(self):
   self.assertIn('detail',self.manifest,'native runtime has no stock five-control detail integration')
   self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion'])
