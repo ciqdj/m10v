@@ -6,7 +6,7 @@ import {prepareNative,generateNative} from '../node/gr3-native-library.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const out=path.resolve(process.argv[2]||path.join(root,'builds/gr3-integrated-device-test'));
 const configuration=process.argv[3]?JSON.parse(await readFile(process.argv[3],'utf8')):{
- slots:[1,64,54,37,33].map((film,i)=>({film,grain:i===4?2:0,soft:0,halo:i===4?{gain:8,spread:8,threshold:0,profile:3}:{gain:3,spread:3,threshold:5,profile:2}})),
+ slots:[1,64,54,37,33].map((film,i)=>({film,grain:i===4?2:0,soft:0,halo:{gain:3,spread:3,threshold:5,profile:2}})),
  stamp:2,format:0,corner:3,color:1};
 const extensions={aspect:true,level:true,negativeGrain:true},debug_mode=true;
 const source=await readFile(path.join(root,'bin/fwdc239b-gr3-official.bin'));

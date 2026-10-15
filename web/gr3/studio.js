@@ -564,7 +564,7 @@ function showSettingsTab(tab){
 $('tab-imaging').onclick=()=>showSettingsTab('imaging');$('tab-library').onclick=()=>showSettingsTab('library');
 for(const name of ['imaging','library'])$('tab-'+name).onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const next=settingsTab==='imaging'?'library':'imaging';showSettingsTab(next);$('tab-'+next).focus();}};
 $('use-native-plan').onclick=()=>showSettingsTab('library');
-$('use-800t-plan').onclick=()=>{if(!nativeEditor)return;nativeEditor.setFilm(33,4);showSettingsTab('library');notice('800T 已装入槽位 5；保存时与胶卷库、颗粒、柔光和时间戳一起构建。');};
+$('use-800t-plan').onclick=()=>{if(!nativeEditor)return;nativeEditor.setFilm(33,4);showSettingsTab('library');notice('800T 已装入槽位 5；保存时与胶卷库、颗粒、柔光和时间戳一起构建。GR III 机内在【图像控制】按 FN 可调节五项参数。');};
 $('use-local-source').onclick=()=>importSource(null,true);
 $('local-source-model').value=chosenModel;
 for (const [key, label] of fields) {
