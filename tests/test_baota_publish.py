@@ -86,6 +86,6 @@ class BaotaPublishTests(unittest.TestCase):
  def test_success_checks_builds_restart_and_exact_commit(self):
   r=self.run_script('--deploy',AFTER);self.assertEqual(r.returncode,0,r.stderr)
   self.assertEqual((self.root/'head').read_text(),AFTER);self.assertIn('DEPLOY_OK commit='+AFTER,r.stdout)
-  self.assertIn('scripts/build_gr3_device_candidate.mjs',self.trace());self.assertIn('M10V_PYTHON=',self.trace());self.assertEqual(self.trace().count('runuser '),2);self.assertIn("'restart'",self.trace())
+  self.assertIn('scripts/build_gr3_device_candidate.mjs',self.trace());self.assertIn('scripts/check_gr3x_release.mjs',self.trace());self.assertNotIn('scripts/export_gr3_m10v_native.mjs',self.trace());self.assertIn('MODEL_GUARD_OK model=gr3x native_export=blocked',r.stdout);self.assertIn('M10V_PYTHON=',self.trace());self.assertEqual(self.trace().count('runuser '),2);self.assertIn("'restart'",self.trace())
   self.assertEqual((self.root/'bin/fwdc239b-gr3-official.bin').read_bytes(),b'protected')
 if __name__=='__main__':unittest.main()
