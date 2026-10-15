@@ -21,6 +21,9 @@ if name=='git':
  elif a[0]=='rev-parse':print(os.environ['FAKE_EXPECTED'] if (a[1]=='origin/main' or a[1].startswith('refs/m10v/releases/')) else (root/'head').read_text())
  elif a[0]=='merge':(root/'head').write_text(a[-1])
  elif a[0]=='reset':(root/'head').write_text(a[-1])
+ elif 'fetch' in a and os.getenv('FAKE_FETCH_FAILURES'):
+  count=root/'fetch-count';n=int(count.read_text()) if count.exists() else 0;count.write_text(str(n+1))
+  if n<int(os.environ['FAKE_FETCH_FAILURES']):sys.exit(128)
 elif name=='systemctl':
  if a[0]=='show':print('www' if a[3]=='User' else str(root))
 elif name=='runuser':sys.exit(int(os.getenv('FAKE_BUILD_FAIL','0')))
@@ -31,7 +34,7 @@ class BaotaPublishTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
   self.root=Path(self.tmp.name);self.bin=self.root/'commands';self.bin.mkdir()
-  for name in ('git','systemctl','runuser','flock','chown','curl'):
+  for name in ('git','systemctl','runuser','flock','chown','curl','sleep'):
    p=self.bin/name;p.write_text(FAKE);p.chmod(0o755)
   (self.root/'head').write_text(BEFORE)
   (self.root/'.venv/bin').mkdir(parents=True)
@@ -66,6 +69,13 @@ class BaotaPublishTests(unittest.TestCase):
   r=self.run_script('--deploy',AFTER,str(bundle));self.assertEqual(r.returncode,0,r.stderr)
   self.assertIn("'bundle', 'verify'",self.trace());self.assertIn('refs/m10v/releases/'+AFTER,self.trace())
   self.assertNotIn("'fetch', 'origin'",self.trace())
+ def test_transient_fetch_is_retried_before_deploy(self):
+  r=self.run_script('--deploy',AFTER,FAKE_FETCH_FAILURES='1');self.assertEqual(r.returncode,0,r.stderr)
+  self.assertIn('DEPLOY_OK',r.stdout);self.assertEqual((self.root/'fetch-count').read_text(),'2')
+ def test_exhausted_fetch_retries_preserve_running_commit(self):
+  r=self.run_script('--deploy',AFTER,FAKE_FETCH_FAILURES='5');self.assertNotEqual(r.returncode,0)
+  self.assertEqual((self.root/'head').read_text(),BEFORE);self.assertNotIn("'merge',",self.trace())
+  self.assertEqual((self.root/'fetch-count').read_text(),'3')
  def test_success_checks_builds_restart_and_exact_commit(self):
   r=self.run_script('--deploy',AFTER);self.assertEqual(r.returncode,0,r.stderr)
   self.assertEqual((self.root/'head').read_text(),AFTER);self.assertIn('DEPLOY_OK commit='+AFTER,r.stdout)

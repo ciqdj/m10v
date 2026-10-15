@@ -42,7 +42,17 @@ if [[ -n "$bundle" ]]; then
   ref="refs/m10v/releases/$expected"
   git fetch "$bundle" "HEAD:$ref"
 else
-  git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 fetch origin main
+  fetched=0
+  for attempt in 1 2 3; do
+    if git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 fetch origin main; then
+      fetched=1; break
+    fi
+    if [[ $attempt -lt 3 ]]; then
+      printf 'FETCH_RETRY attempt=%s\n' "$attempt" >&2
+      sleep "$((attempt * 5))"
+    fi
+  done
+  [[ $fetched == 1 ]] || { printf 'GitHub fetch failed after three attempts; running version preserved.\n' >&2; exit 1; }
   ref=origin/main
 fi
 [[ $(git rev-parse "$ref") == "$expected" ]] || { printf 'Fetched release differs from requested SHA; stop.\n' >&2; exit 1; }
