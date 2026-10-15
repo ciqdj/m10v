@@ -383,7 +383,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'builds/gr3-m10v-library')
+    parser.add_argument('--base',type=lambda v:int(v,0),default=0x540b6000)
     parser.add_argument('--initial-state-hex')
     parser.add_argument('--debug',action='store_true')
     parser.add_argument('--debug-build-id',type=lambda v:int(v,0),default=0)
-    args = parser.parse_args(); print(json.dumps(build(args.out, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id), indent=2))

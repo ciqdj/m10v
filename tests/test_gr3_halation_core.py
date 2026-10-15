@@ -164,6 +164,94 @@ class HalationTests(unittest.TestCase):
         self.assertEqual(y[192*512+256],255)
         self.assertEqual(c[192*512+257],128)
 
+    def test_camera_natural_rejects_reflective_cable_and_keeps_lamp(self):
+        im,y,c,s,n=self.fixture(512,384)
+        # A bright thin cable is not a compact lamp, even on a black sky.
+        for x in range(40,320):y[80*512+x]=247
+        y[220*512+400]=255
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        cable=[c[row*512+x+1]-128 for row in range(72,89) for x in range(80,280,2)]
+        self.assertLessEqual(max(cable),1)
+        self.assertGreater(c[220*512+402+1],128)
+        self.assertEqual(c[220*512+400+1],128)
+
+    def test_camera_default_keeps_hot_narrow_light_strips(self):
+        for vertical in (False,True):
+            for offset in (0,1):
+                im,y,c,s,n=self.fixture(512,384)
+                for position in range(80,300):
+                    for thickness in (0,1):
+                        x,row=(256+offset+thickness,position) if vertical else (position,192+offset+thickness)
+                        y[row*512+x]=255
+                self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+                x,row=(260+offset,180) if vertical else (180,196+offset)
+                self.assertGreaterEqual(c[row*512+(x&~1)+1]-128,8)
+
+    def test_camera_natural_rejects_diagonal_cable_interior(self):
+        im,y,c,s,n=self.fixture(512,384)
+        for x in range(48,320):y[(40+x//2)*512+x]=250
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        values=[c[(40+x//2+dy)*512+x+1]-128 for x in range(100,260,2) for dy in range(-6,7)]
+        self.assertLessEqual(max(values),1)
+
+    def test_camera_natural_rejects_broad_bright_deck(self):
+        im,y,c,s,n=self.fixture(512,384)
+        for row in range(180,192):
+            for x in range(40,472):y[row*512+x]=253
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        values=[c[row*512+x+1]-128 for row in range(174,199) for x in range(100,400,2)]
+        self.assertLessEqual(max(values),1)
+
+    def test_camera_default_saturated_broad_sources_stay_neutral(self):
+        for bounds in ((40,472,180,192),(40,472,100,300),(0,512,0,200)):
+            im,y,c,s,n=self.fixture(512,384)
+            left,right,top,bottom=bounds
+            for row in range(top,bottom):
+                for x in range(left,right):y[row*512+x]=255
+            before=bytes(c)
+            self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+            self.assertEqual(bytes(c),before)
+
+    def test_camera_natural_rejects_cable_endpoints(self):
+        im,y,c,s,n=self.fixture(512,384)
+        for x in range(40,320):y[80*512+x]=247
+        before=bytes(c)
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        self.assertEqual(bytes(c),before)
+
+    def test_camera_natural_rejects_large_bright_wall_corners(self):
+        im,y,c,s,n=self.fixture(512,384)
+        for row in range(100,300):
+            for x in range(40,472):y[row*512+x]=253
+        before=bytes(c)
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        self.assertEqual(bytes(c),before)
+
+    def test_camera_natural_keeps_lamp_cropped_at_image_corner(self):
+        im,y,c,s,n=self.fixture(512,384);y[0]=255
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        self.assertGreater(c[5],128);self.assertEqual(c[1],128)
+
+    def test_camera_default_ignores_small_reflection_without_hot_core(self):
+        im,y,c,s,n=self.fixture();y[48*128+64]=242
+        before=bytes(c)
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        self.assertEqual(bytes(c),before)
+
+    def test_camera_default_lamp_has_visible_near_red_without_far_wash(self):
+        im,y,c,s,n=self.fixture(512,384);y[192*512+256]=255
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        self.assertGreaterEqual(c[192*512+258+1]-128,8)
+        self.assertLessEqual(c[192*512+270+1]-128,1)
+        self.assertEqual(c[192*512+256+1],128)
+
+    def test_camera_natural_point_halo_fades_without_large_far_tail(self):
+        im,y,c,s,n=self.fixture(512,384);y[192*512+256]=255
+        self.assertEqual(self.fn(C.byref(im),self.controls(gain=3,radius=3,threshold=5,profile=3),s,n),0)
+        near=c[192*512+258+1]-128
+        far=c[192*512+270+1]-128
+        self.assertGreaterEqual(near,2);self.assertLessEqual(far,1)
+
     def test_dark_uniform_white_and_off_remain_unchanged(self):
         for value,strength in [(24,1),(255,2),(24,0)]:
             im,y,c,s,n=self.fixture()

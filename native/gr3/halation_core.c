@@ -65,6 +65,51 @@ int m10v_halation(const m10v_halo_image *image, uint32_t control,
             if (v > a[at]) a[at] = (uint8_t)v;
         }
     }
+    /* Current camera controls use compact two-dimensional emitters. A cable
+     * or road stripe stays bright on opposite sides of a local square; a lamp
+     * falls away in both axes. Scan full sides so slanted thin lines cannot
+     * slip between a few directional samples. Read a completely, write b,
+     * then copy: source classification never feeds back into itself. Legacy
+     * controls retain their established rendering for older adapter callers. */
+    if(control&0x80000000u) {
+        for(uint32_t row=0;row<gh;++row)for(uint32_t x=0;x<gw;++x) {
+            uint32_t center=a[row*gw+x],best=0;
+            /* A seed needs a hot core at least eight luminance levels above
+             * the selected threshold. Dim, point-like reflections alone are
+             * insufficient; lower threshold still admits softer emitters. */
+            if(center>=96)for(uint32_t radius=1;radius<=4;radius<<=1) {
+                uint32_t surround=0,present=0,narrow=255;
+                for(uint32_t axis=0;axis<2;++axis) {
+                    uint32_t along=axis?row:x,count=axis?gh:gw;
+                    uint32_t across=axis?x:row,span=axis?gw:gh;
+                    uint32_t lo=0,hi=0,minus=edge(along,count,-(int)radius),plus=edge(along,count,(int)radius);
+                    for(int k=-(int)radius;k<=(int)radius;++k) {
+                        uint32_t cross=edge(across,span,k);
+                        uint32_t at=axis?minus*gw+cross:cross*gw+minus;
+                        uint32_t v=a[at];if(v>lo)lo=v;
+                        at=axis?plus*gw+cross:cross*gw+plus;
+                        v=a[at];if(v>hi)hi=v;
+                    }
+                    /* Every available side must fall below the core. An
+                     * average accepts wire endpoints and white-wall corners.
+                     * Missing sides at image borders are not source evidence. */
+                    if(along<radius)lo=0;
+                    if(along+radius>=count)hi=0;
+                    uint32_t side=lo>hi?lo:hi;
+                    if(along>=radius||along+radius<count)present|=1u<<axis;
+                    if(side>surround)surround=side;
+                    if(side<narrow)narrow=side;
+                }
+                /* Near-saturated strips may continue along one axis, but must
+                 * fall away across their width at the two smallest scales. */
+                if(radius<=2&&center>=192)surround=narrow;
+                uint32_t contrast=present==3&&center>surround?center-surround:0;
+                if(contrast>best)best=contrast;
+            }
+            b[row*gw+x]=best>=8&&best>=(center>>2)?(uint8_t)best:0;
+        }
+        for(uint32_t i=0;i<cells;++i)a[i]=b[i];
+    }
     /* Reject connected broad highlights (sky, white walls), rather than
      * coloring the dark edge beside every bright region. Queue coordinates
      * fit in 16+16 bits; no integer division or recursion is required. */
@@ -116,7 +161,10 @@ int m10v_halation(const m10v_halo_image *image, uint32_t control,
         for (uint32_t bit = 128; bit; bit >>= 1) {
             uint32_t t = root | bit; if (t*t <= v) root = t;
         }
-        a[i] = (uint8_t)root;
+        /* Retain a visible fringe close to accepted emitters. Taper only
+         * low-amplitude outer tails, rather than dimming the whole lamp halo.
+         * The weight rises smoothly to one; all values remain <=255. */
+        a[i] = (uint8_t)((control&0x80000000u)?(root*(a[i]<8?a[i]:8)+4)>>3:root);
     }
     uint32_t cb = fmt == M10V_CBCR422 ? 0 : 1, cr = cb ^ 1;
     for (uint32_t row = 0; row < h; ++row) {

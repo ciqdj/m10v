@@ -1,4 +1,6 @@
 /* M10V menu adapters for the exact official ImageControlController ABI.
+ * Count/index/max adapters are called only from this controller; the global
+ * stock model APIs remain unchanged for ADJ and detail controllers.
  * Browsing private entries never writes a private ID to stock tone storage.
  * Explicit confirmation commits a validated journal and then activates one of
  * the five real stock slots. The original controller owns view allocation.

@@ -5,9 +5,10 @@ import {execFile} from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {normalizeConfiguration} from '../web/gr3/native-library-state.mjs';
+import {normalizeConfiguration,normalizeExtensions} from '../web/gr3/native-library-state.mjs';
 import {inspectOfficial} from './firmware.mjs';
 import {buildNativeLibrary,nativeSourceFingerprint} from './gr3-m10v-native-build.mjs';
+import {buildCameraComponents,composeNative,integrationFingerprint} from './gr3-integrated-components.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const officialHash='d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4';
@@ -38,32 +39,36 @@ export function initialState(configuration){
  let crc=0xffffffff;for(const byte of b.subarray(0,60)){crc^=byte;for(let k=0;k<8;k++)crc=(crc>>>1)^(0xedb88320&-(crc&1));}
  b.writeUInt32LE(~crc>>>0,60);return b;
 }
-export function prepareNative(source,value,{debug_mode=false}={}){
- const report=inspectOfficial(source);
+export function prepareNative(source,value,{debug_mode=false,extensions:requestedExtensions}={}){
+ const report=inspectOfficial(source),extensions=normalizeExtensions(requestedExtensions);
+ if(Object.values(extensions).some(Boolean)&&report.model!=='GR III')throw Error('组合扩展当前仅支持 GR III');
  if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');
  if(debug_mode&&report.model!=='GR III')throw Error('调试模式当前仅支持 GR III');
- const configuration=normalizeConfiguration(value),runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,debug_mode,runtime_source_sha256}));
- return {schema:'m10v-native-library-plan/v1',ready:true,source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
+ const integration_source_sha256=integrationFingerprint();
+ const configuration=normalizeConfiguration(value),runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,extensions,debug_mode,runtime_source_sha256,integration_source_sha256}));
+ return {schema:'m10v-native-library-plan/v1',ready:true,extensions,integration_source_sha256,features:['film','800t','grain','soft','timestamp',...Object.keys(extensions).filter(k=>extensions[k])],source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
   debug_mode,debug_log:debug_mode?{schema:'m10v-gr3-sd-debug/v1',build_id:configuration_sha256.slice(0,8),files:['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'],page_bytes:4096,records_per_channel:63}:null,
   initial_state_hex:initialState(configuration).toString('hex'),film_count:65,active_slots:5,camera_tested:false,external_film_pack:false,
   scope:'静态 JPEG 色彩、颗粒、柔光与时间戳；五槽机内替换并持久化。取景和 RAW 再开发未接入。',
   initial_settings_policy:'首次无有效 M10V 记录时使用网页默认值；已有机内 M10V 记录优先。'};
 }
 let building=false;
-export async function generateNative(source,value,accepted,{signal,debug_mode=false}={}){
- const plan=prepareNative(source,value,{debug_mode});if(accepted!==plan.configuration_sha256)throw Error('配置已变化，请重新预检');
+export async function generateNative(source,value,accepted,{signal,debug_mode=false,extensions}={}){
+ const plan=prepareNative(source,value,{debug_mode,extensions});if(accepted!==plan.configuration_sha256)throw Error('配置已变化，请重新预检');
  if(building)throw Error('另一个 M10V 原生固件正在构建，请稍后重试');
  building=true;let folder;
  try{
   folder=await mkdtemp(path.join(os.tmpdir(),'m10v-native-export-'));
   let python=path.join(root,'.venv/bin/python');try{await access(python);}catch{python='python3';}
-  await run(python,['scripts/build_gr3_m10v_library.py','--out',folder,'--initial-state-hex',plan.initial_state_hex,...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[])],{cwd:root,signal,timeout:120000,maxBuffer:2*1024*1024});
+  const component=await buildCameraComponents(source,plan.extensions,{signal});
+  await run(python,['scripts/build_gr3_m10v_library.py','--base',component?'0x540ba000':'0x540b6000','--out',folder,'--initial-state-hex',plan.initial_state_hex,...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[])],{cwd:root,signal,timeout:120000,maxBuffer:2*1024*1024});
   const manifest=JSON.parse(await readFile(path.join(folder,'m10v-library-arm.json'),'utf8'));
   if(manifest.initial_state_hex!==plan.initial_state_hex)throw Error('ARM 初始配置回读不同');
   if(manifest.debug_mode!==debug_mode||(debug_mode&&manifest.debug_log?.build_id!==plan.debug_log.build_id))throw Error('ARM 调试模式回读不同');
   const runtime=await readFile(path.join(folder,'m10v-library-arm.bin'));
   const result=buildNativeLibrary(source,runtime,manifest);
-  return {...result,manifest,runtime,receipt:{...result.receipt,configuration:plan.configuration,configuration_sha256:plan.configuration_sha256,runtime_source_sha256:plan.runtime_source_sha256,
+  const joined=composeNative(source,result.candidate,runtime,manifest,component,plan.extensions);
+  return {...result,candidate:joined.candidate,nativeCandidate:result.candidate,component,manifest,runtime,receipt:{...result.receipt,extensions:plan.extensions,features:plan.features,integration_source_sha256:plan.integration_source_sha256,composition:joined.composition,candidate_sha256:hash(joined.candidate),candidate_bytes:joined.candidate.length,rtos_growth:joined.structure.rtosGrowth,configuration:plan.configuration,configuration_sha256:plan.configuration_sha256,runtime_source_sha256:plan.runtime_source_sha256,
    model:plan.model,public_version:plan.public_version,filename:plan.filename,initial_state_hex:plan.initial_state_hex,initial_settings_policy:plan.initial_settings_policy}};
  }finally{if(folder)await rm(folder,{recursive:true,force:true});building=false;}
 }

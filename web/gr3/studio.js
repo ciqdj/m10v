@@ -3,12 +3,13 @@ import { createEditorState, createImportGate } from './editor-state.mjs';
 import { createFilmPreview } from './preview-controller.mjs';
 import { previewFilmPixels } from './film-preview.mjs';
 import {mountNativeLibrary} from './native-library.js';
-import {defaultConfiguration,migrateSimulationSelection} from './native-library-state.mjs';
+import {defaultConfiguration,migrateSimulationSelection,nativeSelection} from './native-library-state.mjs';
 let chosenModel=location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
 let modelLabel=chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
 let settingsTab='imaging';
 let debugMode=false;
+const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.features.has('level'),negativeGrain:state.features.has('negativeGrain')});
 const debugEnabled=()=>debugMode&&state.profile==='native'&&chosenModel==='gr3';
 
 const $ = (id) => document.getElementById(id);
@@ -190,6 +191,11 @@ function textNode(tag, value, className = '') {
   if (className) node.className = className;
   return node;
 }
+function enterNativeSelection(){
+ const selected=nativeSelection([...state.features],state.nativeConfig,chosenModel);
+ state.features=new Set(selected.features);state.profile='native';
+ nativeEditor.setConfiguration(selected.configuration);
+}
 function renderFeatures() {
   const target = $('feature-list');
   for (const [index, [id, name, description, tag]] of definitions.entries()) {
@@ -209,13 +215,14 @@ function renderFeatures() {
     button.addEventListener('click', () => {
       if(chosenModel==='gr3x'&&id!=='film'){notice('GR IIIx 当前支持统一胶卷方案。',true);return;}
       if(id==='film'){
-        if(active&&chosenModel!=='gr3x'){state.features=new Set(state.toolFeaturesDraft);state.profile='custom';}
-        else{state.toolFeaturesDraft=[...state.features].filter(v=>v!=='film');state.features=new Set(['film']);state.profile='native';}
-      }else{
-        if(state.profile==='native')state.features=new Set(state.toolFeaturesDraft);
-        state.features.delete('film');state.profile='custom';active?state.features.delete(id):state.features.add(id);
-        notice('已选择原厂工具方案；统一胶卷的五槽设置仍保留。');
-      }
+        if(active&&chosenModel!=='gr3x'){state.features.delete('film');state.profile='custom';}
+        else{try{enterNativeSelection();}catch(e){notice(e.message,true);return;}}
+      }else if(state.profile==='native'){
+        if(!['timestamp','aspect','level','negativeGrain'].includes(id)){notice('胶卷库当前可组合时间戳、画幅、水平仪和负片颗粒；其他工具请先移除胶卷库。',true);return;}
+        active?state.features.delete(id):state.features.add(id);
+        if(id==='timestamp')nativeEditor.setConfiguration({...state.nativeConfig,stamp:active?0:(state.nativeConfig.stamp||1)});
+      }else{active?state.features.delete(id):state.features.add(id);}
+
       invalidate();
       renderFeatures();
     });
@@ -229,9 +236,10 @@ function renderFeatures() {
       else if (id === 'negativeGrain') detail.append(textNode('p','相机内置负片的颗粒项将出现；关闭、弱、中、强由原厂菜单保存。'));
       else if (id === 'rawNr') renderRawNrDetail(detail);
       else if (id === 'timestamp') {
-        detail.append(textNode('p', '默认 ON · YYYY.MM.DD · 右下 · 中 · 橙。日期格式、位置、字号和颜色可在相机菜单中调整，关机后保留。'));
+        if(state.profile==='native'){detail.append(textNode('p','使用胶卷库中的时间戳设置；日期来自本次拍摄元数据。格式、位置与颜色在胶卷库或机内 Timestamp 调整。'));}
+        else detail.append(textNode('p', '默认 ON · YYYY.MM.DD · 右下 · 中 · 橙。日期格式、位置、字号和颜色可在相机菜单中调整，关机后保留。'));
         const points = document.createElement('div'); points.className = 'feature-points';
-        for (const value of ['ON / OFF', '五色字体', '四种日期格式', '四角位置', '3:2 / 4:3 / 1:1 / 65:24']) points.append(textNode('span', value));
+        for (const value of (state.profile==='native'?['开 / 关','四种颜色','四种日期格式','四角位置']:['ON / OFF', '五色字体', '四种日期格式', '四角位置', '3:2 / 4:3 / 1:1 / 65:24'])) points.append(textNode('span', value));
         detail.append(points);
       } else if (id === 'aspect') {
         const points = document.createElement('div'); points.className = 'feature-points';
@@ -440,9 +448,9 @@ function syncRecipeSource(usePreset = true) {
 }
 function renderBuildSummary() {
   if(state.profile==='native'){
-    $('build-feature-count').textContent='65 套胶卷 / 5 槽 / 800T / 质感 / 时间戳';
+    $('build-feature-count').textContent='65 套胶卷 / 5 槽 / 800T / 质感 / 时间戳'+(state.features.has('aspect')?' / 画幅':'')+(state.features.has('level')?' / 水平仪':'')+(state.features.has('negativeGrain')?' / 负片颗粒':'');
     $('runtime-state').textContent='胶卷库 · 全部内置';
-    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`Slot ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]} / 柔光 ${['关','弱','中','强'][v.soft]}`)),textNode('p',`800T · ${state.nativeConfig.slots.filter(v=>v.film===33).map(v=>`强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p','当前使用 M10V 原生胶卷库方案；影像定制草稿保留，可在设置页切换。'));
+    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`Slot ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]} / 柔光 ${['关','弱','中','强'][v.soft]}`)),textNode('p',`800T · ${state.nativeConfig.slots.filter(v=>v.film===33).map(v=>`强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>featureName[id]).join('、')}。机内入口：MENU → 影像控制 → M10V Library；ADJ 保留原厂列表。`));
     return;
   }
   $('build-feature-count').textContent = `${state.features.size} 项 / ${state.recipes.size} 个配方位置`;
@@ -468,8 +476,8 @@ async function importSource(file,local=false) {
     }else report=await (await api('/api/import',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})).json();
     if(!['GR III','GR IIIx'].includes(report.model))throw Error('当前工作台仅支持 GR III 和 GR IIIx 官方包。');
     chosenModel=report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;
-    if(chosenModel==='gr3x'&&state.profile!=='native'){
-      state.toolFeaturesDraft=[...state.features].filter(v=>v!=='film');state.features=new Set(['film']);state.profile='native';
+    if(chosenModel==='gr3x'){
+      state.toolFeaturesDraft=[...state.features].filter(v=>v!=='film');enterNativeSelection();
     }
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
@@ -505,7 +513,7 @@ async function prepare() {
   $('preflight-result').textContent = '正在核验固件、配方位置与功能补丁…';
   try {
     const report = await (await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/prepare`, {
-      method: 'POST', signal:controller.signal, body: JSON.stringify(state.profile==='native'?{configuration:state.nativeConfig,debug_mode:debugEnabled()}:{selection:selection()}),
+      method: 'POST', signal:controller.signal, body: JSON.stringify(state.profile==='native'?{configuration:state.nativeConfig,extensions:nativeExtensions(),debug_mode:debugEnabled()}:{selection:selection()}),
       headers: { 'Content-Type': 'application/json' },
     })).json();
     if(revision!==state.revision||activeBuildController!==controller)return;
@@ -532,7 +540,7 @@ async function build() {
   $('build-result').textContent = '正在构建、重编码并独立回读，约需半分钟…';
   try {
     const response = await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/build`, {
-      method: 'POST', signal:controller.signal, body: JSON.stringify({ ...(state.profile==='native'?{configuration:state.nativeConfig,debug_mode:debugEnabled()}:{selection:selection()}),
+      method: 'POST', signal:controller.signal, body: JSON.stringify({ ...(state.profile==='native'?{configuration:state.nativeConfig,extensions:nativeExtensions(),debug_mode:debugEnabled()}:{selection:selection()}),
         accepted_configuration_sha256: state.preparation.configuration_sha256 }),
       headers: { 'Content-Type': 'application/json' },
     });
@@ -546,7 +554,7 @@ async function build() {
   } finally { if(activeBuildController===controller){activeBuildController=null;$('cancel-build').hidden=true;$('build-firmware').disabled=!(state.preparation&&(riskAcceptedRevision===state.revision));renderLedger();} }
 }
 function showSettingsTab(tab){
- if(tab==='library'){if(state.profile!=='native')state.toolFeaturesDraft=[...state.features].filter(v=>v!=='film');state.features=new Set(['film']);}
+ if(tab==='library'){try{enterNativeSelection();}catch(e){notice(e.message,true);return;}}
  const next=tab==='library'||chosenModel==='gr3x'||state.features.has('film')?'native':'custom';
  if(state.profile!==next){state.profile=next;invalidate();}
  settingsTab=tab;renderFeatures();const library=tab==='library';$('imaging-settings').hidden=library;$('native-editor').hidden=!library;
@@ -651,8 +659,9 @@ try {
   state.token = status.session_token; state.runtime = status.gr3_custom_runtime === true;
   state.nativeCatalog=nativeCatalog.films;
   $('native-editor').innerHTML=nativeMarkup;
-  nativeEditor=mountNativeLibrary($('native-editor'),{onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){if(state.profile!=='native')state.toolFeaturesDraft=[...state.features].filter(v=>v!=='film');state.profile='native';state.features=new Set(['film']);if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
+  nativeEditor=mountNativeLibrary($('native-editor'),{onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';state.features.add('film');configuration.stamp?state.features.add('timestamp'):state.features.delete('timestamp');if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
   state.nativeConfig=nativeEditor.getConfiguration();
+  if(state.nativeConfig.stamp)state.features.add('timestamp');
   state.films = film.looks; state.community = community;
   restoreDraft();showSettingsTab(state.profile==='native'?'library':'imaging');
   renderFeatures();

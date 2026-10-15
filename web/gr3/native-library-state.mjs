@@ -24,3 +24,21 @@ export function migrateSimulationSelection(ids,texture,catalog,current=defaultCo
  });
  return {configuration:normalizeConfiguration(configuration),unresolved};
 }
+
+// Optional camera features share the native export; no implicit draft conversion.
+export const defaultExtensions=()=>({aspect:false,level:false,negativeGrain:false});
+export function normalizeExtensions(value=defaultExtensions()){
+ const keys=['aspect','level','negativeGrain'];
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join('|')!==keys.sort().join('|')||keys.some(k=>typeof value[k]!=='boolean'))throw Error('附加功能配置必须包含画幅、水平仪和负片颗粒开关');
+ return {aspect:value.aspect,level:value.level,negativeGrain:value.negativeGrain};
+}
+export function withNativeLibrary(features){
+ const allowed=['film','timestamp','aspect','level','negativeGrain'];
+ if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合时间戳、画幅、水平仪和负片颗粒；请先移除其他配方或工具');
+ const selected=new Set(['film',...features]);return allowed.filter(id=>selected.has(id));
+}
+
+export function nativeSelection(features,configuration,model){
+ const compatible=model==='gr3x'?features.filter(id=>['film','timestamp'].includes(id)):features;
+ return {features:withNativeLibrary(compatible),configuration:{...configuration,stamp:compatible.includes('timestamp')?(configuration.stamp||1):0}};
+}

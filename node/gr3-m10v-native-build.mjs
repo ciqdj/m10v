@@ -6,12 +6,23 @@ import { inspectOfficial } from './firmware.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 
-const BASE = 0x540b6000, LOAD = 0x53000000;
+const LOAD = 0x53000000;
+const nativeBases = [0x540b6000, 0x540ba000];
 const sha = value => createHash('sha256').update(value).digest('hex');
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const hooks = [
-  [0x532c2a9c,0xe1a0c00d,'m10v_menu_count'], [0x532c2b7c,0xe30d3368,'m10v_menu_max_count'],
-  [0x532c2c80,0xe1a0c00d,'m10v_menu_index'], [0x532922b4,0xe351000a,'m10v_menu_name'],
+  // Private enumeration belongs exclusively to ImageControlController.
+  // Global model functions remain stock for ADJ, detail and generic consumers.
+  [0x531ab78c,0xeb045cc2,'m10v_menu_count',true],
+  [0x531ab7cc,0xeb045d2b,'m10v_menu_index',true],
+  [0x531ab814,0xeb045ca0,'m10v_menu_count',true],
+  [0x531ab834,0xeb045d11,'m10v_menu_index',true],
+  [0x531ab930,0xeb045c59,'m10v_menu_count',true],
+  [0x531ab96c,0xeb045cc3,'m10v_menu_index',true],
+  [0x531ab9fc,0xeb045c26,'m10v_menu_count',true],
+  [0x531abc2c,0xeb045bd2,'m10v_menu_max_count',true],
+  [0x531abe34,0xeb045b18,'m10v_menu_count',true],
+  [0x531abe88,0xeb045b7c,'m10v_menu_index',true], [0x532922b4,0xe351000a,'m10v_menu_name'],
   [0x532a985c,0xe1a0c00d,'m10v_menu_value_name'], [0x532935dc,0xe351000a,'m10v_menu_icon'],
   [0x532a9988,0xe1a0c00d,'m10v_menu_value_icon'], [0x531ab914,0xe1a0c00d,'m10v_menu_focus'],
   [0x531ac24c,0xe1a0c00d,'m10v_menu_confirm'], [0x531ac270,0xe1a0c00d,'m10v_menu_key'],
@@ -31,6 +42,8 @@ function branch(address, target, link=false) {
   return ((link ? 0xeb000000 : 0xea000000) | ((delta >> 2) & 0xffffff)) >>> 0;
 }
 function checkRuntime(runtime, manifest) {
+  const BASE=manifest?.base;
+  need(nativeBases.includes(BASE), 'native runtime base invalid');
   need(Buffer.isBuffer(runtime) && runtime.length > 4096 && runtime.length <= 524288 && runtime.length % 4 === 0,
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
@@ -115,6 +128,7 @@ function encodeExtended(source, original, target, insertion, growth) {
   need(decodeFrameMap(candidate,target.length).decoded.equals(target),'native fresh decode differs'); return candidate;
 }
 export function buildNativeLibrary(source,runtime,manifest) {
+  const BASE=manifest?.base;
   const report=inspectOfficial(source);checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
@@ -133,6 +147,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
   return {candidate,receipt:auditNativeLibrary(source,candidate,runtime,manifest)};
 }
 export function auditNativeLibrary(source,candidate,runtime,manifest) {
+  const BASE=manifest?.base;
   const report=inspectOfficial(source);checkRuntime(runtime,manifest);
   const structural=auditGr3Candidate(source,candidate,{maxRtosGrowth:512*1024});
   const before=decodeFrameMap(source).decoded,after=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
@@ -171,6 +186,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
     verified_hooks:patchList(manifest).length,icon_count:65,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:2,film_count:65,active_slots:5,external_film_pack:false,
+    menu_entry:'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
     camera_scope:'still JPEG; original RAW pixels protected; live-view color and RAW-development effects not integrated'};
 }

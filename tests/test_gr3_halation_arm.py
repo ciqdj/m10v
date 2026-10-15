@@ -51,6 +51,23 @@ class ArmHalationTests(unittest.TestCase):
         self.assertEqual(actual['status'],0)
         self.assertEqual(actual['y'],bytes(y));self.assertEqual(actual['chroma'],bytes(c))
         self.assertTrue(actual['seamRegistersPreserved']);self.assertTrue(actual['flagsPreserved'])
+    def test_arm_camera_emitter_filter_matches_host_with_cable_and_point_lamp(self):
+        im,y,c,s,n=self.fixture(96,72)
+        for x in range(8,72):y[(8+x//2)*96+x]=250
+        y[56*96+80]=255
+        for x in range(16,64):y[60*96+x]=255
+        control=0x80000000|3|(3<<4)|(5<<8)|(3<<16)
+        before_y,before_c=bytes(y),bytes(c)
+        self.assertEqual(self.fn(C.byref(im),control,s,n),0)
+        self.assertEqual(c[28*96+40+1],128)
+        self.assertGreater(c[56*96+82+1],128)
+        self.assertGreater(c[62*96+40+1],128)
+        actual=run_arm(self.code,self.seam,before_y,before_c,96,72,96,96,1,control,n)
+        self.assertEqual(actual['status'],0)
+        self.assertEqual(actual['y'],bytes(y));self.assertEqual(actual['chroma'],bytes(c))
+        self.assertTrue(actual['calleeSaved']);self.assertTrue(actual['flagsPreserved'])
+        self.assertTrue(actual['seamRegistersPreserved']);self.assertTrue(actual['stackRestored'])
+
     def test_manifest_code_hash_and_budget(self):
         self.assertEqual(hashlib.sha256(self.code).hexdigest(),self.manifest['codeSha256'])
         self.assertLessEqual(len(self.code),4096);self.assertFalse(self.manifest['cameraLayoutProved'])

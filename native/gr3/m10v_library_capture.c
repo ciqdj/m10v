@@ -19,6 +19,30 @@ static int raw_ram(uint32_t p, uint32_t size) {
 static int overlap(uint32_t a, uint32_t an, uint32_t b, uint32_t bn) {
     return a < b + bn && b < a + an;
 }
+/* The UI date service can be unavailable in the capture thread. Never let
+ * an unavailable/invalid date suppress unrelated image processing. */
+static int capture_date_valid(const uint32_t time[3]) {
+    const m10v_library_date *d = (const m10v_library_date *)time;
+    static const uint8_t days[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    if (d->year < 1980 || d->year > 2199 || !d->month || d->month > 12 ||
+        !d->day || d->hour > 23 || d->minute > 59 || ((const uint8_t *)time)[6] > 59) return 0;
+    uint32_t max = days[d->month - 1];
+    if (d->month == 2 && d->year % 4 == 0 && (d->year % 100 != 0 || d->year % 400 == 0)) ++max;
+    return d->day <= max;
+}
+static void skip_capture_stamp(m10v_library_state *state) {
+    /* This is a stack copy, never stored. Keep the serialized-state CRC valid
+     * for render's validation without changing the persisted configuration. */
+    state->stamp = 0;
+    uint32_t crc = 0xffffffffu;
+    const uint8_t *bytes = (const uint8_t *)state;
+    for (uint32_t i = 0; i < sizeof(*state) - sizeof(state->crc); ++i) {
+        crc ^= bytes[i];
+        for (uint32_t bit = 0; bit < 8; ++bit)
+            crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
+    }
+    state->crc = ~crc;
+}
 #if M10V_DEBUG_MODE
 static int capture_library_impl(uint32_t context) {
 #else
@@ -37,7 +61,7 @@ int m10v_capture_library(uint32_t context) {
         ctx[0x34 / 4] != *(const uint32_t *)(uintptr_t)(recipe + 0x44c8u) ||
         ctx[0x38 / 4] != *(const uint32_t *)(uintptr_t)(recipe + 0x5cu)) return -3;
     uint32_t request = ctx[0x38 / 4], shooting = ctx[0x34 / 4], descriptor = ctx[0x3c / 4], jpeg = ctx[0x4c / 4];
-    if (!ram(request, 14) || !ram(shooting, 0x797) || !ram(descriptor, 32) || !ram(jpeg, 17) ||
+    if (!ram(request, 14) || !ram(shooting, 0x94c) || !ram(descriptor, 32) || !ram(jpeg, 17) ||
         *(const uint32_t *)(uintptr_t)request != 0x53d0fe60u) return -3;
     const uint8_t *req = (const uint8_t *)(uintptr_t)request;
     if (req[12] != 1 || req[13] > 1 || ((const uint8_t *)(uintptr_t)jpeg)[16] != 1) return -4;
@@ -65,7 +89,7 @@ int m10v_capture_library(uint32_t context) {
     uint32_t planes[2] = {desc[1], desc[2]};
     for (uint32_t i = 0; i < 2; ++i)
         if (overlap(planes[i], bytes, raw_source, raw_bytes) || overlap(planes[i], bytes, recipe, 0x44cc) ||
-            overlap(planes[i], bytes, request, 0x3c) || overlap(planes[i], bytes, shooting, 0x797) ||
+            overlap(planes[i], bytes, request, 0x3c) || overlap(planes[i], bytes, shooting, 0x94c) ||
             overlap(planes[i], bytes, raw_dims, 4)) return -3;
     const uint32_t *preview = (const uint32_t *)(uintptr_t)(recipe + 0x110u);
     const uint16_t *pd = (const uint16_t *)(uintptr_t)(recipe + 0x120u);
@@ -80,13 +104,33 @@ int m10v_capture_library(uint32_t context) {
     uint32_t time[3] = {0,0,0};
     uint32_t seed = state.sequence ^ planes[0];
     if (state.stamp || state.slots[slot].grain) {
-        uint32_t root = ((root_fn)0x5320ad88u)();
-        uint32_t service = ((get_fn)0x5320b97cu)(root);
-        if (!ram(service, 0x1a0) || !((clock_fn)0x532b36ccu)(service, time)) return -7;
-        const m10v_library_date *date = (const m10v_library_date *)time;
-        seed ^= ((uint32_t)date->year << 16) ^ ((uint32_t)date->month << 8) ^ date->day ^
-                ((uint32_t)date->hour << 24) ^ ((uint32_t)date->minute << 16) ^
-                ((uint32_t)((const uint8_t *)time)[6] << 8);
+        /* Official producer 0x534322d8/0x534fa22c writes this capture
+         * metadata date. +0x948 is weekday, not hour. Prefer exposure metadata
+         * over the UI cache (which may be unavailable or from a later time). */
+        const uint8_t *shot = (const uint8_t *)(uintptr_t)shooting;
+        m10v_library_date *date = (m10v_library_date *)time;
+        date->year = *(const uint16_t *)(shot + 0x944);
+        date->month = shot[0x946]; date->day = shot[0x947];
+        date->hour = shot[0x949]; date->minute = shot[0x94a];
+        ((uint8_t *)time)[6] = shot[0x94b];
+        uint32_t clock_status = 4, source = shooting + 0x944;
+        /* 4 capture date, 1 UI date, 2 UI unavailable, 3 invalid date. */
+        if (!capture_date_valid(time)) {
+            uint32_t root = ((root_fn)0x5320ad88u)();
+            source = ((get_fn)0x5320b97cu)(root);
+            clock_status = 2;
+            if (ram(source, 0x3cc) && ((clock_fn)0x532b36ccu)(source, time))
+                clock_status = capture_date_valid(time) ? 1 : 3;
+        }
+        M10V_LOG(120,context,clock_status,state.stamp,source);
+        if (clock_status != 1 && clock_status != 4) {
+            skip_capture_stamp(&state);
+        } else {
+            const m10v_library_date *date = (const m10v_library_date *)time;
+            seed ^= ((uint32_t)date->year << 16) ^ ((uint32_t)date->month << 8) ^ date->day ^
+                    ((uint32_t)date->hour << 24) ^ ((uint32_t)date->minute << 16) ^
+                    ((uint32_t)((const uint8_t *)time)[6] << 8);
+        }
     }
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
     uint32_t use_halo=state.slots[slot].film==33&&state.slots[slot].halo_profile&&state.slots[slot].halo_gain;
@@ -99,7 +143,7 @@ int m10v_capture_library(uint32_t context) {
         if (!ram(address, scratch_bytes)) return -6;
         if (overlap(address, scratch_bytes, planes[0], bytes) || overlap(address, scratch_bytes, planes[1], bytes) ||
             overlap(address, scratch_bytes, raw_source, raw_bytes) || overlap(address, scratch_bytes, recipe, 0x44cc) ||
-            overlap(address, scratch_bytes, request, 0x3c) || overlap(address, scratch_bytes, shooting, 0x797) ||
+            overlap(address, scratch_bytes, request, 0x3c) || overlap(address, scratch_bytes, shooting, 0x94c) ||
             overlap(address, scratch_bytes, raw_dims, 4) || overlap(address, scratch_bytes, preview[1], preview_bytes) ||
             overlap(address, scratch_bytes, preview[2], preview_chroma_bytes)) {
             ((free_fn)0x536af2e4u)(scratch); return -6;

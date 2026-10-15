@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {defaultConfiguration,normalizeExtensions} from '../web/gr3/native-library-state.mjs';
+import {prepareNative,generateNative} from './gr3-native-library.mjs';
+const source=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));
+
+test('native extensions have a strict complete configuration without accepting unrelated controls',()=>{
+ assert.deepEqual(normalizeExtensions(),{aspect:false,level:false,negativeGrain:false});
+ assert.deepEqual(normalizeExtensions({aspect:true,level:true,negativeGrain:true}),{aspect:true,level:true,negativeGrain:true});
+ for(const value of [null,{aspect:true},{aspect:1,level:false,negativeGrain:false},{aspect:false,level:false,negativeGrain:false,timestamp:true}])assert.throws(()=>normalizeExtensions(value));
+});
+test('one accepted plan binds native slots, timestamp, aspect, level and native negative grain',async()=>{
+ const c=defaultConfiguration();c.stamp=2;c.slots[4].grain=2;
+ const plain=prepareNative(source,c),extensions={aspect:true,level:true,negativeGrain:true};
+ const joined=prepareNative(source,c,{extensions});
+ assert.deepEqual(joined.extensions,extensions);
+ assert.deepEqual(joined.configuration,c);
+ assert.notEqual(joined.configuration_sha256,plain.configuration_sha256);
+ assert.ok(joined.features.includes('aspect')&&joined.features.includes('level')&&joined.features.includes('negativeGrain'));
+ await assert.rejects(()=>generateNative(source,c,plain.configuration_sha256,{extensions}),/变化/);
+ const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
+ assert.throws(()=>prepareNative(x,c,{extensions}),/GR III/);
+});
+
+test('final joined firmware contains all selected components and rejects repaired-checksum tampering',async()=>{
+ const {decodeFrameMap,sum32}=await import('./gr3-frames.mjs');
+ const {auditIntegratedNative}=await import('./gr3-integrated-components.mjs');
+ const config=defaultConfiguration();config.slots[4].grain=2;config.stamp=2;
+ const extensions={aspect:true,level:true,negativeGrain:true};
+ const plan=prepareNative(source,config,{extensions});
+ const result=await generateNative(source,config,plan.configuration_sha256,{extensions});
+ assert.deepEqual(result.receipt.extensions,extensions);
+ assert.equal(result.manifest.base,0x540ba000);
+ assert.ok(result.receipt.composition.verified);
+ assert.equal(result.receipt.composition.aspect_resource_id,911);
+ assert.equal(result.receipt.composition.native_resource_range[0],786);
+ assert.equal(result.receipt.composition.native_resource_range[1],910);
+ assert.equal(sum32(result.candidate),0);
+ const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
+ let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
+ assert.equal(d.readUInt32LE(at+16+0xb348c0),10);
+ assert.equal(d.subarray(at+16+0xb3501e,at+16+0xb35020).toString('hex'),'020f');
+ assert.deepEqual(auditIntegratedNative(source,result.candidate,result.nativeCandidate,result.runtime,result.manifest,result.component,extensions),result.receipt.composition);
+ const damaged=Buffer.from(result.candidate);damaged[200]^=1;
+ damaged.writeUInt32LE(0,damaged.length-4);damaged.writeUInt32LE(-sum32(damaged)>>>0,damaged.length-4);
+ assert.throws(()=>auditIntegratedNative(source,damaged,result.nativeCandidate,result.runtime,result.manifest,result.component,extensions));
+});
+
+test('library selection retains composable tools and refuses unsupported combinations without dropping options',async()=>{
+ const {withNativeLibrary}=await import('../web/gr3/native-library-state.mjs');
+ assert.deepEqual(withNativeLibrary(['aspect','level','negativeGrain','timestamp']),['film','timestamp','aspect','level','negativeGrain']);
+ assert.deepEqual(withNativeLibrary(['film','aspect','level']),['film','aspect','level']);
+ assert.throws(()=>withNativeLibrary(['recipes','aspect']),/配方|组合/);
+});
+
+test('native transition synchronizes timestamp and clears GR III-only tools on model switch',async()=>{
+ const {nativeSelection}=await import('../web/gr3/native-library-state.mjs');
+ const c=defaultConfiguration();
+ assert.equal(nativeSelection(['timestamp','aspect'],c,'gr3').configuration.stamp,1);
+ assert.equal(nativeSelection(['aspect'],{...c,stamp:2},'gr3').configuration.stamp,0);
+ const x=nativeSelection(['film','timestamp','aspect','level','negativeGrain'],{...c,stamp:2},'gr3x');
+ assert.deepEqual(x.features,['film','timestamp']);
+ assert.equal(x.configuration.stamp,2);
+});

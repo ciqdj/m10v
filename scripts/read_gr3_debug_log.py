@@ -8,7 +8,7 @@ from pathlib import Path
 EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'menu.key.after',
         30:'menu.focus.before',31:'menu.focus.after',40:'menu.confirm.before',41:'menu.confirm.after',
         50:'menu.redraw.before',51:'menu.redraw.after',60:'settings.commit.before',61:'settings.commit.after',
-        100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after'}
+        100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
 
 def page_records(data):
     if len(data)!=4096:return None

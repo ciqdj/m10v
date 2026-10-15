@@ -75,10 +75,13 @@ changed=1
 git merge --ff-only "$expected"
 [[ $(git rev-parse HEAD) == "$expected" ]]
 for model in gr3 gr3x; do
-  flags=("--model=$model")
-  if [[ $model == gr3 ]]; then flags+=(--debug); fi
-  if ! runuser -u www -- env M10V_LLVM_CLANG=/usr/bin/clang "$node" \
-    scripts/export_gr3_m10v_native.mjs "${flags[@]}" "$work/$model" >"$work/$model.log" 2>&1; then
+  if [[ $model == gr3 ]]; then
+    build_args=(scripts/build_gr3_device_candidate.mjs "$work/$model")
+  else
+    build_args=(scripts/export_gr3_m10v_native.mjs "--model=$model" "$work/$model")
+  fi
+  if ! runuser -u www -- env M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
+    "${build_args[@]}" >"$work/$model.log" 2>&1; then
     cat "$work/$model.log" >&2; exit 1
   fi
   printf 'FIRMWARE_BUILD_OK model=%s\n' "$model"
