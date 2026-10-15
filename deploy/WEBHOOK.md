@@ -1,3 +1,7 @@
+# 状态：历史 HTTPS 方案，当前停用
+
+生产自动部署使用 [SSH.md](SSH.md)。以下为保留的实现说明。
+
 # GitHub → 宝塔自动部署
 
 GitHub Actions push/main → 签名 Git bundle → 现有 HTTPS `/hooks/github` → 仅 loopback 监听的独立部署服务 → 固定部署脚本。仅 `zhaoo/m10v` 的 `main` 推送触发；`develop` 推送忽略，避免双分支同步造成重复发布。

@@ -23,39 +23,26 @@ jobs:
       - name: Verify deployment controls
         run: |
           node --test node/github-webhook.test.mjs node/server-deployment.test.mjs
-          python3 -m unittest tests.test_baota_publish
-      - name: Deliver verified Git bundle
+          python3 -m unittest tests.test_baota_publish tests.test_ssh_deploy
+      - name: Deploy verified Git bundle over restricted SSH
         env:
-          DEPLOY_SECRET: ${{ secrets.M10V_DEPLOY_SECRET }}
+          DEPLOY_SSH_KEY: ${{ secrets.M10V_DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.M10V_DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          test -n "$DEPLOY_SECRET"
-          # Every production checkout has this fixed initial release. No server GitHub fetch is required.
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          key="$RUNNER_TEMP/m10v-deploy-key"
+          hosts="$RUNNER_TEMP/m10v-known-hosts"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$hosts"
           git bundle create /tmp/m10v-release.bundle f34a53636bae0bb9939d4ae9f5057b1d2c005762..HEAD
           git bundle verify /tmp/m10v-release.bundle
-          python3 - <<'PY'
-          import os,json,base64,hmac,hashlib,pathlib
-          bundle=pathlib.Path('/tmp/m10v-release.bundle').read_bytes()
-          body=json.dumps({'repository':{'full_name':'zhaoo/m10v'},'ref':'refs/heads/main','after':os.environ['GITHUB_SHA'],'bundle':base64.b64encode(bundle).decode()},separators=(',',':')).encode()
-          assert len(body)<32*1024*1024, 'Bundle exceeds receiver limit'
-          pathlib.Path('/tmp/m10v-payload.json').write_bytes(body)
-          signature=hmac.new(os.environ['DEPLOY_SECRET'].encode(),body,hashlib.sha256).hexdigest()
-          pathlib.Path('/tmp/m10v-headers').write_text('Content-Type: application/json\nX-GitHub-Event: push\nX-Hub-Signature-256: sha256='+signature+'\n')
-          pathlib.Path('/tmp/m10v-status-headers').write_text(pathlib.Path('/tmp/m10v-headers').read_text().replace('X-GitHub-Event: push','X-GitHub-Event: m10v-status'))
-          PY
-          getent ahostsv4 m10v.izhaoo.com
-          curl --ipv4 --http1.1 --tlsv1.2 --tls-max 1.2 --resolve m10v.izhaoo.com:443:114.55.142.234 --fail-with-body --retry 8 --retry-all-errors --retry-delay 10 --max-time 30 \
-            --header @/tmp/m10v-headers --data-binary @/tmp/m10v-payload.json \
-            https://m10v.izhaoo.com/hooks/github
-          for attempt in $(seq 1 90); do
-            sleep 5
-            if ! curl --ipv4 --http1.1 --tlsv1.2 --tls-max 1.2 --resolve m10v.izhaoo.com:443:114.55.142.234 --fail --retry 2 --retry-all-errors --max-time 15 --silent --show-error \
-              --header @/tmp/m10v-status-headers --data-binary @/tmp/m10v-payload.json \
-              https://m10v.izhaoo.com/hooks/github -o /tmp/m10v-status.json; then
-              continue
-            fi
-            result=$(python3 -c 'import json,os; s=json.load(open("/tmp/m10v-status.json")); r=s.get("lastResult") or {}; print("success" if s.get("deployed")==os.environ["GITHUB_SHA"] else "failure" if r.get("sha")==os.environ["GITHUB_SHA"] and r.get("ok")==False and s.get("running")!=os.environ["GITHUB_SHA"] else "pending")')
-            if [ "$result" = success ]; then cat /tmp/m10v-status.json; exit 0; fi
-            if [ "$result" = failure ]; then cat /tmp/m10v-status.json; exit 1; fi
-          done
-          echo 'Timed out waiting for verified deployment'; exit 1
+          ssh -T -i "$key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            root@114.55.142.234 "deploy $GITHUB_SHA" \
+            < /tmp/m10v-release.bundle | tee /tmp/m10v-deploy.log
+          grep -F "DEPLOY_OK commit=$GITHUB_SHA " /tmp/m10v-deploy.log

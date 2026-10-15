@@ -136,3 +136,5 @@ sudo systemctl restart m10v
 ## GitHub 推送后自动部署
 
 现有服务器可使用签名 Webhook 自动部署 `main`；配置、持久化队列、日志核验和停用方式见 [WEBHOOK.md](WEBHOOK.md)。
+
+当前生产自动发布使用 [受限 SSH 方案](SSH.md)。HTTPS Webhook 因云端网络问题未启用。
