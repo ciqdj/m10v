@@ -102,9 +102,9 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
     required = {
         'm10v_halation': {'m10v_halation'},
         'm10v_library_': {'m10v_library_init', 'm10v_library_valid', 'm10v_library_name',
-            'm10v_library_select', 'm10v_library_texture', 'm10v_library_halation', 'm10v_library_tables', 'm10v_library_stamp', 'm10v_library_render'},
+            'm10v_library_select', 'm10v_library_texture', 'm10v_library_halation', 'm10v_library_detail', 'm10v_library_tables', 'm10v_library_stamp', 'm10v_library_render'},
         'm10v_camera_library_': {'m10v_camera_library_load', 'm10v_camera_library_select',
-            'm10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp'},
+            'm10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp', 'm10v_camera_library_detail'},
         'm10v_menu_': {'m10v_menu_count', 'm10v_menu_max_count', 'm10v_menu_index', 'm10v_menu_name',
             'm10v_menu_value_name', 'm10v_menu_icon', 'm10v_menu_value_icon', 'm10v_menu_focus',
             'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter'},
@@ -115,6 +115,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
         'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
         'm10v_sd_camera_': {'m10v_sd_camera_item','m10v_sd_camera_install'},
         'm10v_debug_': {'m10v_debug_log'},
+        'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
     }[prefix]
     if set(symbols) != required or not image_sections: raise ValueError('runtime API incomplete')
     return bytes(image), symbols
@@ -196,6 +197,18 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             debug_base=(base+len(image)+15)&~15
             debug,debug_symbols=link_object(debug_obj.read_bytes(),debug_base,prefix='m10v_debug_')
             image+=bytes(debug_base-base-len(image))+debug;symbols.update(debug_symbols)
+        # Link dedicated stock-detail backend against the same camera journal.
+        from scripts.build_gr3_native_detail import build_detail, STOCK_TABLE
+        detail_obj=folder/'detail.o'
+        subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_detail.c'),'-o',str(detail_obj)],check=True,capture_output=True)
+        detail_base=(base+len(image)+15)&~15
+        provisional,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,'m10v_detail_tables':detail_base},'m10v_detail_')
+        shims_base=(detail_base+len(provisional)+15)&~15
+        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols})
+        detail,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,'m10v_detail_tables':detail_report['tables']},'m10v_detail_')
+        image+=bytes(detail_base-base-len(image))+detail
+        image+=bytes(shims_base-base-len(image))+shims
+        symbols.update(detail_symbols)
         menu_obj = folder / 'menu.o'
         subprocess.run([compiler, *FLAGS, *debug_flags, f'-DM10V_NATIVE_BASE={base}u', '-c',
                         str(ROOT / 'native/gr3/m10v_library_menu.c'), '-o', str(menu_obj)], check=True, capture_output=True)
@@ -216,18 +229,27 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if len(names) != 33 or len(set(names)) != 33: raise ValueError('original catalog names incomplete')
         texts = names[:32] + [f'M10V Slot {i}' for i in range(1, 6)] + [
             'M10V Film Library', 'Save failed. Try again.', 'M10V Library',
-            'Choose Film', 'Grain', 'Soft Diffusion', 'Timestamp', 'Choose Slot',
+            'Choose Film', '颗粒', '柔光', 'Timestamp', 'Choose Slot',
             'Grain Off', 'Grain Weak', 'Grain Medium', 'Grain Strong',
             'Diffusion Off', 'Diffusion Weak', 'Diffusion Medium', 'Diffusion Strong',
             'Timestamp Off', 'Date Only', 'Date and Time', 'Date Format', 'Stamp Corner', 'Stamp Color', 'Back',
             'YYYY.MM.DD', 'DD.MM.YYYY', 'YYYY-MM-DD', 'YY.MM.DD',
             'Top Left', 'Top Right', 'Bottom Left', 'Bottom Right',
             'White', 'Orange', 'Red', 'Yellow', 'Back', 'Done', names[32],
-            '800T Halation','Halation Gain','Halation Spread','Highlight Gate','Halation Profile',
+            '800T Halation','光晕强度','扩散范围','高光阈值','Halation Profile',
             *[str(i) for i in range(9)],'Off','Weak','Natural','Strong',
             *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]]
         if len(texts) != 125: raise ValueError('private resource inventory differs')
-        if sd_library:texts+=['Empty','Previous page','Next page','SD Film Library']
+        if sd_library:
+            translations={'M10V Film Library':'胶卷库','Save failed. Try again.':'读取或保存失败，请检查存储卡','M10V Library':'胶卷设置',
+                'Choose Film':'内置胶卷','Timestamp':'时间戳','Choose Slot':'设置槽位',
+                'Grain Off':'颗粒关闭','Grain Weak':'颗粒弱','Grain Medium':'颗粒中','Grain Strong':'颗粒强',
+                'Diffusion Off':'柔光关闭','Diffusion Weak':'柔光弱','Diffusion Medium':'柔光中','Diffusion Strong':'柔光强',
+                'Timestamp Off':'时间戳关闭','Date Only':'仅日期','Date and Time':'日期和时间','Date Format':'日期格式',
+                'Stamp Corner':'显示位置','Stamp Color':'文字颜色','Back':'返回','Done':'完成','Top Left':'左上','Top Right':'右上',
+                'Bottom Left':'左下','Bottom Right':'右下','White':'白色','Orange':'橙色','Red':'红色','Yellow':'黄色',
+                '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
+            texts=[translations.get(t,t) for t in texts]+['空','上一页','下一页','胶卷库']
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
@@ -365,7 +387,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 65, 'slots': 5,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
                             ('native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
-                             'native/gr3/halation_core.c', 'native/gr3/halation_core.h',
+                             'native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h',
+                             'native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py',
                              'native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py',
                              'native/gr3/m10v_library_camera.c', 'native/gr3/m10v_library_menu.c',
                              'native/gr3/m10v_library_capture.c',
@@ -379,6 +402,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['sd_library']=sd_library
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','scripts/generate_gr3_sd_contract.mjs']})
+    manifest['detail']=detail_report
     manifest['debug_mode']=debug_mode
     manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
         'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'],

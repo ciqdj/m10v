@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -25,6 +26,16 @@ test('M10V native library builds from official bytes without a compatibility run
     const decoded = decodeFrameMap(result.candidate, result.candidate.readUInt32LE(result.candidate.length - 8)).decoded;
     assert.ok(decoded.includes(Buffer.from('M10V2A.bin')));
     assert.ok(!runtime.includes(Buffer.from('GRLIFE')));
+    assert.deepEqual(manifest.detail.ids,[18,19,20,21,22]);
+    assert.equal(manifest.detail.backend,'m10v_camera_library_detail');
+    // Updating an untrusted manifest hash cannot authorize arbitrary shim code.
+    const changedDetail=Buffer.from(runtime);
+    changedDetail[manifest.detail.entries.callback-manifest.base]^=1;
+    const changedManifest={...manifest,code_sha256:createHash('sha256').update(changedDetail).digest('hex')};
+    assert.throws(()=>buildNativeLibrary(source,changedDetail,changedManifest),/detail instruction differs/);
+    const changedCaption=Buffer.from(runtime);
+    changedCaption.writeUInt16LE(866,manifest.detail.captions-manifest.base+72);
+    assert.throws(()=>buildNativeLibrary(source,changedCaption,{...manifest,code_sha256:createHash('sha256').update(changedCaption).digest('hex')}),/detail caption differs/);
     const damaged = Buffer.from(result.candidate); damaged[200] ^= 1;
     assert.throws(() => auditNativeLibrary(source, damaged, runtime, manifest));
     const wrongRuntime = Buffer.from(runtime); wrongRuntime[0] ^= 1;

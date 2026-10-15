@@ -32,16 +32,20 @@ int m10v_library_select(m10v_library_state *, uint32_t slot, uint32_t film,
 int m10v_library_texture(m10v_library_state *, uint32_t slot, uint32_t grain, uint32_t soft,
                          m10v_library_store, void *);
 int m10v_library_halation(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t profile, m10v_library_store, void *);
+int m10v_library_detail(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t grain, uint32_t soft, m10v_library_store, void *);
 int m10v_library_tables(uint32_t film, int16_t *, int16_t *, uint16_t *, uint16_t *);
 int m10v_library_stamp(m10v_library_state *, uint32_t enabled, uint32_t format,
                        uint32_t corner, uint32_t color, m10v_library_store, void *);
 int m10v_library_render(m10v_library_image *, const m10v_library_state *, uint32_t slot,
                         const m10v_library_date *, uint32_t seed, uint8_t *scratch,
                         uint32_t scratch_bytes);
+/* Nonnegative load provenance: 0=new journal, 1=defaults, 2=v2 migration,
+ * 3=v1 migration. All are usable validated states; negative is failure. */
 int m10v_camera_library_load(m10v_library_state *);
 int m10v_camera_library_select(m10v_library_state *, uint32_t slot, uint32_t film);
 int m10v_camera_library_texture(m10v_library_state *, uint32_t slot, uint32_t grain, uint32_t soft);
 int m10v_camera_library_halation(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t profile);
+int m10v_camera_library_detail(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t grain, uint32_t soft);
 int m10v_camera_library_stamp(m10v_library_state *, uint32_t enabled, uint32_t format,
                              uint32_t corner, uint32_t color);
 #endif

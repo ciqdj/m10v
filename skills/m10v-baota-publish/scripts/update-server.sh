@@ -90,13 +90,17 @@ for model in gr3 gr3x; do
   if [[ $model == gr3 ]]; then
     build_args=(scripts/build_gr3_device_candidate.mjs "$work/$model")
   else
-    build_args=(scripts/export_gr3_m10v_native.mjs "--model=$model" "$work/$model")
+    build_args=(scripts/check_gr3x_release.mjs)
   fi
   if ! runuser -u www -- env M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
     "${build_args[@]}" >"$work/$model.log" 2>&1; then
     cat "$work/$model.log" >&2; exit 1
   fi
-  printf 'FIRMWARE_BUILD_OK model=%s\n' "$model"
+  if [[ $model == gr3 ]]; then
+    printf 'FIRMWARE_BUILD_OK model=%s\n' "$model"
+  else
+    printf 'MODEL_GUARD_OK model=gr3x native_export=blocked\n'
+  fi
 done
 systemctl restart "$service"
 healthy=0

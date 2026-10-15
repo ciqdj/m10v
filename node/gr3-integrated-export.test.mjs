@@ -71,7 +71,7 @@ test('RAW NR plans bind all modes and reject unknown model addresses',()=>{
  assert.equal(new Set(plans.map(p=>p.configuration_sha256)).size,3);
  assert.ok(plans[1].features.includes('rawNr'));assert.ok(!plans[0].features.includes('rawNr'));
  const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.doesNotThrow(()=>prepareNative(x,c));
+ assert.throws(()=>prepareNative(x,c),/GR IIIx/);
  assert.throws(()=>prepareNative(x,c,{extensions:{...flags,rawNr:{mode:'off'}}}),/GR III/);
  for(const rawNr of [null,{mode:'threshold',iso:6300},{mode:'off',iso:6400},{mode:'stock',extra:1}])assert.throws(()=>normalizeExtensions({...flags,rawNr}));
 });

@@ -109,7 +109,8 @@ class M10VCaptureTests(unittest.TestCase):
         for row in range(height):
             y[row * stride + width:(row + 1) * stride] = bytes([173] * 8)
             uv[row * stride + width:(row + 1) * stride] = bytes([197] * 8)
-        y[48 * stride + 64] = 255
+        for row in range(47,50):
+            for x in range(63,66): y[row * stride + x] = 255
         u.mem_write(0x55010000, bytes(y)); u.mem_write(0x55020000, bytes(uv))
         return h, u, recipe + 0x9b8, y, uv, cache, frees, width, height, stride
 
@@ -155,6 +156,14 @@ class M10VCaptureTests(unittest.TestCase):
                 self.assertGreater(max(hc[row*stride+x+1] for row in range(42,55) for x in range(58,72,2)),128)
                 self.assertEqual(len(cache),4); self.assertEqual(frees,[0x550b0000])
 
+    def test_settings_trace_records_all_five_actual_capture_values(self):
+        h,u,context,*_=self.fixture(debug=True,film=33)
+        self.assertEqual(h.call(u,'m10v_camera_library_detail',0x55001000,1,6,2,7,1,3),0)
+        h.capture_events.clear()
+        self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+        rows=[e for e in h.capture_events if e[0]==112]
+        self.assertEqual(rows,[(112,1,6|(2<<4)|(7<<8)|(1<<12)|(3<<16),4,3)])
+
     def test_official_capture_metadata_date_wins_over_unready_or_different_ui_date(self):
         for ready in (0,1):
             h,u,context,y,uv,cache,frees,width,height,stride = self.fixture(
@@ -179,8 +188,21 @@ class M10VCaptureTests(unittest.TestCase):
             self.assertEqual(h.call(u,'m10v_capture_library',context),0)
             clock = [e for e in h.capture_events if e[0] == 120]
             self.assertEqual(clock,[(120,context,status,2,0x55006000)])
-            self.assertEqual([e[0] for e in h.capture_events],[100,120,110,111,101])
+            self.assertEqual([e[0] for e in h.capture_events],[100,113,120,110,112,114,111,101])
+            self.assertEqual([e[1:] for e in h.capture_events if e[0]==114],[(12168,9,128*96,216)])
             self.assertEqual(h.capture_events[-1][2],0)
+
+    def test_capture_diagnoses_migrated_and_saved_journal_sources(self):
+        h,u,context,*_ = self.fixture(debug=True,film=33)
+        h.files={name.replace('M10V3','M10V2'):data for name,data in h.files.items()}
+        h.capture_events.clear()
+        self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+        self.assertEqual([e[1:3] for e in h.capture_events if e[0]==113],[(1,2)])
+        self.assertEqual(h.call(u,'m10v_camera_library_load',0x55001000),2)
+        self.assertEqual(h.call(u,'m10v_camera_library_detail',0x55001000,1,3,3,5,1,0),0)
+        h.capture_events.clear()
+        self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+        self.assertEqual([e[1:3] for e in h.capture_events if e[0]==113],[(1,0)])
 
     def test_grain_without_stamp_survives_unready_official_clock(self):
         h,u,context,y,uv,cache,frees,*_ = self.fixture(film=33,clock_ready=0,stamp=0)
@@ -213,13 +235,13 @@ class M10VCaptureTests(unittest.TestCase):
         self.assertEqual(h.call(u,'m10v_capture_library',context),-6)
         self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
 
-    def test_800t_off_gain_and_profile_disable_only_halo_and_need_no_scratch(self):
+    def test_800t_gain_is_the_only_halo_enable_and_profile_cannot_bypass_allocation(self):
         h,u,context,y,uv,cache,frees,*_=self.fixture(film=33,allocation=False)
         h.call(u,'m10v_camera_library_texture',0x55001000,1,0,0)
         h.call(u,'m10v_camera_library_stamp',0x55001000,0,0,0,0)
         h.call(u,'m10v_camera_library_halation',0x55001000,1,8,8,0,0)
-        self.assertEqual(h.call(u,'m10v_capture_library',context),0);self.assertFalse(frees)
-        self.assertEqual(len(cache),4)
+        self.assertEqual(h.call(u,'m10v_capture_library',context),-6);self.assertFalse(frees)
+        self.assertEqual(len(cache),0)
         h,u,context,y,uv,cache,frees,*_=self.fixture(film=33,allocation=False)
         h.call(u,'m10v_camera_library_texture',0x55001000,1,0,0)
         h.call(u,'m10v_camera_library_halation',0x55001000,1,0,8,0,3)

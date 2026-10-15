@@ -8,7 +8,7 @@ from pathlib import Path
 EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'menu.key.after',
         30:'menu.focus.before',31:'menu.focus.after',40:'menu.confirm.before',41:'menu.confirm.after',
         50:'menu.redraw.before',51:'menu.redraw.after',60:'settings.commit.before',61:'settings.commit.after',
-        100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
+        70:'detail.change',71:'detail.reset',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
 
 def page_records(data):
     if len(data)!=4096:return None
@@ -20,6 +20,19 @@ def page_records(data):
         if r[0]!=0x474c564d or r[1]!=1 or not 0<r[2]<=h[5] or r[8]!=h[2] or r[9]!=h[6] or r[15]!=zlib.crc32(raw[:60]):return None
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':'menu' if r[9]==1 else 'capture'})
+    for record in records:
+        if record['event']==112:
+            slot,packed,sequence,revision=record['arguments']
+            record['settings']={'slot':slot,'gain':packed&15,'spread':(packed>>4)&15,
+                'threshold':(packed>>8)&15,'grain':(packed>>12)&15,'soft':(packed>>16)&15,
+                'sequence':sequence,'renderer_revision':revision}
+        if record['event']==114:
+            peak,active,pixels,gate=record['arguments']
+            record['highlight_energy']={'maximum':peak,'active_pixels':active,'image_pixels':pixels,'gate':gate}
+        if record['event']==113:
+            slot,source,sequence,namespace=record['arguments']
+            record['provenance']={'slot':slot,'source':{0:'journal-v3',1:'defaults',2:'migrated-v2',3:'migrated-v1'}.get(source,'unknown'),
+                'sequence':sequence,'journal_namespace':namespace}
     return (h[2],h[6],h[5]),records
 
 def decode_logs(pages):

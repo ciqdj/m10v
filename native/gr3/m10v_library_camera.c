@@ -8,7 +8,7 @@
 typedef uint32_t (*manager_fn)(void);
 typedef int (*read_fn)(uint32_t, const char *, uint32_t, void *);
 typedef int (*write_fn)(uint32_t, const char *, uint32_t, const void *);
-static const char state_names[2][12] = {"M10V2A.bin", "M10V2B.bin"};
+static const char state_names[2][12] = {"M10V3A.bin", "M10V3B.bin"};
 
 static int ram(const void *ptr, uint32_t size) {
     uintptr_t p = (uintptr_t)ptr;
@@ -57,7 +57,28 @@ static int migrate(uint32_t fs,m10v_library_state *state){
     state->stamp=old[32];state->format=old[33];state->corner=old[34];state->color=old[35];
     uint32_t crc=0xffffffffu;const uint8_t *bytes=(const uint8_t *)state;
     for(uint32_t i=0;i<60;++i){crc^=bytes[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
-    return m10v_library_valid(state)?0:-1;
+    return m10v_library_valid(state)?3:-1;
+}
+/* New journal namespace isolates the new exposure model from saved old
+ * aggressive defaults. Old files remain intact for firmware rollback. */
+static int migrate_energy(uint32_t fs,m10v_library_state *state) {
+    static const char old_names[2][12]={"M10V2A.bin","M10V2B.bin"};
+    m10v_library_state old[2];int good[2];
+    for(uint32_t i=0;i<sizeof(old);++i)((uint8_t *)old)[i]=0;
+    for(uint32_t i=0;i<2;++i)good[i]=((read_fn)0x53825648u)(fs,old_names[i],sizeof(*state),&old[i])&&m10v_library_valid(&old[i]);
+    if(!good[0]&&!good[1])return migrate(fs,state);
+    uint32_t selected=!good[0]||(good[1]&&old[1].sequence>old[0].sequence);
+    copy(state,&old[selected]);
+    for(uint32_t i=0;i<5;++i) {
+        m10v_slot *v=&state->slots[i];
+        /* New units are not a calibrated mapping of the obsolete multiplier.
+         * Preserve explicit off; otherwise reset to documented 3/3/5. */
+        v->halo_gain=(v->halo_gain&&v->halo_profile)?3:0;
+        v->halo_spread=3;v->halo_threshold=5;v->halo_profile=2;
+    }
+    uint32_t crc=0xffffffffu;const uint8_t *bytes=(const uint8_t *)state;
+    for(uint32_t i=0;i<60;++i){crc^=bytes[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
+    return 2;
 }
 int m10v_camera_library_load(m10v_library_state *state) {
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
@@ -68,7 +89,7 @@ int m10v_camera_library_load(m10v_library_state *state) {
     for (uint32_t i = 0; i < 2; ++i)
         available[i] = ((read_fn)0x53825648u)(fs, state_names[i], sizeof(*state), &candidates[i]) &&
                        m10v_library_valid(&candidates[i]);
-    if (!available[0] && !available[1]) return migrate(fs,state);
+    if (!available[0] && !available[1]) return migrate_energy(fs,state);
     uint32_t selected = !available[0] || (available[1] && candidates[1].sequence > candidates[0].sequence);
     copy(state, &candidates[selected]); return M10V_LIBRARY_OK;
 }
@@ -85,6 +106,11 @@ int m10v_camera_library_texture(m10v_library_state *state, uint32_t slot, uint32
 int m10v_camera_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t profile){
     if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();return fs?m10v_library_halation(state,slot,gain,spread,threshold,profile,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
+}
+int m10v_camera_library_detail(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t grain,uint32_t soft){
+    if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();
+    return fs?m10v_library_detail(state,slot,gain,spread,threshold,grain,soft,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
 }
 int m10v_camera_library_stamp(m10v_library_state *state, uint32_t enabled, uint32_t format,
                              uint32_t corner, uint32_t color) {

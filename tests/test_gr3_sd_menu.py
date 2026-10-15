@@ -22,7 +22,8 @@ class SdMenuTests(unittest.TestCase):
   u.hook_add(UC_HOOK_CODE,sd);return u
  def test_sd_entry_and_paging_do_not_write_private_tones(self):
   u=self.machine();u.mem_write(0x5506821d,b'\1');self.assertEqual(self.call(u,'m10v_menu_count',0x55068200),7)
-  self.focus=6;self.call(u,'m10v_menu_confirm',0x55005000);self.assertEqual(u.mem_read(0x5506821d,1),b'\x0f')
+  self.focus=6;self.call(u,'m10v_menu_confirm',0x55005000);self.assertEqual(u.mem_read(0x5506821d,1),b'\x0e')
+  self.focus=0;self.call(u,'m10v_menu_confirm',0x55005000);self.assertEqual(u.mem_read(0x5506821d,1),b'\x0f')
   self.assertEqual(self.call(u,'m10v_menu_index',0x55068200,0),512+33)
   for _ in range(4):self.focus=9;self.call(u,'m10v_menu_confirm',0x55005000)
   self.assertEqual(self.call(u,'m10v_menu_index',0x55068200,0),512+65)
@@ -34,9 +35,29 @@ class SdMenuTests(unittest.TestCase):
   self.call(u,'m10v_menu_focus',0x55005000,0);self.assertEqual(u.mem_read(0x5506821f,1),bytes([67]))
   self.ids[0]=34;self.call(u,'m10v_menu_confirm',0x55005000);self.assertEqual(self.installs,[])
   self.ids[0]=33;self.call(u,'m10v_menu_confirm',0x55005000);self.assertEqual(self.installs,[[0,0,33,4]])
-  self.assertEqual(self.native_tones,[21]);self.assertEqual(u.mem_read(0x5506821d,1),b'\1')
+  self.assertEqual(self.native_tones,[21]);self.assertEqual(u.mem_read(0x5506821d,1),b'\x0e')
   u.mem_write(0x5506821d,b'\x0f');self.focus=10;self.call(u,'m10v_menu_confirm',0x55005000);self.assertEqual(len(self.installs),1)
  def test_failed_install_stays_in_menu_without_tone_write(self):
   u=self.machine();u.mem_write(0x5506821d,bytes([15,12,0]));self.focus=0;self.call(u,'m10v_menu_focus',0x55005000,0)
   self.install_result=-1;self.call(u,'m10v_menu_confirm',0x55005000)
   self.assertEqual(self.native_tones,[]);self.assertEqual(u.mem_read(0x5506821d,1),b'\x0f');self.assertTrue(self.captions)
+
+ def test_library_is_separate_entry_and_slot_selection_does_not_activate_until_install(self):
+  u=self.machine()
+  self.assertEqual(self.call(u,'m10v_menu_count',0x55068200),14)
+  self.assertEqual(self.call(u,'m10v_menu_index',0x55068200,13),603)
+  self.focus=13;self.call(u,'m10v_menu_confirm',0x55005000)
+  self.assertEqual(u.mem_read(0x5506821d,1),bytes([14]))
+  self.assertEqual(self.call(u,'m10v_menu_count',0x55068200),5)
+  self.native_tones=[];self.focus=4;self.call(u,'m10v_menu_confirm',0x55005000)
+  self.assertEqual(u.mem_read(0x5506821d,2),bytes([15,21]))
+  self.assertEqual(self.native_tones,[])
+  self.focus=0;self.call(u,'m10v_menu_confirm',0x55005000)
+  self.assertEqual(self.installs,[[0,0,33,4]])
+  self.assertEqual(u.mem_read(0x5506821d,1),bytes([14]))
+  self.assertEqual(self.native_tones,[21])
+ def test_sd_resources_are_chinese_and_800t_native_detail_is_present(self):
+  resources=self.manifest['resources'];texts=resources['texts']
+  self.assertEqual(texts[914-786],'胶卷库')
+  self.assertEqual(texts[858-786:860-786],['返回','完成'])
+  self.assertEqual(self.manifest['detail']['ids'],[18,19,20,21,22])

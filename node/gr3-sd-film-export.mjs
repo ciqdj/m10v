@@ -46,10 +46,10 @@ export function exportSdFilms(input){
  const instructions='M10V SD 胶卷库 / GR III 2.10\n'+
  '需要配套的 M10V SD 胶卷库固件；旧内置胶卷库固件不读取此文件，GR IIIx 暂不支持。\n'+
  '解压，将 SD/M10V 目录复制到 SD 卡根目录，与 DCIM 并列。更新时只替换 FILMS.M10，保留其他文件。\n'+
- '机内：MENU > Image Control > M10V Library > Choose Slot，选择要替换的槽位；返回后进入 SD Film Library。\n'+
- 'Previous page / Next page 翻页，选卷按 OK 装入。Back 返回，Done 退出。最多五个活动槽，卡上可存全部当前平台胶卷。\n'+
+ '机内：MENU > 影像控制 > 胶卷库，选择要替换的槽位并按 OK，直接进入卡上的胶卷列表。\n'+
+ '上一页 / 下一页翻页，选卷按 OK 装入，成功后返回五槽列表。返回取消当前选择，完成退出。最多五个活动槽，卡上可存全部当前平台胶卷。\n'+
  '装入成功后重启或换卡仍保留。无卡、损坏或不兼容文件不替换原槽。失败提示后请保留原配置重试。\n'+
  '文件包含完整配方和图标；当前运行时只接受与其支持版本完全匹配的 33 款，未来新配方需匹配固件。\n'+
- '离线验证候选，尚未通过真机 SD 换卷验收。成像范围沿用现有静态 JPEG 引擎。\n';
+ '离线验证候选，尚未通过真机 SD 换卷验收。胶卷仅作用于保存的静态 JPEG，实时取景尚不随换卷变化。800T 已合入新版能量扩散与原厂 FN 五项中文调节，旧版胶卷包需重新导出。\n';
  return {receipt,zip:encodeZip({'SD/M10V/FILMS.M10':pack,'README.txt':Buffer.from(instructions),'manifest.json':Buffer.from(JSON.stringify(receipt,null,2)+'\n')})};
 }

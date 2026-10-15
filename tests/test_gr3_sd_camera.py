@@ -40,7 +40,7 @@ class SdCameraTests(unittest.TestCase):
   elif pc==0x539001d0:self.w(a[2],self.position);self.w(a[3],0);ret=1
   elif pc==0x53828014:ret=0x55003000
   elif pc==0x53825fa8:
-   name=self.string(a[1]);self.calls.append(('save',name,a[2]));ret=int(not self.fail_save and not (self.fail_state and name.startswith('M10V2')))
+   name=self.string(a[1]);self.calls.append(('save',name,a[2]));ret=int(not self.fail_save and not (self.fail_state and name.startswith('M10V3')))
    if ret:self.files[name]=bytes(u.mem_read(a[3],a[2]))
   elif pc==0x53825648:
    name=self.string(a[1]);value=self.files.get(name);ret=int(value is not None)
@@ -56,6 +56,7 @@ class SdCameraTests(unittest.TestCase):
     u.mem_write(0x55040000,raw);self.w(a[2],len(raw));ret=0x55040000
   elif pc==0x538253e8:self.w(a[3],a[1]-8);self.w(extra,a[2]+8);ret=1
   elif pc==0x5362d478:ret=1
+  elif pc==0x5383c8a8:ret=0
   if ret is not None:u.reg_write(UC_ARM_REG_R0,ret&0xffffffff);u.reg_write(UC_ARM_REG_PC,u.reg_read(UC_ARM_REG_LR))
  def call(self,name,*args):
   u=self.u;sp=0x550fe000;u.reg_write(UC_ARM_REG_SP,sp)
@@ -87,7 +88,7 @@ class SdCameraTests(unittest.TestCase):
    with self.subTest(flag=flag):
     setattr(self,flag,True)
     self.assertNotEqual(self.call('m10v_sd_camera_install',0,0,33,0),0)
-    self.assertFalse(any(name.startswith('M10V2') for _,name,_ in self.calls))
+    self.assertFalse(any(name.startswith('M10V3') for _,name,_ in self.calls))
     self.assertEqual((self.opened,self.allocated),(0,0))
     setattr(self,flag,False)
  def test_state_write_failure_preserves_previous_slots_and_reuses_verified_snapshot(self):
@@ -114,3 +115,20 @@ class SdCameraTests(unittest.TestCase):
   self.assertNotEqual(self.call('m10v_sd_camera_install',0,0,33,0),0)
   self.assertEqual(self.raw_loads,0)
   self.assertEqual((self.opened,self.allocated),(0,0))
+
+ def test_sd_replacement_changes_actual_saved_jpeg_pixels_without_sd_during_capture(self):
+  u=self.u;recipe=0x55070000;shooting=0x55078000;request=0x55076000;context=recipe+0x9b8
+  for offset,value in [(0x18,0),(0x5c,request),(0x60,0xa3000000),(0x230,0x55075000),(0x44c8,shooting)]:self.w(recipe+offset,value)
+  u.mem_write(0x55075000,struct.pack('<HH',6112,4064));self.w(request,0x53d0fe60)
+  u.mem_write(request+12,b'\1\1');u.mem_write(shooting+0x77c,bytes([18]));u.mem_write(recipe+0x140,b'\1')
+  self.w(context,0x53d0fbe0)
+  for offset,value in [(0x30,recipe+0x1a8),(0x34,shooting),(0x38,request),(0x3c,recipe+0xb0),(0x48,recipe+0x110),(0x4c,recipe+0x130)]:self.w(context+offset,value)
+  for offset,y,c in [(0xb0,0x55060000,0x55062000),(0x110,0x55090000,0x550a0000)]:
+   u.mem_write(recipe+offset,struct.pack('<4I8H',1,y,c,0,64,32,64,32,0,0,2,0))
+  outputs=[]
+  for page,row,film in [(0,1,34),(4,0,65)]:
+   self.card=self.pack;self.assertEqual(self.call('m10v_sd_camera_install',page,row,film,1),0)
+   self.card=b'';u.mem_write(0x55060000,bytes([64])*2048);u.mem_write(0x55062000,bytes([128])*2048)
+   self.assertEqual(self.call('m10v_capture_library',context),0)
+   outputs.append(bytes(u.mem_read(0x55060000,2048))+bytes(u.mem_read(0x55062000,2048)))
+  self.assertNotEqual(outputs[0],outputs[1]);self.assertEqual((self.opened,self.allocated),(0,0))

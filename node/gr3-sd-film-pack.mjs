@@ -8,6 +8,7 @@ const read=p=>readFileSync(new URL('../'+p,import.meta.url));
 const looks=JSON.parse(read('web/gr3/film-catalog.json')).looks;
 const icons=read('native/gr3/m10v_icons.rgba');
 const source=read('native/gr3/m10v_library.c').toString();
+const rendererContract=createHash('sha256').update(source).update(read('native/gr3/halation_energy.h')).digest();
 const originals=[...source.matchAll(/\{"([^"\n]+)",(-?\d+),(-?\d+),(-?\d+),(-?\d+),(-?\d+),(-?\d+),(-?\d+)\}/g)];
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 export function sdCrc(bytes){let c=0xffffffff;for(const v of bytes){c^=v;for(let i=0;i<8;i++)c=(c>>>1)^(0xedb88320&-(c&1));}return ~c>>>0;}
@@ -26,6 +27,9 @@ export function sdFilmRecord(id){
   look.knots.flat().forEach((v,i)=>b.writeUInt16LE(v,1652+i*2));
  }
  icons.copy(b,2048,(id-1)*6400,id*6400);
+ // Bind the color/energy renderer as well as its parameters: old engines must
+ // reject new records even when a particular numeric recipe is unchanged.
+ rendererContract.copy(b,8448);
  b.writeUInt32LE(sdCrc(b.subarray(0,-4)),SD_RECORD_BYTES-4);return b;
 }
 export function sdExpectedHeader(){
@@ -49,5 +53,5 @@ export function auditSdFilmPack(bytes){
  // Canonical comparison also rejects changed names/icons/curves, reserved bytes,
  // duplicate identities and CRC-repaired but incompatible payloads.
  need(bytes.equals(buildSdFilmPack(ids)),'胶卷包校验失败或配方版本不兼容');
- return {schema:'m10v-sd-film-pack/v1',model:'gr3',count,ids,bytes:bytes.length,sha256:digest(bytes),path:'M10V/FILMS.M10',camera_tested:false};
+ return {schema:'m10v-sd-film-pack/v1',model:'gr3',count,ids,bytes:bytes.length,sha256:digest(bytes),path:'M10V/FILMS.M10',camera_tested:false,renderer_sha256:rendererContract.toString('hex')};
 }

@@ -30,7 +30,7 @@ const hooks = [
   [0x5320a834,0xe08ec106,'m10v_icon_pixels'],
   [0x533966e8,0xe3023bac,'m10v_resource_primary'], [0x533970fc,0xe3023bac,'m10v_resource_secondary'],
 ];
-const sources = ['scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','scripts/build_gr3_m10v_library.py'];
 const sdSources=['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','scripts/generate_gr3_sd_contract.mjs'];
@@ -57,6 +57,7 @@ function checkRuntime(runtime, manifest) {
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);
+  checkDetail(runtime,manifest);
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
   need(init.length === 64 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+64).equals(init), 'native initial settings readback differs');
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
@@ -90,11 +91,69 @@ function checkRuntime(runtime, manifest) {
       'native UTF16 resource differs');
   }
 }
+const detailHooks=[
+ [0x531afc20,0xebffffa4,'capacity',true],
+ [0x531afa24,0xe345c3b3,'table_ip',true],[0x531afacc,0xe34533b3,'table_r3',true],
+ [0x531affa8,0xe345c3b3,'table_ip',true],[0x531b01f8,0xe34533b3,'table_selected',true],
+ [0x531b000c,0xea000066,'row',false],[0x531b03f8,0xea000065,'current',false],
+ [0x531b05e4,0xea00005c,'setup',false],[0x531b0bf4,0xea000093,'callback',false],
+ [0x531acd24,0xeb0456c0,'reset',true]];
+const detailInstructions={"capacity":[0xe3a00010,0xe12fff1e],"table_ip":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223096,3904700419,3777818624,0xe3a0e00c,3904741375],"table_r3":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"table_selected":[3912065023,3775856640,3912040451,3852271640,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"row":[3796090898,3814457348,[8,false,1394278828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394278828],3796049938,3785369602,3783401476,3785363461,3818913795,[14,true,"m10v_detail_control"],[14,false,1394278500]],"current":[3796156434,3814457348,[8,false,1394279828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394279828],3796115474,3785363461,3818913793,[14,true,"m10v_detail_control"],3785375744,[14,false,1394279516]],"default":[3785363456,3818913796,3818921984,[14,false,"m10v_detail_control"]],"setup":[3795894290,3814457348,[8,false,1394280284],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394280284],3813670933,3785359364,3796619280,3902629904,[3,false,"slider8"],[14,false,"slider3"]],"callback":[3796221970,3814457348,[8,false,1394282056],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394282056],3796181010,3785368578,3783401478,3785363460,3818913794,[14,true,"m10v_detail_control"],3813670912,[1,false,1394281580],3796619292,3902646512],"reset":[3912056848,[14,true,1395402796],3785363461,3818913799,3818921984,[14,true,"m10v_detail_control"],3904733200]};
+function checkDetail(runtime,manifest,raw) {
+ const d=manifest.detail,base=manifest.base;
+ need(d?.schema==='m10v-gr3-native-detail/v1'&&d.backend==='m10v_camera_library_detail'&&
+  JSON.stringify(d.ids)==='[18,19,20,21,22]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion']), 'native detail contract differs');
+ const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
+ const table=read(d.tables,288),captions=read(d.captions,92);
+ const expectedIds=[862,863,864,827,828];
+ for(let i=0;i<5;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
+ for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
+ for(const [name,template] of Object.entries(detailInstructions)){
+  const at=d.entries?.[name],code=read(at,template.length*4);
+  for(let i=0;i<template.length;i++){
+   const instruction=template[i];let word=instruction;
+   if(Array.isArray(instruction)){
+    const [condition,link,target]=instruction,to=typeof target==='string'?(manifest.symbols[target]??d[target]):target;
+    word=((branch(at+i*4,to,link)&0x0fffffff)|(condition<<28))>>>0;
+   }
+   need(code.readUInt32LE(i*4)===word,'native detail instruction differs: '+name+' '+i);
+  }
+ }
+ // Exact stock entry bytes and list prefix are compared to the freshly decoded
+ // official source, never to a manifest-supplied preimage or instruction list.
+ if(raw){
+  need(captions.subarray(0,72).equals(raw.subarray(0xb34bd8,0xb34c20)),'native detail stock captions differ');
+  for(let i=0;i<36;i++){
+   const old=0xb3488c+i*8,p=raw.readUInt32LE(old),n=raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
+   need(table.readUInt32LE(i*8+4)===n+5,'native detail count differs');
+   const list=read(fresh,n*2+10);
+   need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(Buffer.from([0,18,0,19,0,20,0,21,0,22])),'native detail list differs');
+  }
+  for(const [target,maximum] of [[d.slider8,8],[d.slider3,3]]){
+   const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
+   for(let a=start;a<stop;a+=4){
+    const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
+    if((word&0x0e000000)===0x0a000000){let delta=(word&0xffffff)<<2;if(delta&0x2000000)delta-=0x4000000;let to=a+8+delta;if(to>=start&&to<=stop)to=mapped(to);word=((word&0xf0000000)|((word&0x1000000)?0x0b000000:0x0a000000)|(((to-at-8)>>2)&0xffffff))>>>0;}
+    if(a===0x531ad01c)word=0xe1a00006;
+    if(a===0x531ad020)word=branch(at,d.entries.default,true);
+    if(a===0x531ad024)word=0xe1a00000;
+    if(a===0x531ad03c&&maximum===3)word=0xe3a03039;
+    if(a===0x531ad060)word=(0xe3a02000|maximum)>>>0;
+    if(a===0x531ad064&&maximum===3)word=0xe3a03078;
+    need(code.readUInt32LE(at-target)===word,'native detail slider relocation differs at '+a.toString(16)+' expected '+word.toString(16)+' got '+code.readUInt32LE(at-target).toString(16));
+   }
+   const guard=0x531ad0b4-start;
+   need(code.readUInt32LE(guard)===0xe3500000&&code.readUInt32LE(guard+4)===(branch(target+guard+4,mapped(0x531ad110))&0x0fffffff),'native detail null guard differs');
+  }
+ }
+}
 function patchList(manifest) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
   for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,735),name:'M10V icon maximum '+address.toString(16)});
-  return [...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
+  detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
+  return [...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},
@@ -134,8 +193,7 @@ function encodeExtended(source, original, target, insertion, growth) {
 }
 export function buildNativeLibrary(source,runtime,manifest) {
   const BASE=manifest?.base;
-  const report=inspectOfficial(source);checkRuntime(runtime,manifest);
-  need(!manifest.sd_library||report.model==='GR III','SD library ABI is GR III only');
+  const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
   const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=524288,'native RTOS growth invalid');
@@ -154,13 +212,13 @@ export function buildNativeLibrary(source,runtime,manifest) {
 }
 export function auditNativeLibrary(source,candidate,runtime,manifest) {
   const BASE=manifest?.base;
-  const report=inspectOfficial(source);checkRuntime(runtime,manifest);
-  need(!manifest.sd_library||report.model==='GR III','SD library ABI is GR III only');
+  const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const structural=auditGr3Candidate(source,candidate,{maxRtosGrowth:512*1024});
   const before=decodeFrameMap(source).decoded,after=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
   const oldRows=sectionMap(before,report),newRows=sectionMap(after,report,structural.rtosGrowth);
   const old=oldRows.find(row=>row.name==='RTOS'),fresh=newRows.find(row=>row.name==='RTOS');
   const raw=before.subarray(old.offset+16,old.offset+old.size);
+  checkDetail(runtime,manifest,raw);
   const stockDirectory=raw.subarray(0x107b540+0x20fc,0x107b540+0x20fc+671*4);
   need(stockDirectory.equals(runtime.subarray(manifest.icons.table-BASE,manifest.icons.table-BASE+671*4)),'official icon directory differs');
   const table=raw.readUInt32LE(0x434)-LOAD,domains=raw.readUInt32LE(0x438);
@@ -193,7 +251,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
     verified_hooks:patchList(manifest).length,icon_count:65,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:2,film_count:65,active_slots:5,external_film_pack:manifest.sd_library,sd_film_library:manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:33,max_records:256,page_rows:8}:null,
-    menu_entry:'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
+    menu_entry:manifest.sd_library?'MENU > Image Control > 胶卷库':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
     camera_scope:'still JPEG; original RAW pixels protected; live-view color and RAW-development effects not integrated'};
 }
