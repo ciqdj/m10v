@@ -1,0 +1,98 @@
+{
+  "schema": "m10v-changelog/v1",
+  "releases": [
+    {
+      "version": "2026.10.16.2",
+      "date": "2026-10-16",
+      "title": "更新日志与发布规范",
+      "changes": [
+        "新增更新日志页面，在首页、工作台与说明页提供入口。",
+        "补齐历史更新，区分部署验证记录和早期源码记录。",
+        "发布前检查新增更新记录；宝塔发布技能同步记录维护步骤。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
+      "version": "2026.10.16.1",
+      "date": "2026-10-16",
+      "title": "800T 重建与机内五项调节",
+      "changes": [
+        "重做 800T 高光能量扩散，恢复红色高光溢出与偏青色调。",
+        "GR III 在【图像控制】按 FN，独立调节光晕强度、扩散范围、高光阈值、颗粒和柔光，设置可持久保存。",
+        "修复 FN 详细页黑屏，五项名称改为中文；颗粒、柔光刻度与关闭、弱、中、强四个位置一致。",
+        "修复 Linux clang 构建兼容问题；明确拦截未经验证的 GR IIIx 原生详细菜单导出。"
+      ],
+      "commit": "c3d54fe1f7cde4423eca0955cde3c3693a906dd6",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38765563035"
+    },
+    {
+      "version": "2026.10.15.3",
+      "date": "2026-10-15",
+      "title": "选卷体验、品牌与 RAW 降噪",
+      "changes": [
+        "优化胶卷选择、分类和界面品牌展示。",
+        "将 RAW 降噪策略接入统一固件组合构建，支持原厂、关闭和 ISO 阈值设置。",
+        "完善参数校验和固件导出回读。"
+      ],
+      "commit": "21b4247c2f016d68a7e27e57ffb8434ca90153b3",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38725895243"
+    },
+    {
+      "version": "2026.10.15.2",
+      "date": "2026-10-15",
+      "title": "GitHub 自动部署宝塔",
+      "changes": [
+        "通过受限 SSH 传输校验过的 Git bundle，服务器无需连接 GitHub 拉取源码。",
+        "发布执行固件构建、服务重启与健康检查；失败时尝试回退。",
+        "修复受限 SSH 的文件权限问题，确保 www 服务可读取新部署源码。"
+      ],
+      "commit": "75779a662d17a150ba8eba19a8537a7de9177573",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38690617492"
+    },
+    {
+      "version": "2026.10.15.1",
+      "date": "2026-10-15",
+      "title": "多机型工作台与机内调试",
+      "changes": [
+        "接入 GR IV 原厂编辑器和 GR II 只读固件检查，并统一各机型页面风格。",
+        "增加 SD 卡菜单与拍摄阶段调试日志。",
+        "保护原厂 ADJ 列表，统一胶卷效果、颗粒、柔光、时间戳及附加功能的固件导出。",
+        "此版本由后续成功发布日志中的服务器起始提交核实，准确上线时刻未保留。"
+      ],
+      "commit": "80d884aa399a971a7004613284ef6164659e9e04",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38690617492"
+    },
+    {
+      "version": "2026.10.14.2",
+      "date": "2026-10-14",
+      "title": "宝塔部署与旧版 LLVM 兼容",
+      "changes": [
+        "补齐公网来源校验、Nginx 反向代理和 systemd 部署说明。",
+        "在 Alibaba Cloud Linux 3 环境核验 www 服务用户可构建固件。",
+        "修复柔光采样中的 ARM 除法辅助函数依赖，兼容服务器 LLVM。"
+      ],
+      "commit": "83837f8c9e9dee67e0e63929e02f70dcea10fc3a",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/blob/83837f8c9e9dee67e0e63929e02f70dcea10fc3a/deploy/README.md"
+    },
+    {
+      "version": "2026.10.14.1",
+      "date": "2026-10-14",
+      "title": "M10V 工作台初始版本",
+      "changes": [
+        "建立统一的固件导入、影像方案设置与保存流程。",
+        "提供胶卷目录、五槽配置、质感、800T 光晕和时间戳。",
+        "接入固件身份检查、导出回读与风险提示。此条依据首个源码提交回补，不作为独立上线证明。"
+      ],
+      "commit": "72303d8cb094e0274267401ba9f0a0300405fbb5",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/72303d8cb094e0274267401ba9f0a0300405fbb5"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import {renderChangelog} from './changelog.mjs';
 import { fitXmp } from './gr3-xmp-fit.mjs';
 import { prepareCustomization, buildCustomization } from './gr3-customization.mjs';
 import { stockPresetCapabilities } from './gr3-stock-presets.mjs';
@@ -36,6 +37,7 @@ const web = path.join(root, 'web');
 const MAX_UPLOAD = 128 * 1024 * 1024;
 const staticFiles = {
   '/': ['index.html', 'text/html; charset=utf-8'],
+  '/changelog.json': ['changelog.json', 'application/json; charset=utf-8'],
   '/guide/': ['guide.html', 'text/html; charset=utf-8'],
   '/guide': ['guide.html', 'text/html; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
@@ -102,6 +104,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }catch{return send(response,503,{error:'deployment receiver unavailable'});}
     }
     if (request.method === 'GET') {
+      if(pathname==='/changelog/'||pathname==='/changelog'){
+        try{return send(response,200,Buffer.from(renderChangelog()),'text/html; charset=utf-8');}
+        catch{return send(response,503,{error:'release history unavailable'});}
+      }
       if(pathname==='/gr3/native-library.html'){response.writeHead(302,{Location:'/gr3/','Cache-Control':'no-store'});response.end();return;}
 
       if(pathname === '/api/gr3/native-library/catalog') {
