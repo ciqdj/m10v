@@ -2,19 +2,20 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
-  <title>GR III / GR IIIx 固件工作室 · M10V</title>
+  <title>m10v · GR固件工作台</title>
   <link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/gr3/native-library-embedded.css">
   <script type="module" src="/gr3/studio.js"></script>
-</head>
+<link rel="stylesheet" href="/gr3/film-picker.css">
+<link rel="icon" type="image/svg+xml" href="/shared/m10v-logo.svg"><link rel="stylesheet" href="/shared/brand.css"></head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">M10V <small>FIRMWARE STUDIO</small></a>
+    <a class="brand m10v-brand" href="/" aria-label="m10v · GR固件工作台 首页"><img class="m10v-mark" src="/shared/m10v-logo.svg" width="42" height="35" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a>
     <nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><span class="current" id="studio-model-status" aria-current="page">GR III / GR IIIx</span><a href="/guide/">说明</a><a href="/gr4/">GR IV</a><a href="/gr2/">GR II · 检查</a><a href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a></nav>
   </header>
   <section class="hero"><div class="hero-inner">
     <p class="kicker">RICOH GR III / GR IIIx · ONE STUDIO</p><h1>导入，调色，带走。</h1>
     <p>导入固件 → 设置方案 → 保存固件 · 同一份来源，同一个工作台</p>
-    <div class="hero-rule"><span>65 FILMS / 5 SLOTS</span><span>GR III / GR IIIx</span></div>
+    <div class="hero-rule"><span>33 FILMS / 5 SLOTS</span><span>GR III / GR IIIx</span></div>
   </div></section>
   <main class="studio">
     <aside class="steps" aria-label="工作台导航">
@@ -37,8 +38,8 @@
       </section>
       <section class="page" data-page="features" hidden>
         <div class="page-head"><p>LOOK DESK / 影像方案</p><h2>建立你的街头方案。</h2><span>影像定制与胶卷库共享官方来源和保存出口，随时切换查看。</span></div>
-        <div class="settings-tabs" role="tablist" aria-label="设置方案"><button id="tab-imaging" role="tab" aria-selected="true">影像方案</button><button id="tab-library" role="tab" aria-selected="false">胶卷库 · 含 800T</button></div>
-        <div class="unified-looks"><button id="use-native-plan"><strong>M10V 胶卷库</strong><span>65 卷内置 · 机内换槽 · 颗粒 / 柔光 / 时间戳</span></button><button id="use-800t-plan"><strong>800T</strong><span>冷色暗部与暖红高光 · 加入五槽方案</span></button></div>
+        <div class="settings-tabs" role="tablist" aria-label="设置方案"><button id="tab-imaging" role="tab" aria-selected="true">影像方案</button><button id="tab-library" role="tab" aria-selected="false">胶卷库</button></div>
+        <div class="unified-looks"><button id="use-native-plan"><strong>M10V 胶卷库</strong><span>33 卷内置 · 机内换槽 · 颗粒 / 柔光 / 时间戳</span></button><button id="use-800t-plan"><strong>800T</strong><span>冷色暗部与暖红高光 · 加入五槽方案</span></button></div>
         <p id="active-plan-note" class="scheme-note" role="status">当前保存：影像定制方案</p>
         <div id="imaging-settings" role="tabpanel" aria-labelledby="tab-imaging">
         <div class="toolbar"><span id="selection-count">已选择 0 项功能</span><div><button class="outline" id="undo-edit" disabled>撤销</button><button class="outline" id="redo-edit" disabled>重做</button></div></div>

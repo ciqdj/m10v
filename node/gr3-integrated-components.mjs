@@ -7,7 +7,8 @@ import {auditGr3Candidate} from './gr3-candidate-audit.mjs';
 import {auditNativeLibrary} from './gr3-m10v-native-build.mjs';
 import {createStorePlan} from './gr3-store-plan.mjs';
 import {runGr3Runtime} from './gr3-runtime.mjs';
-import {normalizeExtensions} from '../web/gr3/native-library-state.mjs';
+import {planRawNr,rawNrEvidence} from './gr3-raw-nr.mjs';
+import {normalizeExtensions,activeExtensions} from '../web/gr3/native-library-state.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const LOAD=0x53000000, COMPONENT_BASE=0x540b6000, COMPONENT_END=0x540ba000;
@@ -25,7 +26,7 @@ const resourceAdaptations=[
  [0x540b8c14,0xe3003311,0xe300338e],
 ];
 export function integrationFingerprint(){
- return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-native-library.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
+ return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
 }
 function parts(source,candidate){
  const report=inspectOfficial(source),decoded=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
@@ -57,7 +58,7 @@ function validateComponent(source,component,e){
 }
 function expectedImage(source,nativeCandidate,runtime,manifest,component,requested){
  const e=normalizeExtensions(requested),nativeReceipt=auditNativeLibrary(source,nativeCandidate,runtime,manifest);
- need(inspectOfficial(source).model==='GR III'||!Object.values(e).some(Boolean),'组合扩展当前仅支持 GR III');
+ need(inspectOfficial(source).model==='GR III'||!activeExtensions(e).length,'组合扩展当前仅支持 GR III');
  const original=parts(source,source),native=parts(source,nativeCandidate),c=validateComponent(source,component,e);
  need(manifest.base===(c?COMPONENT_END:COMPONENT_BASE),'composition native placement differs');
  const target=Buffer.from(native.decoded),rtos=target.subarray(native.sections.RTOS.offset,native.sections.RTOS.offset+native.sections.RTOS.size);
@@ -82,6 +83,12 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   need(rtos.readUInt32LE(0xb348c0)===9&&rtos.readUInt16LE(0xb3501e)===0,'negative grain preimage differs');
   rtos.writeUInt32LE(10,0xb348c0);rtos.writeUInt16LE(0x0f02,0xb3501e);
  }
+ const rawEdits=planRawNr(source,e.rawNr);
+ for(const edit of rawEdits){
+  const expected=Buffer.from(edit.expectedHex,'hex'),replacement=Buffer.from(edit.replacementHex,'hex');
+  need(rtos.subarray(edit.offset,edit.offset+expected.length).equals(expected),'RAW NR patch overlaps another component');
+  replacement.copy(rtos,edit.offset);
+ }
  target.writeUInt32LE(0,target.length-4);target.writeUInt32LE(-sum32(target)>>>0,target.length-4);
  return {target,nativeReceipt,composition:{schema:'m10v-gr3-integrated-components/v1',verified:true,extensions:e,
   component_variant:variant(e)||null,component_rtos_sha256:c?sha(c.rtos):null,
@@ -89,6 +96,11 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   native_resource_range:[786,910],aspect_resource_id:e.aspect?911:null,
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
+  raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,
+   patched_bytes:rawEdits.reduce((n,p)=>n+p.replacementHex.length/2,0),
+   patches_sha256:sha(JSON.stringify(rawEdits)),
+   code_sites:e.rawNr.mode==='off'?rawEdits.map(({offset,expectedHex,replacementHex})=>({address:LOAD+offset,expected_hex:expectedHex,replacement_hex:replacementHex})):[],
+   table_cleared_index_range:e.rawNr.mode==='threshold'?[36,Math.round(8*(Math.log2(e.rawNr.iso/3.125)-1))]:null},
   camera_tested:false}};
 }
 // Reuse compressed frames only when their entire backward-reference history is unchanged.

@@ -124,7 +124,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if initial_state_hex is None:
         initial = bytearray(64)
         struct.pack_into('<IHHI', initial, 0, 0x5630314d, 2, 64, 0)
-        for i in range(5): struct.pack_into('<H6B', initial, 12+i*8, 33 if i == 4 else i+1, 0, 0, 3,3,5,2)
+        for i in range(5): struct.pack_into('<H6B', initial, 12+i*8, 33 if i == 4 else i+34, 0, 0, 3,3,5,2)
         struct.pack_into('<I', initial, 60, zlib.crc32(initial[:60]))
     else:
         initial = bytes.fromhex(initial_state_hex)

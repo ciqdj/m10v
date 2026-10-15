@@ -15,7 +15,9 @@ typedef uint32_t (*call2_fn)(uint32_t, uint32_t);
 typedef uint32_t (*call3_fn)(uint32_t, uint32_t, uint32_t);
 typedef uint32_t (*root_fn)(void);
 static const uint8_t tones[5] = {12,18,19,20,21};
-static const uint8_t counts[15] = {13,6,65,4,4,7,5,4,4,4,4,9,9,9,4};
+/* The persistent catalog keeps IDs 1..65 for existing journals. Only the
+ * curated 800T and original 32 simulations are offered for replacement. */
+static const uint8_t counts[15] = {13,6,33,4,4,7,5,4,4,4,4,9,9,9,4};
 static uint8_t *model(void) {
     uint32_t root = ((root_fn)0x5320ad88u)();
     return (uint8_t *)(uintptr_t)((get_fn)0x5320ba9cu)(root);
@@ -36,7 +38,7 @@ uint32_t m10v_menu_count(uint32_t address) {
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x80u))(address);
     return counts[mode(m)];
 }
-uint32_t m10v_menu_max_count(void) { return 65; }
+uint32_t m10v_menu_max_count(void) { return 33; }
 uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     const uint8_t *m = (const uint8_t *)(uintptr_t)address;
     if (!supported(m)) return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
@@ -44,7 +46,7 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!group) return index == 12 ? 128 : ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     if (index >= counts[group]) return 0;
     static const uint8_t first[15] = {0,129,144,176,180,184,208,192,196,200,218,224,224,224,233};
-    if(group==2&&index>=32)return index==32?213:256+index-33;
+    if(group==2)return index==0?213:256+index-1;
     if(group==1&&index==5)return 214;
     return first[group]+index;
 }
@@ -123,7 +125,9 @@ static void redraw(uint32_t controller) {
     else if(group>=2&&group!=10){
         m10v_library_state state;
         if(m10v_camera_library_load(&state)>=0){const m10v_slot *v=&state.slots[target];
-            if(group==2)selected=v->film-1;
+            /* Hidden historical looks stay active until an explicit confirm.
+             * Their browsing cursor safely starts at 800T without a write. */
+            if(group==2)selected=v->film>=33?v->film-33:0;
             else if(group==3)selected=v->grain;else if(group==4)selected=v->soft;
             else if(group==5)selected=state.stamp;else if(group==7)selected=state.format;
             else if(group==8)selected=state.corner;else if(group==9)selected=state.color;
@@ -183,7 +187,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     if(group>=11){const m10v_slot *v=&state.slots[target];
         result=m10v_camera_library_halation(&state,target,group==11?index:v->halo_gain,group==12?index:v->halo_spread,group==13?index:v->halo_threshold,group==14?index:v->halo_profile);
     }
-    else if (group == 2) result = m10v_camera_library_select(&state, target, index + 1);
+    else if (group == 2) result = m10v_camera_library_select(&state, target, index + 33);
     else if (group == 3) result = m10v_camera_library_texture(&state, target, index, state.slots[target].soft);
     else if (group == 4) result = m10v_camera_library_texture(&state, target, state.slots[target].grain, index);
     else result = m10v_camera_library_stamp(&state, group == 5 ? index : state.stamp,

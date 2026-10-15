@@ -1,6 +1,6 @@
 // One catalogue and one five-slot contract for simulation and in-camera library.
 export const defaultHalo=()=>({gain:3,spread:3,threshold:5,profile:2});
-export const defaultConfiguration=()=>({slots:Array.from({length:5},(_,i)=>({film:i===4?33:i+1,grain:0,soft:0,halo:defaultHalo()})),stamp:0,format:0,corner:0,color:0});
+export const defaultConfiguration=()=>({slots:Array.from({length:5},(_,i)=>({film:i===4?33:34+i,grain:0,soft:0,halo:defaultHalo()})),stamp:0,format:0,corner:0,color:0});
 export function normalizeConfiguration(value=defaultConfiguration()){
  const exact=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).sort().join('|')===[...keys].sort().join('|');
  const int=(n,min,max)=>Number.isInteger(n)&&n>=min&&n<=max;
@@ -26,15 +26,24 @@ export function migrateSimulationSelection(ids,texture,catalog,current=defaultCo
 }
 
 // Optional camera features share the native export; no implicit draft conversion.
-export const defaultExtensions=()=>({aspect:false,level:false,negativeGrain:false});
+export const rawNrThresholds=[400,800,1600,3200,5000,6400,8000,10000,12800];
+export function normalizeRawNr(value={mode:'stock'}){
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['mode','iso'].includes(k))||!['stock','off','threshold'].includes(value.mode)||
+  (value.mode==='threshold'?!rawNrThresholds.includes(value.iso):value.iso!==undefined))throw Error('RAW 降噪配置或 ISO 阈值无效');
+ return value.mode==='threshold'?{mode:value.mode,iso:value.iso}:{mode:value.mode};
+}
+export const defaultExtensions=()=>({aspect:false,level:false,negativeGrain:false,rawNr:{mode:'stock'}});
 export function normalizeExtensions(value=defaultExtensions()){
  const keys=['aspect','level','negativeGrain'];
- if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join('|')!==keys.sort().join('|')||keys.some(k=>typeof value[k]!=='boolean'))throw Error('附加功能配置必须包含画幅、水平仪和负片颗粒开关');
- return {aspect:value.aspect,level:value.level,negativeGrain:value.negativeGrain};
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>![...keys,'rawNr'].includes(k))||keys.some(k=>typeof value[k]!=='boolean'))throw Error('附加功能配置必须包含画幅、水平仪和负片颗粒开关');
+ return {aspect:value.aspect,level:value.level,negativeGrain:value.negativeGrain,rawNr:normalizeRawNr(value.rawNr)};
+}
+export function activeExtensions(value){
+ const e=normalizeExtensions(value);return ['aspect','level','negativeGrain'].filter(k=>e[k]).concat(e.rawNr.mode==='stock'?[]:['rawNr']);
 }
 export function withNativeLibrary(features){
- const allowed=['film','timestamp','aspect','level','negativeGrain'];
- if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合时间戳、画幅、水平仪和负片颗粒；请先移除其他配方或工具');
+ const allowed=['film','timestamp','aspect','level','negativeGrain','rawNr'];
+ if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；请先移除其他配方或工具');
  const selected=new Set(['film',...features]);return allowed.filter(id=>selected.has(id));
 }
 

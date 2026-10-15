@@ -8,6 +8,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 from scripts.build_gr3_m10v_library import build
 from scripts.analyze_gr3_device_regression import machine, run
@@ -77,7 +78,7 @@ writeFileSync(dir+'/rtos.bin',d.subarray(at+16,at+16+d.readUInt32LE(at+12)));
         return writes,backs,bytes(u.mem_read(0x550071c2,1))[0]
 
     def test_adj_tail_and_reverse_browsing_never_commit_private_id(self):
-        for group in (0,1,2,10,14):
+        for group in range(15):
             for index in (11,12,13,12,11,0):
                 with self.subTest(group=group,index=index):
                     writes,backs,tone=self.probe(index,group)
@@ -120,6 +121,44 @@ from tests import test_gr3_m10v_redraw_arm as redraw
 
 @unittest.skipUnless(OFFICIAL.exists(), 'official firmware unavailable')
 class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
+    visible_film_count = 33
+    slot_five_film_index = 0
+    slot_one_film_index = 1
+
+    def test_curated_first_and_last_rows_confirm_into_real_stock_slot(self):
+        for index,film,tone in ((0,33,213),(1,34,256),(32,65,287)):
+            with self.subTest(index=index):
+                self.files.clear()
+                self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
+                self.call(0x531ac074,redraw.CONTROLLER)
+                self.focus(0);self.call('m10v_menu_confirm',redraw.CONTROLLER)
+                self.assertEqual(self.call('m10v_menu_index',redraw.MODEL,index),tone)
+                self.focus(index)
+                self.assertFalse(self.files)
+                self.assertLess(self.tone,128)
+                self.call('m10v_menu_confirm',redraw.CONTROLLER)
+                payload=self.files['M10V2B.bin']
+                self.assertEqual(struct.unpack_from('<H',payload,20)[0],film)
+                self.assertEqual(self.tone,18)
+                self.assertEqual(self.u.mem_read(redraw.MODEL+0x1d,1),b'\x01')
+
+    def test_hidden_old_ids_focus_800t_without_rewriting_valid_journal(self):
+        self.call('m10v_library_init',0x55009000)
+        initial=bytes(self.u.mem_read(0x55009000,64))
+        for film in range(1,66):
+            with self.subTest(film=film):
+                payload=bytearray(initial)
+                struct.pack_into('<H',payload,20,film)
+                struct.pack_into('<I',payload,60,zlib.crc32(payload[:60]))
+                self.files={'M10V2B.bin':bytes(payload)}
+                before=dict(self.files)
+                self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
+                self.call(0x531ac074,redraw.CONTROLLER)
+                self.focus(0);self.call('m10v_menu_confirm',redraw.CONTROLLER)
+                self.assertEqual(self.call(0x53394820,redraw.VIEW),max(0,film-33))
+                self.assertEqual(self.files,before)
+                self.assertEqual(self.tone,18)
+
     def boundaries(self,u,address,size,data):
         if address==0x535847d8:
             # The optional SD diagnostic channel has no device manager in this

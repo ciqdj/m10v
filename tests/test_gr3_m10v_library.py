@@ -106,6 +106,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
 
     def test_65_shared_presets_and_crc_state(self):
         state = self.state(); self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 1)
+        self.assertEqual([slot.film for slot in state.slots], [34,35,36,37,33])
         names = [self.lib.m10v_library_name(i) for i in range(1, 66)]
         self.assertEqual(len(set(names)), 65); self.assertTrue(all(names))
         self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(66))
@@ -122,7 +123,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         def success(_, proposed): return 0
         self.assertEqual(self.lib.m10v_library_select(C.byref(state), 2, 32, success, None), 0)
         self.assertEqual(state.slots[2].film, 32); self.assertEqual(state.sequence, 1)
-        self.assertEqual([state.slots[i].film for i in (0, 1, 3, 4)], [1, 2, 4, 33])
+        self.assertEqual([state.slots[i].film for i in (0, 1, 3, 4)], [34, 35, 37, 33])
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 1)
         before = bytes(state)
         self.assertLess(self.lib.m10v_library_select(C.byref(state), 5, 1, success, None), 0)
@@ -131,6 +132,9 @@ class NativeFilmLibraryTests(unittest.TestCase):
 
     def test_neutral_disabled_effects_are_byte_identical_and_padding_is_protected(self):
         state = self.state(); image, y, uv, scratch = self.image()
+        @STORE
+        def save(_, proposed): return 0
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state), 0, 1, save, None), 0)
         before = bytes(y), bytes(uv), bytes(scratch)
         self.assertEqual(self.render(image, state, scratch), 0)
         self.assertEqual((bytes(y), bytes(uv), bytes(scratch)), before)
@@ -146,6 +150,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         outputs = []
         for seed in (12, 12, 13):
             state = self.state(); self.lib.m10v_library_texture(C.byref(state), 0, 3, 0, save, None)
+            self.lib.m10v_library_select(C.byref(state), 0, 1, save, None)
             image, y, uv, scratch = self.image(); self.assertEqual(self.render(image, state, scratch, seed=seed), 0)
             outputs.append(bytes(y)); self.assertEqual(bytes(uv), bytes(self.image()[2]))
             for row in range(image.height): self.assertEqual(bytes(y[row * image.stride + 128:(row + 1) * image.stride]), bytes([173] * 8))
@@ -156,6 +161,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         @STORE
         def save(_, proposed): return 0
         state = self.state(); self.lib.m10v_library_texture(C.byref(state), 0, 0, 3, save, None)
+        self.lib.m10v_library_select(C.byref(state), 0, 1, save, None)
         image, y, uv, scratch = self.image(); at = 48 * image.stride + 64; y[at] = 255
         before_uv = bytes(uv)
         self.assertEqual(self.render(image, state, scratch), 0)
@@ -167,6 +173,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         def save(_, proposed): return 0
         for corner in range(4):
             state = self.state(); self.lib.m10v_library_stamp(C.byref(state), 1, 0, corner, 1, save, None)
+            self.lib.m10v_library_select(C.byref(state), 0, 1, save, None)
             image, y, uv, scratch = self.image(320, 240); before = bytes(y)
             self.assertEqual(self.render(image, state, scratch, Date(2026, 10, 14, 23, 59)), 0)
             changed = [i for i in range(image.y_bytes) if y[i] != before[i]]

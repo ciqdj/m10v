@@ -31,7 +31,7 @@ test('all eight extension combinations preserve selected/unselected bytes in deb
     const variant=[extensions.aspect?'aspect':null,extensions.level?'level':null].filter(Boolean).join('-');
     const component=components[variant]??null,n=natives.get(component?0x540ba000:0x540b6000);
     const result=composeNative(source,n.candidate,n.runtime,n.manifest,component,extensions),rtos=raw(result.candidate);
-    assert.deepEqual(result.composition.extensions,extensions);
+    assert.deepEqual(result.composition.extensions,{...extensions,rawNr:{mode:'stock'}});
     assert.equal(result.composition.component_variant,variant||null);
     assert.equal(result.composition.aspect_resource_id,extensions.aspect?911:null);
     assert.equal(result.composition.shared_resource_routes,extensions.aspect?2:0);

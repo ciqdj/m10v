@@ -6,7 +6,7 @@ test('guide is served at both URLs and includes concise usage, limits, risk and 
   const base=`http://127.0.0.1:${server.address().port}`;
   for(const path of ['/guide','/guide/']){
    const res=await fetch(base+path);assert.equal(res.status,200);assert.match(res.headers.get('content-type'),/text\/html/);const html=await res.text();
-   for(const text of ['gr-custom-tool','GRLife','gr3-film-mods','darkslide-gr','65 套预设','fwdc239b.bin','fwdc243b.bin','变砖','已有记录优先'])assert.ok(html.includes(text),text);
+   for(const text of ['gr-custom-tool','GRLife','gr3-film-mods','darkslide-gr','33 套预设','fwdc239b.bin','fwdc243b.bin','变砖','已有记录优先'])assert.ok(html.includes(text),text);
    assert.ok(!html.includes('<script'));
   }
  }finally{await new Promise(r=>server.close(r));}

@@ -6,15 +6,15 @@ import {prepareNative,generateNative} from './gr3-native-library.mjs';
 const source=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));
 
 test('native extensions have a strict complete configuration without accepting unrelated controls',()=>{
- assert.deepEqual(normalizeExtensions(),{aspect:false,level:false,negativeGrain:false});
- assert.deepEqual(normalizeExtensions({aspect:true,level:true,negativeGrain:true}),{aspect:true,level:true,negativeGrain:true});
+ assert.deepEqual(normalizeExtensions(),{aspect:false,level:false,negativeGrain:false,rawNr:{mode:'stock'}});
+ assert.deepEqual(normalizeExtensions({aspect:true,level:true,negativeGrain:true}),{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'stock'}});
  for(const value of [null,{aspect:true},{aspect:1,level:false,negativeGrain:false},{aspect:false,level:false,negativeGrain:false,timestamp:true}])assert.throws(()=>normalizeExtensions(value));
 });
 test('one accepted plan binds native slots, timestamp, aspect, level and native negative grain',async()=>{
  const c=defaultConfiguration();c.stamp=2;c.slots[4].grain=2;
  const plain=prepareNative(source,c),extensions={aspect:true,level:true,negativeGrain:true};
  const joined=prepareNative(source,c,{extensions});
- assert.deepEqual(joined.extensions,extensions);
+ assert.deepEqual(joined.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.deepEqual(joined.configuration,c);
  assert.notEqual(joined.configuration_sha256,plain.configuration_sha256);
  assert.ok(joined.features.includes('aspect')&&joined.features.includes('level')&&joined.features.includes('negativeGrain'));
@@ -30,7 +30,7 @@ test('final joined firmware contains all selected components and rejects repaire
  const extensions={aspect:true,level:true,negativeGrain:true};
  const plan=prepareNative(source,config,{extensions});
  const result=await generateNative(source,config,plan.configuration_sha256,{extensions});
- assert.deepEqual(result.receipt.extensions,extensions);
+ assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.equal(result.manifest.base,0x540ba000);
  assert.ok(result.receipt.composition.verified);
  assert.equal(result.receipt.composition.aspect_resource_id,911);
@@ -62,4 +62,39 @@ test('native transition synchronizes timestamp and clears GR III-only tools on m
  const x=nativeSelection(['film','timestamp','aspect','level','negativeGrain'],{...c,stamp:2},'gr3x');
  assert.deepEqual(x.features,['film','timestamp']);
  assert.equal(x.configuration.stamp,2);
+});
+
+
+test('RAW NR plans bind all modes and reject unknown model addresses',()=>{
+ const flags={aspect:false,level:false,negativeGrain:false},c=defaultConfiguration();
+ const plans=['stock','off','threshold'].map(mode=>prepareNative(source,c,{extensions:{...flags,rawNr:mode==='threshold'?{mode,iso:6400}:{mode}}}));
+ assert.equal(new Set(plans.map(p=>p.configuration_sha256)).size,3);
+ assert.ok(plans[1].features.includes('rawNr'));assert.ok(!plans[0].features.includes('rawNr'));
+ const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
+ assert.doesNotThrow(()=>prepareNative(x,c));
+ assert.throws(()=>prepareNative(x,c,{extensions:{...flags,rawNr:{mode:'off'}}}),/GR III/);
+ for(const rawNr of [null,{mode:'threshold',iso:6300},{mode:'off',iso:6400},{mode:'stock',extra:1}])assert.throws(()=>normalizeExtensions({...flags,rawNr}));
+});
+
+test('native RAW NR export independently reads back off and threshold together with old extensions',async()=>{
+ const {decodeFrameMap,sum32}=await import('./gr3-frames.mjs');
+ const {auditIntegratedNative,composeNative}=await import('./gr3-integrated-components.mjs');
+ const {planRawNr}=await import('./gr3-raw-nr.mjs');
+ const config=defaultConfiguration(),flags={aspect:true,level:true,negativeGrain:true};
+ // Build the ARM/native image once; composition tests reuse it for each isolated RAW mode.
+ const plan=prepareNative(source,config,{extensions:flags});
+ const base=await generateNative(source,config,plan.configuration_sha256,{extensions:flags});
+ for(const rawNr of [{mode:'stock'},{mode:'off'},{mode:'threshold',iso:6400}]){
+  const extensions={...flags,rawNr};
+  const result=composeNative(source,base.nativeCandidate,base.runtime,base.manifest,base.component,extensions);
+  const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
+  let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
+  for(const e of planRawNr(source,rawNr))assert.equal(d.subarray(at+16+e.offset,at+16+e.offset+e.replacementHex.length/2).toString('hex'),e.replacementHex);
+  assert.deepEqual(result.composition.raw_nr.configuration,rawNr);
+  assert.equal(result.composition.raw_nr.patch_count,planRawNr(source,rawNr).length);
+  assert.equal(result.composition.raw_nr.jpeg_nr,'stock');
+  assert.equal(sum32(result.candidate),0);
+  assert.deepEqual(auditIntegratedNative(source,result.candidate,base.nativeCandidate,base.runtime,base.manifest,base.component,extensions),result.composition);
+  if(rawNr.mode!=='stock')assert.throws(()=>auditIntegratedNative(source,result.candidate,base.nativeCandidate,base.runtime,base.manifest,base.component,flags),/bytes differ/);
+ }
 });

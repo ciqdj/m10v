@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" fill="none" shape-rendering="crispEdges" role="img" aria-labelledby="title"><title id="title">m10v 像素相机</title>
+<path fill="#746B58" d="M6 8h8V4h12v4h16v4h4v24H2V12h4z"/>
+<path fill="#D9B574" d="M6 12h36v4h4v16h-4v4H6v-4H2V16h4z"/>
+<path fill="#242A26" d="M6 16h36v16H6zM14 8h12v4H14z"/>
+<path fill="#EDE6D3" d="M6 12h8v4H6zM34 12h8v4h-8z"/>
+<path fill="#141B18" d="M18 12h12v4h4v4h4v8h-4v4h-4v4H18v-4h-4v-4h-4v-8h4v-4h4z"/>
+<path fill="#D9B574" d="M20 16h8v4h4v8h-4v4h-8v-4h-4v-8h4z"/>
+<path fill="#596D63" d="M20 20h8v8h-8z"/><path fill="#F6E5BE" d="M20 20h4v4h-4z"/>
+<path fill="#141B18" d="M6 20h4v8H6zM38 20h4v8h-4z"/>
+<path fill="#746B58" d="M6 36h8v4H6zM34 36h8v4h-8z"/>
+</svg>

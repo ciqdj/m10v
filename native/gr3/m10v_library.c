@@ -73,7 +73,7 @@ void m10v_library_init(m10v_library_state *state) {
 #else
     state->magic = 0x5630314du; state->version = 2; state->size = sizeof(*state);
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) {
-        state->slots[i].film = (uint16_t)(i == 4 ? 33 : i + 1);
+        state->slots[i].film = (uint16_t)(i == 4 ? 33 : i + 34);
         state->slots[i].halo_gain=3; state->slots[i].halo_spread=3;
         state->slots[i].halo_threshold=5; state->slots[i].halo_profile=2;
     }

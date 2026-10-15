@@ -2,6 +2,7 @@ import {createFirmwareSaveGate} from './firmware-save-gate.mjs';
 import { createEditorState, createImportGate } from './editor-state.mjs';
 import { createFilmPreview } from './preview-controller.mjs';
 import { previewFilmPixels } from './film-preview.mjs';
+import {enhanceFilmSelect} from './film-picker.mjs';
 import {mountNativeLibrary} from './native-library.js';
 import {defaultConfiguration,migrateSimulationSelection,nativeSelection} from './native-library-state.mjs';
 let chosenModel=location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
@@ -9,7 +10,7 @@ let modelLabel=chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
 let settingsTab='imaging';
 let debugMode=false;
-const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.features.has('level'),negativeGrain:state.features.has('negativeGrain')});
+const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.features.has('level'),negativeGrain:state.features.has('negativeGrain'),rawNr:state.features.has('rawNr')?state.rawNr:{mode:'stock'}});
 const debugEnabled=()=>debugMode&&state.profile==='native'&&chosenModel==='gr3';
 
 const $ = (id) => document.getElementById(id);
@@ -31,7 +32,7 @@ const definitions = [
   ['recipes', '配方（调参数）', '给原厂影像风格预设一组九项参数，并设置机内名称与图标。', '6 个位置可定制'],
   ['timestamp', '时间戳优化', '为 JPEG 照片加入拍摄日期。格式、位置、字号与颜色可在相机菜单中设置。', '完整机内菜单'],
   ['aspect', '更多画幅比例', '新增 4:3 与 65:24，并提供 65:24 实时取景蒙版。', '4:3 / 65:24'],
-  ['film', '胶片模拟与机内胶卷库', '65 套预设共用五槽；在这里选卷，在胶卷库调质感与 800T 光晕。', '同一目录 · 同一配置'],
+  ['film', '胶片模拟与机内胶卷库', '33 套预设共用五槽；在这里选卷，在胶卷库调质感与 800T 光晕。', '同一目录 · 同一配置'],
   ['presets', '原厂名称与图标', '给更多原厂预设定制名称、图标；需要先导入官方文件核对资源。', '12 个原厂预设'],
   ['negativeGrain', '负片颗粒', '开放内置负片的原厂颗粒菜单，档位在相机里调整。', '原厂颗粒菜单'],
   ['rawNr', 'RAW 降噪策略', '控制写入 DNG 前的 Bayer 降噪；JPEG 高 ISO 降噪保持原厂。', '独立 RAW 策略'],
@@ -164,7 +165,7 @@ function renderLedger() {
   const native=state.profile==='native';
   const rows = [
     ['机型',state.source?`${state.source.model} · ${state.source.public_version}`:modelLabel],
-    ['当前方案',native?'M10V 胶卷库 · 含 800T':`${state.features.size} 项影像定制`],
+    ['当前方案',native?'胶卷库':`${state.features.size} 项影像定制`],
     ['胶卷',native?state.nativeConfig.slots.map(s=>state.nativeCatalog.find(f=>f.id===s.film)?.name||`#${s.film}`).join(' / '):state.features.has('film')?`${state.filmIds.length} / 5 款`:'未启用'],
     ['固件来源',state.projectId?'官方文件已核验':'等待导入'],
     ['保存状态',activeBuildController?'正在处理':state.preparation?'方案已核验':'保存时自动核验'],
@@ -218,7 +219,7 @@ function renderFeatures() {
         if(active&&chosenModel!=='gr3x'){state.features.delete('film');state.profile='custom';}
         else{try{enterNativeSelection();}catch(e){notice(e.message,true);return;}}
       }else if(state.profile==='native'){
-        if(!['timestamp','aspect','level','negativeGrain'].includes(id)){notice('胶卷库当前可组合时间戳、画幅、水平仪和负片颗粒；其他工具请先移除胶卷库。',true);return;}
+        if(!['timestamp','aspect','level','negativeGrain','rawNr'].includes(id)){notice('胶卷库可组合时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；其他工具请先移除胶卷库。',true);return;}
         active?state.features.delete(id):state.features.add(id);
         if(id==='timestamp')nativeEditor.setConfiguration({...state.nativeConfig,stamp:active?0:(state.nativeConfig.stamp||1)});
       }else{active?state.features.delete(id):state.features.add(id);}
@@ -402,12 +403,12 @@ function renderFilmDetail(target) {
   state.nativeConfig.slots.forEach((slot,index)=>{
     const label=textNode('label',`槽位 ${index+1}`),select=document.createElement('select');select.className='shared-slot-select';select.dataset.sharedSlot=String(index);select.setAttribute('aria-label',`槽位 ${index+1} 胶卷`);
     const missing=state.unresolvedSlots.find(v=>v.slot===index);
-    if(missing){const option=textNode('option','需重选 · '+missing.id);option.value='';select.append(option);}
-    for(const film of state.nativeCatalog){const option=textNode('option',film.name);option.value=String(film.id);select.append(option);}
+    if(missing){const option=textNode('option','需重选 · '+missing.id);option.value='';option.disabled=true;select.append(option);}
+    for(const film of state.nativeCatalog){const option=textNode('option',film.name);option.value=String(film.id);option.dataset.icon=film.icon_url;option.dataset.group=film.group;select.append(option);}
     select.value=missing?'':String(slot.film);select.onchange=()=>nativeEditor.setFilm(Number(select.value),index);
     const film=state.nativeCatalog.find(f=>f.id===slot.film);
     if(!missing&&film?.icon_url){const icon=document.createElement('img');icon.className='film-icon';icon.src=film.icon_url;icon.alt='';icon.width=40;icon.height=40;label.append(icon);}
-    label.append(select);rows.append(label);
+    label.append(select);enhanceFilmSelect(select,{caption:`SLOT 0${index+1} / 选择胶卷`});rows.append(label);
   });
   target.append(rows);const button=textNode('button','查看完整目录 · 调颗粒、柔光与光晕 →','outline');button.type='button';button.onclick=()=>showSettingsTab('library');target.append(button);
 }
@@ -482,7 +483,7 @@ async function importSource(file,local=false) {
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
     $('build-model').textContent=`${report.model} · ${report.public_version}`;
-    document.title=`${report.model} 固件工作室 · M10V`;
+    document.title=`m10v · GR固件工作台 · ${report.model}`;
     document.querySelector('.hero .kicker').textContent=`RICOH ${report.model} · ${report.public_version}`;
     state.projectId = report.sha256; state.source = report; invalidate();
     state.stockCapabilities=chosenModel==='gr3x'?[]:await (await api(`/api/projects/${state.projectId}/stock-presets`)).json();

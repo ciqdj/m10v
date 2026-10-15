@@ -160,6 +160,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
               target.endsWith('.css') ? 'text/css; charset=utf-8' :
                 target.endsWith('.json') ? 'application/json; charset=utf-8' :
                 target.endsWith('.html') ? 'text/html; charset=utf-8' :
+                  target.endsWith('.svg') ? 'image/svg+xml; charset=utf-8' :
                   target.endsWith('.png') ? 'image/png' : 'application/octet-stream';
             return send(response, 200, await readFile(target), type);
           } catch { /* fall through */ }

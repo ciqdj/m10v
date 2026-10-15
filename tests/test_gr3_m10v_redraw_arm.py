@@ -25,6 +25,9 @@ class NativeRedrawArmTests(unittest.TestCase):
     firmware_name = 'RTOS-user.bin'
     manifest_folder = 'rebuild'
     slot_five_caption = 822
+    visible_film_count = 65
+    slot_five_film_index = 32
+    slot_one_film_index = 0
 
     @classmethod
     def setUpClass(cls):
@@ -46,15 +49,16 @@ class NativeRedrawArmTests(unittest.TestCase):
         self.u.mem_write(MODEL, bytes([18])+bytes(35))
         self.put(CONTROLLER+0x174, VIEW)
         self.put(CONTROLLER+0x160, 0x55007000)
-        self.u.mem_write(CONTROLLER+0x1a9, bytes([67]))
+        row_count = self.visible_film_count + 2
+        self.u.mem_write(CONTROLLER+0x1a9, bytes([row_count]))
         self.put(VIEW, VTABLE)
         self.put(VTABLE+0x18, 0x550ff100)
         self.put(VTABLE+0x5c, 0x53394600)
         self.put(VTABLE+0x58, 0x533945fc)
         self.put(VIEW+0xf4, VECTOR)
-        self.put(VIEW+0xf8, VECTOR+67*4)
+        self.put(VIEW+0xf8, VECTOR+row_count*4)
         self.put(VIEW+0x120, 60)
-        for i in range(67):
+        for i in range(row_count):
             self.put(VECTOR+4*i, RECORDS+8*i)
             self.put(RECORDS+8*i, ROWS+0x200*i)
             self.put(ROWS+0x200*i, VTABLE)
@@ -108,7 +112,7 @@ class NativeRedrawArmTests(unittest.TestCase):
         elif address in (0x536af2e4, 0x533ad308, 0x550ff100, 0x533a1734, 0x533a19b4):
             if address in (0x533a1734, 0x533a19b4):
                 index = (r(UC_ARM_REG_R0)-ROWS)//0x200
-                self.assertGreaterEqual(index, 0); self.assertLess(index, 67)
+                self.assertGreaterEqual(index, 0); self.assertLess(index, self.visible_film_count+2)
                 self.assertEqual(r(UC_ARM_REG_R0), ROWS+0x200*index)
                 (self.icons if address == 0x533a1734 else self.markers)[index] = r(UC_ARM_REG_R1)
             result = 0
@@ -170,9 +174,9 @@ class NativeRedrawArmTests(unittest.TestCase):
         self.assertEqual(self.u.mem_read(VIEW+0x108, 1), b'\x08')
         self.focus(0)
         self.call('m10v_menu_confirm', CONTROLLER)
-        self.assertEqual(self.u.mem_read(VIEW+0x108, 1), b'\x43')
-        self.assertEqual(set(self.icons), set(range(67)))
-        for i in range(65):
+        self.assertEqual(self.u.mem_read(VIEW+0x108, 1), bytes([self.visible_film_count+2]))
+        self.assertEqual(set(self.icons), set(range(self.visible_film_count+2)))
+        for i in range(self.visible_film_count):
             self.focus(i)
             self.assertEqual(self.tone, 21)
         self.assertFalse(self.assertions)
@@ -197,7 +201,7 @@ class NativeRedrawArmTests(unittest.TestCase):
         self.call('m10v_menu_confirm', CONTROLLER)
         self.focus(0)
         self.call('m10v_menu_confirm', CONTROLLER)
-        self.assertEqual(self.call(0x53394820, VIEW), 32)  # Slot5 has 800T ID33
+        self.assertEqual(self.call(0x53394820, VIEW), self.slot_five_film_index)  # Slot5 has 800T ID33
 
 
 @unittest.skipUnless((EVIDENCE/'RTOS-fixed.bin').exists(), 'decoded fixed firmware unavailable')
@@ -239,7 +243,7 @@ class FixedNativeRedrawArmTests(NativeRedrawArmTests):
         self.assertEqual(self.u.mem_read(MODEL, 1), b'\x12')
         self.focus(0)
         self.call('m10v_menu_confirm', CONTROLLER)  # Choose Film for Slot1
-        self.assertEqual(self.call(0x53394820, VIEW), 0)
+        self.assertEqual(self.call(0x53394820, VIEW), self.slot_one_film_index)
         self.u.mem_write(0x55008000, struct.pack('<H', 0x89))
         self.call('m10v_menu_key', CONTROLLER, 0x55008000)
         self.assertEqual(self.tone, 18)
