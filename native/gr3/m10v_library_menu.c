@@ -44,7 +44,7 @@ uint32_t m10v_menu_count(uint32_t address) {
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x80u))(address);
     uint32_t group=mode(m);
 #if M10V_SD_LIBRARY
-    if(group==0)return 14;
+    if(group==0)return 12;
     if(group==14)return 5;
     if(group>=15)return 10;
     if(group==1)return 7;
@@ -57,7 +57,7 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!supported(m)) return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     uint32_t group = mode(m);
     #if M10V_SD_LIBRARY
-    if(!group&&index==13)return 603;
+    if(!group)return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address,index);
     if(group==14)return index<5?208+index:0;
 #endif
     if (!group) return index == 12 ? 128 : ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);

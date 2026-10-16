@@ -42,20 +42,11 @@ class SdMenuTests(unittest.TestCase):
   self.install_result=-1;self.call(u,'m10v_menu_confirm',0x55005000)
   self.assertEqual(self.native_tones,[]);self.assertEqual(u.mem_read(0x5506821d,1),b'\x0f');self.assertTrue(self.captions)
 
- def test_library_is_separate_entry_and_slot_selection_does_not_activate_until_install(self):
+ def test_independent_settings_leave_only_stock_imagecontrol_entries(self):
   u=self.machine()
-  self.assertEqual(self.call(u,'m10v_menu_count',0x55068200),14)
-  self.assertEqual(self.call(u,'m10v_menu_index',0x55068200,13),603)
-  self.focus=13;self.call(u,'m10v_menu_confirm',0x55005000)
-  self.assertEqual(u.mem_read(0x5506821d,1),bytes([14]))
-  self.assertEqual(self.call(u,'m10v_menu_count',0x55068200),5)
-  self.native_tones=[];self.focus=4;self.call(u,'m10v_menu_confirm',0x55005000)
-  self.assertEqual(u.mem_read(0x5506821d,2),bytes([15,21]))
-  self.assertEqual(self.native_tones,[])
-  self.focus=0;self.call(u,'m10v_menu_confirm',0x55005000)
-  self.assertEqual(self.installs,[[0,0,33,4]])
-  self.assertEqual(u.mem_read(0x5506821d,1),bytes([14]))
-  self.assertEqual(self.native_tones,[21])
+  self.assertEqual(self.call(u,'m10v_menu_count',0x55068200),12)
+  self.assertEqual(self.manifest['settings_menu']['private_routes'],[0x0200f100,0x0200f101])
+  self.assertEqual(self.manifest['resources']['texts'][129:131],['胶卷库','时间水印'])
  def test_sd_resources_are_chinese_and_800t_native_detail_is_present(self):
   resources=self.manifest['resources'];texts=resources['texts']
   self.assertEqual(texts[914-786],'胶卷库')

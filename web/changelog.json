@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.16.4",
+      "date": "2026-10-16",
+      "title": "独立机内胶卷库与时间水印候选",
+      "changes": [
+        "设置菜单新增胶卷库和时间水印两个独立入口，不再占用影像控制面板。",
+        "胶卷库使用五仓位独立页面，左右选卷、上下翻页，确认后保存替换。",
+        "时间水印支持机内设置模式、四种日期格式、四角位置和四种颜色，取消编辑保持原值。",
+        "保留新版800T及原厂FN调节；已做离线ARM与整包回归，实际屏幕和硬件操作仍待验证，实时取景效果尚未接入。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.16.3",
       "date": "2026-10-16",
       "title": "SD 胶卷库与新版 800T 整合候选",
@@ -11,9 +25,9 @@
         "胶卷包校验同时绑定成像引擎与配方，升级后需重新下载配套胶卷包。",
         "明确胶卷只作用于保存的静态 JPEG；实时取景尚未接入，本版仍待实机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "d858556ff0866eee8a44cf8a7377a87313fffc78",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/d858556ff0866eee8a44cf8a7377a87313fffc78"
     },
     {
       "version": "2026.10.16.2",

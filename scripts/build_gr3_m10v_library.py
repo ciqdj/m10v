@@ -115,6 +115,9 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
         'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
         'm10v_sd_camera_': {'m10v_sd_camera_item','m10v_sd_camera_install'},
         'm10v_debug_': {'m10v_debug_log'},
+        'm10v_settings_': {'m10v_settings_open','m10v_settings_key'},
+        'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
+        'm10v_settings_controller_': {'m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
     }[prefix]
     if set(symbols) != required or not image_sections: raise ValueError('runtime API incomplete')
@@ -190,6 +193,25 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 sd_base=(base+len(image)+15)&~15
                 sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
                 image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
+        settings_report = None
+        if sd_library:
+            for name,prefix in [('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
+                obj_path=folder/(name+'.o')
+                subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
+                start=(base+len(image)+15)&~15
+                code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix)
+                image+=bytes(start-base-len(image))+code;symbols.update(entries)
+            controller_obj=folder/'settings-controller.o'
+            subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
+            start=(base+len(image)+15)&~15
+            placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable']}
+            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_')
+            from scripts.build_gr3_settings_hooks import build_settings_hooks
+            hook_start=(start+len(provisional)+15)&~15
+            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries})
+            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_')
+            image+=bytes(start-base-len(image))+code
+            image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
         debug_flags = [f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}']
         if debug_mode:
             debug_obj = folder / 'debug.o'
@@ -250,6 +272,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'Bottom Left':'左下','Bottom Right':'右下','White':'白色','Orange':'橙色','Red':'红色','Yellow':'黄色',
                 '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
             texts=[translations.get(t,t) for t in texts]+['空','上一页','下一页','胶卷库']
+        if sd_library:
+            texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色']
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
@@ -402,6 +426,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['sd_library']=sd_library
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','scripts/generate_gr3_sd_contract.mjs']})
+    manifest['settings_menu']=settings_report
+    if sd_library:
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','scripts/build_gr3_settings_hooks.py','node/gr3-settings-menu.mjs']})
     manifest['detail']=detail_report
     manifest['debug_mode']=debug_mode
     manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
