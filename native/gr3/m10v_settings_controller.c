@@ -1,6 +1,7 @@
 /* Exact GR III 2.10 BaseController ownership adapter. Not enabled until the
  * separately audited root/factory patches and key mapping are installed. */
 #include "m10v_settings_controller.h"
+#include "m10v_debug.h"
 #include "m10v_sd_library.h"
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
@@ -61,15 +62,18 @@ uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
 uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t route){
  (void)route;m10v_settings_ops o;ops(&o);
  if(m10v_settings_open(&p->state,&o,p->page))return 0;
- return p->view.count==29&&p->view.widgets[0] ? 1 : m10v_settings_view_create(&p->view)==0;
+ return p->view.count==M10V_VIEW_COUNT&&p->view.widgets[0] ? 1 : m10v_settings_view_create(&p->view)==0;
 }
 void m10v_settings_controller_enter(m10v_settings_controller *p,uint32_t route,uint32_t flags){
  (void)route;(void)flags;m10v_settings_ops o;ops(&o);
+ M10V_LOG(80,p->page,route,p->state.screen,p->state.focus);
  m10v_settings_view_draw(&p->view,&p->state,&o);
  ((fn3)0x5316d354u)((uint32_t)(uintptr_t)p,0,p->view.widgets[0]);
+ M10V_LOG(81,p->page,route,p->state.screen,p->state.focus);
 }
 uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event){
  uint32_t raw=*(const uint16_t *)(uintptr_t)event,key;
+ M10V_LOG(82,raw,p->state.screen,p->state.focus,p->state.value);
  switch(raw){
  case 0xce:key=M10V_KEY_LEFT;break;
  case 0xcf:case 0xd3:key=M10V_KEY_RIGHT;break;
@@ -80,8 +84,10 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
  default:return 0;
  }
  m10v_settings_ops o;ops(&o);m10v_settings_key(&p->state,&o,key);
+ M10V_LOG(83,raw,p->state.screen,p->state.focus,(p->state.error<<16)|p->state.value);
  if(p->state.screen==M10V_SETTINGS_CLOSED)((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);
  else m10v_settings_view_draw(&p->view,&p->state,&o);
+ M10V_LOG(84,raw,p->state.screen,p->state.focus,(p->state.error<<16)|p->state.value);
  return 1;
 }
 

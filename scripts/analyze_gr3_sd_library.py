@@ -50,7 +50,7 @@ def analyze(code):
   pos=struct.unpack('<I',u.mem_read(0x55008004,4))[0]
   assert result==(actual>=0) and pos==max(0,actual)
   results.append(dict(low_level_read=actual,wrapper_result=result,error=error,tell=pos,exact_read_accepted=bool(result and not error and pos==4096)))
- return {'official_rtos_sha256':hashlib.sha256(code).hexdigest(),'vtable':'0x53d252d0','read':'0x5359279c','seek':'0x53592974','tell':'0x53592a60','size_by_path':'0x535948c4','cases':results,'boundary':'Real manager read/seek/tell and FAT adapters; mocked mutex, low-level media syscalls and error translation. No physical card/thread timing claim.'}
+ return {'official_rtos_sha256':hashlib.sha256(code).hexdigest(),'vtable':'0x53d252d0','read':'0x5359279c','seek':'0x53592974','tell':'0x53592a60','size_by_open_handle':'0x535948c4','cases':results,'boundary':'Real manager read/seek/tell and FAT adapters; mocked mutex, low-level media syscalls and error translation. No physical card/thread timing claim.'}
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('rtos',type=Path);p.add_argument('--out',type=Path);a=p.parse_args();result=json.dumps(analyze(a.rtos.read_bytes()),indent=2)+'\n'
  if a.out:a.out.write_text(result)

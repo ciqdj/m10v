@@ -10,7 +10,7 @@ typedef int (*open_fn)(uint32_t,const char *,uint32_t,uint32_t *,uint32_t *);
 typedef int (*io_fn)(uint32_t,uint32_t,void *,uint32_t,uint32_t *);
 typedef int (*seek_fn)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t *);
 typedef int (*tell_fn)(uint32_t,uint32_t,uint32_t *,uint32_t *);
-typedef int (*size_fn)(uint32_t,const char *,uint32_t *,uint32_t *);
+typedef int (*size_fn)(uint32_t,uint32_t,uint32_t *,uint32_t *);
 typedef int (*close_fn)(uint32_t,uint32_t,uint32_t *);
 static const char path[]="C:\\M10V\\FILMS.M10";
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
@@ -32,10 +32,13 @@ static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
  const uint32_t *v=(const uint32_t *)(uintptr_t)vt;
  for(uint32_t i=7;i<=13;++i)if(i!=10&&!code(v[i],4))return 0;
  uint32_t size=0,error=0,handle=0,id=0;
- if(!((size_fn)v[12])(fs,path,&size,&error)||error||size<4096||size>4096+M10V_SD_MAX_FILMS*M10V_SD_RECORD_BYTES)return 0;
  int opened=((open_fn)v[7])(fs,path,1,&handle,&error);
  if(!handle)return 0;
- if(opened&&!error&&exact(fs,v,handle,0,memory,4096)){
+ /* v[12] queries an OPEN HANDLE: v[21] reads handle[1] as the device
+  * index. Passing a path here turns ASCII into an out-of-bounds index. */
+ if(opened&&!error&&((size_fn)v[12])(fs,handle,&size,&error)&&!error&&
+    size>=4096&&size<=4096+M10V_SD_MAX_FILMS*M10V_SD_RECORD_BYTES&&
+    exact(fs,v,handle,0,memory,4096)){
   uint32_t count=m10v_sd_header(memory,size),index=page*8+row;
   if(count&&index<count){
    id=m10v_sd_u32(memory+64+index*12);

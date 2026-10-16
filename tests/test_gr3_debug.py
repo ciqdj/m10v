@@ -81,6 +81,12 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(self.u.reg_read(UC_ARM_REG_PC),0x550ff000)
         return self.u.reg_read(UC_ARM_REG_R0)
 
+    def test_independent_page_trace_decodes_keys_state_and_error(self):
+        self.assertEqual(self.log(83,0xcf,4,2,(3<<16)|1),1)
+        record=self.decoded()['records'][-1]
+        self.assertEqual(record['stage'],'page.state.after')
+        self.assertEqual(record['page_state'],{'key':'0xcf','screen':'value','focus':2,'value':1,'error':3})
+
     def test_focus_wrapper_records_real_slot_and_preserves_original_result(self):
         self.u.mem_write(0x55068200,b'\x15')
         self.assertEqual(self.invoke('m10v_menu_focus',0x55005000,11),77)

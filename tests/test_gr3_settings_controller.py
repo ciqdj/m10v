@@ -24,10 +24,11 @@ OWNER=0x10002000
 PAGE=OWNER+0x13bc
 STRIDE=0x280
 VIEW=0x158
-SAVED_STATE=VIEW+132
+SAVED_STATE=VIEW+164
 SCREEN=SAVED_STATE+64
 
 class ControllerLifetimeTests(unittest.TestCase):
+ debug=False
  @classmethod
  def setUpClass(cls):
   p=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/tmp/m10v-sd-research/rtos.bin'))
@@ -37,7 +38,7 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_settings_controller_vtable','m10v_settings_view_create',
          'm10v_settings_view_draw','m10v_settings_view_destroy',
          'm10v_camera_library_load','m10v_sd_camera_item','m10v_sd_camera_install',
-         'm10v_camera_library_stamp']
+         'm10v_camera_library_stamp','m10v_debug_log']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -45,7 +46,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    blobs=[]
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
-    subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
     blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_')
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs
@@ -66,15 +67,15 @@ class ControllerLifetimeTests(unittest.TestCase):
    r=[m.reg_read(reg) for reg in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3)]
    name=reverse.get(a)
    if name:
-    self.events.append((name,*r))
+    self.events.append((name,*r,*([self.word(m,m.reg_read(UC_ARM_REG_SP))] if name=='m10v_debug_log' else [])))
     result=0
     if name=='m10v_settings_factory_original':result=OWNER if r[1]==0x0200004a else self.fallback
     elif name=='m10v_settings_top_dtor_original':result=r[0]
     elif name=='m10v_settings_controller_vtable':result=STUB+0x800
     elif name=='m10v_settings_view_create':
      if self.view_fail:result=0xffffffff
-     else:m.mem_write(r[0],struct.pack('<I',0x10009000));m.mem_write(r[0]+128,struct.pack('<I',29))
-    elif name=='m10v_settings_view_destroy':m.mem_write(r[0],bytes(132))
+     else:m.mem_write(r[0],struct.pack('<I',0x10009000));m.mem_write(r[0]+160,struct.pack('<I',37))
+    elif name=='m10v_settings_view_destroy':m.mem_write(r[0],bytes(164))
     elif name=='m10v_camera_library_load':
      result=0xffffffff if self.load_fail else 0
      state=bytearray(64)
@@ -199,5 +200,29 @@ class ControllerLifetimeTests(unittest.TestCase):
    self.route=route
    self.assertEqual(self.call(u,'key_route',0x55012300),0x0200004a if route in (0x0200f100,0x0200f101) else route)
    self.assertEqual(self.route,route)
+
+class ControllerDebugTests(ControllerLifetimeTests):
+ debug=True
+ def test_timestamp_keys_report_state_and_redraw_without_changing_films(self):
+  u=self.machine();self.setup_owner(u);p=PAGE+STRIDE
+  self.call(u,'ready',p,0x0200f101);self.call(u,'enter',p,0x0200f101,0)
+  before=bytes(u.mem_read(p+SAVED_STATE+12,40))
+  def key(k):
+   u.mem_write(0x10000100,struct.pack('<H',k));self.call(u,'key',p,0x10000100)
+  key(0xd8) # edit mode
+  self.assertEqual(self.word(u,p+SCREEN),4)
+  key(0xcf) # date only
+  self.assertEqual(self.word(u,p+SCREEN+20),1)
+  key(0xd8) # commit
+  self.assertEqual(self.word(u,p+SCREEN),3)
+  self.assertEqual(bytes(u.mem_read(p+SAVED_STATE+52,1)),b'\1')
+  key(0xd1) # next row
+  self.assertEqual(self.word(u,p+SCREEN+4),1)
+  self.assertEqual(bytes(u.mem_read(p+SAVED_STATE+12,40)),before)
+  logs=[e[1] for e in self.events if e[0]=='m10v_debug_log']
+  self.assertEqual(logs,[80,81]+[82,83,84]*4)
+  self.assertEqual(self.count('m10v_camera_library_stamp'),1)
+  states=[e[2:] for e in self.events if e[0]=='m10v_debug_log' and e[1]==83]
+  self.assertEqual(states,[(0xd8,4,0,0),(0xcf,4,0,1),(0xd8,3,0,1),(0xd1,3,1,1)])
 
 if __name__=='__main__':unittest.main()

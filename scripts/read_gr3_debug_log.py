@@ -8,7 +8,8 @@ from pathlib import Path
 EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'menu.key.after',
         30:'menu.focus.before',31:'menu.focus.after',40:'menu.confirm.before',41:'menu.confirm.after',
         50:'menu.redraw.before',51:'menu.redraw.after',60:'settings.commit.before',61:'settings.commit.after',
-        70:'detail.change',71:'detail.reset',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
+        70:'detail.change',71:'detail.reset',80:'page.enter.before',81:'page.enter.after',
+        82:'page.key.before',83:'page.state.after',84:'page.draw.after',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
 
 def page_records(data):
     if len(data)!=4096:return None
@@ -21,6 +22,9 @@ def page_records(data):
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':'menu' if r[9]==1 else 'capture'})
     for record in records:
+        if record['event'] in (82,83,84):
+            key,screen,focus,packed=record['arguments']
+            record['page_state']={'key':hex(key),'screen':{0:'closed',1:'films',2:'catalog',3:'stamp',4:'value'}.get(screen,screen),'focus':focus,'value':packed&0xffff,'error':packed>>16}
         if record['event']==112:
             slot,packed,sequence,revision=record['arguments']
             record['settings']={'slot':slot,'gain':packed&15,'spread':(packed>>4)&15,

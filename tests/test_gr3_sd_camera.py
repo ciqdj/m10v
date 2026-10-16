@@ -1,5 +1,5 @@
 """Execute linked ARM SD adapter with explicit filesystem substitutes."""
-import struct,subprocess,tempfile,unittest
+import hashlib,os,struct,subprocess,tempfile,unittest
 from pathlib import Path
 from unicorn import Uc,UC_ARCH_ARM,UC_MODE_ARM,UC_HOOK_CODE,UC_PROT_READ,UC_PROT_EXEC
 from unicorn.arm_const import *
@@ -36,7 +36,7 @@ class SdCameraTests(unittest.TestCase):
    length=min(a[3],len(self.card)-self.position);length=max(0,length-1) if self.short else length
    u.mem_write(a[2],self.card[self.position:self.position+length]);self.position+=length;self.w(extra,0);ret=1
   elif pc==0x539001b0:self.assertEqual(a[3],0);self.position=a[2];self.w(extra,0);ret=1
-  elif pc==0x539001c0:self.w(a[2],len(self.card));self.w(a[3],int(self.fail_stat));ret=int(not self.fail_stat)
+  elif pc==0x539001c0:self.assertEqual(a[1],0x55009000);self.assertEqual(self.opened,1);self.w(a[2],len(self.card));self.w(a[3],int(self.fail_stat));ret=int(not self.fail_stat)
   elif pc==0x539001d0:self.w(a[2],self.position);self.w(a[3],0);ret=1
   elif pc==0x53828014:ret=0x55003000
   elif pc==0x53825fa8:
@@ -132,3 +132,36 @@ class SdCameraTests(unittest.TestCase):
    self.assertEqual(self.call('m10v_capture_library',context),0)
    outputs.append(bytes(u.mem_read(0x55060000,2048))+bytes(u.mem_read(0x55062000,2048)))
   self.assertNotEqual(outputs[0],outputs[1]);self.assertEqual((self.opened,self.allocated),(0,0))
+
+ def test_original_size_wrapper_receives_open_handle_not_path(self):
+  # Execute both original size and metadata dispatch. Only the metadata
+  # constructor, mutex and device leaf are substitutes; actual SD is untested.
+  path=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/tmp/m10v-sd-research/rtos.bin'))
+  if not path.exists():self.skipTest('set M10V_GR3_ORIGINAL_RTOS')
+  code=path.read_bytes()
+  self.assertEqual(hashlib.sha256(code).hexdigest(),'8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67')
+  u=self.u
+  for start,end in [(0x5359312c,0x5359320c),(0x535948c4,0x53594974)]:
+   u.mem_write(start,code[start-0x53000000:end-0x53000000])
+  self.w(0x53900000+12*4,0x535948c4);self.w(0x53900000+21*4,0x5359312c)
+  self.w(0x55002018,0x5500b000);self.w(0x5500b000,0x5500b100)
+  self.w(0x5500b100,0x53900500);self.w(0x53900500+0x48,0x53900400)
+  self.w(0x55009000,7);self.w(0x55009004,0)
+  def original_leaves(uc,pc,size,data):
+   a=[uc.reg_read(r) for r in [UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3]]
+   ret=None
+   if pc==0x53594990:uc.mem_write(a[0],bytes(64));ret=a[0]
+   elif pc==0x53592738:ret=0x55007000
+   elif pc in [0x536ae71c,0x536ae870]:ret=1
+   elif pc==0x53900400:
+    self.assertEqual(a[1],7);self.assertEqual(self.opened,1)
+    self.w(a[2]+24,len(self.card));self.w(a[3],int(self.fail_stat));ret=int(not self.fail_stat)
+   if ret is not None:uc.reg_write(UC_ARM_REG_R0,ret);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+  u.hook_add(UC_HOOK_CODE,original_leaves)
+  self.assertEqual(self.call('m10v_sd_camera_item',0,0),33)
+  self.fail_stat=True
+  self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
+  self.assertEqual((self.opened,self.allocated),(0,0))
+  self.fail_stat=False;self.card=b''
+  self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
+  self.assertEqual((self.opened,self.allocated),(0,0))
