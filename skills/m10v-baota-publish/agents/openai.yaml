@@ -1,4 +1,4 @@
 interface:
   display_name: "M10V 宝塔发布"
   short_description: "将 M10V 修复推送 GitHub 并快速同步宝塔，核验构建、服务与线上页面"
-  default_prompt: "使用 $m10v-baota-publish 推送并部署当前 M10V 修改，完成上线校验。"
+  default_prompt: "使用 $m10v-baota-publish 更新本次 changelog，再推送并部署当前 M10V 修改，完成更新日志和线上校验。"

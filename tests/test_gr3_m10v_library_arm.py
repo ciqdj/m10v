@@ -48,7 +48,7 @@ class FilmLibraryArmTests(unittest.TestCase):
                     (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3)]
                 self.assertEqual(fs, 0x55004200); self.assertIn(length,(C.sizeof(State),64,44))
                 filename = bytes(uc.mem_read(name, 12)).split(b'\0')[0].decode()
-                self.assertIn(filename, ('M10V3A.bin','M10V3B.bin','M10V2A.bin','M10V2B.bin','M10V0.bin','M10V1.bin'))
+                self.assertIn(filename, ('M10V4A.bin','M10V4B.bin','M10V3A.bin','M10V3B.bin','M10V2A.bin','M10V2B.bin','M10V0.bin','M10V1.bin'))
                 self.file_calls.append((address, filename))
                 result = 0
                 if address == 0x53825fa8 and self.store_result == 0:
@@ -268,14 +268,14 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u, 'm10v_camera_library_load', state), 1)
         self.assertEqual(self.call(u, 'm10v_camera_library_select', state, 1, 32), 0)
         first = bytes(u.mem_read(state, C.sizeof(State)))
-        self.assertIn('M10V3B.bin', self.files)
+        self.assertIn('M10V4B.bin', self.files)
         self.assertEqual(self.call(u, 'm10v_camera_library_select', state, 4, 17), 0)
-        self.assertIn('M10V3A.bin', self.files)
+        self.assertIn('M10V4A.bin', self.files)
         fresh = 0x55002000
         self.assertEqual(self.call(u, 'm10v_camera_library_load', fresh), 0)
         self.assertEqual(bytes(u.mem_read(fresh, C.sizeof(State))), bytes(u.mem_read(state, C.sizeof(State))))
-        damaged = bytearray(self.files['M10V3A.bin']); damaged[16] ^= 1
-        self.files['M10V3A.bin'] = bytes(damaged)
+        damaged = bytearray(self.files['M10V4A.bin']); damaged[16] ^= 1
+        self.files['M10V4A.bin'] = bytes(damaged)
         self.assertEqual(self.call(u, 'm10v_camera_library_load', fresh), 0)
         self.assertEqual(bytes(u.mem_read(fresh, C.sizeof(State))), first)
         self.store_result = -1; before = bytes(u.mem_read(fresh, C.sizeof(State)))
@@ -297,7 +297,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.call(u, 'm10v_menu_focus', controller, 31)
         self.assertFalse(self.files); self.assertFalse(self.native_tones)
         self.focus = 31; self.call(u, 'm10v_menu_confirm', controller)
-        state = State.from_buffer_copy(self.files['M10V3B.bin'])
+        state = State.from_buffer_copy(self.files['M10V4B.bin'])
         self.assertEqual(state.slots[1].film, 64)
         self.assertEqual(self.native_tones, [18])
         self.assertTrue(all(value < 25 for value in self.native_tones))
@@ -334,31 +334,48 @@ class FilmLibraryArmTests(unittest.TestCase):
                 self.assertEqual(bytes(hy)[row*stride+width:(row+1)*stride],y[row*stride+width:(row+1)*stride])
                 self.assertEqual(bytes(hc)[row*stride+width:(row+1)*stride],uv[row*stride+width:(row+1)*stride])
 
+    def test_previous_800t_journal_migrates_without_reusing_aggressive_parameters(self):
+        u=self.machine();addr=0x55001000
+        self.call(u,'m10v_library_init',addr)
+        old=bytearray(u.mem_read(addr,56))+bytearray(8);struct.pack_into('<HHI',old,4,2,64,19)
+        struct.pack_into('<H6B',old,44,33,2,1,8,8,0,3)
+        struct.pack_into('<I',old,60,zlib.crc32(old[:60]));self.files['M10V2B.bin']=bytes(old)
+        self.assertEqual(self.call(u,'m10v_camera_library_load',addr),2)
+        state=State.from_buffer_copy(u.mem_read(addr,C.sizeof(State)));v=state.slots[4]
+        self.assertEqual([v.halo_gain,v.halo_spread,v.halo_threshold,v.halo_profile],[3,3,5,2])
+        self.assertEqual([v.grain,v.soft],[2,1]);self.assertEqual(state.sequence,19)
+        self.assertEqual(self.files['M10V2B.bin'],bytes(old))
+        self.assertEqual(self.call(u,'m10v_camera_library_detail',addr,4,6,2,7,1,2),0)
+        self.assertIn('M10V4A.bin',self.files)
+        self.assertEqual(self.call(u,'m10v_camera_library_load',addr),0)
+        state=State.from_buffer_copy(u.mem_read(addr,C.sizeof(State)))
+        self.assertEqual([state.slots[4].halo_gain,state.slots[4].soft],[6,2])
+
     def test_old_44_byte_journal_migrates_without_overwriting_legacy_files(self):
         u=self.machine();old=bytearray(44)
         struct.pack_into('<IHHI',old,0,0x5630314d,1,44,7)
         for i in range(5):struct.pack_into('<HBB',old,12+4*i,33-i,i%4,(i+1)%4)
         old[32:36]=bytes([2,3,2,1]);struct.pack_into('<I',old,40,zlib.crc32(old[:40]))
         self.files['M10V1.bin']=bytes(old)
-        self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),0)
+        self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),3)
         state=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)))
         self.assertEqual((state.version,state.size,state.sequence),(3,104,7))
         self.assertEqual([s.film for s in state.slots],[33,32,31,30,29])
         self.assertEqual([state.slots[0].halo_gain,state.slots[0].halo_spread,state.slots[0].halo_threshold,state.slots[0].halo_profile],[3,3,5,2])
         self.assertEqual(self.call(u,'m10v_camera_library_halation',0x55001000,0,8,1,7,3),0)
-        self.assertEqual(self.files['M10V1.bin'],bytes(old));self.assertIn('M10V3A.bin',self.files)
+        self.assertEqual(self.files['M10V1.bin'],bytes(old));self.assertIn('M10V4A.bin',self.files)
         self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),0)
         state=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)));self.assertEqual(state.slots[0].halo_gain,8)
 
-    def test_halation_menu_commits_all_four_controls_and_reopens_from_journal(self):
+    def test_halation_menu_commits_three_controls_and_reopens_from_journal(self):
         u=self.machine();model=0x55068200;controller=0x55005000
-        for mode,index in [(11,8),(12,1),(13,7),(14,3)]:
+        for mode,index in [(11,8),(12,1),(13,7)]:
             u.mem_write(model+0x1d,bytes([mode]));self.focus=index
             self.assertEqual(self.call(u,'m10v_menu_confirm',controller),0)
             self.assertEqual(u.mem_read(model+0x1d,1),b'\x0a')
         self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),0)
         state=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)));slot=state.slots[1]
-        self.assertEqual([slot.halo_gain,slot.halo_spread,slot.halo_threshold,slot.halo_profile],[8,1,7,3])
+        self.assertEqual([slot.halo_gain,slot.halo_spread,slot.halo_threshold,slot.halo_profile],[8,1,7,2])
         self.assertEqual(self.call(u,'m10v_library_valid',0x55001000),1)
         self.assertFalse(self.native_tones)
 
@@ -384,7 +401,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.call(u,'m10v_library_init',0x55001000)
         self.call(u,'m10v_camera_library_halation',0x55001000,1,8,1,7,3)
         before=dict(self.files)
-        for index,expected in enumerate((8,1,7,3)):
+        for index,expected in enumerate((8,1,7)):
             u.mem_write(model+0x1d,b'\x0a');self.focus=index
             self.call(u,'m10v_menu_confirm',controller)
             self.assertEqual(self.focus,expected)
@@ -437,7 +454,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         for i in range(5):struct.pack_into('<H6B',old,12+i*8,65-i,2,1,8,1,7,3)
         old[52:56]=bytes([2,3,2,1]);struct.pack_into('<I',old,60,zlib.crc32(old[:60]))
         self.files['M10V2B.bin']=bytes(old)
-        self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),0)
+        self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),2)
         s=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)))
         self.assertEqual((s.version,s.size,s.sequence),(3,104,17))
         self.assertEqual([v.film for v in s.slots],[65,64,63,62,61])
@@ -446,6 +463,29 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u,'m10v_camera_library_select',0x55001000,0,66),-2)
         self.assertEqual(self.files['M10V2B.bin'],bytes(old))
         self.assertEqual(bytes(u.mem_read(0x55001000,C.sizeof(State))),bytes(s))
+
+    def test_experimental_texture_journal_migrates_old_halation_and_preserves_leak(self):
+        u=self.machine();addr=0x55001000;self.call(u,'m10v_library_init',addr)
+        old=bytearray(u.mem_read(addr,C.sizeof(State)))
+        struct.pack_into('<H6B',old,12,33,2,1,8,8,0,0)
+        old[57]=7;struct.pack_into('<I',old,100,zlib.crc32(old[:100]))
+        self.files['M10V3B.bin']=bytes(old)
+        self.assertEqual(self.call(u,'m10v_camera_library_load',addr),2)
+        s=State.from_buffer_copy(u.mem_read(addr,C.sizeof(State)))
+        self.assertEqual(s.slots[0].halo_gain,0);self.assertEqual(s.effects[0][1],7)
+        self.assertEqual(self.files['M10V3B.bin'],bytes(old))
+
+    def test_published_energy_journal_preserves_controls_in_new_texture_namespace(self):
+        u=self.machine();old=bytearray(64)
+        struct.pack_into('<IHHI',old,0,0x5630314d,2,64,17)
+        for i in range(5):struct.pack_into('<H6B',old,12+i*8,33,2,1,8,1,7,2)
+        struct.pack_into('<I',old,60,zlib.crc32(old[:60]))
+        self.files['M10V3B.bin']=bytes(old)
+        self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),2)
+        s=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)))
+        self.assertEqual((s.slots[0].halo_gain,s.slots[0].halo_spread,s.slots[0].halo_threshold),(8,1,7))
+        self.assertEqual(self.call(u,'m10v_camera_library_effects',0x55001000,0,1,8),0)
+        self.assertEqual(self.files['M10V3B.bin'],bytes(old));self.assertIn('M10V4A.bin',self.files)
 
     def test_all_films_have_common_menu_and_only_800t_has_halation_entry(self):
         u=self.machine();state=0x55001000;model=0x55068200

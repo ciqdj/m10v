@@ -10,7 +10,7 @@ export function normalizeConfiguration(value=defaultConfiguration()){
   if(!(exact(s,['film','grain','soft','halo'])||exact(s,['film','grain','soft'])||exact(s,['film','grain','soft','halo','effects']))||!int(s.film,1,66)||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
   const h=s.halo??defaultHalo();if(!exact(h,['gain','spread','threshold','profile'])||!int(h.gain,0,8)||!int(h.spread,0,8)||!int(h.threshold,0,8)||!int(h.profile,0,3))throw Error('800T 光晕参数无效');
   const e=s.effects??defaultEffects();if(!exact(e,['grainSize','leakGain','leakPosition','leakSpread','leakVariation'])||!int(e.grainSize,0,2)||!int(e.leakGain,0,8)||!int(e.leakPosition,0,5)||!int(e.leakSpread,0,8)||!int(e.leakVariation,0,1))throw Error('胶卷质感参数无效');
-  return {film:s.film,grain:s.grain,soft:s.soft,halo:{gain:h.gain,spread:h.spread,threshold:h.threshold,profile:h.profile},effects:{...e}};
+  return {film:s.film,grain:s.grain,soft:s.soft,halo:{gain:h.profile===0?0:h.gain,spread:h.spread,threshold:h.threshold,profile:h.profile},effects:{...e}};
  });
  if(!int(value.stamp,0,2)||!int(value.format,0,3)||!int(value.corner,0,3)||!int(value.color,0,3))throw Error('时间戳配置无效');
  return {slots,stamp:value.stamp,format:value.format,corner:value.corner,color:value.color};

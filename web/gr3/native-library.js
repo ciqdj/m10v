@@ -19,10 +19,8 @@ function render(){
  const effects=configuration.slots[active].effects;
  for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy;}
  $('#reset-texture').disabled=busy;
- $('#halo-profile').setAttribute('aria-label','800T 光晕档位');
  const halo=configuration.slots[active].halo;
  for(const k of ['gain','spread','threshold']){$('#halo-'+k).value=String(halo[k]);$('#halo-'+k+'-value').textContent=halo[k]+'/8';$('#halo-'+k).disabled=busy;}
- segment('#halo-profile',['关闭','弱','自然','强'],halo.profile,v=>halo.profile=v);
  segment('#stamp',['关闭','日期','日期 + 时间'],configuration.stamp,v=>configuration.stamp=v);
  for(const k of ['format','corner','color']){$('#'+k).value=String(configuration[k]);$('#'+k).disabled=busy||!configuration.stamp;}
  $('#native-debug-mode').disabled=busy;

@@ -17,7 +17,7 @@ typedef uint32_t (*root_fn)(void);
 static const uint8_t tones[5] = {12,18,19,20,21};
 /* The persistent catalog keeps IDs 1..65 for existing journals. Only the
  * curated 800T and original 32 simulations are offered for replacement. */
-static const uint8_t counts[21] = {13,7,34,5,4,7,5,4,4,4,4,9,9,9,4,5,3,9,6,9,2};
+static const uint8_t counts[21] = {13,7,34,5,4,7,5,4,4,4,3,9,9,9,0,5,3,9,6,9,2};
 static uint8_t *model(void) {
     uint32_t root = ((root_fn)0x5320ad88u)();
     return (uint8_t *)(uintptr_t)((get_fn)0x5320ba9cu)(root);

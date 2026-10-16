@@ -117,7 +117,7 @@ function encode(base,target){
  candidate.writeUInt32LE(-sum32(candidate)>>>0,candidate.length-4);return candidate;
 }
 export function auditIntegratedNative(source,candidate,nativeCandidate,runtime,manifest,component,extensions){
- auditGr3Candidate(source,candidate,{maxRtosGrowth:512*1024});
+ auditGr3Candidate(source,candidate,{maxRtosGrowth:544*1024});
  const {target,composition}=expectedImage(source,nativeCandidate,runtime,manifest,component,extensions);
  need(parts(source,candidate).decoded.equals(target),'integrated final bytes differ from verified components');
  return composition;
@@ -125,6 +125,6 @@ export function auditIntegratedNative(source,candidate,nativeCandidate,runtime,m
 export function composeNative(source,nativeCandidate,runtime,manifest,component,extensions){
  const {target}=expectedImage(source,nativeCandidate,runtime,manifest,component,extensions),candidate=encode(nativeCandidate,target);
  const composition=auditIntegratedNative(source,candidate,nativeCandidate,runtime,manifest,component,extensions);
- const structure=auditGr3Candidate(source,candidate,{maxRtosGrowth:512*1024});
+ const structure=auditGr3Candidate(source,candidate,{maxRtosGrowth:544*1024});
  return {candidate,composition,structure};
 }

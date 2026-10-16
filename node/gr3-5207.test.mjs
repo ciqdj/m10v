@@ -24,3 +24,8 @@ test('all films pack shared texture and resetting it preserves film and special 
   assert.equal(c.slots[0].effects.leakGain,8);assert.deepEqual(reset.slots.slice(1),c.slots.slice(1));
  }
 });
+
+test('old halo profile off remains off with the energy renderer',()=>{
+ const c=defaultConfiguration();c.slots[0].halo={gain:8,spread:3,threshold:5,profile:0};
+ assert.equal(normalizeConfiguration(c).slots[0].halo.gain,0);
+});

@@ -2,7 +2,7 @@
 
 当前生产入口为 GitHub Actions [Deploy Baota](https://github.com/zhaoo/m10v/actions/workflows/deploy-baota.yml)。只响应 main 推送，可手动 Run workflow 重试；develop 不会重复发布。并发任务按顺序执行。
 
-Actions 先运行部署保护测试，再创建相对固定初始版本 f34a53636bae0bb9939d4ae9f5057b1d2c005762 的 Git bundle，通过受限 SSH 传入服务器；服务器无需拉取 GitHub。远端核验 bundle 前置对象、完整目标 SHA 和 fast-forward 关系，然后以 www 构建完整 GR III 组合包及 GR IIIx，重启 m10v 并检查健康状态。只有本次 SHA 的 DEPLOY_OK 返回后，Actions 才显示绿色。构建或健康检查失败会尝试回退。
+Actions 先运行部署保护测试，再创建相对固定初始版本 f34a53636bae0bb9939d4ae9f5057b1d2c005762 的 Git bundle，通过受限 SSH 传入服务器；服务器无需拉取 GitHub。远端核验 bundle 前置对象、完整目标 SHA 和 fast-forward 关系，然后以 www 构建完整 GR III 组合包，并核验 GR IIIx 官方基线及原生导出拦截（800T 详细菜单地址仅验证 GR III），重启 m10v 并检查健康状态。只有本次 SHA 的 DEPLOY_OK 返回后，Actions 才显示绿色。构建或健康检查失败会尝试回退。
 
 专用公钥在 root authorized_keys 中使用 restrict 和固定 command；拒绝交互 shell、PTY、端口转发、agent 转发及任意远端命令，仅接受 `deploy <40位SHA>`。私钥存储于仓库 Actions Secret `M10V_DEPLOY_SSH_KEY`，不写入 Git。服务器 Ed25519 指纹通过宝塔核对，固定于仓库变量 `M10V_DEPLOY_KNOWN_HOSTS`，SSH 严格验证。
 

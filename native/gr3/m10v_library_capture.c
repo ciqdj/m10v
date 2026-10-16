@@ -100,7 +100,9 @@ int m10v_capture_library(uint32_t context) {
     uint32_t preview_chroma_bytes = pf == 1 ? preview_bytes : preview_bytes >> 1;
     if (!ram(preview[1], preview_bytes) || !ram(preview[2], preview_chroma_bytes)) return -3;
     m10v_library_state state;
-    if (m10v_camera_library_load(&state) < 0) return -5;
+    int settings_source=m10v_camera_library_load(&state);
+    if (settings_source < 0) return -5;
+    M10V_LOG(113,slot,(uint32_t)settings_source,state.sequence,3);
     uint32_t time[3] = {0,0,0};
     uint32_t seed = state.sequence ^ planes[0];
     if (state.stamp || state.slots[slot].grain || state.effects[slot].leak_variation) {
@@ -137,15 +139,15 @@ int m10v_capture_library(uint32_t context) {
          * can retain the same seed. No unverified timer/MMIO calls. */
         for(uint32_t yy=0;yy<height;yy+=height/16+1)for(uint32_t xx=0;xx<width;xx+=width/16+1){seed^=((const uint8_t *)(uintptr_t)planes[0])[yy*stride+xx];seed*=16777619u;}
         const uint8_t *e=(const uint8_t *)&state.effects[slot];(void)e;
-        M10V_LOG(112,context,state.slots[slot].film,seed,(uint32_t)e[0]|((uint32_t)e[1]<<8)|((uint32_t)e[2]<<16)|((uint32_t)e[3]<<24));
-        M10V_LOG(113,context,e[4],state.slots[slot].grain,state.slots[slot].soft);
+        M10V_LOG(130,context,state.slots[slot].film,seed,(uint32_t)e[0]|((uint32_t)e[1]<<8)|((uint32_t)e[2]<<16)|((uint32_t)e[3]<<24));
+        M10V_LOG(131,context,e[4],state.slots[slot].grain,state.slots[slot].soft);
     }
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
-    uint32_t use_halo=state.slots[slot].film==33&&state.slots[slot].halo_profile&&state.slots[slot].halo_gain;
+    uint32_t use_halo=state.slots[slot].film==33&&state.slots[slot].halo_gain;
     if (state.slots[slot].soft || use_halo) {
         uint32_t step = 1, shift = 0;
         while (((width + step - 1) >> shift) > 384 || ((height + step - 1) >> shift) > 256) { step <<= 1; ++shift; }
-        scratch_bytes = ((use_halo ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
+        scratch_bytes = ((state.slots[slot].film == 33 ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
         scratch = ((allocate_fn)0x536af2a8u)(scratch_bytes);
         uint32_t address = (uint32_t)(uintptr_t)scratch;
         if (!ram(address, scratch_bytes)) return -6;
@@ -162,6 +164,21 @@ int m10v_capture_library(uint32_t context) {
     uint32_t touched = (height - 1) * stride + width;
     ((cache_fn)0x5383c8a8u)(image.y, touched); ((cache_fn)0x5383c8a8u)(image.chroma, touched);
     M10V_LOG(110,context,slot,state.slots[slot].film,(width<<16)|height);
+    M10V_LOG(112,slot,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|
+        ((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].grain<<12)|((uint32_t)state.slots[slot].soft<<16),state.sequence,3);
+#if M10V_DEBUG_MODE
+    if(state.slots[slot].film==33 && state.slots[slot].halo_gain) {
+        uint32_t peak=0,active=0,gate=176+8u*state.slots[slot].halo_threshold;
+        for(uint32_t row=0;row<height;++row)for(uint32_t x=0;x<width;++x) {
+            uint32_t light=image.y[row*stride+x];
+            int red=(int)light+((359*((int)image.chroma[row*stride+(x&~1u)+1]-128))>>8)-24;
+            if(red>255)red=255;if(red>(int)light)light=(uint32_t)red;
+            if(light>peak)peak=light;if(light>gate)++active;
+        }
+        uint32_t excess=peak>gate?peak-gate:0;
+        M10V_LOG(114,excess*excess*8,active,width*height,gate);
+    }
+#endif
     int result = m10v_library_render(&image, &state, slot, (const m10v_library_date *)time,
                                      seed, scratch, scratch_bytes);
     M10V_LOG(111,context,(uint32_t)result,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].halo_profile<<12),scratch_bytes);

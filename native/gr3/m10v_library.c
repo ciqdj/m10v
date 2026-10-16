@@ -6,6 +6,7 @@
 #include "film_5207.h"
 #include <stddef.h>
 #include "m10v_legacy_data.h"
+#include "halation_energy.h"
 
 typedef struct {
     char name[24];
@@ -48,7 +49,7 @@ static const film films[33] = {
     {"Golden Shade",244,242,4,10,4,-9,8},
     {"Low Key Color",304,250,0,-6,-4,2,3},
     {"High Key Color",230,230,0,17,10,-2,3},
-    {"800T",276,274,-6,2,4,7,-4}
+    {"800T",264,238,0,1,3,10,-16}
 };
 
 static uint32_t checksum(const m10v_library_state *state) {
@@ -126,6 +127,13 @@ int m10v_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,
     m10v_library_state next;copy_state(&next,state);
     next.slots[slot].halo_gain=(uint8_t)gain;next.slots[slot].halo_spread=(uint8_t)spread;
     next.slots[slot].halo_threshold=(uint8_t)threshold;next.slots[slot].halo_profile=(uint8_t)profile;
+    return commit(state,&next,store,context);
+}
+int m10v_library_detail(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t grain,uint32_t soft,m10v_library_store store,void *context) {
+    if(!m10v_library_valid(state)||slot>=5||state->slots[slot].film!=33||gain>8||spread>8||threshold>8||grain>3||soft>3)return M10V_LIBRARY_INVALID;
+    m10v_library_state next;copy_state(&next,state);
+    m10v_slot *v=&next.slots[slot];v->halo_gain=(uint8_t)gain;v->halo_spread=(uint8_t)spread;
+    v->halo_threshold=(uint8_t)threshold;v->grain=(uint8_t)grain;v->soft=(uint8_t)soft;v->halo_profile=2;
     return commit(state,&next,store,context);
 }
 int m10v_library_stamp(m10v_library_state *state, uint32_t enabled, uint32_t format,
@@ -314,17 +322,19 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         gw = (image->width + mask) >> shift; gh = (image->height + mask) >> shift;
     }
     uint32_t cells = gw * gh;
-    uint32_t use_halo = choice->film == 33 && choice->halo_profile && choice->halo_gain;
-    uint32_t needed = ((use_halo ? 6 : 2) * cells + 3) & ~3u;
+    uint32_t use_halo = choice->film == 33 && choice->halo_gain;
+    uint32_t needed = (((choice->film == 33 ? 6 : 2)) * cells + 3) & ~3u;
     if ((choice->soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
         (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
         overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
         overlap(scratch, needed, image, sizeof(*image)) ||
         (state->stamp && overlap(scratch, needed, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
     if (use_halo) {
-        m10v_halo_image preflight = {image->y,image->chroma,image->y_bytes,image->chroma_bytes,
-            image->width,image->height,image->stride,image->stride,M10V_CBCR422};
-        if (m10v_halation(&preflight,0,0,0)) return M10V_LIBRARY_INVALID;
+        /* Keep the previous full-capacity preflight without linking the
+         * retired halation renderer; the energy model below owns 800T. */
+        if((uintptr_t)image->y>UINTPTR_MAX-image->y_bytes ||
+           (uintptr_t)image->chroma>UINTPTR_MAX-image->chroma_bytes ||
+           overlap(image->y,image->y_bytes,image->chroma,image->chroma_bytes))return M10V_LIBRARY_INVALID;
         if ((uintptr_t)scratch > UINTPTR_MAX-scratch_bytes ||
             overlap(scratch,scratch_bytes,image->y,image->y_bytes) ||
             overlap(scratch,scratch_bytes,image->chroma,image->chroma_bytes) ||
@@ -332,6 +342,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
             overlap(scratch,scratch_bytes,image,sizeof(*image)) ||
             (state->stamp && overlap(scratch,scratch_bytes,date,sizeof(*date)))) return M10V_LIBRARY_INVALID;
     }
+    if(choice->film==33 && (use_halo || choice->soft))m10v_800t_effects(image,choice,scratch,gw,gh,shift);
     if(choice->film==66&&choice->soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     if(choice->film==66){m10v_5207_render(image,&state->effects[slot],choice->grain,seed);}
     else if(choice->film>33){if(legacy_color(image,choice->film))return M10V_LIBRARY_INVALID;}
@@ -350,15 +361,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         image->y[at] = curve[image->y[at]]; image->y[at + 1] = curve[image->y[at + 1]];
     }
     }
-    if (use_halo) {
-        m10v_halo_image halo = {image->y,image->chroma,image->y_bytes,image->chroma_bytes,
-            image->width,image->height,image->stride,image->stride,M10V_CBCR422};
-        static const uint8_t profiles[4]={0,1,3,6};
-        uint32_t control=0x80000000u|choice->halo_gain|((uint32_t)choice->halo_spread<<4)|
-            ((uint32_t)choice->halo_threshold<<8)|((uint32_t)profiles[choice->halo_profile]<<16);
-        if (m10v_halation(&halo,control,scratch,scratch_bytes)) return M10V_LIBRARY_INVALID;
-    }
-    if (choice->soft && choice->film!=66)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
+    if (choice->soft && choice->film!=66 && choice->film!=33)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     if(choice->film!=66)m10v_5207_texture(image,&state->effects[slot],choice->grain,seed,0);
     if (state->stamp) stamp(image, state, date);
     return M10V_LIBRARY_OK;
