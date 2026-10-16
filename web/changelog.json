@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.17.2",
+      "date": "2026-10-17",
+      "title": "修复宝塔服务中 GR III 固件导出的 Node 路径",
+      "changes": [
+        "修复宝塔 systemd 服务 PATH 不含 node 时，GR III SD 胶卷库构建失败的问题。",
+        "网页构建向 Python 子进程传递当前 Node 可执行文件的绝对路径，独立命令行构建仍支持配置路径或 PATH 查找。",
+        "新增精简 PATH 下的真实网页调试组合导出回归，校验 SD 胶卷库、画幅、水平仪、负片颗粒及固件摘要。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.17.1",
       "date": "2026-10-17",
       "title": "独立胶卷库与时间水印，融合全库新胶卷与质感设置",
@@ -12,9 +25,9 @@
         "融合主分支新版槽位保存与迁移、颗粒尺寸、柔光、漏光及专属光晕和曝光设置，保留800T与主分支成像实现。",
         "既有质感设置入口保留；新增胶卷与整合后的完整固件仍以离线回归和部署验证为准，实时取景胶卷效果尚未接入。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "71dd3f741a14d6d5720a6f98181775e4317ba285",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38929755812"
     },
     {
       "version": "2026.10.16.4",

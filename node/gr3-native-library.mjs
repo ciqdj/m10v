@@ -67,7 +67,7 @@ export async function generateNative(source,value,accepted,{signal,debug_mode=fa
   folder=await mkdtemp(path.join(os.tmpdir(),'m10v-native-export-'));
   let python=path.join(root,'.venv/bin/python');try{await access(python);}catch{python='python3';}
   const component=await buildCameraComponents(source,plan.extensions,{signal});
-  await run(python,['scripts/build_gr3_m10v_library.py','--base',component?'0x540ba000':'0x540b6000','--out',folder,'--initial-state-hex',plan.initial_state_hex,...(plan.model==='GR III'?['--sd-library']:[]),...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[])],{cwd:root,signal,timeout:120000,maxBuffer:2*1024*1024});
+  await run(python,['scripts/build_gr3_m10v_library.py','--base',component?'0x540ba000':'0x540b6000','--out',folder,'--initial-state-hex',plan.initial_state_hex,...(plan.model==='GR III'?['--sd-library']:[]),...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[])],{cwd:root,signal,env:{...process.env,M10V_NODE:process.execPath},timeout:120000,maxBuffer:2*1024*1024});
   const manifest=JSON.parse(await readFile(path.join(folder,'m10v-library-arm.json'),'utf8'));
   if(manifest.initial_state_hex!==plan.initial_state_hex)throw Error('ARM 初始配置回读不同');
   if(manifest.debug_mode!==debug_mode||(debug_mode&&manifest.debug_log?.build_id!==plan.debug_log.build_id))throw Error('ARM 调试模式回读不同');

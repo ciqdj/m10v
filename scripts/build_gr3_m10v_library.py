@@ -202,7 +202,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         symbols.update(camera_symbols)
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
         if sd_library:
-            subprocess.run(['node','scripts/generate_gr3_sd_contract.mjs','--check'],cwd=ROOT,check=True,capture_output=True)
+            node = os.environ.get('M10V_NODE') or shutil.which('node')
+            if not node:
+                raise RuntimeError('Node.js is unavailable; set M10V_NODE to its absolute executable path')
+            subprocess.run([node,'scripts/generate_gr3_sd_contract.mjs','--check'],cwd=ROOT,check=True,capture_output=True)
             for sd_source,sd_prefix in [('m10v_sd_library.c','m10v_sd_'),('m10v_sd_camera.c','m10v_sd_camera_')]:
                 sd_obj=folder/(sd_source+'.o')
                 subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3'/sd_source),'-o',str(sd_obj)],check=True,capture_output=True)
