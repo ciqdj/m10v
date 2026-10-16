@@ -29,13 +29,13 @@ uint32_t m10v_sd_header(const uint8_t *p,uint32_t total){
  m10v_sd_u32(p+24)!=239||m10v_sd_u32(p+28)!=1||total!=4096+count*M10V_SD_RECORD_BYTES||m10v_sd_u32(p+12)!=total||
  m10v_sd_crc(p,4092)!=m10v_sd_u32(p+4092))return 0;
  for(uint32_t i=32;i<64;++i)if(p[i])return 0;
- for(uint32_t i=0;i<count;++i){uint32_t id=m10v_sd_u32(p+64+12*i);if(id<33||id>65||m10v_sd_u32(p+72+12*i)!=1)return 0;
+ for(uint32_t i=0;i<count;++i){uint32_t id=m10v_sd_u32(p+64+12*i);if(id<33||id>M10V_FILM_COUNT||m10v_sd_u32(p+72+12*i)!=1)return 0;
   for(uint32_t j=0;j<i;++j)if(m10v_sd_u32(p+64+12*j)==id)return 0;}
  for(uint32_t i=64+count*12;i<4092;++i)if(p[i])return 0;
  return count;
 }
 uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
- if(!p||n!=M10V_SD_RECORD_BYTES||id<33||id>65||m10v_sd_u32(p+8)!=id||m10v_sd_crc(p,n-4)!=m10v_sd_u32(p+n-4))return 0;
+ if(!p||n!=M10V_SD_RECORD_BYTES||id<33||id>M10V_FILM_COUNT||m10v_sd_u32(p+8)!=id||m10v_sd_crc(p,n-4)!=m10v_sd_u32(p+n-4))return 0;
  uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
  for(uint32_t i=0;i<n;i+=64)block(h,p+i);
  uint8_t tail[64];for(uint32_t i=0;i<64;++i)tail[i]=0;tail[0]=128;

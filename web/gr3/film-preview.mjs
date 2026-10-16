@@ -30,3 +30,32 @@ export function previewFilmPixels(source, look) {
   }
   return output;
 }
+
+// RGB colour approximation only: these tables do not simulate spatial halation,
+// grain, diffusion or leaks, and do not establish a camera/film calibration.
+export function previewHarmanPixels(source, lut, film, filmExposure=0) {
+  if(![67,68].includes(film)||!Number.isInteger(filmExposure)||filmExposure<0||filmExposure>2||(film===67&&filmExposure!==0))throw new RangeError('Harman 胶卷或模拟曝光EI无效');
+  const size=lut.size,table=lut.stocks[film===67?0:filmExposure+1]?.values;
+  if(size!==15||lut.bits!==8||table?.length!==size**3*3)throw new RangeError('Harman 预览色表无效');
+  const output=new Uint8ClampedArray(source.length),stride=[size*size*3,size*3,3];
+  for(let i=0;i<source.length;i+=4){
+    const positions=[source[i],source[i+1],source[i+2]].map(v=>v*(size-1)/255);
+    const base=positions.map(v=>Math.min(size-2,Math.floor(v))),fraction=positions.map((v,c)=>v-base[c]);
+    const axes=[0,1,2].sort((a,b)=>fraction[b]-fraction[a]);
+    const weights=[1-fraction[axes[0]],fraction[axes[0]]-fraction[axes[1]],fraction[axes[1]]-fraction[axes[2]],fraction[axes[2]]];
+    const first=base.reduce((sum,v,c)=>sum+v*stride[c],0),corners=[first];
+    for(const axis of axes)corners.push(corners.at(-1)+stride[axis]);
+    for(let c=0;c<3;c++)output[i+c]=clamp(corners.reduce((sum,p,j)=>sum+table[p+c]*weights[j],0));
+    output[i+3]=source[i+3];
+  }
+  return output;
+}
+let harmanTablesPromise;
+export async function renderPreviewPixels(source, look) {
+  const film=look.film??look.id;
+  if(![67,68].includes(film))return previewFilmPixels(source,look);
+  harmanTablesPromise??=fetch(new URL('./harman-luts.json',import.meta.url)).then(r=>{
+    if(!r.ok)throw new Error('Harman 预览色表载入失败');return r.json();
+  }).catch(error=>{harmanTablesPromise=undefined;throw error;});
+  return previewHarmanPixels(source,await harmanTablesPromise,film,look.effects?.filmExposure??0);
+}

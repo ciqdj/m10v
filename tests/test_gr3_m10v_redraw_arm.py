@@ -171,7 +171,7 @@ class NativeRedrawArmTests(unittest.TestCase):
         self.assertEqual(self.tone, 21)
         self.call('m10v_menu_confirm', CONTROLLER)
         self.assertEqual(bytes(self.u.mem_read(MODEL+0x1d, 1)), b'\x01')
-        self.assertEqual(self.u.mem_read(VIEW+0x108, 1), b'\x08')
+        self.assertEqual(self.u.mem_read(VIEW+0x108, 1), b'\x09' if self.visible_film_count in (34,36) else b'\x08')
         self.focus(0)
         self.call('m10v_menu_confirm', CONTROLLER)
         self.assertEqual(self.u.mem_read(VIEW+0x108, 1), bytes([self.visible_film_count+2]))

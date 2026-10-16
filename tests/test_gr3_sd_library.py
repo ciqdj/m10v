@@ -12,8 +12,8 @@ class SdLibraryTests(unittest.TestCase):
   cls.lib=C.CDLL(str(out));cls.lib.m10v_sd_header.argtypes=[C.c_void_p,C.c_uint32];cls.lib.m10v_sd_record.argtypes=[C.c_void_p,C.c_uint32,C.c_uint32]
   cls.pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
  def test_all_current_recipes_and_indices(self):
-  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),33)
-  for i in range(33):
+  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),36)
+  for i in range(36):
    r=self.pack[4096+i*12288:4096+(i+1)*12288]
    self.assertEqual(self.lib.m10v_sd_record(r,len(r),i+33),i+33)
    self.assertEqual(self.lib.m10v_sd_record(r,len(r),i+34),0)

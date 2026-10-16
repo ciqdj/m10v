@@ -88,7 +88,7 @@ static int persist(const uint8_t *record,uint32_t id){
  return ((write_fn)0x53825fa8u)(fs,name,M10V_SD_RECORD_BYTES,record)&&snapshot_read(fs,primary,record);
 }
 int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if(page>=32||row>=8||expected_id<33||expected_id>65||slot>=5)return -1;
+ if(page>=32||row>=8||expected_id<33||expected_id>M10V_FILM_COUNT||slot>=5)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){

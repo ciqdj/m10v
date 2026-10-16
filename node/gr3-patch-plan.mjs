@@ -29,7 +29,7 @@ function pack(base,target){
 }
 export function applyPatchPlan(official,base,edits){
  const report=inspectOfficial(official),source=officialResources(official);
- if(!base.equals(official))auditGr3Candidate(official,base,{maxRtosGrowth:512*1024});
+ if(!base.equals(official))auditGr3Candidate(official,base,{maxRtosGrowth:672*1024});
  const size=base.readUInt32LE(base.length-8),{decoded}=decodeFrameMap(base,size);
  const map=sectionMap(decoded,report.sections),target=Buffer.from(decoded),spans=[];
  for(const row of report.sections){

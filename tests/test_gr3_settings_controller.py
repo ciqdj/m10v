@@ -22,10 +22,10 @@ STATE=0x540d0000
 STUB=0x540b0000
 OWNER=0x10002000
 PAGE=OWNER+0x13bc
-STRIDE=0x280
+STRIDE=0x2c0
 VIEW=0x158
 SAVED_STATE=VIEW+164
-SCREEN=SAVED_STATE+64
+SCREEN=SAVED_STATE+104
 
 class ControllerLifetimeTests(unittest.TestCase):
  debug=False
@@ -60,6 +60,7 @@ class ControllerLifetimeTests(unittest.TestCase):
   u.reg_write(UC_ARM_REG_C1_C0_2,0xf00000);u.reg_write(UC_ARM_REG_FPEXC,0x40000000)
   u.mem_write(0x5536d074,struct.pack('<II',1,struct.unpack_from('<I',self.firmware,0x6b7058)[0]))
   self.events=[];self.executed=set();self.load_fail=False;self.view_fail=False
+  self.install_fail=False
   self.route=0x0200f100;self.fallback=0x10008000
   reverse={a:n for n,a in self.externals.items() if STUB<=a<STUB+0x100}
   def hook(m,a,n,_):
@@ -78,11 +79,15 @@ class ControllerLifetimeTests(unittest.TestCase):
     elif name=='m10v_settings_view_destroy':m.mem_write(r[0],bytes(164))
     elif name=='m10v_camera_library_load':
      result=0xffffffff if self.load_fail else 0
-     state=bytearray(64)
+     state=bytearray(104)
      for i in range(5):struct.pack_into('<H',state,12+8*i,33+i)
      m.mem_write(r[0],bytes(state))
     elif name=='m10v_sd_camera_item':result=33+r[0]*8+r[1]
+    elif name=='m10v_sd_camera_install':result=0xffffffff if self.install_fail else 0
     m.reg_write(UC_ARM_REG_R0,result)
+   elif a==0x5320ad88:m.reg_write(UC_ARM_REG_R0,0x55007000)
+   elif a==0x5320ba9c:m.reg_write(UC_ARM_REG_R0,0x55008000)
+   elif a==0x532c26c0:self.events.append(('activate_tone',*r))
    elif a==0x5319aa68:
     self.events.append(('stock_top_ctor',r[0]));m.mem_write(r[0],bytes(0x13bc))
    elif a==0x5316d354:
@@ -112,8 +117,9 @@ class ControllerLifetimeTests(unittest.TestCase):
  def setup_owner(self,u):self.call(u,'top_ctor',OWNER)
 
  def test_embedded_initialization_and_stable_factory_identity(self):
-  u=self.machine();self.setup_owner(u)
-  self.assertEqual(self.call(u,'owner_size'),0x18bc)
+  u=self.machine();u.mem_write(OWNER+0x193c,b"CANARY!!");self.setup_owner(u)
+  self.assertEqual(bytes(u.mem_read(OWNER+0x193c,8)),b"CANARY!!")
+  self.assertEqual(self.call(u,'owner_size'),0x193c)
   self.assertIn(0x5316c8d4,self.executed)
   for i,route in enumerate((0x0200f100,0x0200f101)):
    p=PAGE+i*STRIDE
@@ -123,6 +129,24 @@ class ControllerLifetimeTests(unittest.TestCase):
   for route in (0x0200004e,0x08000000,0x0200ffff):
    self.assertEqual(self.call(u,'factory',0x55123400,route),self.fallback)
    self.assertEqual(self.events[-1][:3],('m10v_settings_factory_original',0x55123400,route))
+
+ def test_independent_install_binds_catalog_id_and_activates_exact_slot_tone(self):
+  for slot,tone in enumerate((12,18,19,20,21)):
+   u=self.machine();self.setup_owner(u);p=PAGE
+   self.call(u,'ready',p,0x0200f100)
+   u.mem_write(p+SCREEN+4,struct.pack('<I',slot))
+   def key(raw):
+    u.mem_write(0x10000100,struct.pack('<H',raw));self.call(u,'key',p,0x10000100)
+   key(0xd8)
+   u.mem_write(p+SCREEN+12,struct.pack('<II',35,68))
+   self.install_fail=True;key(0xd8)
+   self.assertEqual(self.word(u,p+SCREEN),2)
+   self.assertEqual(self.count('activate_tone'),0)
+   self.install_fail=False;key(0xd8)
+   installs=[e[1:] for e in self.events if e[0]=='m10v_sd_camera_install']
+   self.assertEqual(installs,[(4,3,68,slot)]*2)
+   self.assertEqual(self.word(u,p+SCREEN),1)
+   self.assertEqual([e[2] for e in self.events if e[0]=='activate_tone'],[tone])
 
  def test_ready_denies_storage_and_view_failure(self):
   u=self.machine();self.setup_owner(u)

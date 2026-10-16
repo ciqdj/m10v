@@ -105,7 +105,7 @@ int m10v_capture_library(uint32_t context) {
     M10V_LOG(113,slot,(uint32_t)settings_source,state.sequence,3);
     uint32_t time[3] = {0,0,0};
     uint32_t seed = state.sequence ^ planes[0];
-    if (state.stamp || state.slots[slot].grain) {
+    if (state.stamp || state.slots[slot].grain || state.effects[slot].leak_variation) {
         /* Official producer 0x534322d8/0x534fa22c writes this capture
          * metadata date. +0x948 is weekday, not hour. Prefer exposure metadata
          * over the UI cache (which may be unavailable or from a later time). */
@@ -134,12 +134,20 @@ int m10v_capture_library(uint32_t context) {
                     ((uint32_t)((const uint8_t *)time)[6] << 8);
         }
     }
+    if(state.slots[slot].film==66||state.effects[slot].leak_variation){
+        /* Content entropy changes with captured sensor noise; identical frames
+         * can retain the same seed. No unverified timer/MMIO calls. */
+        for(uint32_t yy=0;yy<height;yy+=height/16+1)for(uint32_t xx=0;xx<width;xx+=width/16+1){seed^=((const uint8_t *)(uintptr_t)planes[0])[yy*stride+xx];seed*=16777619u;}
+        const uint8_t *e=(const uint8_t *)&state.effects[slot];(void)e;
+        M10V_LOG(130,context,state.slots[slot].film,seed,(uint32_t)e[0]|((uint32_t)e[1]<<8)|((uint32_t)e[2]<<16)|((uint32_t)e[3]<<24));
+        M10V_LOG(131,context,e[4],state.slots[slot].grain,state.slots[slot].soft);
+    }
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
-    uint32_t use_halo=state.slots[slot].film==33&&state.slots[slot].halo_gain;
+    uint32_t use_halo=(state.slots[slot].film==33||state.slots[slot].film==67)&&state.slots[slot].halo_gain;
     if (state.slots[slot].soft || use_halo) {
         uint32_t step = 1, shift = 0;
         while (((width + step - 1) >> shift) > 384 || ((height + step - 1) >> shift) > 256) { step <<= 1; ++shift; }
-        scratch_bytes = ((state.slots[slot].film == 33 ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
+        scratch_bytes = (((state.slots[slot].film == 33 || state.slots[slot].film == 67) ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
         scratch = ((allocate_fn)0x536af2a8u)(scratch_bytes);
         uint32_t address = (uint32_t)(uintptr_t)scratch;
         if (!ram(address, scratch_bytes)) return -6;

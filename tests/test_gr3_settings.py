@@ -7,17 +7,17 @@ HARNESS=r'''
 #include <assert.h>
 #include <string.h>
 static m10v_library_state saved;
-static unsigned ids[33], writes, fail;
+static unsigned ids[M10V_FILM_COUNT-32], writes, fail;
 static int load(void *ctx,m10v_library_state *s){(void)ctx;*s=saved;return 0;}
-static unsigned item(void *ctx,unsigned index){(void)ctx;return index<33?ids[index]:0;}
+static unsigned item(void *ctx,unsigned index){(void)ctx;return index<M10V_FILM_COUNT-32?ids[index]:0;}
 static int install(void *ctx,unsigned index,unsigned id,unsigned slot){(void)ctx;
- if(fail||index>=33||ids[index]!=id)return -1; saved.slots[slot].film=id;writes++;return 0;}
+ if(fail||index>=M10V_FILM_COUNT-32||ids[index]!=id)return -1; saved.slots[slot].film=id;writes++;return 0;}
 static int stamp(void *ctx,unsigned mode,unsigned format,unsigned corner,unsigned color){(void)ctx;
  if(fail)return -1;saved.stamp=mode;saved.format=format;saved.corner=corner;saved.color=color;writes++;return 0;}
 int main(void){
  m10v_settings p; m10v_settings_ops ops={0,load,item,install,stamp};
- memset(&saved,0,sizeof(saved));for(unsigned i=0;i<5;i++)saved.slots[i].film=33+i;
- for(unsigned i=0;i<33;i++)ids[i]=33+i;
+ memset(&saved,0,sizeof(saved));memset(saved.effects,7,sizeof(saved.effects));for(unsigned i=0;i<5;i++)saved.slots[i].film=33+i;
+ for(unsigned i=0;i<M10V_FILM_COUNT-32;i++)ids[i]=33+i;
  assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
  assert(p.screen==M10V_SETTINGS_FILMS&&p.focus==0);
  for(unsigned i=0;i<4;i++)m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);
@@ -42,6 +42,7 @@ int main(void){
   }
   m10v_settings_key(&p,&ops,M10V_KEY_DOWN);
  }
+ for(unsigned i=0;i<sizeof(saved.effects);i++)assert(((unsigned char*)saved.effects)[i]==7);
  unsigned before=writes; m10v_settings_key(&p,&ops,M10V_KEY_OK);m10v_settings_key(&p,&ops,M10V_KEY_LEFT);
  m10v_settings_key(&p,&ops,M10V_KEY_BACK);assert(writes==before);
  m10v_settings_key(&p,&ops,M10V_KEY_OK);m10v_settings_key(&p,&ops,M10V_KEY_LEFT);fail=1;

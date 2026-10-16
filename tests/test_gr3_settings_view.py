@@ -65,9 +65,9 @@ class SettingsViewTests(unittest.TestCase):
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x10000000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),0x100f0000)
   return u.reg_read(UC_ARM_REG_R0)
  def state(self,u,screen=1,focus=2):
-  s=bytearray(96)
+  s=bytearray(136)
   for i in range(5):struct.pack_into('<H',s,12+8*i,33+i)
-  s[52:56]=bytes([1,2,3,0]);struct.pack_into('<8I',s,64,screen,focus,0,0,0,1,0,0)
+  s[52:56]=bytes([1,2,3,0]);struct.pack_into('<8I',s,104,screen,focus,0,0,0,1,0,0)
   u.mem_write(0x10002000,bytes(s))
  def widgets(self,u):return struct.unpack('<40I',u.mem_read(0x10001000,160))
  def test_original_tree_film_selection_and_teardown(self):
@@ -78,7 +78,7 @@ class SettingsViewTests(unittest.TestCase):
   self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(5)],[1,1,6,1,1])
   self.assertEqual([struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)],[703,704,705,706,707])
   p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0];self.assertEqual(bytes(u.mem_read(p,28)),'3 / 5  PORTRA\0'.encode('utf-16le'))
-  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],915)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],937)
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
   for a in (0x5339199c,0x53393d84,0x5339a908,0x53396944,0x53390ca0,0x53390ef8,0x5339a9a0,0x53396f80,0x5316cde8):self.assertIn(a,self.executed)
  def test_original_stamp_rows_and_value_preview(self):
@@ -86,12 +86,12 @@ class SettingsViewTests(unittest.TestCase):
   self.state(u,3,2);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([u.mem_read(w[29+i]+0xee,1)[0] for i in range(4)],[31,31,10,31])
   self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[0]*5)
-  self.assertEqual([struct.unpack('<H',u.mem_read(w[33+i]+0xea,2))[0] for i in range(4)],[929,933,938,939])
+  self.assertEqual([struct.unpack('<H',u.mem_read(w[33+i]+0xea,2))[0] for i in range(4)],[951,955,960,961])
   self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0,0,1,0])
   self.assertEqual([u.mem_read(w[25+i]+0x9e,1)[0] for i in range(4)],[0,0,1,0])
   self.state(u,4,2);self.call(u,'draw',0x10001000,0x10002000,0)
-  self.assertEqual(struct.unpack('<H',u.mem_read(w[35]+0xea,2))[0],936)
-  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],945)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[35]+0xea,2))[0],958)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],967)
   self.assertEqual([u.mem_read(w[29+i]+0xee,1)[0] for i in range(4)],[31]*4)
   self.assertEqual([u.mem_read(w[33+i]+0xee,1)[0] for i in range(4)],[31,31,10,31])
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
@@ -123,12 +123,12 @@ class SettingsViewTests(unittest.TestCase):
   self.assertEqual(struct.unpack('<4I',u.mem_read(w[16]+0x20,16)),inner)
  def test_catalog_highlights_actual_index_and_hides_empty_last_page_entries(self):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u);self.state(u,2,4)
-  u.mem_write(0x10002000+76,struct.pack('<I',6))
+  u.mem_write(0x10002000+116,struct.pack('<I',6))
   u.mem_write(0x10003000,struct.pack('<5I',0,0,0x540b0010,0,0))
   self.call(u,'draw',0x10001000,0x10002000,0x10003000)
   self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(5)],[1,6,1,1,1])
   self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[1,1,0,0,0])
-  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],947)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],969)
   p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
   self.assertEqual(bytes(u.mem_read(p,20)),'7  PORTRA\0'.encode('utf-16le'))
 

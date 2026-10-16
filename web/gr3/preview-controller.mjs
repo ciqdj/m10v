@@ -1,4 +1,4 @@
-import {previewFilmPixels} from './film-preview.mjs';
+import {renderPreviewPixels} from './film-preview.mjs';
 let sourcePromise;
 function loadSource(){
  sourcePromise??=new Promise((resolve,reject)=>{
@@ -18,7 +18,7 @@ export function createFilmPreview(){
    if(destroyed||!pending?.canvas.isConnected)return;
    const {canvas,look}=pending,id=latest;
    if(worker){inFlight=id;worker.postMessage({kind:'render',id,look});}
-   else canvas.getContext('2d').putImageData(new ImageData(previewFilmPixels(source.data,look),620,413),0,0);
+   else {inFlight=id;renderPreviewPixels(source.data,look).then(pixels=>{if(!destroyed&&id===latest&&canvas.isConnected)canvas.getContext('2d').putImageData(new ImageData(pixels,620,413),0,0);}).catch(error=>{if(id===latest)pending?.onError?.(error.message);}).finally(()=>{inFlight=0;if(id!==latest)dispatch();});}
   });
  }
  if(worker){

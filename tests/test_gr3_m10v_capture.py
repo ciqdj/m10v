@@ -114,6 +114,24 @@ class M10VCaptureTests(unittest.TestCase):
         u.mem_write(0x55010000, bytes(y)); u.mem_write(0x55020000, bytes(uv))
         return h, u, recipe + 0x9b8, y, uv, cache, frees, width, height, stride
 
+    def test_common_leak_is_consumed_by_non_5207_capture_with_per_shot_seed(self):
+        for film in (40,67,68):
+            h,u,context,y,uv,cache,frees,width,height,stride=self.fixture(film=film,stamp=0,debug=True)
+            if film==68:self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,6,2),0)
+            self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,1,8),0)
+            self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,4,1),0)
+            self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+            events=[e for e in h.capture_events if e[0]==130]
+            self.assertEqual(len(events),1);self.assertEqual(events[0][2],film)
+            state=host_tests.State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(host_tests.State)))
+            hy=(C.c_uint8*len(y)).from_buffer_copy(y);hc=(C.c_uint8*len(uv)).from_buffer_copy(uv)
+            image=host_tests.Image(hy,hc,stride*height,stride*height,width,height,stride)
+            scratch=(C.c_uint8*(6*width*height))()
+            self.assertEqual(host_tests.NativeFilmLibraryTests.lib.m10v_library_render(
+                C.byref(image),C.byref(state),1,None,events[0][3],scratch,len(scratch)),0)
+            self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(hy))
+            self.assertEqual(bytes(u.mem_read(0x55020000,len(uv))),bytes(hc))
+
     def test_capture_jpeg_and_raw_jpeg_use_stored_slot_and_match_native_pixels(self):
         for raw, bank in ((0, 0x60000000), (1, 0xa3000000)):
             h, u, context, y, uv, cache, frees, width, height, stride = self.fixture(raw=raw, raw_bank=bank)
@@ -194,7 +212,12 @@ class M10VCaptureTests(unittest.TestCase):
 
     def test_capture_diagnoses_migrated_and_saved_journal_sources(self):
         h,u,context,*_ = self.fixture(debug=True,film=33)
-        h.files={name.replace('M10V3','M10V2'):data for name,data in h.files.items()}
+        old_files={}
+        for name,data in h.files.items():
+            old=bytearray(data[:56])+bytearray(8);struct.pack_into('<HH',old,4,2,64)
+            struct.pack_into('<I',old,60,zlib.crc32(old[:60]))
+            old_files[name.replace('M10V5','M10V2')]=bytes(old)
+        h.files=old_files
         h.capture_events.clear()
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         self.assertEqual([e[1:3] for e in h.capture_events if e[0]==113],[(1,2)])

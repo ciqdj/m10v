@@ -17,6 +17,9 @@ GLYPHS.update({
 PALETTE=['#728d88','#c78d48','#6a87a6','#b48373','#626977','#b29597','#508b9d','#ba794f','#858761','#aebcb1','#498c92','#b47787','#b2aa90','#9caec1','#9c7a53','#917b61','#899090','#b3b4a9','#66696a','#a99988','#839ba5','#6c967c','#a08baa','#c1a275','#748895','#8eab6a','#bb6655','#c9c6b5','#667fa7','#bca26c','#687469','#bab7a4','#c83737']
 def label(name,i):
  # Labels describe existing presets; this does not add or rename any recipe.
+ if name=='蓝凤凰':return 'PHNX','II200','#397ac4'
+ if name=='哈曼 RED':return 'RED','125','#c74435'
+ if name=='5207':return '5207','250D','#b59a45'
  if name=='800T':return 'CINE','800T','#c83737'
  if name=='Gold 200':return 'KODA','200','#d5a844'
  if name.startswith('Ektar '):return 'EKTAR',name.split()[-1],'#c94c47'
@@ -47,7 +50,8 @@ def text(d,x,y,s,c):
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
  names += [v['name'] for v in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]
- if len(names)!=65:raise ValueError('catalog must contain 65 films')
+ names += ['5207','蓝凤凰','哈曼 RED']
+ if len(names)!=68:raise ValueError('catalog must contain 68 films')
  # Preserve exact official directory pointers; original descriptors stay in RAM.
  import subprocess,struct
  js="import {readFileSync} from 'node:fs';import {officialResources} from './node/gr3-stock-presets.mjs';const {decoded:d,sections:s}=officialResources(readFileSync('bin/fwdc239b-gr3-official.bin'));process.stdout.write(d.subarray(s.RTOS.offset+0x107b540+0x20fc,s.RTOS.offset+0x107b540+0x20fc+671*4));"

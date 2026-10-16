@@ -26,17 +26,13 @@ class WorkflowTests(unittest.TestCase):
         connection.close()
         return result
 
-    def test_page_exposes_actual_import_backup_and_locked_features(self):
+    def test_home_exposes_current_model_launcher(self):
         status, page = self.get('/')
         self.assertEqual(status, 200)
-        self.assertIn('选择官方固件', page)
-        self.assertIn('导出电脑端备份', page)
-        self.assertIn('验证备份包', page)
-        self.assertIn('自定义裁切比例', page)
-        self.assertIn('关机画面', page)
-        self.assertIn('id="crop-form"', page)
-        self.assertIn('id="shutdown-catalog"', page)
-        self.assertIn('修改固件导出已锁定', page)
+        for route in ('/gr3/', '/gr4/', '/gr2/', '/guide/', '/changelog/'):
+            self.assertIn('href="'+route+'"', page)
+        self.assertIn('GR III 与 GR IIIx', page)
+        self.assertIn('36 套胶卷', page)
         self.assertNotIn('id="build-button"', page)
 
     def test_static_assets_served_and_unknown_path_rejected(self):
@@ -46,12 +42,11 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('https://', styles)
         self.assertEqual(self.get('/candidate.bin')[0], 404)
 
-    def test_direct_file_open_keeps_styling_and_explains_server_requirement(self):
+    def test_home_styles_and_client_service_status_contract(self):
         status, page = self.get('/')
         self.assertEqual(status, 200)
-        self.assertIn('href="styles.css"', page)
-        self.assertIn('src="app.js"', page)
+        self.assertIn('href="/styles.css"', page)
         _, script = self.get('/app.js')
-        self.assertIn("location.protocol === 'file:'", script)
-        self.assertIn('npm start', script)
-        self.assertIn("$('firmware-picker').addEventListener('click'", script)
+        self.assertIn('/api/platform/adapters', script)
+        self.assertIn('本地服务已连接', script)
+        self.assertIn('工作区状态不可用', script)

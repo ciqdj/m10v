@@ -18,12 +18,12 @@ const pins={
  'aspect-level':'e8d9416c7c594e6af9934e91c63ae2880ca445c865a0b5123e66c034d5b24cec',
 };
 const resourceAdaptations=[
- [0x540b9448,0xe300032a,0xe300038f],
- [0x540b8a18,0xe300c32a,0xe300c38f],
- [0x540b8be4,0xe300c32a,0xe300c38f],
- [0x540b8a4c,0xe3003311,0xe300338e],
- [0x540b8a6c,0xe3003311,0xe300338e],
- [0x540b8c14,0xe3003311,0xe300338e],
+ [0x540b9448,0xe300032a,0xe30003a9],
+ [0x540b8a18,0xe300c32a,0xe300c3a9],
+ [0x540b8be4,0xe300c32a,0xe300c3a9],
+ [0x540b8a4c,0xe3003311,0xe30033a8],
+ [0x540b8a6c,0xe3003311,0xe30033a8],
+ [0x540b8c14,0xe3003311,0xe30033a8],
 ];
 export function integrationFingerprint(){
  return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
@@ -77,7 +77,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   c.rtos.subarray(original.rtos.length).copy(rtos,original.rtos.length);
   if(e.aspect){
    need(rtos.readUInt32LE(0x540b97e8-LOAD)===2,'component must disable its timestamp renderer');
-   for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');const id=manifest.resources.last_id+(after===0xe300338e?0:1);rtos.writeUInt32LE(((after&0xfffff000)|id)>>>0,off);}
+   for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');const id=manifest.resources.last_id+(after===0xe30033a8?0:1);rtos.writeUInt32LE(((after&0xfffff000)|id)>>>0,off);}
   }
  }
  if(e.negativeGrain){
@@ -118,7 +118,7 @@ function encode(base,target){
  candidate.writeUInt32LE(-sum32(candidate)>>>0,candidate.length-4);return candidate;
 }
 export function auditIntegratedNative(source,candidate,nativeCandidate,runtime,manifest,component,extensions){
- auditGr3Candidate(source,candidate,{maxRtosGrowth:512*1024});
+ auditGr3Candidate(source,candidate,{maxRtosGrowth:672*1024});
  const {target,composition}=expectedImage(source,nativeCandidate,runtime,manifest,component,extensions);
  need(parts(source,candidate).decoded.equals(target),'integrated final bytes differ from verified components');
  return composition;
@@ -126,6 +126,6 @@ export function auditIntegratedNative(source,candidate,nativeCandidate,runtime,m
 export function composeNative(source,nativeCandidate,runtime,manifest,component,extensions){
  const {target}=expectedImage(source,nativeCandidate,runtime,manifest,component,extensions),candidate=encode(nativeCandidate,target);
  const composition=auditIntegratedNative(source,candidate,nativeCandidate,runtime,manifest,component,extensions);
- const structure=auditGr3Candidate(source,candidate,{maxRtosGrowth:512*1024});
+ const structure=auditGr3Candidate(source,candidate,{maxRtosGrowth:672*1024});
  return {candidate,composition,structure};
 }

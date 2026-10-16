@@ -14,14 +14,14 @@ test('independent settings audit binds owned controllers, original fallback and 
   const p=settingsPatches(m);
   assert.equal(p.length,10);
   assert.equal(p.find(x=>x.address===0x53b36adc).replacement,0x201d1b19);
-  assert.equal(p.find(x=>x.address===0x5316fcec).replacement,0xe30108bc);
+  assert.equal(p.find(x=>x.address===0x5316fcec).replacement,0xe301093c);
   for(const a of [m.settings_menu.vtable,m.settings_menu.exports.m10v_settings_factory_original,m.settings_menu.rows[0]]){
    const broken=Buffer.from(r);broken[a-m.base]^=1;
    assert.throws(()=>checkSettings(broken,m),/instruction/);
   }
   const broken=structuredClone(m);broken.settings_menu.private_routes[0]=0x0200004e;
   assert.throws(()=>checkSettings(r,broken),/route/);
-  const captions=structuredClone(m);captions.resources.texts[129]='Image Control';
+  const captions=structuredClone(m);captions.resources.texts[151]='Image Control';
   assert.throws(()=>checkSettings(r,captions),/captions/);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });

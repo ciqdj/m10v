@@ -17,7 +17,7 @@ class State(C.Structure):
     _fields_ = [('magic', C.c_uint32), ('version', C.c_uint16), ('size', C.c_uint16),
                 ('sequence', C.c_uint32), ('slots', Slot * 5),
                 ('stamp', C.c_uint8), ('format', C.c_uint8), ('corner', C.c_uint8),
-                ('color', C.c_uint8), ('reserved', C.c_uint32), ('crc', C.c_uint32)]
+                ('color', C.c_uint8), ('effects', (C.c_uint8*8)*5), ('reserved', C.c_uint32), ('crc', C.c_uint32)]
 
 
 class Image(C.Structure):
@@ -40,7 +40,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         wrapper = Path(cls.tmp.name) / 'date_probe.c'
         wrapper.write_text('#include "' + str(ROOT / 'native/gr3/m10v_library.c') + '"\nuint32_t m10v_test_date(char *out,const m10v_library_date *date,uint32_t format,uint32_t mode){return date_text(out,date,format,mode);}')
         subprocess.run([shutil.which('clang') or 'clang', '-O2', '-Wall', '-Wextra', '-Werror',
-                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), '-o', str(out)],
+                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'), '-o', str(out)],
                        check=True, capture_output=True)
         cls.lib = C.CDLL(str(out))
         cls.lib.m10v_library_init.argtypes = [C.POINTER(State)]
@@ -109,7 +109,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual([slot.film for slot in state.slots], [34,35,36,37,33])
         names = [self.lib.m10v_library_name(i) for i in range(1, 66)]
         self.assertEqual(len(set(names)), 65); self.assertTrue(all(names))
-        self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(66))
+        self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(69))
         state.slots[2].film = 31
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 0)
 
@@ -127,7 +127,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 1)
         before = bytes(state)
         self.assertLess(self.lib.m10v_library_select(C.byref(state), 5, 1, success, None), 0)
-        self.assertLess(self.lib.m10v_library_select(C.byref(state), 0, 66, success, None), 0)
+        self.assertLess(self.lib.m10v_library_select(C.byref(state), 0, 69, success, None), 0)
         self.assertEqual(bytes(state), before)
 
     def test_neutral_disabled_effects_are_byte_identical_and_padding_is_protected(self):

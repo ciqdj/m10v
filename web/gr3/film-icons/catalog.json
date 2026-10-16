@@ -583,5 +583,32 @@
     "color": "#728d88",
     "icon_url": "/gr3/film-icons/65.png",
     "sha256": "2fc3bb558742d9d3f7f6038396117d39b3d3067fb6347002fc5dbf9d465c1e00"
+  },
+  {
+    "id": 66,
+    "name": "5207",
+    "title": "5207",
+    "code": "250D",
+    "color": "#b59a45",
+    "icon_url": "/gr3/film-icons/66.png",
+    "sha256": "ea1314fa70780072a975fbad719c31020acdb4bd5200d1d52fb04c8ed27a7ab9"
+  },
+  {
+    "id": 67,
+    "name": "蓝凤凰",
+    "title": "PHNX",
+    "code": "II200",
+    "color": "#397ac4",
+    "icon_url": "/gr3/film-icons/67.png",
+    "sha256": "8ef8145b0fd0a55b7d78979c6808ea5cbb71f02802f27afbc5bd5a22a0b6055e"
+  },
+  {
+    "id": 68,
+    "name": "哈曼 RED",
+    "title": "RED",
+    "code": "125",
+    "color": "#c74435",
+    "icon_url": "/gr3/film-icons/68.png",
+    "sha256": "b993b6e0faf757fe61a474a7c15fae86eaeae3d988fa5fa7ad6f786292c30198"
   }
 ]

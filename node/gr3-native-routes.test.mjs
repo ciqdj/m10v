@@ -17,7 +17,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const workspace=await (await fetch(base+'/gr3/')).text();assert.ok(workspace.includes('id="native-editor"'));
   const status=await (await fetch(base+'/api/status')).json();
   const catalog=await fetch(base+'/api/gr3/native-library/catalog'); assert.equal(catalog.status,200);
-  const data=await catalog.json();assert.equal(data.films.length,33);assert.deepEqual(data.films.filter(f=>f.group==='M10V精选').map(f=>f.name),['800T']);assert.ok(data.films.every(f=>f.id>=33));assert.equal(data.external_film_pack,true);
+  const data=await catalog.json();assert.equal(data.films.length,36);assert.deepEqual(data.films.filter(f=>f.group==='M10V精选').map(f=>f.name),['800T','5207','蓝凤凰','哈曼 RED']);assert.ok(data.films.every(f=>f.id>=33));assert.equal(data.external_film_pack,true);
   const post=(url,body,auth=true)=>fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{'X-M10V-Token':status.session_token}:{})},body:JSON.stringify(body)});
   assert.equal((await post('/api/gr3/native-library/import-official',{},false)).status,403);
   const ximport=await post('/api/gr3/native-library/import-official',{model:'gr3x'});assert.equal(ximport.status,200);const xid=(await ximport.json()).project_id;
@@ -61,6 +61,6 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(debugReceipt.debug_mode,true);assert.equal(debugReceipt.debug_log.build_id,debugPlan.configuration_sha256.slice(0,8));
   assert.equal(debugReceipt.candidate_sha256,createHash('sha256').update(Buffer.from(await debugBuilt.arrayBuffer())).digest('hex'));
   assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,55);
-  assert.equal(receipt.external_film_pack,true);assert.equal(receipt.initial_state_hex.length,128);
+  assert.equal(receipt.external_film_pack,true);assert.equal(receipt.initial_state_hex.length,208);
  }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
 });

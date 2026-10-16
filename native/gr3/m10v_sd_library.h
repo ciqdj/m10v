@@ -1,6 +1,7 @@
 #ifndef M10V_SD_LIBRARY_H
 #define M10V_SD_LIBRARY_H
 #include <stdint.h>
+#include "m10v_library.h"
 #define M10V_SD_HEADER_BYTES 4096u
 #define M10V_SD_RECORD_BYTES 12288u
 #define M10V_SD_MAX_FILMS 256u

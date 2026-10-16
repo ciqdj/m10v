@@ -42,12 +42,12 @@ test('GR III shares import, settings and save without writing SD', async () => {
   assert.match(gr3, /保存固件/);
 });
 
-test('800T and the library share the normal studio source and save controls',async()=>{
+test('library opens directly and film selection uses its catalog',async()=>{
  const html=await readFile(new URL('../web/gr3/index.html',import.meta.url),'utf8');
- assert.match(html,/id="use-800t-plan"/);assert.match(html,/id="native-editor"/);
+ assert.doesNotMatch(html,/id="(?:use-800t-plan|use-native-plan|active-plan-note)"/);assert.match(html,/id="native-editor"/);
  assert.doesNotMatch(html,/data-step="experimental"/);assert.doesNotMatch(html,/href="\/gr3\/native-library.html"/);
  const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
- assert.match(app,/nativeEditor.setFilm\(33,4\)/);assert.match(app,/native-library/);
+ assert.doesNotMatch(app,/use-800t-plan|use-native-plan|active-plan-note/);assert.match(app,/native-library/);
 });
 
 test('GR III street editor has slot controls and source-derived film preview', async () => {
