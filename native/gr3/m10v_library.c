@@ -73,7 +73,7 @@ void m10v_library_init(m10v_library_state *state) {
     static const uint8_t initial[104] = {M10V_INITIAL_STATE_BYTES};
     for (uint32_t i = 0; i < sizeof(*state); ++i) ((uint8_t *)state)[i] = initial[i];
 #else
-    state->magic = 0x5630314du; state->version = 3; state->size = sizeof(*state);
+    state->magic = 0x5630314du; state->version = 4; state->size = sizeof(*state);
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) {
         state->slots[i].film = (uint16_t)(i == 4 ? 33 : i + 34);
         state->slots[i].halo_gain=3; state->slots[i].halo_spread=3;
@@ -84,7 +84,7 @@ void m10v_library_init(m10v_library_state *state) {
 #endif
 }
 int m10v_library_valid(const m10v_library_state *state) {
-    if (!state || state->magic != 0x5630314du || state->version != 3 ||
+    if (!state || state->magic != 0x5630314du || state->version != 4 ||
         state->size != sizeof(*state) || state->reserved || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
@@ -92,11 +92,12 @@ int m10v_library_valid(const m10v_library_state *state) {
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
             state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
     for(uint32_t i=0;i<5;i++){const m10v_film_effects *e=&state->effects[i];
-        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->reserved[0]||e->reserved[1]||e->reserved[2])return 0;}
+        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->film_exposure>2||(state->slots[i].film!=68&&e->film_exposure)||e->reserved[0]||e->reserved[1])return 0;}
     return 1;
 }
 const char *m10v_library_name(uint32_t id) {
-    return !id || id>M10V_FILM_COUNT ? (const char *)0 : id==66 ? "5207" : id<=33 ? films[id-1].name : legacy_records[id-34].name;
+    static const char appended_names[3][12]={"5207","Phoenix II","HARMAN RED"};
+    return !id || id>M10V_FILM_COUNT ? (const char *)0 : id>=66 ? appended_names[id-66] : id<=33 ? films[id-1].name : legacy_records[id-34].name;
 }
 static int commit(m10v_library_state *state, m10v_library_state *next,
                   m10v_library_store store, void *context) {
@@ -111,7 +112,12 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
         return M10V_LIBRARY_INVALID;
     m10v_library_state next; copy_state(&next, state); next.slots[slot].film = (uint16_t)id;
     if(id==66&&state->slots[slot].film!=66){next.slots[slot].grain=1;next.slots[slot].soft=0;next.slots[slot].halo_gain=0;next.slots[slot].halo_spread=3;next.slots[slot].halo_threshold=5;next.slots[slot].halo_profile=1;
-        m10v_film_effects e={1,0,0,4,0,{0,0,0}};next.effects[slot]=e;}
+        m10v_film_effects e={1,0,0,4,0,0,{0,0}};next.effects[slot]=e;}
+    if((id==67||id==68)&&state->slots[slot].film!=id){
+        m10v_slot *v=&next.slots[slot];v->grain=id==67?1:2;v->soft=0;v->halo_gain=id==67?2:0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=2;
+        m10v_film_effects e={id==67?0:1,0,0,4,0,0,{0,0}};next.effects[slot]=e;
+    }
+    if(id!=68)next.effects[slot].film_exposure=0;
     return commit(state, &next, store, context);
 }
 int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grain, uint32_t soft,
@@ -123,7 +129,7 @@ int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grai
     return commit(state, &next, store, context);
 }
 int m10v_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t profile,m10v_library_store store,void *context) {
-    if(!m10v_library_valid(state)||slot>=5||state->slots[slot].film==66||gain>8||spread>8||threshold>8||profile>3)return M10V_LIBRARY_INVALID;
+    if(!m10v_library_valid(state)||slot>=5||(state->slots[slot].film==66||state->slots[slot].film==68)||gain>8||spread>8||threshold>8||profile>3)return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     next.slots[slot].halo_gain=(uint8_t)gain;next.slots[slot].halo_spread=(uint8_t)spread;
     next.slots[slot].halo_threshold=(uint8_t)threshold;next.slots[slot].halo_profile=(uint8_t)profile;
@@ -147,10 +153,13 @@ int m10v_library_stamp(m10v_library_state *state, uint32_t enabled, uint32_t for
 }
 int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store store,void *ctx){
     static const uint8_t limits[5]={2,8,5,8,1};
-    if(!m10v_library_valid(state)||slot>=5||field>5||(field==5?value!=0:value>limits[field]))return M10V_LIBRARY_INVALID;
+    if(!m10v_library_valid(state)||slot>=5||field>6)return M10V_LIBRARY_INVALID;
+    if(field==6?(state->slots[slot].film!=68||value>2):field==5?value!=0:value>limits[field])return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     if(field==5){
-        m10v_film_effects e={1,0,0,4,0,{0,0,0}};next.effects[slot]=e;next.slots[slot].grain=next.slots[slot].film==66?1:0;next.slots[slot].soft=0;}
+        m10v_film_effects e={next.slots[slot].film==67?0:1,0,0,4,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
+        next.slots[slot].grain=next.slots[slot].film==68?2:(next.slots[slot].film==66||next.slots[slot].film==67)?1:0;next.slots[slot].soft=0;
+    } else if(field==6)next.effects[slot].film_exposure=(uint8_t)value;
     else ((uint8_t *)&next.effects[slot])[field]=(uint8_t)value;
     return commit(state,&next,store,ctx);
 }
@@ -297,6 +306,17 @@ static void soft_diffusion(m10v_library_image *image,const m10v_slot *choice,uin
             image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
         }
 }
+/* Research-guided neutral highlight scatter for Phoenix II. The manufacturer
+ * confirms halation, but publishes no PSF/hue measurement. No 800T red grade. */
+static void phoenix_halation(m10v_library_image *im,const m10v_slot *v,uint8_t *scratch,uint32_t gw,uint32_t gh,uint32_t shift){
+    uint16_t *a=(uint16_t *)scratch,*b=a+gw*gh;
+    energy_source(im,a,gw,gh,shift,176+8u*v->halo_threshold,0);
+    energy_blur(a,b,gw,gh,1+v->halo_spread,1);
+    for(uint32_t row=0;row<im->height;row++)for(uint32_t x=0;x<im->width;x++){
+        uint32_t spill=(energy_sample(a,gw,gh,x,row,shift)*v->halo_gain)>>9;if(spill>128)spill=128;
+        uint32_t at=row*im->stride+x;im->y[at]=clamp(im->y[at]+((spill*(255-im->y[at]))>>8));
+    }
+}
 int m10v_library_render(m10v_library_image *image, const m10v_library_state *state,
                         uint32_t slot, const m10v_library_date *date, uint32_t seed,
                         uint8_t *scratch, uint32_t scratch_bytes) {
@@ -322,8 +342,8 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         gw = (image->width + mask) >> shift; gh = (image->height + mask) >> shift;
     }
     uint32_t cells = gw * gh;
-    uint32_t use_halo = choice->film == 33 && choice->halo_gain;
-    uint32_t needed = (((choice->film == 33 ? 6 : 2)) * cells + 3) & ~3u;
+    uint32_t use_halo = (choice->film == 33 || choice->film == 67) && choice->halo_gain;
+    uint32_t needed = ((((choice->film == 33 || choice->film == 67) ? 6 : 2)) * cells + 3) & ~3u;
     if ((choice->soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
         (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
         overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
@@ -343,8 +363,13 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
             (state->stamp && overlap(scratch,scratch_bytes,date,sizeof(*date)))) return M10V_LIBRARY_INVALID;
     }
     if(choice->film==33 && (use_halo || choice->soft))m10v_800t_effects(image,choice,scratch,gw,gh,shift);
+    if(choice->film==67&&use_halo)phoenix_halation(image,choice,scratch,gw,gh,shift);
     if(choice->film==66&&choice->soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     if(choice->film==66){m10v_5207_render(image,&state->effects[slot],choice->grain,seed);}
+    else if(choice->film>=67){
+        uint32_t exposure=state->effects[slot].film_exposure;
+        m10v_5207_texture_q8(image,&state->effects[slot],choice->grain*(choice->film==68?(exposure==1?218:exposure==2?307:256):256),seed,choice->film==67?2:3+exposure);
+    }
     else if(choice->film>33){if(legacy_color(image,choice->film))return M10V_LIBRARY_INVALID;}
     else {
     const film *look = &films[choice->film - 1];
@@ -362,7 +387,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
     }
     }
     if (choice->soft && choice->film!=66 && choice->film!=33)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
-    if(choice->film!=66)m10v_5207_texture(image,&state->effects[slot],choice->grain,seed,0);
+    if(choice->film<66)m10v_5207_texture(image,&state->effects[slot],choice->grain,seed,0);
     if (state->stamp) stamp(image, state, date);
     return M10V_LIBRARY_OK;
 }

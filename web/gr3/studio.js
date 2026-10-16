@@ -32,7 +32,7 @@ const definitions = [
   ['recipes', '配方（调参数）', '给原厂影像风格预设一组九项参数，并设置机内名称与图标。', '6 个位置可定制'],
   ['timestamp', '时间戳优化', '为 JPEG 照片加入拍摄日期。格式、位置、字号与颜色可在相机菜单中设置。', '完整机内菜单'],
   ['aspect', '更多画幅比例', '新增 4:3 与 65:24，并提供 65:24 实时取景蒙版。', '4:3 / 65:24'],
-  ['film', '胶片模拟与机内胶卷库', '34 套预设共用五槽；在这里选卷，在胶卷库调颗粒、柔光和漏光；800T 另有光晕。', '同一目录 · 同一配置'],
+  ['film', '胶片模拟与机内胶卷库', '36 套预设共用五槽；在这里选卷，在胶卷库调颗粒、柔光和漏光；800T 与蓝凤凰另有光晕，哈曼 RED 支持模拟曝光EI。', '同一目录 · 同一配置'],
   ['presets', '原厂名称与图标', '给更多原厂预设定制名称、图标；需要先导入官方文件核对资源。', '12 个原厂预设'],
   ['negativeGrain', '负片颗粒', '开放内置负片的原厂颗粒菜单，档位在相机里调整。', '原厂颗粒菜单'],
   ['rawNr', 'RAW 降噪策略', '控制写入 DNG 前的 Bayer 降噪；JPEG 高 ISO 降噪保持原厂。', '独立 RAW 策略'],
@@ -448,9 +448,9 @@ function syncRecipeSource(usePreset = true) {
 }
 function renderBuildSummary() {
   if(state.profile==='native'){
-    $('build-feature-count').textContent='65 套胶卷 / 5 槽 / 800T / 质感 / 时间戳'+(state.features.has('aspect')?' / 画幅':'')+(state.features.has('level')?' / 水平仪':'')+(state.features.has('negativeGrain')?' / 负片颗粒':'');
+    $('build-feature-count').textContent='36 套胶卷 / 5 槽 / 专属参数 / 质感 / 时间戳'+(state.features.has('aspect')?' / 画幅':'')+(state.features.has('level')?' / 水平仪':'')+(state.features.has('negativeGrain')?' / 负片颗粒':'');
     $('runtime-state').textContent='胶卷库 · 全部内置';
-    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`Slot ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]} / 柔光 ${['关','弱','中','强'][v.soft]}`)),textNode('p',`800T · ${state.nativeConfig.slots.filter(v=>v.film===33).map(v=>`强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>featureName[id]).join('、')}。机内入口：MENU → 影像控制 → M10V Library；ADJ 保留原厂列表。`));
+    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`Slot ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]} / 柔光 ${['关','弱','中','强'][v.soft]}`)),textNode('p',`专属光晕 · ${state.nativeConfig.slots.filter(v=>[33,67].includes(v.film)).map(v=>`${v.film===67?'蓝凤凰':'800T'} 强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`哈曼 RED · ${state.nativeConfig.slots.filter(v=>v.film===68).map(v=>`模拟曝光EI ${[125,64,250][v.effects.filmExposure]}`).join(' / ')||'未装入'}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>featureName[id]).join('、')}。机内入口：MENU → 影像控制 → M10V Library；ADJ 保留原厂列表。`));
     return;
   }
   $('build-feature-count').textContent = `${state.features.size} 项 / ${state.recipes.size} 个配方位置`;

@@ -81,7 +81,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
                 text_ranges = [(starts[i], starts[i]+s[5]) for i,s in image_sections
                                if names[s[0]:].split(b'\0',1)[0] == b'.text']
                 if target_address & 3 or not any(lo <= target_address < hi for lo,hi in text_ranges):
-                    raise ValueError('absolute switch relocation leaves local ARM text')
+                    raise ValueError(f'absolute switch relocation leaves local ARM text: {name} value={value:#x} addend={word:#x} place={place:#x}')
                 word = target_address
             elif kind in (28, 29):  # R_ARM_CALL / R_ARM_JUMP24
                 if word & 0x0f000000 != (0x0b000000 if kind == 28 else 0x0a000000):
@@ -101,7 +101,8 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
             struct.pack_into('<I', image, out_at, word)
     required = {
         'm10v_halation': {'m10v_halation'},
-        'm10v_5207_': {'m10v_5207_rgb','m10v_5207_render','m10v_5207_texture'},
+        'm10v_5207_': {'m10v_5207_rgb','m10v_5207_render','m10v_5207_texture','m10v_5207_texture_q8'},
+        'm10v_harman_': {'m10v_harman_rgb'},
         'm10v_library_': {'m10v_library_init', 'm10v_library_valid', 'm10v_library_name',
             'm10v_library_detail','m10v_library_effects','m10v_library_select', 'm10v_library_texture', 'm10v_library_halation', 'm10v_library_tables', 'm10v_library_stamp', 'm10v_library_render'},
         'm10v_camera_library_': {'m10v_camera_library_load', 'm10v_camera_library_select',
@@ -125,26 +126,28 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         raise ValueError('invalid debug build options')
     if initial_state_hex is None:
         initial = bytearray(104)
-        struct.pack_into('<IHHI', initial, 0, 0x5630314d, 3, 104, 0)
+        struct.pack_into('<IHHI', initial, 0, 0x5630314d, 4, 104, 0)
         for i in range(5): struct.pack_into('<H6B', initial, 12+i*8, 33 if i == 4 else i+34, 0, 0, 3,3,5,2)
 
         for i in range(5):initial[56+i*8]=1;initial[59+i*8]=4
         struct.pack_into('<I', initial, 100, zlib.crc32(initial[:100]))
     else:
         initial = bytes.fromhex(initial_state_hex)
-        if len(initial) != 104 or struct.unpack_from('<IHHI',initial) != (0x5630314d,3,104,0):
+        if len(initial) != 104 or struct.unpack_from('<IHHI',initial) != (0x5630314d,4,104,0):
             raise ValueError('invalid initial state header')
         for i in range(5):
             film, grain, soft, gain, spread, threshold, profile = struct.unpack_from('<H6B', initial, 12+i*8)
-            if not 1 <= film <= 66 or grain > 3 or soft > 3 or gain>8 or spread>8 or threshold>8 or profile>3: raise ValueError('invalid initial slot')
+            if not 1 <= film <= 68 or grain > 3 or soft > 3 or gain>8 or spread>8 or threshold>8 or profile>3: raise ValueError('invalid initial slot')
         if initial[52] > 2 or any(v > 3 for v in initial[53:56]) or any(initial[96:100]) or struct.unpack_from('<I',initial,100)[0] != zlib.crc32(initial[:100]):
             raise ValueError('invalid initial settings/checksum')
     for i in range(5):
         e=initial[56+i*8:64+i*8]
-        if any(v>limit for v,limit in zip(e,[2,8,5,8,1,0,0,0])):raise ValueError('invalid film texture effects')
+        if (struct.unpack_from('<H',initial,12+i*8)[0]!=68 and e[5]) or any(v>limit for v,limit in zip(e,[2,8,5,8,1,2,0,0])):raise ValueError('invalid film texture effects')
     initial = bytes(initial)
     from scripts.verify_gr3_5207_reference import verify
     film_payload=verify(ROOT)
+    from scripts.verify_gr3_harman_reference import verify as verify_harman
+    harman_payloads=verify_harman(ROOT)
     if base & 4095: raise ValueError('runtime base must be page aligned')
     configured = os.environ.get('M10V_LLVM_CLANG')
     candidates = [configured] if configured else [
@@ -158,11 +161,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         folder = Path(folder); obj = folder / 'library.o'
         subprocess.run([compiler, *FLAGS, '-DM10V_INITIAL_STATE_BYTES=' + ','.join(str(v) for v in initial), '-c', str(ROOT / 'native/gr3/m10v_library.c'), '-o', str(obj)],
                        check=True, capture_output=True)
-        halo=bytes();halo_symbols={}
+        harman_obj=folder/'harman.o'
+        subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3/film_harman.c'),'-o',str(harman_obj)],check=True,capture_output=True)
+        halo,halo_symbols=link_object(harman_obj.read_bytes(),base+0x100,prefix='m10v_harman_')
         film_obj=folder/'5207.o'
         subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3/film_5207.c'),'-o',str(film_obj)],check=True,capture_output=True)
         film_base=(base+0x100+len(halo)+15)&~15
-        film,film_symbols=link_object(film_obj.read_bytes(),film_base,prefix='m10v_5207_')
+        film,film_symbols=link_object(film_obj.read_bytes(),film_base,halo_symbols,prefix='m10v_5207_')
         halo_symbols.update(film_symbols)
         core_base = (film_base+len(film)+15)&~15
         core, symbols = link_object(obj.read_bytes(), core_base, halo_symbols)
@@ -239,8 +244,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             'White', 'Orange', 'Red', 'Yellow', 'Back', 'Done', names[32],
             '800T Halation','光晕强度','扩散范围','高光阈值','Halation Profile',
             *[str(i) for i in range(9)],'Off','Weak','Natural','Strong',
-            *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']], '5207','Light Leak','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Fine','Standard','Coarse','Left','Right','Top','Bottom','Corner','Random','Fixed','Per Shot','Reset Texture']
-        if len(texts) != 144: raise ValueError('private resource inventory differs')
+            *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']], '5207','Light Leak','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Fine','Standard','Coarse','Left','Right','Top','Bottom','Corner','Random','Fixed','Per Shot','Reset Texture','Phoenix II','HARMAN RED','Phoenix II Halation','RED Exposure','EI 125','EI 64','EI 250']
+        if len(texts) != 151: raise ValueError('private resource inventory differs')
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
         for index, text in enumerate(texts):
@@ -263,7 +268,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             movw r3,#786
             cmp r7,r3
             blo 1f
-            movw r3,#929
+            movw r3,#936
             cmp r7,r3
             bhi 1f
             movw r3,#786
@@ -283,7 +288,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             movw r3,#786
             cmp r7,r3
             blo 2f
-            movw r3,#929
+            movw r3,#936
             cmp r7,r3
             bhi 2f
             movw r3,#786
@@ -336,11 +341,11 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         icon_table = base + len(image)
         stock_directory = (ROOT/'native/gr3/m10v_stock_icon_directory.bin').read_bytes()
         icon_pixels = (ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
-        if len(stock_directory)!=671*4 or len(icon_pixels)!=66*6400: raise ValueError('icon inventory differs')
-        icon_descriptors = icon_table + 737*4
-        icon_data = icon_descriptors + 66*8
-        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(66))
-        image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(66))
+        if len(stock_directory)!=671*4 or len(icon_pixels)!=68*6400: raise ValueError('icon inventory differs')
+        icon_descriptors = icon_table + 739*4
+        icon_data = icon_descriptors + 68*8
+        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(68))
+        image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(68))
         image += icon_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
@@ -356,7 +361,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             movw ip,#671
             cmp r1,ip
             blo 1f
-            movw ip,#736
+            movw ip,#738
             cmp r1,ip
             bhi 1f
             lsl ip,r6,#2
@@ -371,12 +376,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         icon_base=(base+len(image)+15)&~15
         icon_code,icon_symbols=link_object(icon_obj.read_bytes(),icon_base,prefix='m10v_icon_')
         image += bytes(icon_base-base-len(image))+icon_code; symbols.update(icon_symbols)
-        if len(image)>524288: raise ValueError('M10V code and artwork exceed 512 KiB mapping budget')
+        if len(image)>655360: raise ValueError('M10V code and artwork exceed validated runtime allocation')
     sha = lambda data: hashlib.sha256(data).hexdigest()
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
-                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 66, 'slots': 5,
+                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 68, 'slots': 5,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
-                            ('scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
+                            ('scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
                              'native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py',
                              'native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py',
                              'native/gr3/m10v_library_camera.c', 'native/gr3/m10v_library_menu.c',
@@ -399,10 +404,16 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['initial_state_offset'] = initial_offset
     film_offset=bytes(image).find(film_payload)
     if film_offset<0:raise ValueError('5207 compiled table readback differs')
+    reference_harman=json.loads((ROOT/'native/gr3/harman-reference.json').read_text())
+    manifest['film_harman']=[]
+    for spec,payload in zip(reference_harman['stocks'],harman_payloads):
+        offset=image.find(payload)
+        if offset<0:raise ValueError('Harman compiled table readback differs')
+        manifest['film_harman'].append({'film_id':spec['id'],'ei':spec['ei'],'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
-    manifest['resources'] = {'first_id': 786, 'last_id': 929, 'table': resource_base,
+    manifest['resources'] = {'first_id': 786, 'last_id': 936, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['icons']={'first_id':671,'last_id':736,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
+    manifest['icons']={'first_id':671,'last_id':738,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest

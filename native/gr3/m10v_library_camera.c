@@ -8,7 +8,7 @@
 typedef uint32_t (*manager_fn)(void);
 typedef int (*read_fn)(uint32_t, const char *, uint32_t, void *);
 typedef int (*write_fn)(uint32_t, const char *, uint32_t, const void *);
-static const char state_names[2][12] = {"M10V4A.bin", "M10V4B.bin"};
+static const char state_names[2][12] = {"M10V5A.bin", "M10V5B.bin"};
 
 static int ram(const void *ptr, uint32_t size) {
     uintptr_t p = (uintptr_t)ptr;
@@ -45,6 +45,9 @@ static int legacy_valid(const uint8_t *p){
     uint32_t crc=0xffffffffu;for(uint32_t i=0;i<40;++i){crc^=p[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}
     return ~crc==little32(p+40);
 }
+static void reset_migrated_effects(m10v_library_state *state){
+    for(uint32_t i=0;i<5;i++){m10v_film_effects e={1,0,0,4,0,0,{0,0}};state->effects[i]=e;}
+}
 static int migrate_v2(uint32_t fs,m10v_library_state *state,uint32_t energy){
     static const char energy_names[2][12]={"M10V3A.bin","M10V3B.bin"};
     static const char old_names[2][12]={"M10V2A.bin","M10V2B.bin"};
@@ -63,6 +66,7 @@ static int migrate_v2(uint32_t fs,m10v_library_state *state,uint32_t energy){
     }
     if(!good[0]&&!good[1])return 1;
     uint32_t index=!good[0]||(good[1]&&little32(records[1]+8)>little32(records[0]+8));
+    reset_migrated_effects(state);
     for(uint32_t i=8;i<56;i++)((uint8_t *)state)[i]=records[index][i];
     if(!energy)for(uint32_t i=0;i<5;i++){m10v_slot *v=&state->slots[i];v->halo_gain=(v->halo_gain&&v->halo_profile)?3:0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=2;}
     uint32_t crc=0xffffffffu;for(uint32_t i=0;i<100;i++){crc^=((uint8_t *)state)[i];for(uint32_t bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
@@ -75,12 +79,23 @@ static int migrate(uint32_t fs,m10v_library_state *state){
     for(uint32_t i=0;i<2;++i)good[i]=((read_fn)0x53825648u)(fs,names[i],44,records[i])&&legacy_valid(records[i]);
     if(!good[0]&&!good[1])return 1;
     uint32_t selected=!good[0]||(good[1]&&little32(records[1]+8)>little32(records[0]+8));const uint8_t *old=records[selected];
+    reset_migrated_effects(state);
     state->sequence=little32(old+8);
     for(uint32_t i=0;i<5;++i){state->slots[i].film=old[12+4*i];state->slots[i].grain=old[14+4*i];state->slots[i].soft=old[15+4*i];}
     state->stamp=old[32];state->format=old[33];state->corner=old[34];state->color=old[35];
     uint32_t crc=0xffffffffu;const uint8_t *bytes=(const uint8_t *)state;
     for(uint32_t i=0;i<100;++i){crc^=bytes[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
     return m10v_library_valid(state)?3:-1;
+}
+/* Published texture schema3: verify old CRC before converting the header.
+ * The new exposure byte was reserved and must be zero in every old slot. */
+static uint32_t texture_crc(const m10v_library_state *state){
+    uint32_t crc=0xffffffffu;for(uint32_t i=0;i<100;i++){crc^=((const uint8_t *)state)[i];for(uint32_t b=0;b<8;b++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}return ~crc;
+}
+static int read_texture_v3(uint32_t fs,const char *name,m10v_library_state *state){
+    if(!((read_fn)0x53825648u)(fs,name,sizeof(*state),state)||state->version!=3||state->size!=104||state->crc!=texture_crc(state))return 0;
+    for(uint32_t i=0;i<5;i++)if(state->slots[i].film>66||state->effects[i].film_exposure)return 0;
+    state->version=4;state->crc=texture_crc(state);return m10v_library_valid(state);
 }
 int m10v_camera_library_load(m10v_library_state *state) {
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
@@ -92,14 +107,16 @@ int m10v_camera_library_load(m10v_library_state *state) {
         available[i] = ((read_fn)0x53825648u)(fs, state_names[i], sizeof(*state), &candidates[i]) &&
                        m10v_library_valid(&candidates[i]);
     if (!available[0] && !available[1]) {
-        /* Accept earlier unpublished 104-byte candidates without overwriting
-         * the published 64-byte energy journal. New writes use M10V4*. */
-        static const char experimental[2][12]={"M10V3A.bin","M10V3B.bin"};
-        for(uint32_t i=0;i<2;i++)available[i]=((read_fn)0x53825648u)(fs,experimental[i],sizeof(*state),&candidates[i])&&m10v_library_valid(&candidates[i]);
-        experimental_source=1;
+        static const char published[2][12]={"M10V4A.bin","M10V4B.bin"};
+        for(uint32_t i=0;i<2;i++)available[i]=read_texture_v3(fs,published[i],&candidates[i]);
         if(!available[0]&&!available[1]){
-            int old=migrate_v2(fs,state,1);if(old==1)old=migrate_v2(fs,state,0);
-            return old==1?migrate(fs,state):old;
+            static const char experimental[2][12]={"M10V3A.bin","M10V3B.bin"};
+            for(uint32_t i=0;i<2;i++)available[i]=read_texture_v3(fs,experimental[i],&candidates[i]);
+            experimental_source=1;
+            if(!available[0]&&!available[1]){
+                int old=migrate_v2(fs,state,1);if(old==1)old=migrate_v2(fs,state,0);
+                return old==1?migrate(fs,state):old;
+            }
         }
     }
     uint32_t selected = !available[0] || (available[1] && candidates[1].sequence > candidates[0].sequence);

@@ -15,7 +15,7 @@ class Film5207Tests(NativeFilmLibraryTests):
         self.assertEqual(self.lib.m10v_library_name(66),b'5207')
         self.assertEqual((s.slots[0].grain,s.slots[0].soft,s.slots[0].halo_gain),(1,0,0))
         self.assertEqual(bytes(s.slots)[8:],others)
-        self.assertEqual((s.version,s.size),(3,C.sizeof(State)))
+        self.assertEqual((s.version,s.size),(4,C.sizeof(State)))
 
     def test_5207_leak_and_grain_are_independent_seeded_and_padding_safe(self):
         s=self.state();ok=STORE(lambda _,p:0)

@@ -30,7 +30,7 @@ const hooks = [
   [0x5320a834,0xe08ec106,'m10v_icon_pixels'],
   [0x533966e8,0xe3023bac,'m10v_resource_primary'], [0x533970fc,0xe3023bac,'m10v_resource_secondary'],
 ];
-const sources = ['scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','scripts/build_gr3_m10v_library.py'];
 export function nativeSourceFingerprint(){return sha(JSON.stringify(sources.map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
@@ -44,11 +44,11 @@ function branch(address, target, link=false) {
 function checkRuntime(runtime, manifest) {
   const BASE=manifest?.base;
   need(nativeBases.includes(BASE), 'native runtime base invalid');
-  need(Buffer.isBuffer(runtime) && runtime.length > 4096 && runtime.length <= 524288 && runtime.length % 4 === 0,
+  need(Buffer.isBuffer(runtime) && runtime.length > 4096 && runtime.length <= 655360 && runtime.length % 4 === 0,
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 66 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
+  need(manifest.film_count === 68 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...sources].sort().join('|'), 'native source inventory differs');
   for (const name of sources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
@@ -60,6 +60,15 @@ function checkRuntime(runtime, manifest) {
   const payload=Buffer.from(table.values),film=manifest.film_5207;
   need(film?.bytes===payload.length&&film.sha256===sha(payload)&&reference.table_sha256===sha(payload)&&Number.isInteger(film.offset)&&film.offset>=0&&film.offset+payload.length<=runtime.length&&runtime.subarray(film.offset,film.offset+payload.length).equals(payload),'5207 compiled payload differs from reference');
   need(film.camera_calibrated===false&&film.film_calibrated===false&&reference.camera_calibrated===false&&reference.film_calibrated===false,'5207 calibration evidence unavailable');
+  const harmanReference=JSON.parse(readFileSync(new URL('../native/gr3/harman-reference.json',import.meta.url)));
+  const harmanWeb=JSON.parse(readFileSync(new URL('../web/gr3/harman-luts.json',import.meta.url)));
+  need(harmanWeb.size===15&&harmanWeb.bits===8&&harmanWeb.stocks.length===4&&manifest.film_harman?.length===4&&harmanReference.camera_calibrated===false&&harmanReference.film_calibrated===false,'Harman reference inventory differs');
+  for(let i=0;i<4;i++){
+    const w=harmanWeb.stocks[i],m=manifest.film_harman[i],spec=harmanReference.stocks[i];
+    need(w.values.length===10125&&w.values.every(v=>Number.isInteger(v)&&v>=0&&v<=255),'Harman table bounds differ');
+    const payload=Buffer.from(w.values);
+    need(m.film_id===w.id&&m.ei===w.ei&&m.bytes===payload.length&&m.sha256===sha(payload)&&spec.table_sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'Harman compiled payload differs');
+  }
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
   need(init.length === 104 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+104).equals(init), 'native initial settings readback differs');
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
@@ -74,16 +83,16 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
-  need(icons?.first_id===671&&icons.last_id===736&&icons.width===40&&icons.height===40&&artwork.length===66*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,737*4],[icons.descriptors,66*8],[icons.pixels,66*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+737*4&&icons.pixels===icons.descriptors+66*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
-  for(let i=0;i<66;i++){
+  need(icons?.first_id===671&&icons.last_id===738&&icons.width===40&&icons.height===40&&artwork.length===68*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
+  for(const [address,length] of [[icons.table,739*4],[icons.descriptors,68*8],[icons.pixels,68*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+739*4&&icons.pixels===icons.descriptors+68*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(let i=0;i<68;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
   }
-  need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 929 &&
-    manifest.resources.texts?.length === 144 && manifest.resources.descriptors?.length === 144, 'native resources incomplete');
-  for (let i=0;i<144;i++) {
+  need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 936 &&
+    manifest.resources.texts?.length === 151 && manifest.resources.descriptors?.length === 151, 'native resources incomplete');
+  for (let i=0;i<151;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');
     const encoded = Buffer.from(text+'\0','utf16le');
@@ -151,13 +160,13 @@ function checkDetail(runtime,manifest,raw) {
 function patchList(manifest) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,736),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,738),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   return [...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
-    {address:0x533966d4,expected:0xe3003311,replacement:movw(3,929),name:'resource maximum primary'},
-    {address:0x533970ec,expected:0xe3003311,replacement:movw(3,929),name:'resource maximum secondary'},
+    {address:0x533966d4,expected:0xe3003311,replacement:movw(3,936),name:'resource maximum primary'},
+    {address:0x533970ec,expected:0xe3003311,replacement:movw(3,936),name:'resource maximum secondary'},
     {address:0x531abd24,expected:0xe300110a,replacement:movw(1,823),name:'M10V menu title'}];
 }
 function sectionMap(decoded, report, growth=0) {
@@ -197,7 +206,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
-  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=544*1024,'native RTOS growth invalid');
+  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=672*1024,'native RTOS growth invalid');
   const insertion=rtos.offset+rtos.size;
   const target=Buffer.concat([decoded.subarray(0,insertion),Buffer.alloc(growth),decoded.subarray(insertion)]);
   target.writeUInt32LE(newPayload,rtos.offset+12);
@@ -214,7 +223,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
 export function auditNativeLibrary(source,candidate,runtime,manifest) {
   const BASE=manifest?.base;
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
-  const structural=auditGr3Candidate(source,candidate,{maxRtosGrowth:544*1024});
+  const structural=auditGr3Candidate(source,candidate,{maxRtosGrowth:672*1024});
   const before=decodeFrameMap(source).decoded,after=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
   const oldRows=sectionMap(before,report),newRows=sectionMap(after,report,structural.rtosGrowth);
   const old=oldRows.find(row=>row.name==='RTOS'),fresh=newRows.find(row=>row.name==='RTOS');
@@ -251,7 +260,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest).length,icon_count:66,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:3,film_count:66,active_slots:5,external_film_pack:false,
+    verified_hooks:patchList(manifest).length,icon_count:68,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:68,active_slots:5,external_film_pack:false,
     menu_entry:'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
     camera_scope:'still JPEG; original RAW pixels protected; live-view color and RAW-development effects not integrated'};

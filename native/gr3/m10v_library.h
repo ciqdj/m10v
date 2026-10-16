@@ -2,14 +2,14 @@
 #define M10V_LIBRARY_H
 #include <stdint.h>
 
-#define M10V_FILM_COUNT 66u
+#define M10V_FILM_COUNT 68u
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0
 #define M10V_LIBRARY_INVALID -1
 #define M10V_LIBRARY_STORE_FAILED -2
 
 typedef struct { uint16_t film; uint8_t grain, soft, halo_gain, halo_spread, halo_threshold, halo_profile; } m10v_slot;
-typedef struct { uint8_t grain_size, leak_gain, leak_position, leak_spread, leak_variation, reserved[3]; } m10v_film_effects;
+typedef struct { uint8_t grain_size, leak_gain, leak_position, leak_spread, leak_variation, film_exposure, reserved[2]; } m10v_film_effects;
 typedef struct {
     uint32_t magic;
     uint16_t version, size;

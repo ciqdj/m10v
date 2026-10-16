@@ -17,7 +17,7 @@ typedef uint32_t (*root_fn)(void);
 static const uint8_t tones[5] = {12,18,19,20,21};
 /* The persistent catalog keeps IDs 1..65 for existing journals. Only the
  * curated 800T and original 32 simulations are offered for replacement. */
-static const uint8_t counts[21] = {13,7,34,5,4,7,5,4,4,4,3,9,9,9,0,5,3,9,6,9,2};
+static const uint8_t counts[22] = {13,7,36,5,4,7,5,4,4,4,3,9,9,9,0,5,3,9,6,9,2,3};
 static uint8_t *model(void) {
     uint32_t root = ((root_fn)0x5320ad88u)();
     return (uint8_t *)(uintptr_t)((get_fn)0x5320ba9cu)(root);
@@ -25,7 +25,7 @@ static uint8_t *model(void) {
 static int supported(const uint8_t *m) {
     return (uintptr_t)m == 0x55068200u && m[0x1b] == 0;
 }
-static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= 20 ? m[0x1d] : 0; }
+static uint32_t mode(const uint8_t *m) { return supported(m) && m[0x1d] <= 21 ? m[0x1d] : 0; }
 static uint32_t slot(const uint8_t *m) {
     /* Byte 0x1e is padding after the stock last member at 0x1c. Keep
      * the original m[0] entry snapshot intact for stock cancellation. */
@@ -34,7 +34,7 @@ static uint32_t slot(const uint8_t *m) {
     return 0;
 }
 static uint32_t group_count(uint32_t group,const uint8_t *m){
-    if(group==1){m10v_library_state state;return m10v_camera_library_load(&state)>=0&&state.slots[slot(m)].film==33?7:6;}
+    if(group==1){m10v_library_state state;return m10v_camera_library_load(&state)>=0&&(state.slots[slot(m)].film==33||state.slots[slot(m)].film>=67)?7:6;}
     (void)m;
     return counts[group];
 }
@@ -43,7 +43,7 @@ uint32_t m10v_menu_count(uint32_t address) {
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x80u))(address);
     return group_count(mode(m),m);
 }
-uint32_t m10v_menu_max_count(void) { return 34; }
+uint32_t m10v_menu_max_count(void) { return 36; }
 uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     const uint8_t *m = (const uint8_t *)(uintptr_t)address;
     if (!supported(m)) return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
@@ -51,9 +51,12 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!group) return index == 12 ? 128 : ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     if (index >= group_count(group,m)) return 0;
     static const uint8_t first[15] = {0,129,144,176,180,184,208,192,196,200,218,224,224,224,233};
-    if(group==2)return index==0?213:index==33?288:256+index-1;
+    if(group==2)return index==0?213:index>=33?288+index-33:256+index-1;
     if(group==1&&index==5)return 300;
-    if(group==1&&index==6)return 214;
+    if(group==1&&index==6){m10v_library_state s;
+        if(m10v_camera_library_load(&s)>=0){uint32_t film=s.slots[slot(m)].film;return film==68?340:film==67?339:214;}
+        return 214;}
+    if(group==21)return 341+index;
     if(group==3&&index==4)return 301;
     if(group==15)return index<4?302+index:306;
     if(group==16)return 310+index;
@@ -65,6 +68,9 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
 }
 static uint32_t resource(uint32_t tone) {
     if(tone==288)return 911;
+    if(tone==289||tone==290)return 930+tone-289;
+    if(tone==339)return 932;
+    if(tone>=340&&tone<=343)return 933+tone-340;
     if(tone==300)return 912;
     if(tone>=301&&tone<=305)return 913+tone-301;
     if(tone==306)return 929;
@@ -93,6 +99,7 @@ static uint32_t resource(uint32_t tone) {
 static uint32_t film_resource(uint32_t film) {
     if (film >= 1 && film <= 32) return 786 + film - 1;
     if (film == 66) return 911;
+    if (film >= 67 && film <= 68) return 930+film-67;
     if (film == 33) return 860;
     if (film >= 34 && film <= 65) return 879 + film - 34;
     return 0;
@@ -116,7 +123,7 @@ uint32_t m10v_menu_value_name(uint32_t translator, uint32_t value) {
 }
 uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
     if(tone>=144 && tone<176)return 671+tone-144;
-    if(tone==288)return 736;
+    if(tone>=288&&tone<=290)return 736+tone-288;
     if(tone==213)return 703;
     if(tone>=256 && tone<288)return 704+tone-256;
     uint8_t *m=model();
@@ -184,7 +191,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
         m[0x1d] = 1; redraw(controller); return 0;
     }
     if (index == group_count(group,m)) {
-        m[0x1d] = group==1?0:group==16?3:group>=17?15:group==15?1:group>=11?10:group==10?1:group>=7?5:1;
+        m[0x1d] = group==1?0:group==21?1:group==16?3:group>=17?15:group==15?1:group>=11?10:group==10?1:group>=7?5:1;
         redraw(controller); return 0;
     }
     if (index == (uint32_t)group_count(group,m) + 1) {
@@ -192,7 +199,8 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     }
     if (index >= group_count(group,m)) return 0;
     if (group == 1) {
-        m[0x1d]=(uint8_t)(index==6?10:index==5?15:index==4?6:index+2);redraw(controller);return 0; }
+        m10v_library_state s;uint32_t extra=m10v_camera_library_load(&s)>=0&&s.slots[slot(m)].film==68?21:10;
+        m[0x1d]=(uint8_t)(index==6?extra:index==5?15:index==4?6:index+2);redraw(controller);return 0; }
     if(group==3&&index==4){m[0x1d]=16;redraw(controller);return 0;}
     if (group == 6) {
         m[0x1e] = tones[index];
@@ -210,7 +218,8 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     if (m10v_camera_library_load(&state) < 0) { failure(controller); return 0; }
     uint32_t target = slot(m); int result;
     M10V_LOG(60,controller,index,group,target);
-    if(group>=16)result=m10v_camera_library_effects(&state,target,group-16,index);
+    if(group==21)result=m10v_camera_library_effects(&state,target,6,index);
+    else if(group>=16)result=m10v_camera_library_effects(&state,target,group-16,index);
     else if(group==15)result=m10v_camera_library_effects(&state,target,5,0);
     else if(group>=11){const m10v_slot *v=&state.slots[target];
         result=m10v_camera_library_halation(&state,target,group==11?index:v->halo_gain,group==12?index:v->halo_spread,group==13?index:v->halo_threshold,group==14?index:v->halo_profile);
@@ -223,7 +232,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     M10V_LOG(61,controller,(uint32_t)result,group,state.slots[target].film);
     if (result) { failure(controller); return 0; }
     if (group == 2) ((call2_fn)(M10V_NATIVE_BASE + 0x00u))((uint32_t)(uintptr_t)m, tones[target]);
-    m[0x1d] = group==16?3:group>=15?15:group>=11?10:group >= 7 || group == 5 ? 5 : 1;
+    m[0x1d] = group==21?1:group==16?3:group>=15?15:group>=11?10:group >= 7 || group == 5 ? 5 : 1;
     redraw(controller); return 0;
 }
 #if M10V_DEBUG_MODE

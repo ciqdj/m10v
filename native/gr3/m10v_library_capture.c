@@ -143,11 +143,11 @@ int m10v_capture_library(uint32_t context) {
         M10V_LOG(131,context,e[4],state.slots[slot].grain,state.slots[slot].soft);
     }
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
-    uint32_t use_halo=state.slots[slot].film==33&&state.slots[slot].halo_gain;
+    uint32_t use_halo=(state.slots[slot].film==33||state.slots[slot].film==67)&&state.slots[slot].halo_gain;
     if (state.slots[slot].soft || use_halo) {
         uint32_t step = 1, shift = 0;
         while (((width + step - 1) >> shift) > 384 || ((height + step - 1) >> shift) > 256) { step <<= 1; ++shift; }
-        scratch_bytes = ((state.slots[slot].film == 33 ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
+        scratch_bytes = (((state.slots[slot].film == 33 || state.slots[slot].film == 67) ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
         scratch = ((allocate_fn)0x536af2a8u)(scratch_bytes);
         uint32_t address = (uint32_t)(uintptr_t)scratch;
         if (!ram(address, scratch_bytes)) return -6;

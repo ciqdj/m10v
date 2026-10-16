@@ -121,12 +121,12 @@ from tests import test_gr3_m10v_redraw_arm as redraw
 
 @unittest.skipUnless(OFFICIAL.exists(), 'official firmware unavailable')
 class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
-    visible_film_count = 34
+    visible_film_count = 36
     slot_five_film_index = 0
     slot_one_film_index = 1
 
     def test_curated_first_and_last_rows_confirm_into_real_stock_slot(self):
-        for index,film,tone in ((0,33,213),(1,34,256),(32,65,287),(33,66,288)):
+        for index,film,tone in ((0,33,213),(1,34,256),(32,65,287),(33,66,288),(34,67,289),(35,68,290)):
             with self.subTest(index=index):
                 self.files.clear()
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
@@ -137,7 +137,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.assertFalse(self.files)
                 self.assertLess(self.tone,128)
                 self.call('m10v_menu_confirm',redraw.CONTROLLER)
-                payload=self.files['M10V4B.bin']
+                payload=self.files['M10V5B.bin']
                 self.assertEqual(struct.unpack_from('<H',payload,20)[0],film)
                 self.assertEqual(self.tone,18)
                 self.assertEqual(self.u.mem_read(redraw.MODEL+0x1d,1),b'\x01')
@@ -150,7 +150,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 payload=bytearray(initial)
                 struct.pack_into('<H',payload,20,film)
                 struct.pack_into('<I',payload,100,zlib.crc32(payload[:100]))
-                self.files={'M10V4B.bin':bytes(payload)}
+                self.files={'M10V5B.bin':bytes(payload)}
                 before=dict(self.files)
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
                 self.call(0x531ac074,redraw.CONTROLLER)

@@ -14,10 +14,12 @@ function render(){
  const slotNode=$('#slots');slotNode.replaceChildren(...configuration.slots.map((s,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus='slot-'+i;b.className='slot';b.disabled=busy;b.setAttribute('aria-pressed',String(i===active));const n=document.createElement('small');n.textContent=`SLOT 0${i+1}`;const t=document.createElement('strong');t.textContent=unresolved.find(v=>v.slot===i)?'需重选 · '+unresolved.find(v=>v.slot===i).id:films.find(f=>f.id===s.film)?.name||'载入中';const e=document.createElement('em');e.textContent=`颗粒 ${levels[s.grain]} · 柔光 ${levels[s.soft]} · 漏光 ${s.effects.leakGain||"关"}`;const art=filmIcon(films.find(f=>f.id===s.film));b.append(n,art,t,e);b.onclick=()=>{active=i;render();};return b;}));
  segment('#grain',levels,configuration.slots[active].grain,v=>configuration.slots[active].grain=v);
  segment('#soft',levels,configuration.slots[active].soft,v=>configuration.slots[active].soft=v);
- $('#halo-controls').hidden=configuration.slots[active].film!==33;
- $('#halo-controls .label').textContent='800T 光晕 · 当前槽位';
+ const film=configuration.slots[active].film;
+ $('#halo-controls').hidden=![33,67].includes(film);
+ $('#red-controls').hidden=film!==68;
+ $('#halo-controls .label').textContent=(film===67?'蓝凤凰':'800T')+' 光晕 · 当前槽位';
  const effects=configuration.slots[active].effects;
- for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy;}
+ for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy||(k==='filmExposure'&&film!==68);}
  $('#reset-texture').disabled=busy;
  const halo=configuration.slots[active].halo;
  for(const k of ['gain','spread','threshold']){$('#halo-'+k).value=String(halo[k]);$('#halo-'+k+'-value').textContent=halo[k]+'/8';$('#halo-'+k).disabled=busy;}
@@ -38,7 +40,7 @@ async function importSource(file){setBusy(true);message('正在核对官方固�
 for(const k of ['format','corner','color'])$('#'+k).onchange=()=>{configuration[k]=Number($('#'+k).value);invalidate();render();};
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
-for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};
+for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};
 $('#reset-texture').onclick=()=>{configuration=resetNativeTexture(configuration,active);invalidate();render();};
 $('#film-group').onchange=renderFilms;
 $('#search').oninput=renderFilms;$('#local-source').onclick=()=>importSource();$('#official-file').onchange=e=>{const f=e.target.files[0];if(f)importSource(f);e.target.value='';};

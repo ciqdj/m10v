@@ -33,7 +33,7 @@ test('all eight extension combinations preserve selected/unselected bytes in deb
     const result=composeNative(source,n.candidate,n.runtime,n.manifest,component,extensions),rtos=raw(result.candidate);
     assert.deepEqual(result.composition.extensions,{...extensions,rawNr:{mode:'stock'}});
     assert.equal(result.composition.component_variant,variant||null);
-    assert.equal(result.composition.aspect_resource_id,extensions.aspect?930:null);
+    assert.equal(result.composition.aspect_resource_id,extensions.aspect?937:null);
     assert.equal(result.composition.shared_resource_routes,extensions.aspect?2:0);
     assert.equal(result.composition.negative_grain_sites.length,extensions.negativeGrain?2:0);
     assert.equal(n.manifest.debug_mode,debug);
@@ -43,7 +43,7 @@ test('all eight extension combinations preserve selected/unselected bytes in deb
     assert.equal(rtos.readUInt32LE(0xb348c0),extensions.negativeGrain?10:9);
     assert.equal(rtos.readUInt16LE(0xb3501e),extensions.negativeGrain?0x0f02:0);
     if(extensions.aspect){
-     assert.equal(rtos.readUInt32LE(0x10b9448),0xe30003a2);
+     assert.equal(rtos.readUInt32LE(0x10b9448),0xe30003a9);
      assert.equal(rtos.readUInt32LE(0x10b97e8),2);
      assert.notEqual(rtos.readUInt32LE(0x292544),stock.readUInt32LE(0x292544));
     }else assert.equal(rtos.readUInt32LE(0x292544),stock.readUInt32LE(0x292544));

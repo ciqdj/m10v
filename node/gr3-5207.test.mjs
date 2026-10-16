@@ -6,10 +6,10 @@ test('5207 has its own curated ID while legacy 5207 stays intact',async()=>{
  const c=await nativeCatalog();assert.equal(c.films.find(f=>f.id===66)?.name,'5207');
  assert.equal(c.films.find(f=>f.id===66)?.group,'M10V精选');assert.equal(c.films.find(f=>f.id===64)?.name,'V3 5207');
 });
-test('old web configuration migrates into v3 and validates effect ranges',()=>{
+test('old web configuration migrates into v4 and validates effect ranges',()=>{
  const old=defaultConfiguration();old.slots[0].film=66;
- const c=normalizeConfiguration(old);assert.deepEqual(c.slots[0].effects,{grainSize:1,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0});
- const bytes=initialState(c);assert.equal(bytes.readUInt16LE(4),3);assert.equal(bytes.length,104);
+ const c=normalizeConfiguration(old);assert.deepEqual(c.slots[0].effects,{grainSize:1,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0,filmExposure:0});
+ const bytes=initialState(c);assert.equal(bytes.readUInt16LE(4),4);assert.equal(bytes.length,104);
  c.slots[0].effects.leakGain=9;assert.throws(()=>normalizeConfiguration(c));
 });
 

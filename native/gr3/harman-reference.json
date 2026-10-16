@@ -1,0 +1,198 @@
+{
+  "schema": "m10v-harman-reference/v1",
+  "table_size": 15,
+  "table_bits": 8,
+  "order": "RGB, blue fastest",
+  "camera_calibrated": false,
+  "film_calibrated": false,
+  "spectral_calibrated": false,
+  "official_lut": false,
+  "parameters": {
+    "status": "assumed; qualitative interpretation, not measured film data",
+    "input": "encoded sRGB D65; scene spectrum and GR3 ISP not recovered",
+    "phoenix_ii": {
+      "status": "all numeric parameters assumed",
+      "matrix": [
+        [
+          1.08,
+          -0.045,
+          -0.035
+        ],
+        [
+          -0.025,
+          1.055,
+          -0.03
+        ],
+        [
+          -0.035,
+          -0.025,
+          1.06
+        ]
+      ],
+      "tone_power": 1.12,
+      "tone_knee": 0.6,
+      "neutral_axis": "matrix rows sum to one; identical tone per channel"
+    },
+    "red": {
+      "status": "all numeric parameters assumed; official channel topology only",
+      "record_matrix": [
+        [
+          1.0,
+          0.0,
+          0.65
+        ],
+        [
+          0.0,
+          0.78,
+          0.45
+        ],
+        [
+          0.0,
+          0.0,
+          0.035
+        ]
+      ],
+      "density_knee": [
+        0.24,
+        0.32,
+        0.4
+      ],
+      "density_scale": [
+        1.65,
+        1.65,
+        1.65
+      ],
+      "scan_power": [
+        0.92,
+        1.18,
+        1.32
+      ],
+      "scan_gain": [
+        1.0,
+        0.72,
+        0.24
+      ],
+      "exposure": "linear record exposure multiplied by 125/EI before density",
+      "grain_relative": {
+        "64": 0.85,
+        "125": 1.0,
+        "250": 1.2
+      }
+    },
+    "spatial_effects": "grain, diffusion and leaks use shared user controls; no baked halation"
+  },
+  "parameters_sha256": "666580e7e6346e2f35f708c65eaf55bdca272af25dbbf981ef4782eb30e94a02",
+  "sources": [
+    {
+      "url": "https://www.harmanphoto.co.uk/amfile/file/download/file/1965/product/2170/",
+      "description": "RED technical information, June 2025, 5 pages; channel topology and qualitative exposure behavior; curves not digitized"
+    },
+    {
+      "url": "https://www.harmantechnology.com/harman-red-125-a-brand-new-professionally-finished-redscale-film/",
+      "description": "Official RED launch: original Phoenix emulsion reversed, C41, no anti-halation"
+    },
+    {
+      "url": "https://www.harmanphoto.co.uk/amfile/file/download/file/1968/product/2208/",
+      "description": "Official Phoenix II technical information, Jul 2025, 5 pages: second generation, possible high-contrast halation, no orange mask; qualitative constraints only"
+    },
+    {
+      "url": "https://www.harmanphoto.co.uk/harman-phoenix-ii-35mm",
+      "description": "Official Phoenix II product: qualitative color/contrast/grain direction only"
+    }
+  ],
+  "sources_sha256": "3fabc66716e6f11b3df6e929d716e6a66f7b8ea3d0845d7fb4c7cf5dcc3eb195",
+  "generator": {
+    "path": "scripts/build_gr3_harman_reference.py",
+    "sha256": "73d96ed295cbcdb0c33529985e630f506075f7ee7b6a97d4180c0bd15a7ffc53"
+  },
+  "dependencies": {
+    "numpy": "2.5.3",
+    "colour-science": "0.4.7"
+  },
+  "stocks": [
+    {
+      "id": 67,
+      "name": "HARMAN Phoenix II 200",
+      "model": "phoenix-ii",
+      "ei": 200,
+      "table_bytes": 10125,
+      "table_sha256": "35eb67b00f9039697cd506b8a77cc6a9e259f985bd24372f443b5040d0b6dde9",
+      "interpolation_validation": {
+        "samples": 8192,
+        "seed": 68125,
+        "encoded_domain": [
+          0,
+          1
+        ],
+        "rgb_abs_p95": 0.007497818583865613,
+        "rgb_abs_max": 0.08684791749517266,
+        "delta_e_00_median": 0.1113745971059561,
+        "delta_e_00_p95": 0.3613907770022788,
+        "delta_e_00_max": 1.6214057373783433
+      }
+    },
+    {
+      "id": 68,
+      "name": "HARMAN RED 125",
+      "model": "red",
+      "ei": 125,
+      "table_bytes": 10125,
+      "table_sha256": "9f1202227870d22c721ae007968291470cfef0c7c8fba50764f4b0c88f62b817",
+      "interpolation_validation": {
+        "samples": 8192,
+        "seed": 68125,
+        "encoded_domain": [
+          0,
+          1
+        ],
+        "rgb_abs_p95": 0.001601260867245824,
+        "rgb_abs_max": 0.03321010734053674,
+        "delta_e_00_median": 0.08004270037738159,
+        "delta_e_00_p95": 0.18240142584098812,
+        "delta_e_00_max": 5.058469392730989
+      }
+    },
+    {
+      "id": 68,
+      "name": "HARMAN RED 125",
+      "model": "red",
+      "ei": 64,
+      "table_bytes": 10125,
+      "table_sha256": "8857832e8b8ad2469c4a60aa7c01346ad66c0e8c46856320d189848fab65d9fd",
+      "interpolation_validation": {
+        "samples": 8192,
+        "seed": 68125,
+        "encoded_domain": [
+          0,
+          1
+        ],
+        "rgb_abs_p95": 0.001791600662031878,
+        "rgb_abs_max": 0.05476825107573208,
+        "delta_e_00_median": 0.07859376596040157,
+        "delta_e_00_p95": 0.2057454058882545,
+        "delta_e_00_max": 8.599109210448363
+      }
+    },
+    {
+      "id": 68,
+      "name": "HARMAN RED 125",
+      "model": "red",
+      "ei": 250,
+      "table_bytes": 10125,
+      "table_sha256": "3c1c7d7257148205a727ee662744d6709685a9145279f2002d0c485209607c1c",
+      "interpolation_validation": {
+        "samples": 8192,
+        "seed": 68125,
+        "encoded_domain": [
+          0,
+          1
+        ],
+        "rgb_abs_p95": 0.0015195269484224224,
+        "rgb_abs_max": 0.01638966615848335,
+        "delta_e_00_median": 0.08225738810517388,
+        "delta_e_00_p95": 0.19249200085300316,
+        "delta_e_00_max": 2.5239268593818336
+      }
+    }
+  ]
+}

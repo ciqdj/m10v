@@ -2,6 +2,7 @@
  * Input is an assumed display-referred domain, NOT recovered scene radiance. */
 #include "film_5207.h"
 #include "film_5207_data.h"
+#include "film_harman.h"
 
 static uint8_t clip(int x){return (uint8_t)(x<0?0:x>255?255:x);}
 static int roundq(int x,int bits){int h=1<<(bits-1);return x>=0?(x+h)>>bits:-((-x+h)>>bits);}
@@ -42,7 +43,7 @@ static uint32_t leak(uint32_t px,uint32_t py,const m10v_film_effects *e,uint32_t
     return weight*e->leak_gain*(uint32_t)(192+ripple/4)/(8*256);
 }
 static uint32_t divide(uint32_t n,uint32_t d){uint32_t q=0,r=0;for(int i=31;i>=0;i--){r=(r<<1)|((n>>i)&1);if(r>=d){r-=d;q|=1u<<i;}}return q;}
-void m10v_5207_texture(m10v_library_image *im,const m10v_film_effects *e,uint32_t grain,uint32_t seed,uint32_t color){
+void m10v_5207_texture_q8(m10v_library_image *im,const m10v_film_effects *e,uint32_t grain,uint32_t seed,uint32_t color){
     if(!color&&!grain&&!e->leak_gain)return;
     uint32_t sx=divide(256u<<16,im->width),sy=divide(256u<<16,im->height);
     uint32_t grain_sx=divide(6000u<<12,im->width),grain_sy=divide(4000u<<12,im->height);
@@ -57,15 +58,15 @@ void m10v_5207_texture(m10v_library_image *im,const m10v_film_effects *e,uint32_
             /* Bounded warm exposure approximation in the assumed encoded input. */
             static const uint32_t transmission[3]={256,112,36};
             for(uint32_t c=0;c<3;c++)rgb[c]=clip(rgb[c]+(int)(light*transmission[c]*(255-rgb[c])>>16));
-            if(color)m10v_5207_rgb(rgb,mapped[k]);else for(uint32_t c=0;c<3;c++)mapped[k][c]=rgb[c];
+            if(color==1)m10v_5207_rgb(rgb,mapped[k]);else if(color>=2)m10v_harman_rgb(color-2,rgb,mapped[k]);else for(uint32_t c=0;c<3;c++)mapped[k][c]=rgb[c];
             if(grain){
                 uint32_t gx=((x+k)*grain_sx)>>12,gy=(y*grain_sy)>>12;
                 uint32_t h=random32(seed^gx*0x9e3779b9u^gy*0x85ebca6bu);
                 int n=noise(gx,gy,seed,e->grain_size)+((int)(h&255)-128)/3;
                 int lum=(54*mapped[k][0]+183*mapped[k][1]+19*mapped[k][2])>>8;
                 int weight=32+(lum<128?lum:255-lum);
-                int delta=n*(int)grain*weight/(128*24);
-                for(uint32_t c=0;c<3;c++)mapped[k][c]=clip((int)mapped[k][c]+delta+((int)((h>>(c*8))&255)-128)*(int)grain/192);
+                int delta=n*(int)grain*weight/(128*24*256);
+                for(uint32_t c=0;c<3;c++)mapped[k][c]=clip((int)mapped[k][c]+delta+((int)((h>>(c*8))&255)-128)*(int)grain/(192*256));
             }
             int r=mapped[k][0],g=mapped[k][1],b=mapped[k][2];
             if(!color){r-=original[k][0];g-=original[k][1];b-=original[k][2];}
@@ -78,4 +79,5 @@ void m10v_5207_texture(m10v_library_image *im,const m10v_film_effects *e,uint32_
     }
 }
 
+void m10v_5207_texture(m10v_library_image *im,const m10v_film_effects *e,uint32_t grain,uint32_t seed,uint32_t color){m10v_5207_texture_q8(im,e,grain<<8,seed,color);}
 void m10v_5207_render(m10v_library_image *im,const m10v_film_effects *e,uint32_t grain,uint32_t seed){m10v_5207_texture(im,e,grain,seed,1);}

@@ -2,6 +2,22 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.16.4",
+      "date": "2026-10-16",
+      "title": "蓝凤凰与哈曼 RED 胶卷",
+      "changes": [
+        "M10V精选新增蓝凤凰（HARMAN Phoenix II 200）与哈曼 RED125，使用独立参考色彩模型，保留原有胶卷 ID。",
+        "蓝凤凰提供独立高光扩散调节；哈曼 RED 提供 EI125、EI64、EI250 模拟曝光，调整发生在色彩响应之前。",
+        "两卷均支持网页及机内颗粒、柔光、漏光；公共质感重置保留专属光晕或曝光设置。",
+        "胶片模拟下拉按分类集中展示，800T、5207、蓝凤凰与哈曼 RED 归于同一个 M10V精选分组。",
+        "升级五槽配置并迁移已发布旧记录，补齐原厂菜单名称、图标、保存与渲染回归。",
+        "依据 HARMAN 官方资料自建参考 LUT，公开来源、假设及校验数据；尚未进行真实胶片与 GR III 实机标定。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.16.3",
       "date": "2026-10-16",
       "title": "5207 胶卷与全库质感统一",
@@ -12,9 +28,9 @@
         "合入最新 800T 高光扩散及原厂 FN 详细菜单修复；隔离新旧设置文件并保留迁移与回退数据。",
         "新增 LUT 内容校验、渲染及菜单回归；5207 色彩与机内表现仍待 GR III 实机和真实胶片标定。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c0022840b0a70dfaee8bc43f75172763478cc362",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38881736309"
     },
     {
       "version": "2026.10.16.2",
