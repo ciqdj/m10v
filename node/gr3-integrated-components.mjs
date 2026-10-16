@@ -18,12 +18,12 @@ const pins={
  'aspect-level':'e8d9416c7c594e6af9934e91c63ae2880ca445c865a0b5123e66c034d5b24cec',
 };
 const resourceAdaptations=[
- [0x540b9448,0xe300032a,0xe300038f],
- [0x540b8a18,0xe300c32a,0xe300c38f],
- [0x540b8be4,0xe300c32a,0xe300c38f],
- [0x540b8a4c,0xe3003311,0xe300338e],
- [0x540b8a6c,0xe3003311,0xe300338e],
- [0x540b8c14,0xe3003311,0xe300338e],
+ [0x540b9448,0xe300032a,0xe30003a2],
+ [0x540b8a18,0xe300c32a,0xe300c3a2],
+ [0x540b8be4,0xe300c32a,0xe300c3a2],
+ [0x540b8a4c,0xe3003311,0xe30033a1],
+ [0x540b8a6c,0xe3003311,0xe30033a1],
+ [0x540b8c14,0xe3003311,0xe30033a1],
 ];
 export function integrationFingerprint(){
  return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
@@ -69,7 +69,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
    if(addition.equals(stock))continue;
    const current=rtos.subarray(off,off+4),address=LOAD+off;
    const router=e.aspect&&[0x533966d4,0x533970ec].includes(address);
-   need(current.equals(stock)||(router&&current.readUInt32LE()===0xe300338e),'camera components overlap native patch at '+address.toString(16));
+   need(current.equals(stock)||(router&&current.readUInt32LE()===0xe30033a1),'camera components overlap native patch at '+address.toString(16));
    addition.copy(rtos,off);stockWords++;
   }
   need(rtos.subarray(original.rtos.length,COMPONENT_END-LOAD).every(v=>v===0),'camera component allocation overlaps native module');
@@ -93,7 +93,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
  return {target,nativeReceipt,composition:{schema:'m10v-gr3-integrated-components/v1',verified:true,extensions:e,
   component_variant:variant(e)||null,component_rtos_sha256:c?sha(c.rtos):null,
   component_range:c?[COMPONENT_BASE,COMPONENT_END]:null,native_range:[manifest.base,manifest.base+runtime.length],
-  native_resource_range:[786,910],aspect_resource_id:e.aspect?911:null,
+  native_resource_range:[786,929],aspect_resource_id:e.aspect?930:null,
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
   raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,

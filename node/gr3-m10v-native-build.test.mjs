@@ -19,11 +19,11 @@ test('M10V native library builds from official bytes without a compatibility run
     const result = buildNativeLibrary(source, runtime, manifest);
     assert.deepEqual(result.receipt.changed_sections, ['RTOS']);
     assert.equal(result.receipt.camera_tested, false);
-    assert.equal(result.receipt.film_count, 65);
+    assert.equal(result.receipt.film_count, 66);
     assert.equal(result.receipt.external_film_pack, false);
     assert.deepEqual(auditNativeLibrary(source, result.candidate, runtime, manifest), result.receipt);
     const decoded = decodeFrameMap(result.candidate, result.candidate.readUInt32LE(result.candidate.length - 8)).decoded;
-    assert.ok(decoded.includes(Buffer.from('M10V2A.bin')));
+    assert.ok(decoded.includes(Buffer.from('M10V3A.bin')));
     assert.ok(!runtime.includes(Buffer.from('GRLIFE')));
     const damaged = Buffer.from(result.candidate); damaged[200] ^= 1;
     assert.throws(() => auditNativeLibrary(source, damaged, runtime, manifest));

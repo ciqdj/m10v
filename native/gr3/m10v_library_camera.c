@@ -8,7 +8,7 @@
 typedef uint32_t (*manager_fn)(void);
 typedef int (*read_fn)(uint32_t, const char *, uint32_t, void *);
 typedef int (*write_fn)(uint32_t, const char *, uint32_t, const void *);
-static const char state_names[2][12] = {"M10V2A.bin", "M10V2B.bin"};
+static const char state_names[2][12] = {"M10V3A.bin", "M10V3B.bin"};
 
 static int ram(const void *ptr, uint32_t size) {
     uintptr_t p = (uintptr_t)ptr;
@@ -45,6 +45,26 @@ static int legacy_valid(const uint8_t *p){
     uint32_t crc=0xffffffffu;for(uint32_t i=0;i<40;++i){crc^=p[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}
     return ~crc==little32(p+40);
 }
+static int migrate_v2(uint32_t fs,m10v_library_state *state){
+    static const char names[2][12]={"M10V2A.bin","M10V2B.bin"};
+    uint8_t records[2][64];int good[2]={0,0};
+    for(uint32_t k=0;k<2;k++){
+        for(uint32_t i=0;i<64;i++)records[k][i]=0;
+        uint8_t *p=records[k];
+        if(!((read_fn)0x53825648u)(fs,names[k],64,p))continue;
+        if(little32(p)!=0x5630314du||p[4]!=2||p[5]||p[6]!=64||p[7]||p[52]>2||p[53]>3||p[54]>3||p[55]>3||little32(p+56))continue;
+        int valid=1;
+        for(uint32_t i=0;i<5;i++){uint8_t *v=p+12+i*8;
+            if(!v[0]||v[0]>65||v[1]||v[2]>3||v[3]>3||v[4]>8||v[5]>8||v[6]>8||v[7]>3)valid=0;}
+        uint32_t crc=0xffffffffu;for(uint32_t i=0;i<60;i++){crc^=p[i];for(uint32_t bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}
+        good[k]=valid&&~crc==little32(p+60);
+    }
+    if(!good[0]&&!good[1])return 1;
+    uint32_t index=!good[0]||(good[1]&&little32(records[1]+8)>little32(records[0]+8));
+    for(uint32_t i=8;i<56;i++)((uint8_t *)state)[i]=records[index][i];
+    uint32_t crc=0xffffffffu;for(uint32_t i=0;i<100;i++){crc^=((uint8_t *)state)[i];for(uint32_t bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
+    return m10v_library_valid(state)?0:-1;
+}
 static int migrate(uint32_t fs,m10v_library_state *state){
     static const char names[2][12]={"M10V0.bin","M10V1.bin"};
     uint8_t records[2][44];int good[2];
@@ -56,7 +76,7 @@ static int migrate(uint32_t fs,m10v_library_state *state){
     for(uint32_t i=0;i<5;++i){state->slots[i].film=old[12+4*i];state->slots[i].grain=old[14+4*i];state->slots[i].soft=old[15+4*i];}
     state->stamp=old[32];state->format=old[33];state->corner=old[34];state->color=old[35];
     uint32_t crc=0xffffffffu;const uint8_t *bytes=(const uint8_t *)state;
-    for(uint32_t i=0;i<60;++i){crc^=bytes[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
+    for(uint32_t i=0;i<100;++i){crc^=bytes[i];for(uint32_t bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;
     return m10v_library_valid(state)?0:-1;
 }
 int m10v_camera_library_load(m10v_library_state *state) {
@@ -68,7 +88,7 @@ int m10v_camera_library_load(m10v_library_state *state) {
     for (uint32_t i = 0; i < 2; ++i)
         available[i] = ((read_fn)0x53825648u)(fs, state_names[i], sizeof(*state), &candidates[i]) &&
                        m10v_library_valid(&candidates[i]);
-    if (!available[0] && !available[1]) return migrate(fs,state);
+    if (!available[0] && !available[1]) {int old=migrate_v2(fs,state);return old==1?migrate(fs,state):old;}
     uint32_t selected = !available[0] || (available[1] && candidates[1].sequence > candidates[0].sequence);
     copy(state, &candidates[selected]); return M10V_LIBRARY_OK;
 }
@@ -91,4 +111,9 @@ int m10v_camera_library_stamp(m10v_library_state *state, uint32_t enabled, uint3
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     uint32_t fs = filesystem();
     return fs ? m10v_library_stamp(state, enabled, format, corner, color, store, (void *)(uintptr_t)fs) : M10V_LIBRARY_STORE_FAILED;
+}
+
+int m10v_camera_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value){
+    if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();return fs?m10v_library_effects(state,slot,field,value,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
 }

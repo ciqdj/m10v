@@ -3,6 +3,7 @@
  * package is loaded. Camera services have separately verified ABI boundaries. */
 #include "m10v_library.h"
 #include "halation_core.h"
+#include "film_5207.h"
 #include <stddef.h>
 #include "m10v_legacy_data.h"
 
@@ -68,30 +69,33 @@ void m10v_library_init(m10v_library_state *state) {
     if (!state) return;
     for (uint32_t i = 0; i < sizeof(*state); ++i) ((uint8_t *)state)[i] = 0;
 #ifdef M10V_INITIAL_STATE_BYTES
-    static const uint8_t initial[64] = {M10V_INITIAL_STATE_BYTES};
+    static const uint8_t initial[104] = {M10V_INITIAL_STATE_BYTES};
     for (uint32_t i = 0; i < sizeof(*state); ++i) ((uint8_t *)state)[i] = initial[i];
 #else
-    state->magic = 0x5630314du; state->version = 2; state->size = sizeof(*state);
+    state->magic = 0x5630314du; state->version = 3; state->size = sizeof(*state);
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) {
         state->slots[i].film = (uint16_t)(i == 4 ? 33 : i + 34);
         state->slots[i].halo_gain=3; state->slots[i].halo_spread=3;
+        state->effects[i].grain_size=1;state->effects[i].leak_spread=4;
         state->slots[i].halo_threshold=5; state->slots[i].halo_profile=2;
     }
     state->crc = checksum(state);
 #endif
 }
 int m10v_library_valid(const m10v_library_state *state) {
-    if (!state || state->magic != 0x5630314du || state->version != 2 ||
+    if (!state || state->magic != 0x5630314du || state->version != 3 ||
         state->size != sizeof(*state) || state->reserved || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
         if (!state->slots[i].film || state->slots[i].film > M10V_FILM_COUNT ||
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
             state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
+    for(uint32_t i=0;i<5;i++){const m10v_film_effects *e=&state->effects[i];
+        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->reserved[0]||e->reserved[1]||e->reserved[2])return 0;}
     return 1;
 }
 const char *m10v_library_name(uint32_t id) {
-    return !id || id>M10V_FILM_COUNT ? (const char *)0 : id<=33 ? films[id-1].name : legacy_records[id-34].name;
+    return !id || id>M10V_FILM_COUNT ? (const char *)0 : id==66 ? "5207" : id<=33 ? films[id-1].name : legacy_records[id-34].name;
 }
 static int commit(m10v_library_state *state, m10v_library_state *next,
                   m10v_library_store store, void *context) {
@@ -105,6 +109,8 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
     if (!m10v_library_valid(state) || slot >= M10V_SLOT_COUNT || !id || id > M10V_FILM_COUNT)
         return M10V_LIBRARY_INVALID;
     m10v_library_state next; copy_state(&next, state); next.slots[slot].film = (uint16_t)id;
+    if(id==66&&state->slots[slot].film!=66){next.slots[slot].grain=1;next.slots[slot].soft=0;next.slots[slot].halo_gain=0;next.slots[slot].halo_spread=3;next.slots[slot].halo_threshold=5;next.slots[slot].halo_profile=1;
+        m10v_film_effects e={1,0,0,4,0,{0,0,0}};next.effects[slot]=e;}
     return commit(state, &next, store, context);
 }
 int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grain, uint32_t soft,
@@ -116,7 +122,7 @@ int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grai
     return commit(state, &next, store, context);
 }
 int m10v_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t profile,m10v_library_store store,void *context) {
-    if(!m10v_library_valid(state)||slot>=5||gain>8||spread>8||threshold>8||profile>3)return M10V_LIBRARY_INVALID;
+    if(!m10v_library_valid(state)||slot>=5||state->slots[slot].film==66||gain>8||spread>8||threshold>8||profile>3)return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     next.slots[slot].halo_gain=(uint8_t)gain;next.slots[slot].halo_spread=(uint8_t)spread;
     next.slots[slot].halo_threshold=(uint8_t)threshold;next.slots[slot].halo_profile=(uint8_t)profile;
@@ -130,6 +136,15 @@ int m10v_library_stamp(m10v_library_state *state, uint32_t enabled, uint32_t for
     next.stamp = (uint8_t)enabled; next.format = (uint8_t)format;
     next.corner = (uint8_t)corner; next.color = (uint8_t)color;
     return commit(state, &next, store, context);
+}
+int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store store,void *ctx){
+    static const uint8_t limits[5]={2,8,5,8,1};
+    if(!m10v_library_valid(state)||slot>=5||field>5||(field==5?value!=0:value>limits[field]))return M10V_LIBRARY_INVALID;
+    m10v_library_state next;copy_state(&next,state);
+    if(field==5){
+        m10v_film_effects e={1,0,0,4,0,{0,0,0}};next.effects[slot]=e;next.slots[slot].grain=next.slots[slot].film==66?1:0;next.slots[slot].soft=0;}
+    else ((uint8_t *)&next.effects[slot])[field]=(uint8_t)value;
+    return commit(state,&next,store,ctx);
 }
 static uint8_t clamp(int value) { return (uint8_t)(value < 0 ? 0 : value > 255 ? 255 : value); }
 static int overlap(const void *a, uint32_t an, const void *b, uint32_t bn) {
@@ -250,6 +265,30 @@ static int legacy_color(m10v_library_image *image,uint32_t id){
     return 0;
 }
 
+static void soft_diffusion(m10v_library_image *image,const m10v_slot *choice,uint8_t *scratch,uint32_t cells,uint32_t gw,uint32_t gh,uint32_t shift){
+
+        uint8_t *temp = scratch + cells;
+        for (uint32_t i = 0; i < cells; ++i) scratch[i] = 0;
+        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
+            uint8_t v = image->y[row * image->stride + x]; uint32_t at = (row >> shift) * gw + (x >> shift);
+            v = v > 192 ? (uint8_t)(v - 192) : 0; if (v > scratch[at]) scratch[at] = v;
+        }
+        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
+            uint32_t total = 0;
+            for (int dx = -2; dx <= 2; ++dx) { int xx = (int)x + dx; if (xx >= 0 && xx < (int)gw) total += scratch[y * gw + (uint32_t)xx]; }
+            temp[y * gw + x] = (uint8_t)(total / 5);
+        }
+        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
+            uint32_t total = 0;
+            for (int dy = -2; dy <= 2; ++dy) { int yy = (int)y + dy; if (yy >= 0 && yy < (int)gh) total += temp[(uint32_t)yy * gw + x]; }
+            scratch[y * gw + x] = (uint8_t)(total / 5);
+        }
+        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
+            uint32_t at = row * image->stride + x; uint32_t v = image->y[at];
+            uint32_t bloom = scratch[(row >> shift) * gw + (x >> shift)];
+            image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
+        }
+}
 int m10v_library_render(m10v_library_image *image, const m10v_library_state *state,
                         uint32_t slot, const m10v_library_date *date, uint32_t seed,
                         uint8_t *scratch, uint32_t scratch_bytes) {
@@ -293,7 +332,9 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
             overlap(scratch,scratch_bytes,image,sizeof(*image)) ||
             (state->stamp && overlap(scratch,scratch_bytes,date,sizeof(*date)))) return M10V_LIBRARY_INVALID;
     }
-    if(choice->film>33){if(legacy_color(image,choice->film))return M10V_LIBRARY_INVALID;}
+    if(choice->film==66&&choice->soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
+    if(choice->film==66){m10v_5207_render(image,&state->effects[slot],choice->grain,seed);}
+    else if(choice->film>33){if(legacy_color(image,choice->film))return M10V_LIBRARY_INVALID;}
     else {
     const film *look = &films[choice->film - 1];
     uint8_t curve[256];
@@ -317,37 +358,8 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
             ((uint32_t)choice->halo_threshold<<8)|((uint32_t)profiles[choice->halo_profile]<<16);
         if (m10v_halation(&halo,control,scratch,scratch_bytes)) return M10V_LIBRARY_INVALID;
     }
-    if (choice->soft) {
-        uint8_t *temp = scratch + cells;
-        for (uint32_t i = 0; i < cells; ++i) scratch[i] = 0;
-        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
-            uint8_t v = image->y[row * image->stride + x]; uint32_t at = (row >> shift) * gw + (x >> shift);
-            v = v > 192 ? (uint8_t)(v - 192) : 0; if (v > scratch[at]) scratch[at] = v;
-        }
-        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
-            uint32_t total = 0;
-            for (int dx = -2; dx <= 2; ++dx) { int xx = (int)x + dx; if (xx >= 0 && xx < (int)gw) total += scratch[y * gw + (uint32_t)xx]; }
-            temp[y * gw + x] = (uint8_t)(total / 5);
-        }
-        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
-            uint32_t total = 0;
-            for (int dy = -2; dy <= 2; ++dy) { int yy = (int)y + dy; if (yy >= 0 && yy < (int)gh) total += temp[(uint32_t)yy * gw + x]; }
-            scratch[y * gw + x] = (uint8_t)(total / 5);
-        }
-        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
-            uint32_t at = row * image->stride + x; uint32_t v = image->y[at];
-            uint32_t bloom = scratch[(row >> shift) * gw + (x >> shift)];
-            image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
-        }
-    }
-    if (choice->grain) for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
-        uint32_t h = seed ^ ((x >> 1) * 0x9e3779b9u) ^ ((row >> 1) * 0x85ebca6bu);
-        h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15;
-        int noise = ((int)(h & 15) - (int)((h >> 4) & 15)) * (int)choice->grain * 3;
-        uint32_t at = row * image->stride + x; int v = image->y[at];
-        int weight = v < 128 ? v : 255 - v;
-        image->y[at] = clamp(v + noise * weight / (16 * 128));
-    }
+    if (choice->soft && choice->film!=66)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
+    if(choice->film!=66)m10v_5207_texture(image,&state->effects[slot],choice->grain,seed,0);
     if (state->stamp) stamp(image, state, date);
     return M10V_LIBRARY_OK;
 }

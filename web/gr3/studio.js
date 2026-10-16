@@ -32,7 +32,7 @@ const definitions = [
   ['recipes', '配方（调参数）', '给原厂影像风格预设一组九项参数，并设置机内名称与图标。', '6 个位置可定制'],
   ['timestamp', '时间戳优化', '为 JPEG 照片加入拍摄日期。格式、位置、字号与颜色可在相机菜单中设置。', '完整机内菜单'],
   ['aspect', '更多画幅比例', '新增 4:3 与 65:24，并提供 65:24 实时取景蒙版。', '4:3 / 65:24'],
-  ['film', '胶片模拟与机内胶卷库', '33 套预设共用五槽；在这里选卷，在胶卷库调质感与 800T 光晕。', '同一目录 · 同一配置'],
+  ['film', '胶片模拟与机内胶卷库', '34 套预设共用五槽；在这里选卷，在胶卷库调颗粒、柔光和漏光；800T 另有光晕。', '同一目录 · 同一配置'],
   ['presets', '原厂名称与图标', '给更多原厂预设定制名称、图标；需要先导入官方文件核对资源。', '12 个原厂预设'],
   ['negativeGrain', '负片颗粒', '开放内置负片的原厂颗粒菜单，档位在相机里调整。', '原厂颗粒菜单'],
   ['rawNr', 'RAW 降噪策略', '控制写入 DNG 前的 Bayer 降噪；JPEG 高 ISO 降噪保持原厂。', '独立 RAW 策略'],
@@ -171,7 +171,6 @@ function renderLedger() {
     ['保存状态',activeBuildController?'正在处理':state.preparation?'方案已核验':'保存时自动核验'],
   ];
   $('open-build-desk').hidden=false;
-  $('active-plan-note').textContent=native?'当前保存：M10V 胶卷库，含每槽质感和时间戳':'当前保存：影像定制方案';
   for (const [label, value] of rows) {
     const row = document.createElement('div');
     row.append(textNode('span', label), textNode('strong', value));
@@ -563,8 +562,6 @@ function showSettingsTab(tab){
 }
 $('tab-imaging').onclick=()=>showSettingsTab('imaging');$('tab-library').onclick=()=>showSettingsTab('library');
 for(const name of ['imaging','library'])$('tab-'+name).onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const next=settingsTab==='imaging'?'library':'imaging';showSettingsTab(next);$('tab-'+next).focus();}};
-$('use-native-plan').onclick=()=>showSettingsTab('library');
-$('use-800t-plan').onclick=()=>{if(!nativeEditor)return;nativeEditor.setFilm(33,4);showSettingsTab('library');notice('800T 已装入槽位 5；保存时与胶卷库、颗粒、柔光和时间戳一起构建。');};
 $('use-local-source').onclick=()=>importSource(null,true);
 $('local-source-model').value=chosenModel;
 for (const [key, label] of fields) {

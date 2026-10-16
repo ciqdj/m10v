@@ -2,19 +2,21 @@
 #define M10V_LIBRARY_H
 #include <stdint.h>
 
-#define M10V_FILM_COUNT 65u
+#define M10V_FILM_COUNT 66u
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0
 #define M10V_LIBRARY_INVALID -1
 #define M10V_LIBRARY_STORE_FAILED -2
 
 typedef struct { uint16_t film; uint8_t grain, soft, halo_gain, halo_spread, halo_threshold, halo_profile; } m10v_slot;
+typedef struct { uint8_t grain_size, leak_gain, leak_position, leak_spread, leak_variation, reserved[3]; } m10v_film_effects;
 typedef struct {
     uint32_t magic;
     uint16_t version, size;
     uint32_t sequence;
     m10v_slot slots[M10V_SLOT_COUNT];
     uint8_t stamp, format, corner, color;
+    m10v_film_effects effects[M10V_SLOT_COUNT];
     uint32_t reserved, crc;
 } m10v_library_state;
 typedef struct {
@@ -24,6 +26,8 @@ typedef struct {
 typedef struct { uint16_t year; uint8_t month, day, hour, minute; } m10v_library_date;
 typedef int (*m10v_library_store)(void *, const m10v_library_state *);
 
+int m10v_library_effects(m10v_library_state *,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store,void *);
+int m10v_camera_library_effects(m10v_library_state *,uint32_t slot,uint32_t field,uint32_t value);
 void m10v_library_init(m10v_library_state *);
 int m10v_library_valid(const m10v_library_state *);
 const char *m10v_library_name(uint32_t film);

@@ -113,6 +113,22 @@ class M10VCaptureTests(unittest.TestCase):
         u.mem_write(0x55010000, bytes(y)); u.mem_write(0x55020000, bytes(uv))
         return h, u, recipe + 0x9b8, y, uv, cache, frees, width, height, stride
 
+    def test_common_leak_is_consumed_by_non_5207_capture_with_per_shot_seed(self):
+        h,u,context,y,uv,cache,frees,width,height,stride=self.fixture(film=40,stamp=0,debug=True)
+        self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,1,8),0)
+        self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,4,1),0)
+        self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+        events=[e for e in h.capture_events if e[0]==112]
+        self.assertEqual(len(events),1);self.assertEqual(events[0][2],40)
+        state=host_tests.State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(host_tests.State)))
+        hy=(C.c_uint8*len(y)).from_buffer_copy(y);hc=(C.c_uint8*len(uv)).from_buffer_copy(uv)
+        image=host_tests.Image(hy,hc,stride*height,stride*height,width,height,stride)
+        scratch=(C.c_uint8*(6*width*height))()
+        self.assertEqual(host_tests.NativeFilmLibraryTests.lib.m10v_library_render(
+            C.byref(image),C.byref(state),1,None,events[0][3],scratch,len(scratch)),0)
+        self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(hy))
+        self.assertEqual(bytes(u.mem_read(0x55020000,len(uv))),bytes(hc))
+
     def test_capture_jpeg_and_raw_jpeg_use_stored_slot_and_match_native_pixels(self):
         for raw, bank in ((0, 0x60000000), (1, 0xa3000000)):
             h, u, context, y, uv, cache, frees, width, height, stride = self.fixture(raw=raw, raw_bank=bank)

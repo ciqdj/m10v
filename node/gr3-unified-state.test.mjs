@@ -2,15 +2,15 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection} from '../web/gr3/native-library-state.mjs';
 import {initialState,nativeCatalog} from './gr3-native-library.mjs';
 test('one catalogue accepts every legacy simulation as a real camera slot',async()=>{
- const c=await nativeCatalog();assert.equal(c.films.length,33);assert.deepEqual(c.films.filter(f=>f.group==='M10V精选').map(f=>f.id),[33]);
+ const c=await nativeCatalog();assert.equal(c.films.length,34);assert.deepEqual(c.films.filter(f=>f.group==='M10V精选').map(f=>f.id),[33,66]);
  assert.equal(c.films.find(f=>f.legacy_id==='ektar100').id,34);
  const cfg=defaultConfiguration();cfg.slots[0].film=34;cfg.slots[1].film=65;
  assert.equal(normalizeConfiguration(cfg).slots[0].film,34);
 });
-test('four halo controls and grain/soft are packed in each version2 slot',()=>{
+test('four halo controls and grain/soft are packed in each version3 slot',()=>{
  const cfg=defaultConfiguration();cfg.slots[4].halo={gain:8,spread:1,threshold:7,profile:3};
  const normalized=normalizeConfiguration(cfg);const bytes=initialState(normalized);
- assert.equal(bytes.length,64);assert.equal(bytes.readUInt16LE(4),2);
+ assert.equal(bytes.length,104);assert.equal(bytes.readUInt16LE(4),3);
  assert.deepEqual([...bytes.subarray(48,52)],[8,1,7,3]);
  assert.throws(()=>normalizeConfiguration({...cfg,slots:cfg.slots.map((s,i)=>i===4?{...s,halo:{...s.halo,gain:9}}:s)}));
 });

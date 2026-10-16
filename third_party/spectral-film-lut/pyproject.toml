@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spectral_film_lut"
+dynamic = ["version"]
+authors = [{ name = "Jan Lohse" }]
+description = "GUI to create LUTs to emulate film from spectral datasheets."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "colour-science>=0.4.7",
+    "imageio>=2.37.4",
+    "matplotlib>=3.11.0",
+    "networkx>=3.6.1",
+    "numba>=0.67.0",
+    "numpy>=2.4.6",
+    "opencv-python>=5.0.0.93",
+    "pyqt6>=6.11.0",
+    "scipy>=1.17.1",
+]
+
+[dependency-groups]
+dev = [
+    "mkdocstrings-python>=2.0.8",
+    "pre-commit>=4.6.2",
+    "pyinstaller>=6.22.3",
+    "ruff>=0.16.8",
+    "zensical>=0.0.63",
+]
+install = [
+    "pyinstaller>=6.21.0",
+]
+
+[project.urls]
+Repository = "https://github.com/JanLohse/spectral_film_lut"
+Documentation = "https://janlohse.github.io/spectral_film_lut/"
+Issues = "https://github.com/JanLohse/spectral_film_lut/issues"
+
+[project.gui-scripts]
+spectral_film_lut = "spectral_film_lut.__main__:run"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/spectral_film_lut/_version.py"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
