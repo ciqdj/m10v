@@ -5,7 +5,8 @@ No old standalone state/allocator hooks are included.
 import struct
 from scripts.build_gr3_menu_patches import assembly, branch, movw
 BASE=0x53000000
-FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion']
+FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']
+DETAIL_IDS={'halo':list(range(18,28)),'common':list(range(21,28)),'red':list(range(21,29))}
 STOCK_TABLE=bytes.fromhex('2c4cb35309000000f04ab35309000000144ab3530a000000104fb353090000008c4ab353090000005050b3530a0000000c50b35309000000ac4ab35309000000ec4fb3530a000000584eb3530a000000d049b35304000000b849b3530a000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000')
 STOCK_CAPTIONS=bytes.fromhex('e3011901e1011b01e2011d01da011f01db012101dc012301e5012501e9012f01e9012f0167012f01e9012f01e9013f01dd012701e4013701d9013101de013301e0013501f8000000')
 STOCK_SLIDER=bytes.fromhex('0dc0a0e1f0d82de97c5705e3055445e304b04ce268d04de2003095e50060a0e10040a0e320300be55b7701eb9f7a01eb9811d6e5305904eb0afdffeb04408de50f30a0e300308de51420a0e30c208de5233ea0e310308de54020a0e314208de5c730a0e318308de50070a0e108408de50410a0e10820a0e32d30a0e354004be248c807eb093da0e30420a0e100308de50710a0e11e30a0e354004be258c807eb54004be20410a0e15dc807eb647196e554104be20700a0e19fc807eb5c400be50c00a0e37c0814eb0030a0e1d02f00e31b2345e30700a0e1002083e5042a0ce3044083e51a2345e3086083e564104be264300be55c390ce358200be51a3345e35c300be56efb07eb5c301be5040053e10300000a64004be20320a0e30010a0e133ff2fe120201be5003095e5030052e10100001a1cd04be2f0a89de8d1cb19eb')
@@ -18,18 +19,25 @@ def build_detail(base,symbols):
  def stub(text,label):
   image.extend(bytes(-len(image)&3));a=base+len(image);return data(assembly(text,a),label)
  def addr(reg,a):return f'movw {reg},#{a&65535};movt {reg},#{a>>16};'
- # Clone every stock kind, append independent IDs only for a validated 800T
- # carrier. Dynamic resolution returns this table or the untouched stock table.
- table=bytearray(STOCK_TABLE)
- for i in range(36):
-  a,n=struct.unpack_from('<II',table,i*8)
-  raw=bytes.fromhex(STOCK_LISTS[a]);assert len(raw)==n*2
-  a=data(raw+bytes(sum(([0,x] for x in range(18,23)),[])),'detail list '+str(i))
-  struct.pack_into('<II',table,i*8,a,n+5)
- table_address=data(table,'dynamic 800T detail tables')
+ # Clone every stock kind, append only the current film's supported IDs.
+ # Runtime validation selects the halo/common/RED table for each carrier.
+ # Original stock tones outside the five carriers retain their original lists.
+ # Dynamic resolution returns this table or the untouched stock table.
+ # Previously this was restricted to one 800T
+
+ tables={}
+ for variant,ids in DETAIL_IDS.items():
+  table=bytearray(STOCK_TABLE)
+  for i in range(36):
+   a,n=struct.unpack_from('<II',table,i*8)
+   raw=bytes.fromhex(STOCK_LISTS[a]);assert len(raw)==n*2
+   a=data(raw+bytes(sum(([0,x] for x in ids),[])),'detail '+variant+' list '+str(i))
+   struct.pack_into('<II',table,i*8,a,n+len(ids))
+  tables[variant]=data(table,'dynamic '+variant+' detail tables')
+ table_address=tables['halo']
  # Existing resource extension occupies IDs786..910. Reuse its text descriptors
  # for three captions, Grain and Soft Diffusion, avoiding another global hook.
- caption_ids=[862,863,864,827,828]
+ caption_ids=[862,863,864,827,828,913,914,915,916,917,933]
  captions=data(STOCK_CAPTIONS+b''.join(struct.pack('<HH',i,i) for i in caption_ids),'detail caption pairs')
  # Each call site has already saved LR in the genuine stock prologue.
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:
@@ -40,14 +48,19 @@ def build_detail(base,symbols):
   if reg=='ip':text+='mov lr,#12;'
   text+='pop {r0-r12,pc};'
   entries[name]=stub(text,name)
- # Constructor runs before actual tone selection; allocate stock max11+5.
- entries['capacity']=stub('mov r0,#16;bx lr','detail constructor capacity')
+ # Constructor precedes tone selection; reserve stock max11 + max10 private rows.
+ entries['capacity']=stub('mov r0,#21;bx lr','detail constructor capacity')
  control=symbols['m10v_detail_control']
- # The C gate checks actual ui[0x198] tone + film33, never the old kind8 gate.
+ # The C gate checks actual ui[0x198] carrier and validated journal.
  # Private IDs can only originate in our validated list, but all dispatches
  # revalidate as well; an invalid/stale row takes the exact stock fallback.
  def gate(idreg,ui,fallback):
-  return f'sub ip,{idreg},#18;cmp ip,#4;bhi {hex(fallback)};push {{r0-r3,r12,lr}};mov r0,{ui};bl {hex(symbols["m10v_detail_table"])};'+addr('ip',0x53b3488c)+'cmp r0,ip;pop {r0-r3,r12,lr};beq '+hex(fallback)+';'
+  return f'sub ip,{idreg},#18;cmp ip,#10;bhi {hex(fallback)};push {{r0-r3,r12,lr}};mov r0,{ui};bl {hex(symbols["m10v_detail_table"])};'+addr('ip',0x53b3488c)+'cmp r0,ip;pop {r0-r3,r12,lr};beq '+hex(fallback)+';'
+ # Intercept before the stock computed branch, restore its original R0-R3,
+ # IP/LR and CMP flags, and retain its exact 18-entry handler jump table.
+ # This enforces native icon/value geometry for both private and stock rows.
+ stock_handlers=struct.unpack('<18I',bytes.fromhex('9c001b53ac001b53bc001b53cc001b53dc001b53ec001b53fc001b530c011b531c011b532c011b533c011b534c011b535c011b536c011b537c011b538c011b539c011b5358001b53'))
+ entries['row_dispatch']=stub('push {r0-r3,r12,lr};lsl r2,r3,#16;orr r2,r2,r4;mov r1,r5;mov r0,#8;'+f'bl {hex(control)};'+'pop {r0-r3,r12,lr};cmp r3,#17;ldrls pc,[pc,r3,lsl #2];b 0x531b000c;'+''.join('.word '+hex(a)+';' for a in stock_handlers),'row bounds and stock dispatch')
  entries['row']=stub(gate('r3','r5',0x531b01ac)+f'sub r2,r3,#18;lsl r2,r2,#16;orr r2,r2,r4;mov r1,r5;mov r0,#3;bl {hex(control)};b 0x531b0064','row render')
  entries['current']=stub(gate('r4','r5',0x531b0594)+f'sub r2,r4,#18;mov r1,r5;mov r0,#1;bl {hex(control)};mov r4,r0;b 0x531b045c','current value')
  # Slider clones retain the stock callback closure and stock cancel/return.
@@ -71,11 +84,19 @@ def build_detail(base,symbols):
    # Match the stock grain slider: resource 57 and 120-pixel tick pitch.
    if a==0x531ad03c and maximum==3:w=0xe3a03039
    if a==0x531ad060:w=0xe3a02000|maximum
-   if a==0x531ad064 and maximum==3:w=0xe3a03078
+   if a==0x531ad064:w=movw(3,360//maximum)
    output+=struct.pack('<I',w)
   return data(output,'stock slider clone '+str(maximum))
- slider8=clone(8);slider3=clone(3)
- entries['setup']=stub(gate('r0','r4',0x531b075c)+f'cmp r0,#21;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};blo {hex(slider8)};b {hex(slider3)}','setup dispatch')
+ sliders={n:clone(n) for n in (8,3,2,5,1)}
+ # Private IDs keep stable meanings across the three visible lists.
+ # Restore the original setup frame before dispatch; retain the selected ID
+ # in ip because r0 must be the stock controller for the slider constructor.
+ dispatch=''
+ for id in range(18,29):
+  maximum=[8,8,8,3,3,2,8,5,8,1,2][id-18]
+  dispatch+=f'cmp ip,#{id};beq {hex(sliders[maximum])};'
+ dispatch_stub=stub(dispatch+f'b {hex(sliders[8])}','slider dispatch')
+ entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
  entries['reset']=stub('push {r4,lr};bl 0x532c282c;mov r1,r5;mov r0,#7;mov r2,#0;'+f'bl {hex(control)};pop {{r4,pc}}','preserve stock reset')
- return bytes(image),{'schema':'m10v-gr3-native-detail/v1','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(18,23)),'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':slider8,'slider3':slider3,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','camera_tested':False}
+ return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(18,29)),'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,587,644,411,588,372,50,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}

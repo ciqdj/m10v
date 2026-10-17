@@ -106,6 +106,19 @@ static int commit(m10v_library_state *state, m10v_library_state *next,
     if (store(context, next) != 0) return M10V_LIBRARY_STORE_FAILED;
     copy_state(state, next); return M10V_LIBRARY_OK;
 }
+int m10v_library_reset(m10v_library_state *state,uint32_t slot,m10v_library_store store,void *context){
+    if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT)return M10V_LIBRARY_INVALID;
+    m10v_library_state next,defaults;copy_state(&next,state);m10v_library_init(&defaults);
+    uint32_t id=state->slots[slot].film;
+    if(defaults.slots[slot].film!=id){
+        m10v_slot *v=&defaults.slots[slot];v->film=(uint16_t)id;
+        v->grain=id==68?2:id==66||id==67?1:0;v->soft=0;
+        v->halo_gain=id==33?3:id==67?2:0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=id==66?1:2;
+        m10v_film_effects e={id==67?0:1,0,0,4,0,0,{0,0}};defaults.effects[slot]=e;
+    }
+    next.slots[slot]=defaults.slots[slot];next.effects[slot]=defaults.effects[slot];
+    return commit(state,&next,store,context);
+}
 int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
                         m10v_library_store store, void *context) {
     if (!m10v_library_valid(state) || slot >= M10V_SLOT_COUNT || !id || id > M10V_FILM_COUNT)
@@ -306,15 +319,46 @@ static void soft_diffusion(m10v_library_image *image,const m10v_slot *choice,uin
             image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
         }
 }
-/* Research-guided neutral highlight scatter for Phoenix II. The manufacturer
- * confirms halation, but publishes no PSF/hue measurement. No 800T red grade. */
-static void phoenix_halation(m10v_library_image *im,const m10v_slot *v,uint8_t *scratch,uint32_t gw,uint32_t gh,uint32_t shift){
+/* Assumed Phoenix II orange/red scatter, weaker than the 800T grade. Build
+ * the source from ORIGINAL luminance, then composite after colour rendering.
+ * The vendor provides no measured PSF or hue: these are bounded design choices. */
+static void phoenix_halation_source(const m10v_library_image *im,const m10v_slot *v,uint8_t *scratch,uint32_t gw,uint32_t gh,uint32_t shift){
     uint16_t *a=(uint16_t *)scratch,*b=a+gw*gh;
-    energy_source(im,a,gw,gh,shift,176+8u*v->halo_threshold,0);
+    uint32_t step=1u<<shift,gate=176+8u*v->halo_threshold;
+    for(uint32_t gy=0;gy<gh;++gy)for(uint32_t gx=0;gx<gw;++gx){
+        uint32_t sum=0,peak=0;
+        for(uint32_t dy=0;dy<step;++dy){
+            uint32_t row=(gy<<shift)+dy;if(row>=im->height)break;
+            for(uint32_t dx=0;dx<step;++dx){
+                uint32_t x=(gx<<shift)+dx;if(x>=im->width)break;
+                uint32_t light=im->y[row*im->stride+x];
+                uint32_t excess=light>gate?light-gate:0,energy=excess*excess*8;
+                sum+=energy;if(energy>peak)peak=energy;
+            }
+        }
+        /* Preserve tiny lamps at step16 without another image scan. A small
+         * bounded peak contribution supplements integrated cell energy; it
+         * is not a claim of calibrated source area or a measured near PSF.
+         * Max 49928 + 49928/16 < 65536, including partial edge cells. */
+        a[gy*gw+gx]=(uint16_t)((sum>>(2*shift))+(shift?peak>>4:0));
+    }
     energy_blur(a,b,gw,gh,1+v->halo_spread,1);
-    for(uint32_t row=0;row<im->height;row++)for(uint32_t x=0;x<im->width;x++){
-        uint32_t spill=(energy_sample(a,gw,gh,x,row,shift)*v->halo_gain)>>9;if(spill>128)spill=128;
-        uint32_t at=row*im->stride+x;im->y[at]=clamp(im->y[at]+((spill*(255-im->y[at]))>>8));
+}
+static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,const uint8_t *scratch,uint32_t gw,uint32_t gh,uint32_t shift){
+    const uint16_t *a=(const uint16_t *)scratch;
+    for(uint32_t row=0;row<im->height;++row)for(uint32_t x=0;x<im->width;x+=2){
+        uint32_t at=row*im->stride+x,y0=im->y[at],y1=im->y[at+1],peak=y0>y1?y0:y1;
+        /* Shared chroma must not tint either member of a clipped bright pair. */
+        if(peak>=240)continue;
+        uint32_t protect=(255-peak)*4;if(protect>255)protect=255;
+        uint32_t red=(energy_sample(a,gw,gh,x,row,shift)*v->halo_gain*protect)>>12;
+        uint32_t limit=6u*v->halo_gain;if(red>limit)red=limit;
+        /* Orange shoulder: more green than 800T, with a six-level red cap
+         * per gain step (800T permits 192). All products fit uint32_t. */
+        uint32_t green=red>>2,lift=(77*red+150*green+128)>>8;
+        im->y[at]=clamp((int)(y0+lift));im->y[at+1]=clamp((int)(y1+lift));
+        im->chroma[at]=clamp((int)im->chroma[at]-(int)((43*red+85*green+128)>>8));
+        im->chroma[at+1]=clamp((int)im->chroma[at+1]+(int)((128*red-107*green+128)>>8));
     }
 }
 int m10v_library_render(m10v_library_image *image, const m10v_library_state *state,
@@ -363,7 +407,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
             (state->stamp && overlap(scratch,scratch_bytes,date,sizeof(*date)))) return M10V_LIBRARY_INVALID;
     }
     if(choice->film==33 && (use_halo || choice->soft))m10v_800t_effects(image,choice,scratch,gw,gh,shift);
-    if(choice->film==67&&use_halo)phoenix_halation(image,choice,scratch,gw,gh,shift);
+    if(choice->film==67&&use_halo)phoenix_halation_source(image,choice,scratch,gw,gh,shift);
     if(choice->film==66&&choice->soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     if(choice->film==66){m10v_5207_render(image,&state->effects[slot],choice->grain,seed);}
     else if(choice->film>=67){
@@ -386,6 +430,7 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         image->y[at] = curve[image->y[at]]; image->y[at + 1] = curve[image->y[at + 1]];
     }
     }
+    if(choice->film==67&&use_halo)phoenix_halation_compose(image,choice,scratch,gw,gh,shift);
     if (choice->soft && choice->film!=66 && choice->film!=33)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     if(choice->film<66)m10v_5207_texture(image,&state->effects[slot],choice->grain,seed,0);
     if (state->stamp) stamp(image, state, date);

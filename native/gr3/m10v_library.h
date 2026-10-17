@@ -28,6 +28,8 @@ typedef int (*m10v_library_store)(void *, const m10v_library_state *);
 
 int m10v_library_effects(m10v_library_state *,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store,void *);
 int m10v_camera_library_effects(m10v_library_state *,uint32_t slot,uint32_t field,uint32_t value);
+int m10v_library_reset(m10v_library_state *,uint32_t slot,m10v_library_store,void *);
+int m10v_camera_library_reset(m10v_library_state *,uint32_t slot);
 void m10v_library_init(m10v_library_state *);
 int m10v_library_valid(const m10v_library_state *);
 const char *m10v_library_name(uint32_t film);

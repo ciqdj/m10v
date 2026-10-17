@@ -21,21 +21,21 @@ class NativeDetailTests(unittest.TestCase):
 
  def test_five_controls_integrated_with_unified_runtime(self):
   self.assertIn('detail',self.manifest,'native runtime has no stock five-control detail integration')
-  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion'])
-  self.assertEqual(self.manifest['detail']['ids'],[18,19,20,21,22])
+  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
+  self.assertEqual(self.manifest['detail']['ids'],list(range(18,29)))
   self.assertEqual(self.manifest['detail']['backend'],'m10v_camera_library_detail')
 
 
  def test_caption_pairs_resolve_actual_runtime_resources(self):
   base=self.manifest['base'];at=self.manifest['detail']['captions']-base
-  ids=[struct.unpack_from('<H',self.runtime,at+72+i*4)[0] for i in range(5)]
+  ids=[struct.unpack_from('<H',self.runtime,at+72+i*4)[0] for i in range(11)]
   labels=[]
   resources=self.manifest['resources']
   for resource_id in ids:
    descriptor=resources['descriptors'][resource_id-resources['first_id']]-base
    length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
    labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
-  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','柔光'])
+  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','柔光','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
 
 class StockDetailArmTests(NativeDetailTests):
  @classmethod
@@ -45,12 +45,12 @@ class StockDetailArmTests(NativeDetailTests):
 import {readFileSync,writeFileSync} from 'node:fs';
 import {decodeFrameMap} from './node/gr3-frames.mjs';
 const source=readFileSync('bin/fwdc239b-gr3-official.bin'),d=decodeFrameMap(source).decoded;
-let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
-writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.readUInt32LE(at+12)));
+let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.fromCharCode(0))[0];const size=d.readUInt32LE(at+12);if(name==='RTOS'||name==='ICONBIN')writeFileSync(process.argv[1]+'/official-'+name.toLowerCase()+'.bin',d.subarray(at+16,at+16+size));at+=16+size;}
 """
   subprocess.run(['node','--input-type=module','-e',script,cls.folder.name],cwd=Path(__file__).resolve().parents[1],check=True)
   cls.rtos=(Path(cls.folder.name)/'official-rtos.bin').read_bytes()
- def machine(self,tone=21,film=33,field=0,allocation=True,save_ok=True):
+  cls.iconbin=(Path(cls.folder.name)/'official-iconbin.bin').read_bytes()
+ def machine(self,tone=21,film=33,field=0,allocation=True,save_ok=True,real_row=False):
   from unicorn import Uc,UC_ARCH_ARM,UC_MODE_ARM,UC_HOOK_CODE
   from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_PC,UC_ARM_REG_LR
   from scripts.build_gr3_native_detail import branch,movw
@@ -58,7 +58,7 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   for a,n in ((0x53000000,0x1400000),(0x55000000,0x10000),(0x57000000,0x10000)):u.mem_map(a,n)
   u.mem_write(0x53000000,self.rtos);u.mem_write(self.manifest['base'],self.runtime)
   d=self.manifest['detail'];e=d['entries']
-  for a,name,link in [(0x531afc20,'capacity',True),(0x531afa24,'table_ip',True),(0x531afacc,'table_r3',True),(0x531affa8,'table_ip',True),(0x531b01f8,'table_selected',True),(0x531b000c,'row',False),(0x531b03f8,'current',False),(0x531b05e4,'setup',False),(0x531b0bf4,'callback',False),(0x531acd24,'reset',True)]:u.mem_write(a,struct.pack('<I',branch(a,e[name],link)))
+  for a,name,link in [(0x531afc20,'capacity',True),(0x531afa24,'table_ip',True),(0x531afacc,'table_r3',True),(0x531affa8,'table_ip',True),(0x531b01f8,'table_selected',True),(0x531b0008,'row_dispatch',False),(0x531b000c,'row',False),(0x531b03f8,'current',False),(0x531b05e4,'setup',False),(0x531b0bf4,'callback',False),(0x531acd24,'reset',True)]:u.mem_write(a,struct.pack('<I',branch(a,e[name],link)))
   for a,w in [(0x531b0248,movw(3,d['captions']&65535)),(0x531b024c,movw(3,d['captions']>>16,True))]:u.mem_write(a,struct.pack('<I',w))
   ui=0x55004000;slider=0x55006000
   u.mem_write(ui+0x198,bytes([tone,0,8,0,0,0,1]))
@@ -66,10 +66,18 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   state=bytearray.fromhex(self.manifest['initial_state_hex']);slots=[12,18,19,20,21]
   for i in range(5):struct.pack_into('<H6B',state,12+i*8,film,1,2,3,4,5,2)
   calls=[]
+  row=0x5500a000
+  if real_row:
+   u.mem_write(row+0xec,struct.pack('<III',row+0x200,row+0x400,row+0x600))
+   u.mem_write(row+0x600,struct.pack('<I',0x53c09e80))
+   u.mem_write(row+0x620,struct.pack('<4I',50,10,40,40))
+   u.mem_write(row+0x654,struct.pack('<4I',0,0,40,40))
   def hook(uc,a,n,data):
    args=[uc.reg_read(r) for r in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3)];result=0
    if a==self.manifest['symbols']['m10v_camera_library_load']:uc.mem_write(args[0],bytes(state))
    elif a==self.manifest['symbols']['m10v_library_valid']:result=1
+   elif a==self.manifest['symbols']['m10v_camera_library_reset']:
+    calls.append(('save',args[1]));result=0 if save_ok else 0xfffffffe
    elif a==self.manifest['symbols']['m10v_camera_library_detail']:
     from unicorn.arm_const import UC_ARM_REG_SP
     extra=struct.unpack('<4I',uc.mem_read(uc.reg_read(UC_ARM_REG_SP),16));calls.append(('save',args[1],args[2],args[3],*extra))
@@ -81,7 +89,12 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
    elif a==0x53394820:
     # Match the real selected private list row, including each stock prefix.
     kind=uc.mem_read(ui+0x19a,1)[0];setting=uc.mem_read(ui+0x199,1)[0]
-    p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8);result=n+field
+    p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
+    ids=list(range(18,28)) if film in (33,67) else list(range(21,29 if film==68 else 28))
+    result=n+ids.index(18+field) if 18+field in ids else n
+   elif real_row and a==0x536af31c:result=0x5500c000
+   elif real_row and a==0x533ad3c0:calls.append(('visible',args[0],args[1]))
+   elif real_row and a in (0x533ad308,0x533ad2c8,0x536af358):pass
    elif a==0x536af2a8:result=0x55009000 if allocation else 0;calls.append(('alloc',args[0]))
    elif a==0x532c282c:calls.append(('stock_reset',))
    elif a==0x5339ee0c:calls.append(('current',args[1]))
@@ -93,7 +106,7 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
     ptr=struct.unpack('<I',uc.mem_read(args[1],4))[0];calls.append(('closure',struct.unpack('<III',uc.mem_read(ptr,12))))
    elif a==0x53396f80:calls.append(('caption',args[1]))
    elif a==0x53394758:result=0x5500a000
-   elif a==0x5339e2f8:calls.append(('row',args[1],bytes(uc.mem_read(args[2],16)).decode('utf-16le').rstrip('\0')))
+   elif a==0x5339e2f8 and not real_row:calls.append(('row',args[1],bytes(uc.mem_read(args[2],16)).split(b'\0',1)[0].decode('ascii')))
    elif a==0x531b07c4:calls.append(('redraw',))
    elif a in (0x532bd5fc,0x532c34a8,0x532c2834,0x5316ca28,0x532c34e4):calls.append(('stock_exit',a))
    elif a in (0x5320ad88,0x5320ba9c,0x5339f210,0x5339f328,0x531ac95c,0x531b07c4):pass
@@ -111,6 +124,26 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   u.emu_start(entry,0x57000000,count=300000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x57000000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp)
   return u.reg_read(UC_ARM_REG_R0)
+ def test_private_row_icons_resolve_to_distinct_visible_stock_40px_artwork(self):
+  # Decode the shipped directory/descriptors independently of the runtime
+  # manifest. The visual selection was reviewed from these exact RGBA bytes.
+  from hashlib import sha256
+  ids=(484,473,398,478,587,644,411,588,372,50,648)
+  self.assertEqual(self.manifest['detail']['row_icons'],list(ids))
+  self.assertEqual(len(set(ids)),11)
+  def offset(address):
+   if 0x55000000<=address<0x5503a080:address=address-0x55000000+0x5407b540
+   return address-0x53000000
+  hashes=[]
+  for identifier in ids:
+   pointer=struct.unpack_from('<I',self.rtos,offset(0x550020fc+identifier*4))[0]
+   width,height,pixel=struct.unpack_from('<HHI',self.rtos,offset(pointer))
+   self.assertEqual((width,height),(40,40))
+   rgba=self.iconbin[pixel*4:pixel*4+6400]
+   self.assertEqual(len(rgba),6400);self.assertTrue(any(rgba[3::4]))
+   hashes.append(sha256(rgba).hexdigest())
+  self.assertEqual(len(set(hashes)),11)
+
  def test_real_detail_list_constructor_enumerates_all_settings_before_tone_selection(self):
   # FN constructs the page with stock tone11 before reading the actual tone.
   # Its list initializer enumerates 3 settings x12 kinds, not just setting0.
@@ -129,7 +162,7 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
     uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
    u.hook_add(UC_HOOK_CODE,services)
    self.execute(u,0x531afbe0,ui)
-   expected=16
+   expected=21
    self.assertEqual(observed,[('allocate',expected),('rows',expected)])
 
  def test_visibility_index_uses_stock_lr_stride_in_all_three_settings(self):
@@ -147,12 +180,12 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   for tone in (11,12,18,19,20,21):
    for setting in range(3):
     u,ui,slider,calls,state=self.machine(tone=tone)
-    u.mem_write(ui+0x199,bytes([setting]));u.mem_write(ui+0x19e,bytes([16]))
+    u.mem_write(ui+0x199,bytes([setting]));u.mem_write(ui+0x19e,bytes([21]))
     def widgets(uc,a,n,data):
      if a in handlers:uc.reg_write(UC_ARM_REG_PC,0x531b0064)
      elif a==0x5339e274:uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
     u.hook_add(UC_HOOK_CODE,widgets);self.execute(u,0x531aff84,ui)
-    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 5)
+    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 10)
 
  def test_stock_count_and_selector_resolve_each_carrier_dynamically(self):
   for tone in (12,18,19,20,21):
@@ -161,7 +194,7 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
     kind=u.mem_read(ui+0x19a,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+kind*8)
     original=sum(self.rtos[p-0x53000000+i*2]!=1 for i in range(n))
-    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(5 if film==33 else 0))
+    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(10 if film==33 else 7))
     if film==33:
      for field in range(5):
       # machine's external widget-index stub supplies last field selection.
@@ -184,6 +217,14 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
    self.assertIn(('scale',45 if field<3 else 120,560 if field<3 else 57),calls)
    self.assertIn(('range',0,8 if field<3 else 3),calls)
 
+ def test_all_extended_sliders_use_the_full_stock_360_pixel_track(self):
+  for film,field,maximum,pitch in ((33,5,2,180),(33,6,8,45),(33,7,5,72),
+                                  (33,8,8,45),(33,9,1,360),(68,10,2,180)):
+   u,ui,slider,calls,state=self.machine(film=film,field=field)
+   self.execute(u,0x531b05c4,ui)
+   self.assertIn(('range',0,maximum),calls)
+   self.assertIn(('scale',pitch,560),calls)
+
  def test_stock_current_reads_five_independent_fields(self):
   for field,expected in enumerate((3,4,5,1,2)):
    u,ui,slider,calls,state=self.machine(field=field);self.execute(u,0x531b03cc,ui)
@@ -201,10 +242,10 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
       i=(12,18,19,20,21).index(tone);self.assertEqual(state[12+i*8+(4,5,6,2,3)[field]],2)
  def test_invalid_values_and_non800t_never_write(self):
   for film in (33,34):
-   for arg in (0x009,0x308,0x403,0x503,0xffff):
+   for arg in (0x009,0x308,0x404,0x503,0xffff):
     u,ui,slider,calls,state=self.machine(film=film)
     result=self.execute(u,self.manifest['symbols']['m10v_detail_control'],2,ui,arg)
-    if film==34 or arg!=0x403:self.assertFalse(any(c[0]=='save' for c in calls))
+    self.assertFalse(any(c[0]=='save' for c in calls))
  def test_slider_allocation_failure_retains_stock_null_guard(self):
   u,ui,slider,calls,state=self.machine(allocation=False);self.execute(u,0x531b05c4,ui)
   self.assertIn(('alloc',12),calls);self.assertFalse(any(c[0]=='closure' for c in calls))
@@ -217,13 +258,73 @@ writeFileSync(process.argv[1]+'/official-rtos.bin',d.subarray(at+16,at+16+d.read
   # Real row dispatcher loops through all stock rows, so start at the private
   # branch with its original saved-frame contract and a sentinel continuation.
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
-  for field,text in enumerate(('3/8','4/8','5/8','弱','中')):
+  for field,text in enumerate(('3','4','5','1','2')):
    u,ui,slider,calls,state=self.machine(field=field)
    u.reg_write(UC_ARM_REG_R3,18+field);u.reg_write(UC_ARM_REG_R4,10+field);u.reg_write(UC_ARM_REG_R5,ui)
    u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_LR,0x57000000)
    u.emu_start(self.manifest['detail']['entries']['row'],0x531b0064,count=10000)
-   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x531b0064);self.assertIn(('row',0x1e3,text),calls)
+   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x531b0064);self.assertIn(('row',(484,473,398,478,587)[field],text),calls)
    self.assertFalse(any(c[0]=='save' for c in calls))
+ def test_row_dispatch_preserves_stock_registers_flags_handlers_and_reuse(self):
+  from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R12,UC_ARM_REG_LR,UC_ARM_REG_SP,UC_ARM_REG_PC,UC_ARM_REG_CPSR
+  handlers=struct.unpack_from('<18I',self.rtos,0x1b0010)
+  registers=(UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R12,UC_ARM_REG_LR)
+  u,ui,slider,calls,state=self.machine(real_row=True)
+  # Private and stock rows use the same native icon/value geometry.
+  for parameter in (18,*range(18),28,4):
+   expected=[0x12340000,0x12340001,0x12340002,parameter,10,ui,0x1234000c,0x57000000]
+   for reg,v in zip(registers,expected):u.reg_write(reg,v)
+   u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_CPSR,0xa0000013)
+   stop=handlers[parameter] if parameter<18 else 0x531b000c
+   u.emu_start(self.manifest['detail']['entries']['row_dispatch'],stop,count=20000)
+   self.assertEqual(u.reg_read(UC_ARM_REG_PC),stop)
+   self.assertEqual([u.reg_read(reg) for reg in registers],expected)
+   self.assertEqual(u.reg_read(UC_ARM_REG_SP),0x5700fff0)
+   self.assertEqual(u.reg_read(UC_ARM_REG_CPSR)&0xf0000000,0x80000000 if parameter<17 else 0x60000000 if parameter==17 else 0x20000000)
+   self.assertEqual(struct.unpack('<4I',u.mem_read(0x5500a620,16)),(50,10,60 if parameter==28 else 40,40))
+
+ def test_stock_bounds_api_preserves_native_icon_and_value_layout_for_all_rows(self):
+  # The row's native value view is only 40px wide. Prove the official layout
+  # method retains both bounds and local drawing rect, including reuse.
+  u,ui,slider,calls,state=self.machine(real_row=True)
+  for parameter,rect in ((18,(50,10,40,40)),(0,(50,10,40,40)),(28,(50,10,60,40)),(17,(50,10,40,40))):
+   self.execute(u,self.manifest['symbols']['m10v_detail_control'],8,ui,(parameter<<16)|10)
+   self.assertEqual(struct.unpack('<4I',u.mem_read(0x5500a620,16)),rect)
+   self.assertEqual(struct.unpack('<4I',u.mem_read(0x5500a654,16)),(0,0,rect[2],rect[3]))
+
+ def test_real_stock_row_setter_draws_distinct_native_icons_and_numeric_values(self):
+  # Execute the official row setter, strlen and byte->UTF16 conversion. The
+  # former mock decoded its input as UTF16 and concealed the actual ABI bug.
+  from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP,UC_ARM_REG_LR
+  for field,expected in enumerate(('3','4','5','1','2','1','0','0','4','0','125')):
+   u,ui,slider,calls,state=self.machine(film=68 if field==10 else 33,field=field,real_row=True)
+   u.reg_write(UC_ARM_REG_R3,18+field);u.reg_write(UC_ARM_REG_R4,10+field);u.reg_write(UC_ARM_REG_R5,ui)
+   u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_LR,0x57000000)
+   u.emu_start(self.manifest['detail']['entries']['row_dispatch'],0x531b0064,count=30000)
+   row=0x5500a000;text_widget=row+0x600
+   length=u.mem_read(text_widget+0xed,1)[0]
+   pointer=struct.unpack('<I',u.mem_read(text_widget+0xf0,4))[0]
+   actual=bytes(u.mem_read(pointer,(length-1)*2)).decode('utf-16le')
+   self.assertEqual(actual,expected)
+   self.assertEqual(struct.unpack('<4I',u.mem_read(text_widget+0x20,16)),(50,10,60 if field==10 else 40,40))
+   self.assertEqual(struct.unpack('<H',u.mem_read(row+0x200+0xea,2))[0],(484,473,398,478,587,644,411,588,372,50,648)[field])
+   self.assertIn(('visible',row+0x200,1),calls)
+   self.assertIn(('visible',row+0x400,0),calls)
+   self.assertIn(('visible',text_widget,1),calls)
+
+ def test_red_exposure_uses_real_ei_numbers_in_selected_and_unselected_rows(self):
+  from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP
+  for selected in (0,1):
+   for value,expected in enumerate(('125','64','250')):
+    u,ui,slider,calls,state=self.machine(film=68,field=10,real_row=True)
+    state[56+4*8+5]=value
+    u.mem_write(0x5500a000+0xa0,bytes([selected]))
+    u.reg_write(UC_ARM_REG_R3,28);u.reg_write(UC_ARM_REG_R4,10);u.reg_write(UC_ARM_REG_R5,ui);u.reg_write(UC_ARM_REG_SP,0x5700fff0)
+    u.emu_start(self.manifest['detail']['entries']['row_dispatch'],0x531b0064,count=30000)
+    text=0x5500a600;length=u.mem_read(text+0xed,1)[0];pointer=struct.unpack('<I',u.mem_read(text+0xf0,4))[0]
+    self.assertEqual(bytes(u.mem_read(pointer,(length-1)*2)).decode('utf-16le'),expected)
+    self.assertEqual(struct.unpack('<4I',u.mem_read(text+0x20,16)),(50,10,60,40))
+
  def test_private_profile_menu_is_unreachable(self):
   # Group10 is the existing private halation submenu, now only three controls.
   from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_PC,UC_ARM_REG_LR,UC_ARM_REG_SP

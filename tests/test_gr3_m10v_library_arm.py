@@ -98,6 +98,82 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u,'m10v_menu_icon',0,209),735)
         self.assertEqual(self.call(u,'m10v_menu_icon',0,21),703)
 
+    def test_detail_lists_offer_only_controls_consumed_by_each_film(self):
+        common = [21,22,23,24,25,26,27]
+        for film, ids in ((33,[18,19,20]+common),(35,common),(66,common),
+                          (67,[18,19,20]+common),(68,common+[28])):
+            with self.subTest(film=film):
+                u=self.machine();state=0x55001000;ui=0x55007000
+                self.call(u,'m10v_library_init',state)
+                self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,film),0)
+                u.mem_write(ui+0x198,bytes([18,0,8,0,0,0,0,0]))
+                table=self.call(u,'m10v_detail_table',ui)
+                self.assertNotEqual(table,0x53b3488c)
+                pointer,count=struct.unpack('<II',u.mem_read(table+8*8,8))
+                entries=bytes(u.mem_read(pointer,count*2))
+                self.assertEqual([v for v in entries[1::2] if v>=18],ids)
+                # One immediate callback must be visible to a fresh capture load.
+                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(3<<8)|3),1)
+                self.assertEqual(self.call(u,'m10v_camera_library_load',state),0)
+                saved=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
+                self.assertEqual(saved.slots[1].grain,3)
+                self.assertEqual(saved.slots[0].grain,0)
+
+    def test_detail_effect_callbacks_are_bounded_persistent_and_failure_atomic(self):
+        for film in (35,66,67,68):
+            u=self.machine();state=0x55001000;ui=0x55007000
+            self.call(u,'m10v_library_init',state)
+            self.call(u,'m10v_camera_library_select',state,1,film)
+            u.mem_write(ui+0x198,bytes([18,0,8,0,0,0,0,0]))
+            for field,value,byte in ((5,2,0),(6,8,1),(7,5,2),(8,8,3),(9,1,4)):
+                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(field<<8)|value),1)
+                self.call(u,'m10v_camera_library_load',state)
+                saved=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
+                self.assertEqual(saved.effects[1][byte],value)
+                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(field<<8)|(value+1)),0)
+            before=dict(self.files);self.store_result=-1
+            self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(6<<8)|0),0)
+            self.assertEqual(self.files,before)
+            self.store_result=0
+            self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(10<<8)|2),1 if film==68 else 0)
+
+    def test_detail_reset_restores_all_visible_fields_in_one_atomic_slot_commit(self):
+        for film,grain,gain,size in ((33,0,3,1),(35,0,3,1),(66,1,0,1),(67,1,2,0),(68,2,0,1)):
+            with self.subTest(film=film):
+                u=self.machine();state=0x55001000;ui=0x55007000
+                self.call(u,'m10v_library_init',state)
+                self.call(u,'m10v_camera_library_select',state,1,film)
+                u.mem_write(ui+0x198,bytes([18,0,8,0,0,0,0,0]))
+                for field,v in ((3,3),(4,3),(5,2),(6,8),(7,5),(8,8),(9,1)):
+                    self.call(u,'m10v_detail_control',2,ui,(field<<8)|v)
+                if film in (33,67):self.call(u,'m10v_detail_control',2,ui,8)
+                if film==68:self.call(u,'m10v_detail_control',2,ui,(10<<8)|2)
+                self.call(u,'m10v_camera_library_load',state)
+                old=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
+                self.file_calls.clear()
+                self.assertEqual(self.call(u,'m10v_detail_control',7,ui,0),1)
+                self.assertEqual(sum(a==0x53825fa8 for a,_ in self.file_calls),1)
+                self.call(u,'m10v_camera_library_load',state)
+                fresh=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
+                self.assertEqual((fresh.slots[1].film,fresh.slots[1].grain,fresh.slots[1].soft),(film,grain,0))
+                if film in (33,67):self.assertEqual((fresh.slots[1].halo_gain,fresh.slots[1].halo_spread,fresh.slots[1].halo_threshold),(gain,3,5))
+                self.assertEqual(list(fresh.effects[1]),[size,0,0,4,0,0,0,0])
+                self.assertEqual(bytes(fresh.slots[0]),bytes(old.slots[0]))
+                self.assertEqual(bytes(fresh.effects[0]),bytes(old.effects[0]))
+                before=dict(self.files);self.store_result=-1
+                self.assertEqual(self.call(u,'m10v_detail_control',7,ui,0),0)
+                self.assertEqual(self.files,before)
+
+    def test_failed_detail_load_never_exposes_defaults_as_saved_settings(self):
+        u=self.machine();state=0x55001000;ui=0x55007000
+        self.call(u,'m10v_library_init',state)
+        self.call(u,'m10v_camera_library_select',state,1,66)
+        u.mem_write(ui+0x198,bytes([18,0,8,0,0,0,0,0]))
+        before=dict(self.files);u.mem_write(0x55004220,b'\0')
+        self.assertEqual(self.call(u,'m10v_detail_table',ui),0x53b3488c)
+        self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(3<<8)|3),0)
+        self.assertEqual(self.files,before)
+
     def test_slot_names_follow_saved_films_in_main_and_slot_selection_lists(self):
         u = self.machine(); state = 0x55008000
         self.call(u, 'm10v_library_init', state)

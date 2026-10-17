@@ -1,62 +1,60 @@
-"""Bake the audited 5207 datasheet model, neutral APD scan, no print stock.
+"""Bake a restrained display-sRGB to display-sRGB 5207-inspired interpretation.
 
-Input: assumed display sRGB, D65 adapted by the spectral model to 5500 K.
-This adapter does NOT invert the GR3 ISP or claim scene-linear recovery.
-Upstream model and licence are vendored; dependency versions are recorded.
+The input has already passed through the camera ISP. Its scene exposure,
+illuminant spectrum and sensor response cannot be recovered by sRGB decoding.
+This intentionally replaces the former uncalibrated spectral/APD inversion.
+All numerical look parameters below are design assumptions, not Kodak data.
 """
 import hashlib
 import importlib.metadata
 import json
 import os
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault('MPLCONFIGDIR', '/private/tmp/m10v-5207-matplotlib')
-os.environ.setdefault('NUMBA_CACHE_DIR', '/private/tmp/m10v-5207-numba')
-sys.path.insert(0, str(ROOT/'third_party/spectral-film-lut/src'))
 import numpy as np
 import colour
-from spectral_film_lut.film_spectral import FilmSpectral
-from spectral_film_lut.negative_film.kodak_5207 import KODAK_5207
-from spectral_film_lut.color_processing import apd_to_xyz
-from spectral_film_lut.xy_lut import RAWTOACES_XYZ
+
+PARAMETERS = {
+    'status': 'assumed display-domain interpretation; not a measured Kodak transform',
+    'input': 'encoded display sRGB D65 after camera ISP; scene radiance not recovered',
+    'output': 'encoded display sRGB D65',
+    'mix_matrix': [[.985,.015,0.],[.006,.988,.006],[0.,.02,.98]],
+    'warm_strength': .04,
+    'toe_lift': .08,
+    'shoulder_compression': .025,
+    'tone': 'x + toe_lift*x*(1-x)^2 - shoulder_compression*x^4',
+    'white_endpoint': .975,
+    'neutral_axis': 'row-stochastic matrix; warmth vanishes on neutrals; common monotone curve',
+    'rendering_intent': 'restrained warm colour, neutral greys, retained blue/cyan and soft highlights',
+}
+RESEARCH_SOURCES = [
+    {'url':'https://github.com/JanLohse/spectral_film_lut',
+     'use':'prior spectral/APD research only; no upstream numerical model or code used in this mapping',
+     'license':'MIT; retained vendored attribution is independent of this assumed mapping'},
+    {'url':'https://janlohse.github.io/spectral_film_lut/reference/film_spectral/',
+     'use':'documents scene-referred input; motivates avoiding spectral exposure simulation on camera-rendered pixels'},
+]
 
 
 class Reference5207:
-    def __init__(self):
-        self.film = FilmSpectral(KODAK_5207)
-        # Fixed scanner inversion, tuned only to a neutral ramp, never to test colours.
-        self.inversion_gamma = 3.5
-        # Upstream's current cid_to_xyz uses a retired default upsampler key.
-        # Use its documented scan matrix fit with an explicit available method.
-        training = RAWTOACES_XYZ / RAWTOACES_XYZ.sum(axis=1,keepdims=True) * .18
-        density = self.film.input_transform(training,exp_kelvin=5500,
-            color_masking=1.0,upsampling_method='SFL upsampling')
-        scanned = self.film.scan_with_apd(density)
-        uncalibrated = apd_to_xyz(scanned,self.inversion_gamma,exp_to_xyz=np.eye(3))
-        self.matrix = np.linalg.lstsq(uncalibrated,training,rcond=None)[0]
-        self.matrix /= self.matrix.sum(axis=0)
-        x = np.linspace(0,1,1025)
-        self.grey_input = x
-        self.grey_output = self._render(np.repeat(x[:,None],3,axis=1))
-
-    def _render(self,rgb):
-        density = self.film.input_transform(np.asarray(rgb,dtype=np.float32),
-            colorspace='sRGB', exp_kelvin=5500, color_masking=1.0,
-            upsampling_method='SFL upsampling')
-        scanned = self.film.scan_with_apd(density)
-        xyz = apd_to_xyz(scanned,self.inversion_gamma,6500,exp_to_xyz=self.matrix)
-        return np.clip(colour.XYZ_to_RGB(xyz,'sRGB',apply_cctf_encoding=True),0,1)
-
+    """Bounded encoded-display mapping, not a physical negative/scan model."""
     def render(self,rgb):
         rgb = np.asarray(rgb,dtype=np.float64)
-        result = self._render(rgb)
-        # Remove scan inversion channel imbalance at the input's neutral luminance.
-        luma = rgb @ np.array([.2126,.7152,.0722])
-        neutral = np.stack([np.interp(luma,self.grey_input,self.grey_output[:,c]) for c in range(3)],axis=-1)
-        target = neutral.mean(axis=-1,keepdims=True)
-        return np.clip(result+target-neutral,0,1)
+        if rgb.ndim == 0 or rgb.shape[-1] != 3 or not np.isfinite(rgb).all():
+            raise ValueError('finite RGB triples required')
+        # This is an explicit bounded display-domain operation. No EOTF/OETF
+        # is added: these parameters describe encoded code-value appearance.
+        x = np.clip(rgb,0,1) @ np.asarray(PARAMETERS['mix_matrix']).T
+        # Small warm exposure bias only where red exceeds green; keep greys
+        # neutral and add no warmth to blue/cyan. Both adjustments are bounded blends.
+        warm = PARAMETERS['warm_strength'] * np.maximum(x[...,0]-x[...,1],0)
+        x[...,0] += warm*(1-x[...,0])
+        x[...,2] *= 1-warm
+        # Positive slope throughout [0,1], with no internal clipping plateau.
+        # At these declared settings f(0)=0, f(1)=.975 and f'(x)>=.90.
+        return x + PARAMETERS['toe_lift']*x*(1-x)**2 - PARAMETERS['shoulder_compression']*x**4
 
 
 def sample_tetrahedral(table,rgb):
@@ -70,30 +68,42 @@ def sample_tetrahedral(table,rgb):
     return result
 
 
-def generate():
+def generate(root=ROOT):
+    root=Path(root)
     model=Reference5207(); axis=np.linspace(0,1,15)
     grid=np.stack(np.meshgrid(axis,axis,axis,indexing='ij'),axis=-1).reshape(-1,3)
     values=np.rint(model.render(grid)*255).astype(np.uint8)
     payload=values.tobytes()
-    header='/* Generated by build_gr3_5207_reference.py; see 5207-reference.json and third-party MIT notice. */\n'
+    header='/* Assumed display-sRGB interpretation; not measured Kodak. See 5207-reference.json. */\n'
     header+='static const uint8_t m10v_5207_lut[3375][3] = {\n'
     header+=''.join('{%d,%d,%d},\n'%tuple(v) for v in values)+'};\n'
-    (ROOT/'native/gr3/film_5207_data.h').write_text(header)
-    (ROOT/'web/gr3/5207-lut.json').write_text(json.dumps({'size':15,'bits':8,'order':'RGB, blue fastest','values':values.reshape(-1).tolist()},separators=(',',':'))+'\n')
-    source_paths=[p for p in (ROOT/'third_party/spectral-film-lut').rglob('*') if p.is_file() and '__pycache__' not in p.parts]
-    source_paths.append(Path(__file__))
+    (root/'native/gr3').mkdir(parents=True,exist_ok=True)
+    (root/'web/gr3').mkdir(parents=True,exist_ok=True)
+    (root/'native/gr3/film_5207_data.h').write_text(header)
+    (root/'web/gr3/5207-lut.json').write_text(json.dumps({'size':15,'bits':8,'order':'RGB, blue fastest','values':values.reshape(-1).tolist()},separators=(',',':'))+'\n')
+    source_paths=[Path(__file__).resolve()]
     samples=np.random.default_rng(5207).uniform(.04,.96,(4096,3))
     expected=model.render(samples); actual=sample_tetrahedral(values.reshape(15,15,15,3)/255,samples)
     delta=colour.delta_E(colour.XYZ_to_Lab(colour.sRGB_to_XYZ(expected)),colour.XYZ_to_Lab(colour.sRGB_to_XYZ(actual)),method='CIE 2000')
-    result={'schema':'m10v-5207-reference/v1','film':'traditional 35mm 5207, ECN-2, neutral APD inversion',
-        'input':'assumed encoded sRGB; GR3 ISP calibration pending','illuminant_kelvin':5500,'print_stock':None,
-        'inversion_gamma':3.5,'color_masking':1.0,'neutral_correction':'input luminance indexed grey-axis correction',
+    grey_levels=np.array([0.,.1,.18,.25,.5,.75,.9,.95,1.])
+    grey=model.render(np.repeat(grey_levels[:,None],3,axis=1))
+    quality={'intent':'display quality constraints, not measured stock accuracy',
+        'grey_input':grey_levels.tolist(),'grey_output':grey[:,0].tolist(),
+        'grey_max_channel_spread':float(np.ptp(grey,axis=1).max()),
+        'grey_max_abs_change':float(np.max(np.abs(grey-grey_levels[:,None]))),
+        'highlight_min_step_90_95_100':float(np.diff(grey[-3:,0]).min())}
+    result={'schema':'m10v-5207-reference/v2','film':'5207-inspired restrained display interpretation',
+        'input':PARAMETERS['input'],'output':PARAMETERS['output'],'print_stock':None,
+        'model':'bounded-display-srgb-v1','parameters':PARAMETERS,'research_sources':RESEARCH_SOURCES,'quality_validation':quality,
+        'spectral_calibrated':False,'official_lut':False,'scene_radiance_recovered':False,
+        'inversion_gamma':None,'color_masking':None,'neutral_correction':'neutral axis preserved algebraically before quantization',
         'camera_calibrated':False,'film_calibrated':False,'table_size':15,'table_bits':8,'table_bytes':len(payload),'table_sha256':hashlib.sha256(payload).hexdigest(),
         'sources':{str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(source_paths)},
-        'dependencies':{n:importlib.metadata.version(n) for n in ['numpy','colour-science','scipy','numba','matplotlib']},
+        'dependencies':{n:importlib.metadata.version(n) for n in ['numpy','colour-science']},
         'interpolation_validation':{'samples':4096,'seed':5207,'encoded_domain':[.04,.96],'delta_e_00_median':float(np.median(delta)), 'delta_e_00_p95':float(np.quantile(delta,.95)), 'rgb_abs_p95':float(np.quantile(np.abs(expected-actual),.95))}}
-    (ROOT/'native/gr3/5207-reference.json').write_text(json.dumps(result,indent=2)+'\n')
-    print(json.dumps(result['interpolation_validation']))
+    (root/'native/gr3/5207-reference.json').write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps({'interpolation':result['interpolation_validation'],'quality':quality}))
+    return result
 
 
 if __name__=='__main__':generate()

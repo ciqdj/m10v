@@ -1,13 +1,29 @@
+import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture} from './native-library-state.mjs';
 export function mountNativeLibrary(root=document,{onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
-let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[];
+let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel='gr3';
 try{const saved=localStorage.getItem('m10v-native-library-v1');if(saved)configuration=normalizeConfiguration(JSON.parse(saved));}catch{}
 // Retired M10V sketches migrate by slot; their numeric IDs remain firmware-compatible.
 configuration.slots.forEach((s,i)=>{if(s.film<33)s.film=[34,35,36,37,33][i];});
 const message=(text,error=false)=>{$('#progress').textContent=text;$('#progress').dataset.error=String(error);};
 function invalidate(meta={}){onChange(normalizeConfiguration(configuration),meta);for(const u of urls)URL.revokeObjectURL(u);urls=[];$('#downloads').hidden=true;message('');try{localStorage.setItem('m10v-native-library-v1',JSON.stringify(configuration));}catch{}}
+function versionUnlockSnapshot(){
+ const enabled=$('#native-version-unlock').checked;
+ const option=$('#native-version-known').checked?{enabled,dsp:$('#native-version-dsp').value,cpu:$('#native-version-cpu').value}:{enabled,mode:'dsp-package-only'};
+ return normalizeVersionUnlock(option,sourceModel);
+}
+function renderVersionUnlock(){
+ const supported=sourceModel==='gr3',toggle=$('#native-version-unlock'),known=$('#native-version-known');
+ $('#native-version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
+ toggle.disabled=busy||!supported;$('#native-version-unlock-fields').hidden=!toggle.checked;
+ known.disabled=busy||!supported||!toggle.checked;
+ const advanced=supported&&toggle.checked&&known.checked;$('#native-version-known-fields').hidden=!advanced;
+ for(const key of ['dsp','cpu']){$('#native-version-'+key).disabled=busy||!advanced;$('#native-version-'+key).required=advanced;}
+ let error='';try{versionUnlockSnapshot();}catch(e){error=e.message;}
+ $('#native-version-error').textContent=error;return !error;
+}
 function segment(selector,labels,value,change){const node=$(selector);node.replaceChildren(...labels.map((text,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus=selector.slice(1)+'-'+i;b.textContent=text;b.setAttribute('aria-pressed',String(i===value));b.disabled=busy;b.onclick=()=>{change(i);invalidate();render();};return b;}));}
 function render(){
  const focused=document.activeElement?.dataset?.focus;
@@ -26,7 +42,8 @@ function render(){
  segment('#stamp',['关闭','日期','日期 + 时间'],configuration.stamp,v=>configuration.stamp=v);
  for(const k of ['format','corner','color']){$('#'+k).value=String(configuration[k]);$('#'+k).disabled=busy||!configuration.stamp;}
  $('#native-debug-mode').disabled=busy;
- renderFilms();$('#build').disabled=busy||!project;$('#local-source').disabled=busy||!$('#local-source').dataset.available;$('#official-file').disabled=busy;$('#search').disabled=busy;
+ const unlockValid=renderVersionUnlock();
+ renderFilms();$('#build').disabled=busy||!project||!unlockValid;$('#local-source').disabled=busy||!$('#local-source').dataset.available;$('#official-file').disabled=busy;$('#search').disabled=busy;
  if(focused)root.querySelector(`[data-focus="${focused}"]`)?.focus({preventScroll:true});
 }
 function filmIcon(f){const img=document.createElement('img');img.className='film-icon';img.width=40;img.height=40;img.alt='';img.decoding='async';if(f?.icon_url)img.src=f.icon_url;else img.hidden=true;return img;}
@@ -36,7 +53,7 @@ function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=
 async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(data.error||`请求失败 ${r.status}`);return data;}
 function post(url,value,signal){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(value),signal});}
 function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
-async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;$('#source-status').textContent='✓ 官方包已核验 · GR III Street 2.10';message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
+async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=file?(result.model==='GR III'?'gr3':null):'gr3';$('#source-status').textContent='✓ 官方包已核验 · GR III Street 2.10';message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
 for(const k of ['format','corner','color'])$('#'+k).onchange=()=>{configuration[k]=Number($('#'+k).value);invalidate();render();};
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
@@ -46,14 +63,18 @@ $('#film-group').onchange=renderFilms;
 $('#search').oninput=renderFilms;$('#local-source').onclick=()=>importSource();$('#official-file').onchange=e=>{const f=e.target.files[0];if(f)importSource(f);e.target.value='';};
 $('#cancel').onclick=()=>abort?.abort();
 $('#native-debug-mode').onchange=()=>invalidate();
+$('#native-version-unlock').onchange=()=>{invalidate();render();};
+$('#native-version-known').onchange=()=>{invalidate();render();};
+for(const key of ['dsp','cpu'])$('#native-version-'+key).oninput=()=>{invalidate();render();};
 $('#build').onclick=async()=>{
- if(busy||!project)return;invalidate();abort=new AbortController();setBusy(true);const snapshot=normalizeConfiguration(configuration),debug_mode=$('#native-debug-mode').checked;
- try{message('1 / 3 · 校验五槽配置与官方基线…');const plan=await jsonResponse(await post(`/api/projects/${project}/native-library/prepare`,{configuration:snapshot,debug_mode},abort.signal));
+ if(busy||!project)return;let version_unlock;try{version_unlock=versionUnlockSnapshot();}catch(e){message(e.message,true);return;}invalidate();abort=new AbortController();setBusy(true);const snapshot=normalizeConfiguration(configuration),debug_mode=$('#native-debug-mode').checked;
+ try{message('1 / 3 · 校验五槽配置与官方基线…');const plan=await jsonResponse(await post(`/api/projects/${project}/native-library/prepare`,{configuration:snapshot,debug_mode,version_unlock},abort.signal));
  message('2 / 3 · 编译 ARM 模块、接入机内菜单和 JPEG 路径…');
- const response=await post(`/api/projects/${project}/native-library/build`,{configuration:snapshot,debug_mode,accepted_configuration_sha256:plan.configuration_sha256},abort.signal);
+ const response=await post(`/api/projects/${project}/native-library/build`,{configuration:snapshot,debug_mode,version_unlock,accepted_configuration_sha256:plan.configuration_sha256},abort.signal);
  if(!response.ok){await jsonResponse(response);throw Error('构建失败');}
  message('3 / 3 · 核对下载摘要…');const blob=await response.blob();const encoded=response.headers.get('X-M10V-Native-Receipt');if(!encoded)throw Error('缺少构建校验记录');
  const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
+ assertVersionUnlockReceipt(receipt.version_unlock,version_unlock);
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),v=>v.toString(16).padStart(2,'0')).join('');
  if(receipt.debug_mode!==debug_mode||digest!==receipt.candidate_sha256||JSON.stringify(receipt.configuration)!==JSON.stringify(snapshot))throw Error('固件摘要或配置回读不一致');
  const binUrl=URL.createObjectURL(blob),recordUrl=URL.createObjectURL(new Blob([JSON.stringify(receipt,null,2)+'\n'],{type:'application/json'}));urls=[binUrl,recordUrl];

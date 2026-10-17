@@ -26,7 +26,7 @@ const resourceAdaptations=[
  [0x540b8c14,0xe3003311,0xe30033a8],
 ];
 export function integrationFingerprint(){
- return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
+ return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
 }
 function parts(source,candidate){
  const report=inspectOfficial(source),decoded=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
@@ -108,7 +108,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
 function encode(base,target){
  const {decoded,frames}=decodeFrameMap(base,base.readUInt32LE(base.length-8));
  need(decoded.length===target.length,'composition must retain allocated extent');const chunks=[];
- for(const f of frames){const from=f.decoded_start,to=f.decoded_end,history=Math.min(2047,from),bytes=target.subarray(from,to);
+ for(const f of frames){const from=f.decoded_start,to=f.decoded_end,history=Math.min(8191,from),bytes=target.subarray(from,to);
   if(target.subarray(from-history,to).equals(decoded.subarray(from-history,to)))chunks.push(base.subarray(128+f.encoded_start,128+f.encoded_end));
   else for(let at=0;at<bytes.length;at+=0x6000){const part=bytes.subarray(at,at+0x6000),prefix=Buffer.alloc(2);prefix.writeUInt16BE(0x8000|part.length);chunks.push(prefix,part);}
  }

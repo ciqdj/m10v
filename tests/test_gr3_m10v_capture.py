@@ -57,7 +57,12 @@ class M10VCaptureTests(unittest.TestCase):
         u.mem_write(0x550063c0, struct.pack('<H6BH', *date, 0, 0))
         cache = []; frees = []
         def camera(uc, address, size, data):
-            if h.manifest.get('debug_mode') and address == h.manifest['symbols']['m10v_debug_log']:
+            if h.manifest.get('debug_mode') and address == h.manifest['symbols'].get('m10v_debug_batch'):
+                pointer=uc.reg_read(UC_ARM_REG_R0);count=uc.reg_read(UC_ARM_REG_R1)
+                self.assertGreater(count,0);self.assertLessEqual(count,16)
+                h.capture_events.extend(struct.unpack('<5I',uc.mem_read(pointer+i*20,20)) for i in range(count))
+                uc.reg_write(UC_ARM_REG_R0,0)
+            elif h.manifest.get('debug_mode') and address == h.manifest['symbols']['m10v_debug_log']:
                 h.capture_events.append(tuple(uc.reg_read(r) for r in
                     (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3)) +
                     (struct.unpack('<I', uc.mem_read(uc.reg_read(UC_ARM_REG_SP), 4))[0],))
@@ -182,6 +187,34 @@ class M10VCaptureTests(unittest.TestCase):
         rows=[e for e in h.capture_events if e[0]==112]
         self.assertEqual(rows,[(112,1,6|(2<<4)|(7<<8)|(1<<12)|(3<<16),4,3)])
 
+    def test_capture_trace_records_cpu_pixel_changes_for_the_reported_films(self):
+        for film in (33,35,66,67,68):
+            with self.subTest(film=film):
+                h,u,context,y,uv,cache,frees,width,height,stride=self.fixture(debug=True,film=film,stamp=0)
+                h.call(u,'m10v_camera_library_texture',0x55001000,1,0,0)
+                if film in (33,67):h.call(u,'m10v_camera_library_halation',0x55001000,1,0,3,5,2)
+                h.capture_events.clear()
+                self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+                before=[e for e in h.capture_events if e[0]==122]
+                after=[e for e in h.capture_events if e[0]==123]
+                self.assertEqual(len(before),1)
+                self.assertEqual(len(after),1)
+                self.assertEqual(before[0][1],context)
+                self.assertEqual(before[0][4],64)
+                self.assertNotEqual(before[0][2:4],after[0][2:4])
+                self.assertEqual([e[1:] for e in h.capture_events if e[0]==121],
+                                 [(context,0x55010000,0x55020000,(width<<16)|height)])
+
+    def test_capture_rejection_identifies_the_guard_before_any_settings_or_pixel_access(self):
+        h,u,context,y,uv,cache,frees,*_=self.fixture(debug=True)
+        u.mem_write(context+0x3c,struct.pack('<I',0))
+        h.capture_events.clear()
+        self.assertEqual(h.call(u,'m10v_capture_library',context),-3)
+        rejects=[e for e in h.capture_events if e[0]==102]
+        self.assertEqual([(e[1],e[2]) for e in rejects],[(context,3)])
+        self.assertFalse(any(e[0] in (110,113,122) for e in h.capture_events))
+        self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
+
     def test_official_capture_metadata_date_wins_over_unready_or_different_ui_date(self):
         for ready in (0,1):
             h,u,context,y,uv,cache,frees,width,height,stride = self.fixture(
@@ -206,8 +239,8 @@ class M10VCaptureTests(unittest.TestCase):
             self.assertEqual(h.call(u,'m10v_capture_library',context),0)
             clock = [e for e in h.capture_events if e[0] == 120]
             self.assertEqual(clock,[(120,context,status,2,0x55006000)])
-            self.assertEqual([e[0] for e in h.capture_events],[100,113,120,110,112,114,111,101])
-            self.assertEqual([e[1:] for e in h.capture_events if e[0]==114],[(12168,9,128*96,216)])
+            self.assertEqual([e[0] for e in h.capture_events],[100,113,120,121,124,122,110,112,111,123,101])
+            self.assertFalse(any(e[0]==114 for e in h.capture_events))
             self.assertEqual(h.capture_events[-1][2],0)
 
     def test_capture_diagnoses_migrated_and_saved_journal_sources(self):

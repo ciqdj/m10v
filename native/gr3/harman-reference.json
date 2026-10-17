@@ -11,27 +11,18 @@
     "status": "assumed; qualitative interpretation, not measured film data",
     "input": "encoded sRGB D65; scene spectrum and GR3 ISP not recovered",
     "phoenix_ii": {
-      "status": "all numeric parameters assumed",
-      "matrix": [
-        [
-          1.08,
-          -0.045,
-          -0.035
-        ],
-        [
-          -0.025,
-          1.055,
-          -0.03
-        ],
-        [
-          -0.035,
-          -0.025,
-          1.06
-        ]
-      ],
-      "tone_power": 1.12,
-      "tone_knee": 0.6,
-      "neutral_axis": "matrix rows sum to one; identical tone per channel"
+      "status": "assumed restrained display interpretation; not measured film data",
+      "input": "encoded display sRGB D65 after camera ISP",
+      "output": "encoded display sRGB D65",
+      "model": "bounded-display-srgb-v1",
+      "warm_strength": 0.025,
+      "blue_cyan_strength": 0.16,
+      "blue_fill": 0.75,
+      "toe_lift": 0.04,
+      "shoulder_compression": 0.018,
+      "tone": "x + toe_lift*x*(1-x)^2 - shoulder_compression*x^4",
+      "neutral_axis": "all chromatic changes vanish on neutral RGB; common monotone curve",
+      "calibration": "no GR3 calibration, no scene reconstruction, no measured stock matching"
     },
     "red": {
       "status": "all numeric parameters assumed; official channel topology only",
@@ -81,7 +72,7 @@
     },
     "spatial_effects": "grain, diffusion and leaks use shared user controls; no baked halation"
   },
-  "parameters_sha256": "666580e7e6346e2f35f708c65eaf55bdca272af25dbbf981ef4782eb30e94a02",
+  "parameters_sha256": "30c3137c6f10000ab2acde73780bf6a86aa0d14eb87166f1c916d3c7f03ec7e8",
   "sources": [
     {
       "url": "https://www.harmanphoto.co.uk/amfile/file/download/file/1965/product/2170/",
@@ -103,7 +94,7 @@
   "sources_sha256": "3fabc66716e6f11b3df6e929d716e6a66f7b8ea3d0845d7fb4c7cf5dcc3eb195",
   "generator": {
     "path": "scripts/build_gr3_harman_reference.py",
-    "sha256": "73d96ed295cbcdb0c33529985e630f506075f7ee7b6a97d4180c0bd15a7ffc53"
+    "sha256": "16c20dc0cd0e8c1a5251153a557e8e1840782ec9f3fbbc31c9745b51a5426156"
   },
   "dependencies": {
     "numpy": "2.5.3",
@@ -116,7 +107,7 @@
       "model": "phoenix-ii",
       "ei": 200,
       "table_bytes": 10125,
-      "table_sha256": "35eb67b00f9039697cd506b8a77cc6a9e259f985bd24372f443b5040d0b6dde9",
+      "table_sha256": "21df9a703bf55a2d538652891b4700ab15811c55f95ef76b343bf897328deee7",
       "interpolation_validation": {
         "samples": 8192,
         "seed": 68125,
@@ -124,11 +115,40 @@
           0,
           1
         ],
-        "rgb_abs_p95": 0.007497818583865613,
-        "rgb_abs_max": 0.08684791749517266,
-        "delta_e_00_median": 0.1113745971059561,
-        "delta_e_00_p95": 0.3613907770022788,
-        "delta_e_00_max": 1.6214057373783433
+        "rgb_abs_p95": 0.001753332024322582,
+        "rgb_abs_max": 0.002236846041142937,
+        "delta_e_00_median": 0.0962884270613378,
+        "delta_e_00_p95": 0.2387008247020363,
+        "delta_e_00_max": 0.5166742975608508
+      },
+      "display_mapping": {
+        "model": "bounded-display-srgb-v1",
+        "input": "encoded display sRGB D65 after camera ISP",
+        "output": "encoded display sRGB D65",
+        "scene_radiance_recovered": false,
+        "intent": "restrained neutral/warm display look with selective blue/cyan; not a measured stock match",
+        "grey_input": [
+          0.0,
+          0.1,
+          0.25,
+          0.5,
+          0.75,
+          0.9,
+          0.95,
+          1.0
+        ],
+        "grey_output": [
+          0.0,
+          0.10323820000000002,
+          0.2555546875,
+          0.503875,
+          0.7461796875,
+          0.8885502000000001,
+          0.9354338874999999,
+          0.982
+        ],
+        "grey_max_abs_change": 0.018000000000000016,
+        "highlight_min_step_90_95_100": 0.04656611250000009
       }
     },
     {

@@ -1,3 +1,4 @@
+import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFirmwareSaveGate} from './firmware-save-gate.mjs';
 import { createEditorState, createImportGate } from './editor-state.mjs';
 import { createFilmPreview } from './preview-controller.mjs';
@@ -140,7 +141,7 @@ function invalidate(recordHistory=true) {
   updateHistoryButtons();
   activeBuildController?.abort();
   state.revision++;
-  state.preparation = null;
+  state.preparation = null;state.preparationRequest=null;
   riskAcceptedRevision=-1;
   $('build-firmware').disabled = true;
   $('preflight-result').className = 'preflight-result';
@@ -159,6 +160,21 @@ function showStep(step) {
   const heading=document.querySelector(`.page[data-page="${step}"] h2`);
   if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
 }
+function versionUnlockSnapshot(){
+ const enabled=state.profile==='native'&&$('version-unlock').checked;
+ const option=$('version-known').checked?{enabled,dsp:$('version-dsp').value,cpu:$('version-cpu').value}:{enabled,mode:'dsp-package-only'};
+ return normalizeVersionUnlock(option,chosenModel);
+}
+function renderVersionUnlock(){
+ const supported=state.profile==='native'&&chosenModel==='gr3',toggle=$('version-unlock'),known=$('version-known');
+ $('version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
+ toggle.disabled=saving||Boolean(activeBuildController)||!supported;$('version-unlock-fields').hidden=!toggle.checked;
+ known.disabled=saving||Boolean(activeBuildController)||!supported||!toggle.checked;
+ const advanced=supported&&toggle.checked&&known.checked;$('version-known-fields').hidden=!advanced;
+ for(const key of ['dsp','cpu']){$('version-'+key).disabled=saving||Boolean(activeBuildController)||!advanced;$('version-'+key).required=advanced;}
+ let error='';try{versionUnlockSnapshot();}catch(e){error=e.message;}
+ $('version-error').textContent=error;return !error;
+}
 function renderLedger() {
   const ledger = $('plan-ledger');
   ledger.replaceChildren();
@@ -176,7 +192,8 @@ function renderLedger() {
     row.append(textNode('span', label), textNode('strong', value));
     ledger.append(row);
   }
-  const canConfigure=state.profile==='native'?!state.unresolvedSlots.length:(state.features.size&&(!state.features.has('recipes')||state.recipes.size));
+  const unlockValid=renderVersionUnlock();
+  const canConfigure=unlockValid&&(state.profile==='native'?!state.unresolvedSlots.length:(state.features.size&&(!state.features.has('recipes')||state.recipes.size)));
   $('prepare-build').disabled = Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('build-firmware').disabled = saving||Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('features-next').disabled=!canConfigure;
@@ -507,17 +524,18 @@ async function download(response, filename) {
 }
 async function prepare() {
   if (!state.projectId) return;
+  let request;try{request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot()}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();
   $('prepare-build').disabled = true;
   $('preflight-result').textContent = '正在核验固件、配方位置与功能补丁…';
   try {
     const report = await (await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/prepare`, {
-      method: 'POST', signal:controller.signal, body: JSON.stringify(state.profile==='native'?{configuration:state.nativeConfig,extensions:nativeExtensions(),debug_mode:debugEnabled()}:{selection:selection()}),
+      method: 'POST', signal:controller.signal, body: JSON.stringify(request),
       headers: { 'Content-Type': 'application/json' },
     })).json();
     if(revision!==state.revision||activeBuildController!==controller)return;
-    state.preparation = report.ready ? report : null;
+    state.preparation = report.ready ? report : null;state.preparationRequest=report.ready?request:null;
     $('preflight-result').className = 'preflight-result ' + (report.ready ? 'ok' : 'error');
     $('preflight-result').textContent = report.ready ? '方案核验通过，保存时继续构建与独立回读。' :
       `预检未通过：${(report.blockers||[]).join('；')}`;
@@ -530,7 +548,7 @@ async function prepare() {
   } finally { if(activeBuildController===controller){activeBuildController=null;renderLedger();} }
 }
 async function build() {
-  if (!state.preparation || !(riskAcceptedRevision===state.revision)) return;
+  if (!state.preparation || !state.preparationRequest || !(riskAcceptedRevision===state.revision)) return;
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;
   $('build-firmware').disabled = true;
@@ -540,11 +558,16 @@ async function build() {
   $('build-result').textContent = '正在构建、重编码并独立回读，约需半分钟…';
   try {
     const response = await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/build`, {
-      method: 'POST', signal:controller.signal, body: JSON.stringify({ ...(state.profile==='native'?{configuration:state.nativeConfig,extensions:nativeExtensions(),debug_mode:debugEnabled()}:{selection:selection()}),
+      method: 'POST', signal:controller.signal, body: JSON.stringify({ ...state.preparationRequest,
         accepted_configuration_sha256: state.preparation.configuration_sha256 }),
       headers: { 'Content-Type': 'application/json' },
     });
     if(revision!==state.revision||activeBuildController!==controller){notice('构建期间方案已变化，已放弃旧方案下载。请重新预检。',true);return;}
+    if(state.profile==='native'){
+      const encoded=response.headers.get('X-M10V-Native-Receipt');if(!encoded)throw Error('缺少构建校验记录');
+      const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
+      assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock);
+    }
     await download(response, state.preparation.filename||(chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
     $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。';
   } catch (error) {
@@ -667,3 +690,8 @@ try {
 } catch (error) { notice(`工作区载入失败：${error.message}`, true); }
 
 $('debug-mode').addEventListener('change',()=>{debugMode=$('debug-mode').checked;invalidate(false);});
+
+$('version-unlock').addEventListener('change',()=>invalidate(false));
+for(const key of ['dsp','cpu'])$('version-'+key).addEventListener('input',()=>invalidate(false));
+
+$('version-known').addEventListener('change',()=>invalidate(false));

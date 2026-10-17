@@ -19,10 +19,18 @@ PARAMETERS = {
     'status': 'assumed; qualitative interpretation, not measured film data',
     'input': 'encoded sRGB D65; scene spectrum and GR3 ISP not recovered',
     'phoenix_ii': {
-        'status': 'all numeric parameters assumed',
-        'matrix': [[1.08,-.045,-.035],[-.025,1.055,-.03],[-.035,-.025,1.06]],
-        'tone_power': 1.12, 'tone_knee': .6,
-        'neutral_axis': 'matrix rows sum to one; identical tone per channel',
+        'status': 'assumed restrained display interpretation; not measured film data',
+        'input': 'encoded display sRGB D65 after camera ISP',
+        'output': 'encoded display sRGB D65',
+        'model': 'bounded-display-srgb-v1',
+        'warm_strength': .025,
+        'blue_cyan_strength': .16,
+        'blue_fill': .75,
+        'toe_lift': .04,
+        'shoulder_compression': .018,
+        'tone': 'x + toe_lift*x*(1-x)^2 - shoulder_compression*x^4',
+        'neutral_axis': 'all chromatic changes vanish on neutral RGB; common monotone curve',
+        'calibration': 'no GR3 calibration, no scene reconstruction, no measured stock matching',
     },
     'red': {
         'status': 'all numeric parameters assumed; official channel topology only',
@@ -74,12 +82,25 @@ class ReferenceHarman:
         rgb = np.asarray(rgb,dtype=float)
         if rgb.shape[-1] != 3 or not np.isfinite(rgb).all():
             raise ValueError('finite RGB triples required')
-        linear = colour.cctf_decoding(np.clip(rgb,0,1),function='sRGB')
         if self.stock == 'phoenix-ii':
             p = PARAMETERS['phoenix_ii']
-            x = np.maximum(linear @ np.array(p['matrix']).T,0)**p['tone_power']
-            positive = x*(1+p['tone_knee'])/(x+p['tone_knee'])
+            # Parameters describe already-rendered display code values. There
+            # is no attempted inverse ISP or conversion into scene exposure.
+            x = np.clip(rgb,0,1).copy()
+            warm = p['warm_strength']*np.maximum(x[...,0]-x[...,1],0)
+            x[...,0] += warm*(1-x[...,0])
+            x[...,2] *= 1-warm
+            # A bounded chromatic blend strengthens blue/cyan without a fixed
+            # blue offset. Neutrals and warm skin never activate this branch.
+            cool = p['blue_cyan_strength']*np.maximum(x[...,2]-x[...,0],0)
+            x[...,0] *= 1-cool
+            x[...,2] += p['blue_fill']*cool*(1-x[...,2])
+            # Derivative is positive over [0,1]; white is .982 rather than a
+            # prematurely clipped plateau. No internal hard gamut clipping.
+            return x+p['toe_lift']*x*(1-x)**2-p['shoulder_compression']*x**4
         else:
+            # Preserve all RED computation and ordering exactly.
+            linear = colour.cctf_decoding(np.clip(rgb,0,1),function='sRGB')
             p = PARAMETERS['red']
             exposure = red_record_exposure(linear,self.ei)
             # Assumed saturating density response; scanning inverts negative
@@ -126,6 +147,19 @@ def generate(root=ROOT):
         web_stocks.append(dict(spec,values=values.reshape(-1).tolist()))
         manifest_stocks.append(dict(spec,table_bytes=values.size,
             table_sha256=hashlib.sha256(values.tobytes()).hexdigest(),interpolation_validation=stats))
+        if spec['model']=='phoenix-ii':
+            levels=np.array([0.,.1,.25,.5,.75,.9,.95,1.])
+            gray=model.render(np.repeat(levels[:,None],3,axis=1))
+            manifest_stocks[-1]['display_mapping']={
+                'model':PARAMETERS['phoenix_ii']['model'],
+                'input':PARAMETERS['phoenix_ii']['input'],
+                'output':PARAMETERS['phoenix_ii']['output'],
+                'scene_radiance_recovered':False,
+                'intent':'restrained neutral/warm display look with selective blue/cyan; not a measured stock match',
+                'grey_input':levels.tolist(),'grey_output':gray[:,0].tolist(),
+                'grey_max_abs_change':float(np.max(np.abs(gray-levels[:,None]))),
+                'highlight_min_step_90_95_100':float(np.diff(gray[-3:,0]).min())}
+
     header='/* Generated assumed HARMAN models; see harman-reference.json. Not official LUTs. */\n'
     header+='static const uint8_t m10v_harman_luts[4][3375][3] = {\n'
     for values in tables:

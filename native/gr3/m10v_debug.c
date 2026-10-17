@@ -39,8 +39,10 @@ static int transfer(uint32_t fs,const uint32_t *v,const char *path,uint32_t *pag
     int closed=((close_fn)v[8])(fs,handle,&closing_error);
     return ok&&closed&&!closing_error;
 }
-int m10v_debug_log(uint32_t event,uint32_t a,uint32_t b,uint32_t c,uint32_t d){
-    uint32_t channel=event>=100?2:1,mask=1;
+int m10v_debug_batch(const uint32_t *events,uint32_t count){
+    if(!count||count>16||!ram((uint32_t)(uintptr_t)events,count*20))return 0;
+    uint32_t channel=events[0]>=100?2:1,mask=1;
+    for(uint32_t i=0;i<count;++i)if((events[i*5]>=100?2u:1u)!=channel)return 0;
     /* The stock model ends at byte0x1c; byte0x1d is private menu mode,
      * byte0x1e private selected tone. Byte0x1f holds one shared logger busy bit.
      * Channels use separate files but share the stock filesystem mutex; skip
@@ -63,17 +65,26 @@ int m10v_debug_log(uint32_t event,uint32_t a,uint32_t b,uint32_t c,uint32_t d){
     uint32_t *page=pages+selected*1024;
     if(!good0&&!good1){for(uint32_t i=0;i<1024;++i)page[i]=0;
         page[0]=0x4744564du;page[1]=1;page[2]=M10V_DEBUG_BUILD_ID;page[6]=channel;}
-    uint32_t sequence=page[5]+1,index=page[4];
-    uint32_t *record=page+16+index*16;
-    for(uint32_t i=0;i<16;++i)record[i]=0;
-    record[0]=0x474c564du;record[1]=1;record[2]=sequence;record[3]=event;
-    record[4]=a;record[5]=b;record[6]=c;record[7]=d;
-    record[8]=M10V_DEBUG_BUILD_ID;record[9]=channel;record[15]=crc(record);
-    if(page[3]<63)++page[3];page[4]=index==62?0:index+1;page[5]=sequence;page[15]=crc(page);
+    for(uint32_t i=0;i<count;++i){
+        const uint32_t *event=events+i*5;
+        uint32_t sequence=page[5]+1,index=page[4];
+        uint32_t *record=page+16+index*16;
+        for(uint32_t j=0;j<16;++j)record[j]=0;
+        record[0]=0x474c564du;record[1]=1;record[2]=sequence;record[3]=event[0];
+        record[4]=event[1];record[5]=event[2];record[6]=event[3];record[7]=event[4];
+        record[8]=M10V_DEBUG_BUILD_ID;record[9]=channel;record[15]=crc(record);
+        if(page[3]<63)++page[3];page[4]=index==62?0:index+1;page[5]=sequence;
+    }
+    page[15]=crc(page);
     /* Always overwrite the other page, preserving the valid source page. */
     result=transfer(fs,v,paths[offset+(good0||good1?1-selected:1)],page,1);
 done:
     if(pages)((free_fn)0x536af2e4u)(pages);
     __atomic_fetch_and(guard,(uint8_t)~mask,__ATOMIC_RELEASE);
     return result;
+}
+
+int m10v_debug_log(uint32_t event,uint32_t a,uint32_t b,uint32_t c,uint32_t d){
+    const uint32_t record[5]={event,a,b,c,d};
+    return m10v_debug_batch(record,1);
 }

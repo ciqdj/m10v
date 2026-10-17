@@ -81,6 +81,21 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(self.u.reg_read(UC_ARM_REG_PC),0x550ff000)
         return self.u.reg_read(UC_ARM_REG_R0)
 
+    def test_batch_records_share_one_sd_transaction_and_reject_mixed_channels(self):
+        self.assertIn('m10v_debug_batch',self.manifest['symbols'])
+        events=[(100+i,0x55001000,i,i+1,i+2) for i in range(12)]
+        self.u.mem_write(0x55008000,b''.join(struct.pack('<5I',*e) for e in events))
+        self.assertEqual(self.invoke('m10v_debug_batch',0x55008000,len(events)),1)
+        self.assertEqual(sum(c[0]=='write' for c in self.calls),1)
+        rows=self.decoded()['records']
+        self.assertEqual([r['event'] for r in rows],[e[0] for e in events])
+        self.assertEqual([r['arguments'] for r in rows],[list(e[1:]) for e in events])
+        self.assertEqual(sum(c[0]=='close' for c in self.calls),self.successful_opens)
+        self.calls.clear()
+        self.u.mem_write(0x55008000,struct.pack('<10I',100,1,2,3,4,30,1,2,3,4))
+        self.assertEqual(self.invoke('m10v_debug_batch',0x55008000,2),0)
+        self.assertEqual(self.calls,[])
+
     def test_independent_page_trace_decodes_keys_state_and_error(self):
         self.assertEqual(self.log(83,0xcf,4,2,(3<<16)|1),1)
         record=self.decoded()['records'][-1]
@@ -98,8 +113,21 @@ class DebugLogArmTests(unittest.TestCase):
     def test_capture_validation_failure_is_logged_and_preserved(self):
         self.assertEqual(self.invoke('m10v_capture_library',0),0xfffffffd)
         records=self.decoded()['records']
-        self.assertEqual([r['event'] for r in records],[100,101])
+        self.assertEqual([r['event'] for r in records],[100,102,101])
         self.assertEqual(records[-1]['arguments'][1],0xfffffffd)
+        self.assertEqual(records[1]['rejection']['guard'],'context')
+
+    def test_capture_cpu_diagnostics_decode_without_claiming_jpeg_success(self):
+        for event,args in ((121,(0x55001000,0x56000000,0x58000000,(6000<<16)|4000)),
+                           (122,(0x55001000,0x12345678,0x9abcdef0,64)),
+                           (124,(0x55001000,6016,4000,18))):
+            self.assertEqual(self.log(event,*args),1)
+        rows=self.decoded()['records']
+        self.assertEqual(rows[0]['image']['width'],6000)
+        self.assertEqual(rows[0]['image']['chroma'],'0x58000000')
+        self.assertEqual(rows[1]['cpu_samples']['y_hash'],'12345678')
+        self.assertIn('not an encoded JPEG',rows[1]['cpu_samples']['scope'])
+        self.assertEqual(rows[2]['layout']['stock_tone'],18)
 
     def test_debug_capture_chain_restores_stock_arguments_flags_and_stack(self):
         registers=(UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,

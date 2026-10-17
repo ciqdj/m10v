@@ -39,9 +39,22 @@ static uint32_t energy_pixel(const m10v_library_image *im,uint32_t x,uint32_t ro
     uint32_t excess=light>gate?light-gate:0;return excess*excess*8;
 }
 static void energy_line(const m10v_library_image *im,uint16_t *line,uint32_t row,uint32_t gate,int distance) {
-    for(uint32_t x=0;x<im->width;++x)
-        line[x]=(uint16_t)((energy_pixel(im,energy_edge(x,im->width,-distance),row,gate,1)+
-            2*energy_pixel(im,x,row,gate,1)+energy_pixel(im,energy_edge(x,im->width,distance),row,gate,1))>>2);
+    /* Traverse each distance lane with a rolling three-tap window. The
+     * previous right sample becomes the next center, so original red energy
+     * is evaluated once per pixel instead of three times. Replicated borders
+     * and the final integer rounding remain exactly the same. No extra plane
+     * or mutable state is needed; rows still come from the original image. */
+    uint32_t width=im->width,step=(uint32_t)distance;
+    for(uint32_t lane=0;lane<step && lane<width;++lane) {
+        uint32_t left=energy_pixel(im,0,row,gate,1);
+        uint32_t center=energy_pixel(im,lane,row,gate,1);
+        for(uint32_t x=lane;x<width;x+=step) {
+            uint32_t next=x+step<width?x+step:width-1;
+            uint32_t right=energy_pixel(im,next,row,gate,1);
+            line[x]=(uint16_t)((left+2*center+right)>>2);
+            left=center;center=right;
+        }
+    }
 }
 static void energy_source(const m10v_library_image *im,uint16_t *a,uint32_t gw,uint32_t gh,uint32_t shift,uint32_t gate,int red_sensitive) {
     uint32_t step=1u<<shift;

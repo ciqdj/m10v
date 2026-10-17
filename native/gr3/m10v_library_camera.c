@@ -157,3 +157,7 @@ int m10v_camera_library_effects(m10v_library_state *state,uint32_t slot,uint32_t
     if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();return fs?m10v_library_effects(state,slot,field,value,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
 }
+int m10v_camera_library_reset(m10v_library_state *state,uint32_t slot){
+    if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();return fs?m10v_library_reset(state,slot,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
+}

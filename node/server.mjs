@@ -209,9 +209,9 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(nativeMatch[2]==='prepare')return send(response,200,prepareNative(original,input.configuration,{debug_mode:input.debug_mode??false,extensions:input.extensions}));
+        if(nativeMatch[2]==='prepare')return send(response,200,prepareNative(original,input.configuration,{debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock}));
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
-        const {candidate,receipt}=await generateNative(original,input.configuration,input.accepted_configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions});
+        const {candidate,receipt}=await generateNative(original,input.configuration,input.accepted_configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock});
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
         return send(response,200,candidate,'application/octet-stream',receipt.filename);
       }

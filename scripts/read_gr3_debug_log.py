@@ -10,6 +10,12 @@ EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'me
         50:'menu.redraw.before',51:'menu.redraw.after',60:'settings.commit.before',61:'settings.commit.after',
         70:'detail.change',71:'detail.reset',80:'page.enter.before',81:'page.enter.after',
         82:'page.key.before',83:'page.state.after',84:'page.draw.after',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',130:'capture.texture',131:'capture.texture.grain',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
+EVENTS.update({102:'capture.rejected',121:'capture.image',122:'capture.cpu-samples.before',
+               123:'capture.cpu-samples.after',124:'capture.layout'})
+GUARDS={1:'context',2:'recipe',3:'topology',4:'sequence-mode',5:'objects',6:'jpeg-request',
+        7:'stock-tone',8:'image-layout',9:'image-planes',10:'raw-dimensions-pointer',
+        11:'raw-dimensions',12:'raw-bank',13:'protected-overlap',14:'preview-layout',
+        15:'preview-planes',16:'settings',17:'scratch-allocation',18:'scratch-overlap'}
 
 def page_records(data):
     if len(data)!=4096:return None
@@ -22,6 +28,23 @@ def page_records(data):
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':'menu' if r[9]==1 else 'capture'})
     for record in records:
+        if record['event']==102:
+            context,guard,a,b=record['arguments']
+            record['rejection']={'context':hex(context),'guard':GUARDS.get(guard,guard),
+                                 'guard_id':guard,'details':[a,b]}
+        if record['event']==121:
+            context,y,chroma,dimensions=record['arguments']
+            record['image']={'context':hex(context),'y':hex(y),'chroma':hex(chroma),
+                             'width':dimensions>>16,'height':dimensions&65535}
+        if record['event'] in (122,123):
+            context,y,chroma,count=record['arguments']
+            record['cpu_samples']={'context':hex(context),'y_hash':f'{y:08x}',
+                                   'chroma_hash':f'{chroma:08x}','pairs':count,
+                                   'scope':'CPU samples only; not an encoded JPEG check'}
+        if record['event']==124:
+            context,stride,allocated,tone=record['arguments']
+            record['layout']={'context':hex(context),'stride':stride,
+                              'allocated_height':allocated,'stock_tone':tone}
         if record['event'] in (82,83,84):
             key,screen,focus,packed=record['arguments']
             record['page_state']={'key':hex(key),'screen':{0:'closed',1:'films',2:'catalog',3:'stamp',4:'value'}.get(screen,screen),'focus':focus,'value':packed&0xffff,'error':packed>>16}

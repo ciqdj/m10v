@@ -31,7 +31,15 @@ const hooks = [
   [0x5320a834,0xe08ec106,'m10v_icon_pixels'],
   [0x533966e8,0xe3023bac,'m10v_resource_primary'], [0x533970fc,0xe3023bac,'m10v_resource_secondary'],
 ];
-const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+// Exact displaced loads and object registers, independently checked below.
+const ispHooks = [
+ [0x536db7f8,0xe5d3277c,2,0xe5900000,'parameters'],
+ [0x536dc26c,0xe5d7277c,2,0xe5960000,'color_table'],
+ [0x536dc4bc,0xe5d7377c,3,0xe5960000,'color_flags'],
+ [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
+ [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
+];
+const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','scripts/build_gr3_m10v_library.py'];
 const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','scripts/generate_gr3_sd_contract.mjs'];
@@ -58,6 +66,7 @@ function checkRuntime(runtime, manifest) {
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);
+  checkIspBase(runtime,manifest);
   checkDetail(runtime,manifest);
   checkSettings(runtime,manifest);
   const reference=JSON.parse(readFileSync(new URL('../native/gr3/5207-reference.json',import.meta.url)));
@@ -82,8 +91,8 @@ function checkRuntime(runtime, manifest) {
     /^[0-9a-f]{8}$/.test(manifest.debug_log.build_id)&&manifest.debug_log.page_bytes===4096&&manifest.debug_log.records_per_channel===63&&
     JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'])&&
     manifest.debug_log.files.every(name=>runtime.includes(Buffer.from('C:\\'+name))):
-    !manifest.debug_log&&!manifest.symbols?.m10v_debug_log&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
-  for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log']:[])]) {
+    !manifest.debug_log&&!manifest.symbols?.m10v_debug_log&&!manifest.symbols?.m10v_debug_batch&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
+  for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log','m10v_debug_batch']:[])]) {
     const address = manifest.symbols?.[name];
     need(Number.isInteger(address) && address % 4 === 0 && address >= BASE + 0x100 && address < BASE + runtime.length,
       'native symbol outside module: '+name);
@@ -112,18 +121,22 @@ const detailHooks=[
  [0x531afc20,0xebffffa4,'capacity',true],
  [0x531afa24,0xe345c3b3,'table_ip',true],[0x531afacc,0xe34533b3,'table_r3',true],
  [0x531affa8,0xe345c3b3,'table_ip',true],[0x531b01f8,0xe34533b3,'table_selected',true],
- [0x531b000c,0xea000066,'row',false],[0x531b03f8,0xea000065,'current',false],
+ [0x531b0008,0x979ff103,'row_dispatch',false],[0x531b000c,0xea000066,'row',false],[0x531b03f8,0xea000065,'current',false],
  [0x531b05e4,0xea00005c,'setup',false],[0x531b0bf4,0xea000093,'callback',false],
  [0x531acd24,0xeb0456c0,'reset',true]];
-const detailInstructions={"capacity":[0xe3a00010,0xe12fff1e],"table_ip":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223096,3904700419,3777818624,0xe3a0e00c,3904741375],"table_r3":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"table_selected":[3912065023,3775856640,3912040451,3852271640,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"row":[3796090898,3814457348,[8,false,1394278828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394278828],3796049938,3785369602,3783401476,3785363461,3818913795,[14,true,"m10v_detail_control"],[14,false,1394278500]],"current":[3796156434,3814457348,[8,false,1394279828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394279828],3796115474,3785363461,3818913793,[14,true,"m10v_detail_control"],3785375744,[14,false,1394279516]],"default":[3785363456,3818913796,3818921984,[14,false,"m10v_detail_control"]],"setup":[3795894290,3814457348,[8,false,1394280284],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394280284],3813670933,3785359364,3796619280,3902629904,[3,false,"slider8"],[14,false,"slider3"]],"callback":[3796221970,3814457348,[8,false,1394282056],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394282056],3796181010,3785368578,3783401478,3785363460,3818913794,[14,true,"m10v_detail_control"],3813670912,[1,false,1394281580],3796619292,3902646512],"reset":[3912056848,[14,true,1395402796],3785363461,3818913799,3818921984,[14,true,"m10v_detail_control"],3904733200]};
+const detailInstructions={"capacity":[0xe3a00015,0xe12fff1e],"table_ip":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223096,3904700419,3777818624,0xe3a0e00c,3904741375],"table_r3":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"table_selected":[3912065023,3775856640,3912040451,3852271640,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"row":[3796090898,3814457354,[8,false,1394278828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394278828],3796049938,3785369602,3783401476,3785363461,3818913795,[14,true,"m10v_detail_control"],[14,false,1394278500]],"current":[3796156434,3814457354,[8,false,1394279828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394279828],3796115474,3785363461,3818913793,[14,true,"m10v_detail_control"],3785375744,[14,false,1394279516]],"default":[3785363456,3818913796,3818921984,[14,false,"m10v_detail_control"]],"setup":[0xe240c012,0xe35c000a,[8,false,0x531b075c],0xe92d500f,0xe1a00004,[14,true,"m10v_detail_table"],0xe304c88c,0xe345c3b3,0xe150000c,0xe8bd500f,[0,false,0x531b075c],0xe1a0c000,0xe1a00004,0xe24bd010,0xe89d6810,[14,false,"slider_dispatch"]],"callback":[3796221970,3814457354,[8,false,1394282056],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394282056],3796181010,3785368578,3783401478,3785363460,3818913794,[14,true,"m10v_detail_control"],3813670912,[1,false,1394281580],3796619292,3902646512],"reset":[3912056848,[14,true,1395402796],3785363461,3818913799,3818921984,[14,true,"m10v_detail_control"],3904733200]};
+detailInstructions.row_dispatch=[0xe92d500f,0xe1a02803,0xe1822004,0xe1a01005,0xe3a00008,[14,true,'m10v_detail_control'],0xe8bd500f,0xe3530011,0x979ff103,[14,false,0x531b000c],
+ 0x531b009c,0x531b00ac,0x531b00bc,0x531b00cc,0x531b00dc,0x531b00ec,0x531b00fc,0x531b010c,0x531b011c,0x531b012c,0x531b013c,0x531b014c,0x531b015c,0x531b016c,0x531b017c,0x531b018c,0x531b019c,0x531b0058];
 function checkDetail(runtime,manifest,raw) {
  const d=manifest.detail,base=manifest.base;
- need(d?.schema==='m10v-gr3-native-detail/v1'&&d.backend==='m10v_camera_library_detail'&&
-  JSON.stringify(d.ids)==='[18,19,20,21,22]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion']), 'native detail contract differs');
+ need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&
+  JSON.stringify(d.ids)==='[18,19,20,21,22,23,24,25,26,27,28]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']), 'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
- const table=read(d.tables,288),captions=read(d.captions,92);
- const expectedIds=[862,863,864,827,828];
- for(let i=0;i<5;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
+ const captions=read(d.captions,116);
+ const variants={halo:[18,19,20,21,22,23,24,25,26,27],common:[21,22,23,24,25,26,27],red:[21,22,23,24,25,26,27,28]};
+ need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
+ const expectedIds=[862,863,864,827,828,913,914,915,916,917,933];
+ for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
   const at=d.entries?.[name],code=read(at,template.length*4);
@@ -140,13 +153,23 @@ function checkDetail(runtime,manifest,raw) {
  // official source, never to a manifest-supplied preimage or instruction list.
  if(raw){
   need(captions.subarray(0,72).equals(raw.subarray(0xb34bd8,0xb34c20)),'native detail stock captions differ');
-  for(let i=0;i<36;i++){
-   const old=0xb3488c+i*8,p=raw.readUInt32LE(old),n=raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
-   need(table.readUInt32LE(i*8+4)===n+5,'native detail count differs');
-   const list=read(fresh,n*2+10);
-   need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(Buffer.from([0,18,0,19,0,20,0,21,0,22])),'native detail list differs');
+  for(const [variant,ids] of Object.entries(variants)){
+   const table=read(d.variant_tables[variant],288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
+   for(let i=0;i<36;i++){
+    const old=0xb3488c+i*8,p=raw.readUInt32LE(old),n=raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
+    need(table.readUInt32LE(i*8+4)===n+ids.length,'native detail count differs');
+    const list=read(fresh,n*2+suffix.length);
+    need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(suffix),'native detail list differs');
+   }
   }
-  for(const [target,maximum] of [[d.slider8,8],[d.slider3,3]]){
+  const maxima=[8,8,8,3,3,2,8,5,8,1,2],dispatch=read(d.slider_dispatch,23*4);
+  for(let i=0;i<11;i++){
+   need(dispatch.readUInt32LE(i*8)===(0xe35c0000|18+i)>>>0,'native detail slider selector differs');
+   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,d.sliders[maxima[i]])&0x0fffffff),'native detail slider target differs');
+  }
+  need(dispatch.readUInt32LE(88)===branch(d.slider_dispatch+88,d.sliders[8]),'native detail slider fallback differs');
+  for(const maximum of [8,3,2,5,1]){
+   const target=d.sliders[maximum];
    const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
    for(let a=start;a<stop;a+=4){
     const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
@@ -156,12 +179,29 @@ function checkDetail(runtime,manifest,raw) {
     if(a===0x531ad024)word=0xe1a00000;
     if(a===0x531ad03c&&maximum===3)word=0xe3a03039;
     if(a===0x531ad060)word=(0xe3a02000|maximum)>>>0;
-    if(a===0x531ad064&&maximum===3)word=0xe3a03078;
+    if(a===0x531ad064)word=movw(3,360/maximum);
     need(code.readUInt32LE(at-target)===word,'native detail slider relocation differs at '+a.toString(16)+' expected '+word.toString(16)+' got '+code.readUInt32LE(at-target).toString(16));
    }
    const guard=0x531ad0b4-start;
    need(code.readUInt32LE(guard)===0xe3500000&&code.readUInt32LE(guard+4)===(branch(target+guard+4,mapped(0x531ad110))&0x0fffffff),'native detail null guard differs');
   }
+ }
+}
+function checkIspBase(runtime,manifest) {
+ const m=manifest.isp_base, base=manifest.base;
+ need(m?.schema==='m10v-gr3-isp-base/v2'&&m.bytes===504&&m.base%16===0&&m.base>=base&&m.base+504<=base+runtime.length&&
+  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)==='[12,18,19,20,21]', 'native ISP base contract differs');
+ need(Object.keys(m.entries||{}).sort().join('|')===ispHooks.map(h=>h[4]).sort().join('|')&&m.patches?.length===5,'native ISP inventory differs');
+ for(const [i,[address,expected,reg,object,name]] of ispHooks.entries()) {
+  const at=m.base+i*104, off=4+reg*4, compare=name==='local_process'?0x53513620:0x53dbd8a0;
+  need(m.entries[name]===at&&JSON.stringify(m.patches[i])===JSON.stringify({address,expected,entry:at}),'native ISP entry differs');
+  const words=[0xe92d500f,0xe10fc000,0xe52dc004,expected,(0xe58d0000|(reg<<12)|off)>>>0,object,
+   movw(1,compare&65535),(0xe3401000|(((compare>>>16)&0xf000)<<4)|((compare>>>16)&0xfff))>>>0,
+   0xe1500001,0x1a000007,0xe59d2000|off,0xe352000c,0x0a000002,0xe2422012,0xe3520003,0x8a000001,
+   0xe3a0200b,0xe58d2000|off,0xe49dc004,0xe12cf00c,0xe8bd500f];
+  if(name!=='local_process')words.splice(9,0,0x0a000003,movw(1,0xd938),0xe34513db,0xe1500001);
+  words.push(branch(at+words.length*4,address+4));
+  for(const [j,word] of words.entries())need(runtime.readUInt32LE(at-base+j*4)===(word>>>0),'native ISP instruction differs: '+name+'+'+j*4);
  }
 }
 function patchList(manifest) {
@@ -170,7 +210,7 @@ function patchList(manifest) {
   for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,738),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
-  return [...settingsPatches(manifest),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...settingsPatches(manifest),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},
@@ -193,8 +233,8 @@ function encodeExtended(source, original, target, insertion, growth) {
     const end=frame.decoded_end+(frame.decoded_end>insertion?growth:0);
     const bytes=target.subarray(start,end), old=original.subarray(frame.decoded_start,frame.decoded_end);
     // Back references may cross frame boundaries. Reuse only when the entire
-    // 2047-byte history window remains identical after insertion or a patch.
-    const history=Math.min(2047,frame.decoded_start);
+    // The codec has a 13-bit (8191-byte) backward-reference window.
+    const history=Math.min(8191,frame.decoded_start);
     const sameHistory=target.subarray(start-history,start).equals(original.subarray(frame.decoded_start-history,frame.decoded_start));
     if(bytes.equals(old)&&sameHistory) chunks.push(source.subarray(128+frame.encoded_start,128+frame.encoded_end));
     else for(let at=0;at<bytes.length;at+=0x6000){
@@ -269,6 +309,8 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
     verified_hooks:patchList(manifest).length,icon_count:68,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:68,active_slots:5,external_film_pack:manifest.sd_library,sd_film_library:manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:36,max_records:256,page_rows:8}:null,
     menu_entry:manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
+    still_isp_base:{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
+    live_view_base:{tone:11,carriers:[12,18,19,20,21],film_color_preview:false},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
-    camera_scope:'still JPEG; original RAW pixels protected; live-view color and RAW-development effects not integrated'};
+    camera_scope:'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }
