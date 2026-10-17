@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.17.4",
+      "date": "2026-10-17",
+      "title": "更新纯文字 Logo，开放 GR IIIx 完整功能导出",
+      "changes": [
+        "全站共享 Logo 和 favicon 改为确认的黑底暗金 m10v 纯文字图，统一首页、工作台、说明和日志页。",
+        "GR IIIx 1.60 开放原生胶卷库、800T／5207／蓝凤凰／RED、FN 参数、SD 换卷、时间戳、画幅、水平仪、负片颗粒与 RAW 降噪。",
+        "GR IIIx 同步开放配方、原厂预设、调试日志及版本适配；正确生成 fwdc243b.bin，并绑定 IIIx 来源及配置摘要。",
+        "通过共用代码差异移植保留 IIIx 独立型号、版本、焦距相关19个原厂 word和完整 CPU 载荷，逐分区独立回读；不直接刷入 GR III 型号内容。",
+        "新增 IIIx 实际组合构建、网页 HTTP、型号保护与最终固件 ARM 路径验证；IIIx 实机启动和成像仍待验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.17.3",
       "date": "2026-10-17",
       "title": "修复胶卷显示与显示域调色，新增可选版本准入适配",
@@ -14,9 +29,9 @@
         "替换 5207 失配的场景域反演，消除过早高光截断；蓝凤凰改用中性灰稳定的显示域解释，并在调色后合成橙红光晕。两者均未完成真实胶片与相机标定。",
         "新增默认关闭的「突破版本锁」开关；开启默认仅适配DSP包头并保持CPU整区不变，无需输入未知版本。CPU更高时仍可能被原厂拒绝；高级模式需实际完整版本。已独立校验差异并执行原厂ARM比较，周年机实际刷写及恢复仍待验证。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "ddd1f8b6556ad271eb6760f33a3a058bce79c314",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39041757507"
     },
     {
       "version": "2026.10.17.2",

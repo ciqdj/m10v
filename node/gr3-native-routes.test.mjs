@@ -32,7 +32,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
    assert.equal(nr.status,200);assert.deepEqual((await nr.json()).extensions.rawNr,rawNr);
   }
   assert.equal((await post(route+'prepare',{configuration:config,extensions:{...nrExtensions,rawNr:{mode:'threshold',iso:6300}}})).status,400);
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,extensions:nrExtensions})).status,400);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,extensions:nrExtensions})).status,200);
   const p=await post(route+'prepare',{configuration:config});assert.equal(p.status,200);const plan=await p.json();
   assert.deepEqual(plan.configuration,config);assert.equal(plan.debug_mode,false);
   assert.deepEqual(plan.version_unlock,{enabled:false});
@@ -43,7 +43,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal((await post(route+'prepare',{configuration:config,version_unlock:{enabled:true}})).status,400);
   assert.equal((await post(route+'prepare',{configuration:config,version_unlock:{...version_unlock,cpu:'2.11.21.27'}})).status,400);
   assert.equal((await post(route+'build',{configuration:config,version_unlock,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,debug_mode:true})).status,400);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,debug_mode:true})).status,200);
   const dp=await post(route+'prepare',{configuration:config,debug_mode:true});assert.equal(dp.status,200);const debugPlan=await dp.json();
   assert.notEqual(debugPlan.configuration_sha256,plan.configuration_sha256);
   assert.equal((await post(route+'build',{configuration:config,debug_mode:true,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
@@ -53,7 +53,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const bytes=Buffer.from(await built.arrayBuffer());const receipt=JSON.parse(Buffer.from(built.headers.get('X-M10V-Native-Receipt'),'base64'));
   assert.equal(receipt.candidate_sha256,createHash('sha256').update(bytes).digest('hex'));
   assert.deepEqual(receipt.configuration,config);assert.equal(receipt.camera_tested,false);assert.equal(receipt.verified_hooks,61);
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,400);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,200);
   assert.equal((await post(`/api/projects/${xid}/native-library/build`,{configuration:config,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
   const nrPlan=await (await post(route+'prepare',{configuration:config,extensions:nrExtensions})).json();
   assert.equal((await post(route+'build',{configuration:config,extensions:nrExtensions,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
@@ -92,5 +92,16 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(sb.readUInt32BE(0x38),0x020affff);assert.equal(sb.readUInt32BE(0x50),0x020a151b);
   assert.equal(sr.version_unlock.mode,'dsp-package-only');assert.equal(sr.version_unlock.current_versions,null);
   assert.equal(sr.version_unlock.checks.cpu_payload_unchanged,true);assert.equal(sr.version_unlock.camera_verified,false);
+  const xoptions={configuration:config,debug_mode:true,extensions:{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'off'}},version_unlock:{enabled:true,mode:'dsp-package-only'}};
+  const xp=await (await post(`/api/projects/${xid}/native-library/prepare`,xoptions)).json();
+  assert.equal(xp.model,'GR IIIx');assert.equal(xp.filename,'fwdc243b.bin');assert.equal(xp.external_film_pack,true);
+  const xb=await post(`/api/projects/${xid}/native-library/build`,{...xoptions,accepted_configuration_sha256:xp.configuration_sha256});
+  assert.equal(xb.status,200,xb.status===200?'':await xb.text());
+  const xbytes=Buffer.from(await xb.arrayBuffer()),xr=JSON.parse(Buffer.from(xb.headers.get('X-M10V-Native-Receipt'),'base64'));
+  assert.equal(xr.candidate_sha256,createHash('sha256').update(xbytes).digest('hex'));assert.equal(xr.source_sha256,xid);
+  assert.equal(xr.filename,'fwdc243b.bin');assert.equal(xbytes.readUInt32LE(0x30),609);assert.equal(xbytes.readUInt32BE(0x38),0x013cffff);
+  assert.equal(xr.gr3x_port.checks.cpu_payload_unchanged,true);assert.equal(xr.gr3x_port.checks.model_words_preserved,true);
+  assert.equal(xr.version_unlock.checks.cpu_payload_unchanged,true);assert.equal(xr.debug_mode,true);
+
  }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
 });

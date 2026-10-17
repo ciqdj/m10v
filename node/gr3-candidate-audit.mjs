@@ -23,7 +23,7 @@ function sections(decoded, sourceSections) {
   return result;
 }
 
-export function auditGr3Candidate(official, candidate, {maxRtosGrowth=64*1024}={}) {
+export function auditGr3Candidate(official, candidate, {maxRtosGrowth=64*1024,minRtosGrowth=1}={}) {
   const source = inspectOfficial(official);
   if (!Buffer.isBuffer(candidate) || candidate.length < 152 || candidate.equals(official))
     fail('candidate missing or unchanged');
@@ -42,7 +42,7 @@ export function auditGr3Candidate(official, candidate, {maxRtosGrowth=64*1024}={
   const rows = sections(decoded, source.sections);
   const growth = rows.find((row) => row.name === 'RTOS').size -
     source.sections.find((row) => row.name === 'RTOS').size;
-  if (![64*1024,512*1024,544*1024,672*1024].includes(maxRtosGrowth) || growth <= 0 || growth > maxRtosGrowth) fail('candidate RTOS growth outside supported range');
+  if (![0,1].includes(minRtosGrowth) || ![64*1024,512*1024,544*1024,672*1024].includes(maxRtosGrowth) || growth < minRtosGrowth || growth > maxRtosGrowth) fail('candidate RTOS growth outside supported range');
   const changedSections = rows.filter((row, index) => row.sha256 !== source.sections[index].sha256)
     .map((row) => row.name);
   if (changedSections.some((name) => !['RTOS', 'ICONBIN'].includes(name)))

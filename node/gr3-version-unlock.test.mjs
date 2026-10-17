@@ -142,3 +142,28 @@ test('repacking does not reuse a compressed frame whose backward history changed
  assert.equal(after.readUInt32BE(versionAt),0x020a1528);assert.equal(after.readUInt32BE(at),0x020a151b);
  }
 });
+
+
+test('GR IIIx exact profile supports its 1.60 version line and preserves its CPU in DSP package mode',async()=>{
+ const m=await load(),x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
+ const input={enabled:true,mode:'dsp-package-only'};
+ assert.deepEqual(m.normalizeVersionUnlock(input,'gr3x'),input);
+ for(const model of ['gr4','__proto__','constructor',null])assert.throws(()=>m.normalizeVersionUnlock(input,model));
+ assert.deepEqual(m.normalizeVersionUnlock({enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.16'},'gr3x'),{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.16'});
+ assert.throws(()=>m.normalizeVersionUnlock({enabled:true,dsp:'2.10.21.27',cpu:'2.10.21.27'},'gr3x'));
+ const result=m.applyVersionUnlock(x,input),d=decodeFrameMap(result.candidate).decoded,old=decodeFrameMap(x).decoded;
+ assert.equal(result.candidate.readUInt32LE(0x30),609);assert.equal(result.candidate.readUInt32LE(0x78),0x02610261);
+ assert.equal(result.candidate.readUInt32BE(0x38),0x013cffff);assert.equal(result.candidate.readUInt32BE(0x50),0x013c0b11);
+ assert.deepEqual(d.subarray(start(9),start(9)+131072),old.subarray(start(9),start(9)+131072));
+ assert.deepEqual(result.receipt.target_versions,{dsp:'1.60.255.255',cpu:'1.60.11.17'});
+ assert.deepEqual(m.verifyVersionUnlock(x,result.candidate,input),result.receipt);
+ const advanced=m.applyVersionUnlock(x,{enabled:true,dsp:'1.60.11.16',cpu:'1.60.12.1'});
+ assert.deepEqual(advanced.receipt.target_versions,{dsp:'1.60.11.17',cpu:'1.60.12.1'});
+ assert.throws(()=>m.applyVersionUnlock(x,{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'}));
+ const mixed=Buffer.from(x);mixed.writeUInt32LE(588,0x30);repair(mixed);assert.throws(()=>m.applyVersionUnlock(mixed,input));
+ const changed=Buffer.from(d);changed[start(9)+0x100]^=1;changed.writeUInt32BE(0,start(9)+0x7c);
+ let total=0;for(let at=start(9);at<start(9)+131072;at+=4)total=(total+changed.readUInt32BE(at))>>>0;
+ changed.writeUInt32BE(-total>>>0,start(9)+0x7c);
+ const forged=pack(repair(changed),result.candidate.subarray(0,128));forged.writeUInt32LE(0x02610261,forged.length-24);repair(forged);
+ assert.throws(()=>m.verifyVersionUnlock(x,forged,input));
+});

@@ -41,10 +41,10 @@ function encodeZip(rows) {
 }
 
 export function exportSdFilms(input){
- if(!input||typeof input!=='object'||Array.isArray(input)||!Object.hasOwn(input,'ids')||Object.keys(input).some(k=>!['ids','model'].includes(k))||(input.model!==undefined&&input.model!=='gr3'))throw Error('请选择 GR III 胶卷');
+ if(!input||typeof input!=='object'||Array.isArray(input)||!Object.hasOwn(input,'ids')||Object.keys(input).some(k=>!['ids','model'].includes(k))||(input.model!==undefined&&!['gr3','gr3x'].includes(input.model)))throw Error('请选择 GR III / GR IIIx 胶卷');
  const pack=buildSdFilmPack(input.ids),receipt=auditSdFilmPack(pack);
- const instructions='M10V SD 胶卷库 / GR III 2.10\n'+
- '需要配套的 M10V SD 胶卷库固件；旧内置胶卷库固件不读取此文件，GR IIIx 暂不支持。\n'+
+ const instructions='M10V SD 胶卷库 / GR III 2.10 / GR IIIx 1.60\n'+
+ '需要配套的 M10V SD 胶卷库固件；旧内置胶卷库固件不读取此文件，GR III 与 GR IIIx 共用此配方包。\n'+
  '解压，将 SD/M10V 目录复制到 SD 卡根目录，与 DCIM 并列。更新时只替换 FILMS.M10，保留其他文件。\n'+
  '机内：MENU > 设置 > 胶卷库，选择要替换的槽位并按 OK，直接进入卡上的胶卷列表。\n'+
  '左右选卷、上下翻页，选卷按 OK 装入，成功后返回五槽列表。MENU 返回上一级，五槽页按 MENU 退出。最多五个活动槽，卡上可存全部当前平台胶卷。\n'+

@@ -9,6 +9,7 @@ import {auditGr3Candidate} from './gr3-candidate-audit.mjs';
 import {createStockEdits} from './gr3-stock-presets.mjs';
 import {planRawNr} from './gr3-raw-nr.mjs';
 import {applyPatchPlan} from './gr3-patch-plan.mjs';
+import {portNativeToGr3x} from './gr3x-native-port.mjs';
 const baseFeatures=['recipes','timestamp','aspect','film','level'];
 const nativeFeatures=['presets','negativeGrain','rawNr'];
 const known=['variant','features','recipes','filmIds','filmLibrary','filmTexture','stockPresets','negativeGrainMenu','rawNr'];
@@ -39,7 +40,14 @@ export function normalizeCustomization(input){
 function editsFor(source,config){return [...createStockEdits(source,{presets:config.selection.stockPresets,negativeGrainMenu:config.selection.negativeGrainMenu}),
  ...planRawNr(source,config.selection.rawNr)];}
 export async function prepareCustomization(source,input,options={}){
- const report=inspectOfficial(source),config=normalizeCustomization(input),edits=editsFor(source,config);
+ const report=inspectOfficial(source);
+ if(report.model==='GR IIIx'){
+  const gr3=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url)),prepared=await prepareCustomization(gr3,input,options);
+  const engineSources=['gr3x-native-port.mjs','gr3-customization.mjs'].map(n=>[n,hash(readFileSync(new URL(n,import.meta.url)))]);
+  const configuration_sha256=hash(JSON.stringify({source:report.sha256,gr3_source:hash(gr3),gr3_configuration_sha256:prepared.configuration_sha256,engineSources}));
+  return {...prepared,configuration_sha256,source_sha256:report.sha256,filename:'fwdc243b.bin',gr3_configuration_sha256:prepared.configuration_sha256};
+ }
+ const config=normalizeCustomization(input),edits=editsFor(source,config);
  const upstream=config.upstreamPlan?(await runGr3Runtime(source,config.upstreamPlan,'prepare',undefined,options)).receipt:null;
  const diffusionRequested=Object.values(config.selection.filmTexture||{}).some(e=>e.hdf>0);
  const blockers=[...(upstream?.blockers||[]),...(diffusionRequested?['gr3_diffusion_descriptor_isolation_not_verified']:[])];
@@ -59,6 +67,14 @@ export async function prepareCustomization(source,input,options={}){
 export async function buildCustomization(source,input,accepted,options={}){
  const prepared=await prepareCustomization(source,input,options);
  need(prepared.ready&&accepted===prepared.configuration_sha256,'方案已变化或预检未通过，请重新预检');
+ if(inspectOfficial(source).model==='GR IIIx'){
+  const gr3=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));
+  const result=await buildCustomization(gr3,input,prepared.gr3_configuration_sha256,options);
+  const ported=portNativeToGr3x(gr3,source,result.candidate),candidate=ported.candidate;
+  return {candidate,receipt:{...result.receipt,...prepared,candidate_sha256:hash(candidate),candidate_bytes:candidate.length,
+   audit:{schema:'m10v-gr3x-final-audit/v1',sourceSha256:hash(source),candidateSha256:hash(candidate),candidateBytes:candidate.length,
+    rtosGrowth:ported.receipt.rtos_growth,checks:ported.receipt.checks,reference_audit:'gr3_audit'},gr3_audit:result.receipt.audit,gr3x_port:ported.receipt}};
+ }
  const config=normalizeCustomization(input),edits=editsFor(source,config);
  const result=config.upstreamPlan?await runGr3Runtime(source,config.upstreamPlan,'build',undefined,options):{candidate:source,receipt:{}};
  if(config.upstreamPlan){const audit=auditGr3Candidate(source,result.candidate);

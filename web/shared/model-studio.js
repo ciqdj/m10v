@@ -14,7 +14,7 @@ function mountDesk() {
   const oldHeader = document.querySelector('header');
   oldHeader.className = 'topbar';
   const menu = gr4 ? $('more-menu') : null;
-  oldHeader.innerHTML = `<a class="brand m10v-brand" href="/" aria-label="m10v · GR固件工作台 首页"><img class="m10v-mark" src="/shared/m10v-logo.svg" width="42" height="35" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a><nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><a href="/gr3/">GR III / IIIx</a><a href="/gr4/" ${gr4 ? 'class="current" aria-current="page"' : ''}>GR IV</a><a href="/gr2/" ${!gr4 ? 'class="current" aria-current="page"' : ''}>GR II</a><a href="/guide/">说明</a></nav>`;
+  oldHeader.innerHTML = `<a class="brand m10v-brand" href="/" aria-label="m10v · GR固件工作台 首页"><img class="m10v-mark" src="/shared/m10v-logo.png" width="48" height="48" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a><nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><a href="/gr3/">GR III / IIIx</a><a href="/gr4/" ${gr4 ? 'class="current" aria-current="page"' : ''}>GR IV</a><a href="/gr2/" ${!gr4 ? 'class="current" aria-current="page"' : ''}>GR II</a><a href="/guide/">说明</a></nav>`;
   if (menu) oldHeader.append(menu);
   const hero = document.createElement('section');hero.className = 'hero';
   hero.innerHTML = `<div class="hero-inner"><p class="kicker">RICOH ${name} · ONE STUDIO</p><h1>导入，调色，带走。</h1><p>导入固件 → 设置方案 → 保存固件 · 同一份来源，同一个工作台</p><div class="hero-rule"><span>${gr4 ? '影像控制 / 裁切 / 关机画面' : '组件 / 内置资源 / 只读检查'}</span><span>${name}</span></div></div>`;

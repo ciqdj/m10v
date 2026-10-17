@@ -30,3 +30,26 @@ test('unsupported identity leaves the previous verified source and configuration
  const h=harness();await h.run(h.report('GR III','a'));const previous=h.state.source;await h.run(h.report('GR IV','b'));
  assert.equal(h.state.source,previous);assert.equal(vm.runInContext('chosenModel',h.context),'gr3');assert.match(h.messages.at(-1)[0],/仅支持/);
 });
+
+
+test('GR IIIx import preserves all selected native extensions',async()=>{
+ const h=harness();h.state.features=new Set(['film','timestamp','aspect','level','negativeGrain','rawNr']);
+ await h.run(h.report('GR IIIx','a'));
+ assert.deepEqual([...h.state.features],['film','timestamp','aspect','level','negativeGrain','rawNr']);
+});
+
+test('GR IIIx uses the shared stock capability endpoint',async()=>{
+ const h=harness();await h.run(h.report('GR IIIx','a'));
+ assert.ok(h.calls.some(c=>c.path.endsWith('/stock-presets')));
+});
+test('GR IIIx imaging tab can select the custom workflow after removing native film',()=>{
+ const node=()=>({setAttribute(){}}),context=vm.createContext({state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
+ vm.runInContext("let chosenModel='gr3x',settingsTab='library';"+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
+ context.showSettingsTab('imaging');assert.equal(vm.runInContext('state.profile',context),'custom');
+});
+
+test('GR IIIx import preserves an explicitly selected custom workflow and recipes',async()=>{
+ const h=harness();h.state.profile='custom';h.state.features=new Set(['recipes','presets','negativeGrain','rawNr']);
+ await h.run(h.report('GR IIIx','a'));
+ assert.equal(h.state.profile,'custom');assert.deepEqual([...h.state.features],['recipes','presets','negativeGrain','rawNr']);
+});

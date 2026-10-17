@@ -15,12 +15,12 @@ function versionUnlockSnapshot(){
  return normalizeVersionUnlock(option,sourceModel);
 }
 function renderVersionUnlock(){
- const supported=sourceModel==='gr3',toggle=$('#native-version-unlock'),known=$('#native-version-known');
+ const supported=['gr3','gr3x'].includes(sourceModel),toggle=$('#native-version-unlock'),known=$('#native-version-known');
  $('#native-version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=busy||!supported;$('#native-version-unlock-fields').hidden=!toggle.checked;
  known.disabled=busy||!supported||!toggle.checked;
  const advanced=supported&&toggle.checked&&known.checked;$('#native-version-known-fields').hidden=!advanced;
- for(const key of ['dsp','cpu']){$('#native-version-'+key).disabled=busy||!advanced;$('#native-version-'+key).required=advanced;}
+ for(const key of ['dsp','cpu']){$('#native-version-'+key).disabled=busy||!advanced;$('#native-version-'+key).required=advanced;$('#native-version-'+key).placeholder=(sourceModel==='gr3x'?'1.60':'2.10')+'.x.x';}
  let error='';try{versionUnlockSnapshot();}catch(e){error=e.message;}
  $('#native-version-error').textContent=error;return !error;
 }
@@ -53,7 +53,7 @@ function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=
 async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(data.error||`请求失败 ${r.status}`);return data;}
 function post(url,value,signal){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(value),signal});}
 function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
-async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=file?(result.model==='GR III'?'gr3':null):'gr3';$('#source-status').textContent='✓ 官方包已核验 · GR III Street 2.10';message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
+async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
 for(const k of ['format','corner','color'])$('#'+k).onchange=()=>{configuration[k]=Number($('#'+k).value);invalidate();render();};
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
@@ -74,11 +74,11 @@ $('#build').onclick=async()=>{
  if(!response.ok){await jsonResponse(response);throw Error('构建失败');}
  message('3 / 3 · 核对下载摘要…');const blob=await response.blob();const encoded=response.headers.get('X-M10V-Native-Receipt');if(!encoded)throw Error('缺少构建校验记录');
  const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
- assertVersionUnlockReceipt(receipt.version_unlock,version_unlock);
+ assertVersionUnlockReceipt(receipt.version_unlock,version_unlock,sourceModel);
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),v=>v.toString(16).padStart(2,'0')).join('');
  if(receipt.debug_mode!==debug_mode||digest!==receipt.candidate_sha256||JSON.stringify(receipt.configuration)!==JSON.stringify(snapshot))throw Error('固件摘要或配置回读不一致');
  const binUrl=URL.createObjectURL(blob),recordUrl=URL.createObjectURL(new Blob([JSON.stringify(receipt,null,2)+'\n'],{type:'application/json'}));urls=[binUrl,recordUrl];
- $('#bin-link').href=binUrl;$('#bin-link').download='fwdc239b.bin';$('#receipt-link').href=recordUrl;$('#receipt-link').download='M10V-build-receipt.json';$('#downloads').hidden=false;
+ $('#bin-link').href=binUrl;$('#bin-link').download=sourceModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin';$('#receipt-link').href=recordUrl;$('#receipt-link').download='M10V-build-receipt.json';$('#downloads').hidden=false;
  message(`候选已生成 · ${(blob.size/1024/1024).toFixed(1)} MB · ${receipt.verified_hooks} 处挂钩、${receipt.icon_count} 个图标回读通过。${debug_mode?'调试已开启，复现后请复制 SD 卡根目录的 M10VMN0/1.BIN、M10VCP0/1.BIN。':''}相机结果待验证。`);$('#bin-link').click();
  }catch(e){message(e.name==='AbortError'?'已取消构建；没有导出固件。':e.message,true);}finally{abort=null;setBusy(false);}
 };

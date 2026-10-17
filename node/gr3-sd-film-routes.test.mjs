@@ -8,7 +8,8 @@ test('SD export endpoint is authenticated, serves complete subsets and rejects b
   const {session_token}=await(await fetch(base+'/api/status')).json();
   const post=(v,token=session_token)=>fetch(base+'/api/gr3/sd-library/export',{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(v)});
   assert.equal((await post({ids:[33]},'bad')).status,403);
-  for(const v of [{ids:[]},{ids:[1]},{ids:[33,33]},{ids:[33],model:'gr3x'},{ids:[33],extra:1},{}])assert.equal((await post(v)).status,400);
+  for(const v of [{ids:[]},{ids:[1]},{ids:[33,33]},{ids:[33],model:'gr4'},{ids:[33],extra:1},{}])assert.equal((await post(v)).status,400);
+  assert.equal((await post({ids:[33],model:'gr3x'})).status,200);
   const res=await post({ids:[65,33,50]});assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'application/zip');
   const b=Buffer.from(await res.arrayBuffer());let at=0;const entries=new Map();
   while(b.readUInt32LE(at)===0x04034b50){const size=b.readUInt32LE(at+18),nl=b.readUInt16LE(at+26),el=b.readUInt16LE(at+28),start=at+30+nl+el;entries.set(b.toString('utf8',at+30,at+30+nl),b.subarray(start,start+size));at=start+size;}

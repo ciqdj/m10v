@@ -20,7 +20,7 @@ test('one accepted plan binds native slots, timestamp, aspect, level and native 
  assert.ok(joined.features.includes('aspect')&&joined.features.includes('level')&&joined.features.includes('negativeGrain'));
  await assert.rejects(()=>generateNative(source,c,plain.configuration_sha256,{extensions}),/变化/);
  const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.throws(()=>prepareNative(x,c,{extensions}),/GR III/);
+ assert.deepEqual(prepareNative(x,c,{extensions}).extensions,prepareNative(source,c,{extensions}).extensions);
 });
 
 test('final joined firmware contains all selected components and rejects repaired-checksum tampering',async()=>{
@@ -65,7 +65,7 @@ test('native transition synchronizes timestamp and clears GR III-only tools on m
  assert.equal(nativeSelection(['timestamp','aspect'],c,'gr3').configuration.stamp,1);
  assert.equal(nativeSelection(['aspect'],{...c,stamp:2},'gr3').configuration.stamp,0);
  const x=nativeSelection(['film','timestamp','aspect','level','negativeGrain'],{...c,stamp:2},'gr3x');
- assert.deepEqual(x.features,['film','timestamp']);
+ assert.deepEqual(x.features,['film','timestamp','aspect','level','negativeGrain']);
  assert.equal(x.configuration.stamp,2);
 });
 
@@ -76,8 +76,8 @@ test('RAW NR plans bind all modes and reject unknown model addresses',()=>{
  assert.equal(new Set(plans.map(p=>p.configuration_sha256)).size,3);
  assert.ok(plans[1].features.includes('rawNr'));assert.ok(!plans[0].features.includes('rawNr'));
  const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.throws(()=>prepareNative(x,c),/GR IIIx/);
- assert.throws(()=>prepareNative(x,c,{extensions:{...flags,rawNr:{mode:'off'}}}),/GR III/);
+ assert.equal(prepareNative(x,c).filename,'fwdc243b.bin');
+ assert.equal(prepareNative(x,c,{extensions:{...flags,rawNr:{mode:'off'}}}).extensions.rawNr.mode,'off');
  for(const rawNr of [null,{mode:'threshold',iso:6300},{mode:'off',iso:6400},{mode:'stock',extra:1}])assert.throws(()=>normalizeExtensions({...flags,rawNr}));
 });
 

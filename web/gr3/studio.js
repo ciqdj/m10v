@@ -12,7 +12,7 @@ let nativeEditor;
 let settingsTab='imaging';
 let debugMode=false;
 const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.features.has('level'),negativeGrain:state.features.has('negativeGrain'),rawNr:state.features.has('rawNr')?state.rawNr:{mode:'stock'}});
-const debugEnabled=()=>debugMode&&state.profile==='native'&&chosenModel==='gr3';
+const debugEnabled=()=>debugMode&&state.profile==='native';
 
 const $ = (id) => document.getElementById(id);
 const fields = [
@@ -110,7 +110,7 @@ function restoreDraft() {
     const draft = JSON.parse(raw);
     if (!Array.isArray(draft.features) || !Array.isArray(draft.recipes) ||
       !Array.isArray(draft.filmIds) || !Array.isArray(draft.filmLibrary)) return;
-    state.profile = chosenModel==='gr3x'||draft.profile==='native'?'native':'custom';
+    state.profile = draft.profile==='native'?'native':'custom';
     state.filmTexture = draft.filmTexture || {}; state.stockPresets = Array.isArray(draft.stockPresets)?draft.stockPresets:[]; state.rawNr=draft.rawNr||{mode:'stock'};
     state.features = new Set(draft.features.filter((id) => definitions.some(([known]) => known === id)));
     state.recipes = new Map(draft.recipes.filter((recipe) => slotById.has(recipe?.slotId))
@@ -166,12 +166,12 @@ function versionUnlockSnapshot(){
  return normalizeVersionUnlock(option,chosenModel);
 }
 function renderVersionUnlock(){
- const supported=state.profile==='native'&&chosenModel==='gr3',toggle=$('version-unlock'),known=$('version-known');
+ const supported=state.profile==='native'&&['gr3','gr3x'].includes(chosenModel),toggle=$('version-unlock'),known=$('version-known');
  $('version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=saving||Boolean(activeBuildController)||!supported;$('version-unlock-fields').hidden=!toggle.checked;
  known.disabled=saving||Boolean(activeBuildController)||!supported||!toggle.checked;
  const advanced=supported&&toggle.checked&&known.checked;$('version-known-fields').hidden=!advanced;
- for(const key of ['dsp','cpu']){$('version-'+key).disabled=saving||Boolean(activeBuildController)||!advanced;$('version-'+key).required=advanced;}
+ for(const key of ['dsp','cpu']){$('version-'+key).disabled=saving||Boolean(activeBuildController)||!advanced;$('version-'+key).required=advanced;$('version-'+key).placeholder=(chosenModel==='gr3x'?'1.60':'2.10')+'.x.x';}
  let error='';try{versionUnlockSnapshot();}catch(e){error=e.message;}
  $('version-error').textContent=error;return !error;
 }
@@ -197,7 +197,7 @@ function renderLedger() {
   $('prepare-build').disabled = Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('build-firmware').disabled = saving||Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('features-next').disabled=!canConfigure;
-  $('debug-option').hidden=state.profile!=='native'||chosenModel!=='gr3';
+  $('debug-option').hidden=state.profile!=='native';
   $('debug-mode').checked=debugMode;
   $('debug-mode').disabled=saving||Boolean(activeBuildController);
 
@@ -228,11 +228,10 @@ function renderFeatures() {
     heading.append(textNode('span', String(index + 1).padStart(2, '0'), 'feature-num'), textNode('h3', name));
     copy.append(heading, textNode('p', description), textNode('span', '● ' + tag, 'feature-tag'));
     const button = textNode('button', active ? '移除' : '加入', 'feature-toggle' + (active ? ' selected' : ''));
-    button.type = 'button';button.disabled=chosenModel==='gr3x'&&(id!=='film'||active);if(chosenModel==='gr3x'&&id==='film'&&active)button.textContent='当前方案';
+    button.type = 'button';
     button.addEventListener('click', () => {
-      if(chosenModel==='gr3x'&&id!=='film'){notice('GR IIIx 当前支持统一胶卷方案。',true);return;}
       if(id==='film'){
-        if(active&&chosenModel!=='gr3x'){state.features.delete('film');state.profile='custom';}
+        if(active){state.features.delete('film');state.profile='custom';}
         else{try{enterNativeSelection();}catch(e){notice(e.message,true);return;}}
       }else if(state.profile==='native'){
         if(!['timestamp','aspect','level','negativeGrain','rawNr'].includes(id)){notice('胶卷库可组合时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；其他工具请先移除胶卷库。',true);return;}
@@ -493,16 +492,13 @@ async function importSource(file,local=false) {
     }else report=await (await api('/api/import',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})).json();
     if(!['GR III','GR IIIx'].includes(report.model))throw Error('当前工作台仅支持 GR III 和 GR IIIx 官方包。');
     chosenModel=report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;
-    if(chosenModel==='gr3x'){
-      state.toolFeaturesDraft=[...state.features].filter(v=>v!=='film');enterNativeSelection();
-    }
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
     $('build-model').textContent=`${report.model} · ${report.public_version}`;
     document.title=`m10v · GR固件工作台 · ${report.model}`;
     document.querySelector('.hero .kicker').textContent=`RICOH ${report.model} · ${report.public_version}`;
     state.projectId = report.sha256; state.source = report; invalidate();
-    state.stockCapabilities=chosenModel==='gr3x'?[]:await (await api(`/api/projects/${state.projectId}/stock-presets`)).json();
+    state.stockCapabilities=await (await api(`/api/projects/${state.projectId}/stock-presets`)).json();
     renderFeatures();
 
     const node = $('source-report'); node.hidden = false; node.replaceChildren();
@@ -566,7 +562,7 @@ async function build() {
     if(state.profile==='native'){
       const encoded=response.headers.get('X-M10V-Native-Receipt');if(!encoded)throw Error('缺少构建校验记录');
       const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
-      assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock);
+      assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock,chosenModel);
     }
     await download(response, state.preparation.filename||(chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
     $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。';
@@ -578,7 +574,7 @@ async function build() {
 }
 function showSettingsTab(tab){
  if(tab==='library'){try{enterNativeSelection();}catch(e){notice(e.message,true);return;}}
- const next=tab==='library'||chosenModel==='gr3x'||state.features.has('film')?'native':'custom';
+ const next=tab==='library'||state.features.has('film')?'native':'custom';
  if(state.profile!==next){state.profile=next;invalidate();}
  settingsTab=tab;renderFeatures();const library=tab==='library';$('imaging-settings').hidden=library;$('native-editor').hidden=!library;
  for(const name of ['imaging','library']){const b=$('tab-'+name);b.setAttribute('aria-selected',String(name===tab));b.tabIndex=name===tab?0:-1;}

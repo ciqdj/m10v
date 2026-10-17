@@ -3,7 +3,8 @@
 import {createHash} from 'node:crypto';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
 
-const BASELINE=0x020a151b,DSP_PACKAGE_CEILING=0x020affff,MAX_BYTES=128*1024*1024,RTOS_BYTES=17520064;
+const profiles={gr3:{project:588,magic:0x024c024c,baseline:0x020a151b,ceiling:0x020affff,line:0x020a,label:'2.10'},gr3x:{project:609,magic:0x02610261,baseline:0x013c0b11,ceiling:0x013cffff,line:0x013c,label:'1.60'}};
+const MAX_BYTES=128*1024*1024,RTOS_BYTES=17520064;
 const rows=[['BOOTPARA',72,0xffff0005],['DRAMPARA',556,0xffff0001],
  ['PARTPARA',516,0xffff0002],['M0',44640,3],['BOOT',21816,4],
  ['RTOS',RTOS_BYTES,0x10004],['LINUX',3062784,0x50004],['INITFS',13899776,0x60004],
@@ -17,7 +18,8 @@ function word(value){
  const parts=value.split('.').map(Number);need(parts.every(v=>v<=255),'版本每段必须在 0–255 范围内');
  return parts.reduce((v,n)=>v*256+n,0);
 }
-export function normalizeVersionUnlock(input){
+export function normalizeVersionUnlock(input,model='gr3'){
+ need(Object.hasOwn(profiles,model),'机型无效');const profile=profiles[model];
  if(input===undefined)return {enabled:false};
  need(input&&typeof input==='object'&&!Array.isArray(input)&&
   Object.keys(input).every(k=>['enabled','mode','dsp','cpu'].includes(k)),'配置字段无效');
@@ -29,18 +31,20 @@ export function normalizeVersionUnlock(input){
  }
  need(input.mode===undefined||input.mode==='observed-versions','版本适配模式无效');
  const dsp=word(input.dsp),cpu=word(input.cpu);
- need((dsp>>>16)===0x020a&&(cpu>>>16)===0x020a,'仅支持同一 2.10 公共版本线的 DSP/CPU 完整版本');
+ need((dsp>>>16)===profile.line&&(cpu>>>16)===profile.line,`仅支持同一 ${profile.label} 公共版本线的 DSP/CPU 完整版本`);
  return {...(input.mode?{enabled:true,mode:input.mode}:{enabled:true}),dsp:text(dsp),cpu:text(cpu)};
 }
-function targets(input){return input.mode==='dsp-package-only'?{dsp:DSP_PACKAGE_CEILING,cpu:BASELINE}:
- {dsp:Math.max(BASELINE,word(input.dsp)),cpu:Math.max(BASELINE,word(input.cpu))};}
+function targets(input,profile){return input.mode==='dsp-package-only'?{dsp:profile.ceiling,cpu:profile.baseline}:
+ {dsp:Math.max(profile.baseline,word(input.dsp)),cpu:Math.max(profile.baseline,word(input.cpu))};}
 function cpuSum(decoded,start){let n=0;for(let at=start;at<start+131072;at+=4)n=(n+decoded.readUInt32BE(at))>>>0;return n;}
 function read(bytes){
  need(Buffer.isBuffer(bytes)&&bytes.length>=152&&bytes.length<MAX_BYTES&&!(bytes.length&3),'候选容器大小无效');
  const tail=bytes.length-24,encoded=bytes.readUInt32LE(tail+12),size=bytes.readUInt32LE(tail+16);
- need(bytes.readUInt32LE(0x30)===588&&bytes.readUInt32LE(0x78)===0x024c024c&&
-  bytes.readUInt32LE(0x7c)===0xa55a5aa5&&bytes.readUInt32LE(tail)===0x024c024c&&
-  bytes.readUInt32LE(tail+4)===0xa55a5aa5&&bytes.readUInt32LE(tail+8)===2,'仅支持 GR III 公共 2.10 基线的既有候选，机型/标记无效');
+ const model=Object.keys(profiles).find(k=>bytes.readUInt32LE(0x30)===profiles[k].project&&bytes.readUInt32LE(0x78)===profiles[k].magic);
+ need(model,'机型/标记无效');const profile=profiles[model];
+ need(
+  bytes.readUInt32LE(0x7c)===0xa55a5aa5&&bytes.readUInt32LE(tail)===profile.magic&&
+  bytes.readUInt32LE(tail+4)===0xa55a5aa5&&bytes.readUInt32LE(tail+8)===2,'公共基线候选机型/标记无效');
  need(size>=59718388&&size<=59718388+672*1024&&!(size&3)&&
   ((128+encoded+3)&~3)===tail&&bytes.subarray(128+encoded,tail).every(v=>v===0),'容器布局无效');
  need(sum32(bytes)===0,'容器 checksum 无效');
@@ -56,13 +60,13 @@ function read(bytes){
  }
  need(at+4===decoded.length,'分区尾部无效');
  const cpu=sections.CPU.offset;
- need(decoded.readUInt32LE(cpu+0x80)===588,'CPU 项目编号无效');
+ need(decoded.readUInt32LE(cpu+0x80)===profile.project,'CPU 项目编号无效');
  need(decoded.readUInt32BE(cpu+0x7c)!==0xffffffff&&cpuSum(decoded,cpu)===0,'CPU checksum 无效');
- return {decoded,frames,sections,tail};
+ return {decoded,frames,sections,tail,model,profile};
 }
 function versions(bytes,r){return {outer_dsp:bytes.readUInt32BE(0x38),outer_cpu:bytes.readUInt32BE(0x50),
  rtos:r.decoded.readUInt32BE(r.sections.RTOS.offset+0x2038),cpu:r.decoded.readUInt32BE(r.sections.CPU.offset+0x90)};}
-function baseline(bytes,r){need(Object.values(versions(bytes,r)).every(v=>v===BASELINE),'输入必须是已审计且尚未解锁版本的 2.10.21.27 候选');}
+function baseline(bytes,r){need(Object.values(versions(bytes,r)).every(v=>v===r.profile.baseline),`输入必须是已审计且尚未解锁版本的 ${text(r.profile.baseline)} 候选`);}
 function repair(bytes){bytes.writeUInt32LE(0,bytes.length-4);bytes.writeUInt32LE(-sum32(bytes)>>>0,bytes.length-4);}
 function pack(before,r,target){
  const chunks=[];
@@ -86,13 +90,15 @@ function equalOutside(a,b,ranges,message){
  need(a.subarray(cursor).equals(b.subarray(cursor)),message);
 }
 export function verifyVersionUnlock(before,after,input){
- const option=normalizeVersionUnlock(input);
+ const enabled=input?.enabled;
+ const source=enabled?read(before):null;
+ const option=normalizeVersionUnlock(input,source?.model);
  need(Buffer.isBuffer(before)&&Buffer.isBuffer(after),'候选必须为 Buffer');
  const common={schema:'m10v-gr3-version-unlock/v1',enabled:option.enabled,
   before_sha256:hash(before),candidate_sha256:hash(after),camera_verified:false};
  if(!option.enabled){need(before.equals(after),'关闭时禁止任何修改');return {...common,status:'disabled',checks:{non_target_unchanged:true}};}
  // Freshly decode both buffers; this verifier never calls the mutating builder.
- const a=read(before),b=read(after);baseline(before,a);const goal=targets(option);
+ const a=source,b=read(after);need(a.model===b.model,'候选机型改变');baseline(before,a);const goal=targets(option,a.profile);
  const dspOnly=option.mode==='dsp-package-only';
  equalOutside(before.subarray(0,128),after.subarray(0,128),dspOnly?[[0x38,4]]:[[0x38,4],[0x50,4]],'外层非版本字段发生改变');
  equalOutside(before.subarray(-24),after.subarray(-24),[[12,4],[20,4]],'容器 footer 非目标字段发生改变');
@@ -107,20 +113,21 @@ export function verifyVersionUnlock(before,after,input){
  need(Object.keys(expected).every(k=>actual[k]===expected[k]),'版本回读与逐组件目标不符');
  return {...common,status:'version_unlock_offline_verified',mode:dspOnly?'dsp-package-only':'observed-versions',
   strategy:dspOnly?'dsp_package_public_line_ceiling_cpu_unchanged':'match_observed_component_versions',
-  current_versions:dspOnly?null:{dsp:option.dsp,cpu:option.cpu},source_versions:{dsp:text(BASELINE),cpu:text(BASELINE)},
+  current_versions:dspOnly?null:{dsp:option.dsp,cpu:option.cpu},source_versions:{dsp:text(a.profile.baseline),cpu:text(a.profile.baseline)},
   target_versions:{dsp:text(goal.dsp),cpu:text(goal.cpu)},versions:Object.fromEntries(Object.entries(actual).map(([k,v])=>[k,text(v)])),
   checks:{outer_sum32:0,decoded_sum32:0,cpu_sum32_be:0,cpu_payload_unchanged:cpuUnchanged,non_target_unchanged:true,section_layout_unchanged:true,fresh_decode:true},
-  ...(dspOnly?{version_scope:'DSP 目标仅为 2.10 公共线包头上限，不是机身实际版本；机身 CPU 版本未知且未修改，CPU 较高时原厂仍会拒绝'}:{}),
+  ...(dspOnly?{version_scope:`DSP 目标仅为 ${a.profile.label} 公共线包头上限，不是机身实际版本；机身 CPU 版本未知且未修改，CPU 较高时原厂仍会拒绝`}:{}),
   hardware_scope:'版本比较局部门禁的离线验证；未验证纪念版机身、服务固件组件兼容性、整条刷写流程或恢复路径',
   blockers:[...(dspOnly?['current_cpu_version_unknown_stock_gate_may_reject']:[]),
    'anniversary_camera_acceptance_unverified','service_component_compatibility_unverified','hardware_recovery_unverified']};
 }
 export function applyVersionUnlock(candidate,input){
- const option=normalizeVersionUnlock(input);
+ const r=input?.enabled?read(candidate):null;
+ const option=normalizeVersionUnlock(input,r?.model);
  need(Buffer.isBuffer(candidate),'候选必须为 Buffer');
  if(!option.enabled){const out=Buffer.from(candidate);return {candidate:out,receipt:verifyVersionUnlock(candidate,out,option)};}
- const r=read(candidate);baseline(candidate,r);const goal=targets(option);
- if(goal.dsp===BASELINE&&goal.cpu===BASELINE){const out=Buffer.from(candidate);return {candidate:out,receipt:verifyVersionUnlock(candidate,out,option)};}
+ baseline(candidate,r);const goal=targets(option,r.profile);
+ if(goal.dsp===r.profile.baseline&&goal.cpu===r.profile.baseline){const out=Buffer.from(candidate);return {candidate:out,receipt:verifyVersionUnlock(candidate,out,option)};}
  const target=Buffer.from(r.decoded),cpu=r.sections.CPU.offset;
  target.writeUInt32BE(goal.dsp,r.sections.RTOS.offset+0x2038);
  if(option.mode!=='dsp-package-only'){

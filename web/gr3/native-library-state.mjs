@@ -53,7 +53,7 @@ export function withNativeLibrary(features){
 }
 
 export function nativeSelection(features,configuration,model){
- const compatible=model==='gr3x'?features.filter(id=>['film','timestamp'].includes(id)):features;
+ const compatible=features;
  return {features:withNativeLibrary(compatible),configuration:{...configuration,stamp:compatible.includes('timestamp')?(configuration.stamp||1):0}};
 }
 
