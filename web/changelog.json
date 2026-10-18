@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.3",
+      "date": "2026-10-19",
+      "title": "完善新站 HTTPS 与宝塔维护流程",
+      "changes": [
+        "为新站配置受信任的域名证书、TLS 1.2/1.3、HTTP/2 和 HTTPS 跳转。",
+        "技能补充 DNS 证书验证、备案后自动续期切换、宝塔 HTTPS IP 入口及来源限制的验证方法。",
+        "仅更新 GR III、GR IIIx、GR IV 的部署维护说明，不改变固件补丁。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.2",
       "date": "2026-10-19",
       "title": "补齐独立服务器的组合构建依赖与建站说明",
@@ -10,9 +23,9 @@
         "记录宝塔静态缓存规则导致 JS、CSS、图片 404 的处理，以及改密后的面板入口查询方式。",
         "适用于 GR III、GR IIIx、GR IV 的服务器部署；不改变相机补丁或实机验证结论。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "32327df550b55b981db7380a9eed52fb9b1998ad",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/32327df550b55b981db7380a9eed52fb9b1998ad"
     },
     {
       "version": "2026.10.19.1",

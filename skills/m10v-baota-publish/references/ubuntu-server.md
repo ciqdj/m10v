@@ -21,9 +21,24 @@ admin 可使用 sudo。服务器 Ed25519 指纹应为 `SHA256:14wdxfbNTDj0zIp43y
 - Ubuntu 依赖：`git python3 python3-venv clang lld build-essential`；venv 包 `pillow numpy capstone unicorn`。
 - 完整发布的 GR III 扩展组合和 GR IV 定制需要锁定的 `.runtime/grlife-current`。初始化必须运行 `node scripts/sync-grlife-runtime.mjs --current`，或传输已核验缓存并以 www 验证 `runtimeAvailable()` 为 true；保持 manifest 与逐文件 SHA-256 校验。缓存默认权限为 600/700，需要仅对该目录改为文件 644、目录 755。缺失会导致发布回退，不能跳过组合构建。
 - 三个官方输入分别为 `bin/fwdc239b-gr3-official.bin`、`bin/fwdc243b-gr3x-official.bin`、`bin/fwdc248b-gr4-officical.bin`。它们不在 Git，重建服务器时单独安全传输并核对完整 SHA-256。
-- 2 GB 节点保留 2 GB swap，并对服务及发布构建设置 `NODE_OPTIONS=--max-old-space-size=128`。这是 JS 堆限制，Buffer、Python、编译器仍需额外内存。
+- 2 GB 节点保留至少 1 GB swap（当前宝塔已配置 1 GB），并对服务及发布构建设置 `NODE_OPTIONS=--max-old-space-size=128`。这是 JS 堆限制，Buffer、Python、编译器仍需额外内存。
 - Nginx 使用仓库 `deploy/nginx-location.conf`：300 秒超时、16k 响应头缓冲、`proxy_buffers 4 16k`、`proxy_busy_buffers_size 32k`，避免约 7 KB 审计头超过默认缓冲。先 `nginx -t`，再 reload。Nginx 由宝塔官方极速安装器安装，当前 1.28.3。
 - 宝塔新建站点的默认图片、JS/CSS 本地缓存 location 会截获代理静态资源并返回 404。只移除这两类缓存规则，保留敏感文件及 ACME 规则，并分别验证 studio.js、styles.css、logo.png 返回 200。
+
+## HTTPS 与面板
+
+站点证书由 Certbot DNS-01 签发，文件在 `/etc/letsencrypt/live/m10v.izhaoo.com/`；Nginx 与宝塔读取 `/www/server/panel/vhost/cert/m10v.izhaoo.com/` 的受保护副本。部署 hook `/etc/letsencrypt/renewal-hooks/deploy/m10v-copy-cert.sh` 在续期后复制并检查、重载 Nginx。私钥仅 root 可读。2026-10-19 初始证书有效至 2027-01-16；每次检查应以实际 `openssl x509 -dates` 为准。
+
+当前 DNS 验证需要人工更新 TXT，不能因 Certbot 默认 timer 已启用就报告自动续期已打通。备案完成且公网 HTTP 验证可达后，改为 webroot 并实际验证：
+
+```sh
+sudo certbot reconfigure --cert-name m10v.izhaoo.com --webroot -w /www/wwwroot/m10v-site
+sudo certbot renew --dry-run
+```
+
+Nginx 的 ACME 验证 location 与网站根目录必须保留。当前 TLS 1.2/1.3、HTTP/2 与 HTTP→HTTPS 跳转已配置；验证不得使用 `-k` 忽略证书。服务器内部验证使用 `curl --resolve m10v.izhaoo.com:443:127.0.0.1 https://m10v.izhaoo.com/`。
+
+宝塔使用 HTTPS IP 证书，入口为 `https://47.96.158.25:8888` 加 `admin_path.pl` 中的安全路径。8888 只对管理员访问 IP 放行，3000 不向公网开放。宝塔会过滤 curl 等爬虫 UA，登录页返回 404 时先用实际浏览器或完整浏览器 UA 验证，不能关闭面板安全入口、IP限制或爬虫过滤来通过检查。
 
 ## 自动发布
 
