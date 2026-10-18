@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.18.3",
+      "date": "2026-10-18",
+      "title": "暂停实机失败的 GR III 桥接下载",
+      "changes": [
+        "最新实机反馈：GR III 2.10.22.27 一阶桥接包确认后立即失败，仍可正常开机；撤销此前实机通过结论。",
+        "主工作台与独立导出页显示调查状态，服务端拒绝旧预检和新预检的桥接下载；保留普通固件与 GR IIIx、GR IV 功能。",
+        "记录离线验证边界：版本门禁模拟不代表机身解压硬件或完整更新流程验收；失败原因仍在调查，未将版本盲目提高作为修复。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.18.2",
       "date": "2026-10-18",
       "title": "GR IV 原生胶卷库与完整工作台",
@@ -11,9 +24,9 @@
         "复用导入、草稿、预检、构建、备份和SD导出流程，输出fwdc248b.bin；原厂参考工具保留在/gr4/reference/。",
         "新增原始ARM交互、绘图对照、存储故障、完整分辨率和最终封包回读验证；网页构建下载通过，GR IV刷入、LCD和成像仍待实机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a88fcffaf9c384cf48a768d759514ab2042c45ee",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39111543232"
     },
     {
       "version": "2026.10.18.1",

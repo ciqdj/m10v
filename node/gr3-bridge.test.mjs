@@ -15,7 +15,7 @@ test('bridge has third-component increment component versions and only the evide
  assert.equal(d.subarray(sections.RTOS.at+0x6285dc,sections.RTOS.at+0x6285e0).toString('hex'),'e6ffffea');
  assert.equal(sum32(candidate),0);assert.equal(sum32(d),0);
  let cpuSum=0;for(let p=sections.CPU.at;p<sections.CPU.at+131072;p+=4)cpuSum=(cpuSum+d.readUInt32BE(p))>>>0;assert.equal(cpuSum,0);
- assert.equal(receipt.camera_verified,true);assert.equal(receipt.hardware_verification.source,'user_report');assert.equal(receipt.hardware_verification.candidate_sha256,'e49cce2858e52b200b9d451100d13f3ff7ea51f30b66503cb26d503851431955');assert.equal(receipt.candidate_sha256,receipt.hardware_verification.candidate_sha256);assert.equal(receipt.package_version,'2.10.22.27');
+ assert.equal(receipt.camera_verified,false);assert.equal(receipt.status,'hardware_failed');assert.equal(receipt.hardware_verification.status,'failed');assert.equal(receipt.hardware_verification.camera_bootable,true);assert.equal(receipt.hardware_verification.source,'user_report');assert.equal(receipt.hardware_verification.candidate_sha256,'e49cce2858e52b200b9d451100d13f3ff7ea51f30b66503cb26d503851431955');assert.equal(receipt.candidate_sha256,receipt.hardware_verification.candidate_sha256);assert.equal(receipt.package_version,'2.10.22.27');
  assert.deepEqual(verifyGr3Bridge(official,candidate),receipt);
  assert.throws(()=>buildGr3Bridge(readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url))),/GR III|identity/);
  const wrong=Buffer.from(official);wrong[0x38]^=1;assert.throws(()=>buildGr3Bridge(wrong));
