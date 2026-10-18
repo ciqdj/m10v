@@ -15,13 +15,13 @@
 ```bash
 node -v
 sudo apt update
-sudo apt install -y git python3 python3-venv clang build-essential
+sudo apt install -y git python3 python3-venv clang llvm lld build-essential
 ```
 
 Alibaba Cloud Linux 3 使用官方系统源安装编译工具；在宝塔软件商店安装「python环境管理器」，再安装 Python 3.12，保留系统 Python：
 
 ```bash
-sudo dnf install -y git clang llvm
+sudo dnf install -y git clang llvm lld
 ```
 
 下载项目，再创建独立虚拟环境。Ubuntu 可以直接使用 `python3`；宝塔 Python 环境使用管理器显示的解释器绝对路径替换它：
@@ -36,11 +36,12 @@ mkdir -p bin data
 
 首次上线无需恢复未开放的 GR IV 校准 DNG。原生胶卷库不依赖 GRLife 兼容运行时；如果开放 GR III 其他原厂工具，再按根 README 安装兼容运行时。
 
-将两份本机已有官方 BIN 上传至：
+将三份本机已有官方 BIN 上传至（GR IV 同样用于发布构建检查）：
 
 ```text
 /www/wwwroot/m10v/bin/fwdc239b-gr3-official.bin
 /www/wwwroot/m10v/bin/fwdc243b-gr3x-official.bin
+/www/wwwroot/m10v/bin/fwdc248b-gr4-officical.bin
 ```
 
 在服务器生成历史读取别名（第一次执行时）：
@@ -89,6 +90,8 @@ M10V_PYTHON=/www/wwwroot/m10v/.venv/bin/python
 ```
 
 也提供了 `ecosystem.config.cjs` 供已使用 PM2 的环境参考。保持单进程，不要配置 cluster 多实例；当前构建互斥和会话令牌为进程级。
+
+GR IV 同时需要 LLVM 的 `llvm-objcopy`、`llvm-nm` 和 LLD 的 `ld.lld`，仅安装 clang 无法生成固件。安装后在站点目录以服务用户运行 `runuser -u www -- env M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$PWD/.venv/bin/python" /usr/local/bin/m10v-node scripts/check_gr4_release.mjs`，完成实际编译、封包及回读检查。
 
 ## 4. 配置宝塔站点
 

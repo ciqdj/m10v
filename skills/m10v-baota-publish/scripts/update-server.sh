@@ -86,17 +86,19 @@ trap 'exit 1' HUP INT TERM
 changed=1
 git merge --ff-only "$expected"
 [[ $(git rev-parse HEAD) == "$expected" ]]
-for model in gr3 gr3x; do
+for model in gr3 gr3x gr4; do
   if [[ $model == gr3 ]]; then
     build_args=(scripts/build_gr3_device_candidate.mjs "$work/$model")
-  else
+  elif [[ $model == gr3x ]]; then
     build_args=(scripts/check_gr3x_release.mjs)
+  else
+    build_args=(scripts/check_gr4_release.mjs)
   fi
   if ! runuser -u www -- env M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
     "${build_args[@]}" >"$work/$model.log" 2>&1; then
     cat "$work/$model.log" >&2; exit 1
   fi
-  if [[ $model == gr3 ]]; then
+  if [[ $model != gr3x ]]; then
     printf 'FIRMWARE_BUILD_OK model=%s\n' "$model"
   else
     printf 'MODEL_GUARD_OK model=gr3x native_export=blocked\n'
