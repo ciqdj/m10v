@@ -5,12 +5,12 @@ import vm from 'node:vm';
 import {nativeSelection} from '../web/gr3/native-library-state.mjs';
 const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
 const method=app.slice(app.indexOf('async function importSource('),app.indexOf('async function download('));
-function harness(){
+function harness(model='gr3'){
  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'gr3',hidden:true,disabled:true,textContent:'',append(){},replaceChildren(){}});return nodes.get(id);};
  const state={profile:'native',features:new Set(['film']),nativeConfig:{slots:[{film:33}]},projectId:'',source:null};
  let imported;const calls=[],messages=[];
- const context=vm.createContext({nativeSelection,nativeEditor:{setConfiguration(c){state.nativeConfig=c;}},state,$:node,document:{title:'',querySelector:()=>node('hero')},notice:(...v)=>messages.push(v),invalidate(){},renderFeatures(){},showStep(){},showSettingsTab(){},textNode:()=>node('text'),
- api:async(path,options={})=>{calls.push({path,options});return {json:async()=>path.endsWith('import-official')?{project_id:imported.sha256}:path.endsWith('stock-presets')?[]:imported};}});
+ const context=vm.createContext({gr4Workbench:model==='gr4',nativeApi:'/api/'+model+'/native-library',nativeSelection,nativeEditor:{setConfiguration(c){state.nativeConfig=c;}},state,$:node,document:{title:'',querySelector:()=>node('hero')},notice:(...v)=>messages.push(v),invalidate(){},renderFeatures(){},showStep(){},showSettingsTab(){},textNode:()=>node('text'),
+ api:async(path,options={})=>{calls.push({path,options});return {json:async()=>path.endsWith('import-official')?(model==='gr4'?{...imported,project_id:imported.sha256}:{project_id:imported.sha256}):path.endsWith('stock-presets')?[]:imported};}});
  vm.runInContext("let chosenModel='gr3';let modelLabel='GR III';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+method,context);
  const report=(model,sha)=>({model,sha256:sha.repeat(64),public_version:model==='GR IIIx'?'1.60':'2.10',internal_version:'test',size:100,sections:[{}]});
  return {state,nodes,node,calls,messages,report,context,run:async(r,local=false)=>{imported=r;await context.importSource(local?null:{},local);}};
@@ -43,7 +43,7 @@ test('GR IIIx uses the shared stock capability endpoint',async()=>{
  assert.ok(h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
 test('GR IIIx imaging tab can select the custom workflow after removing native film',()=>{
- const node=()=>({setAttribute(){}}),context=vm.createContext({state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
+ const node=()=>({setAttribute(){}}),context=vm.createContext({gr4Workbench:false,state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
  vm.runInContext("let chosenModel='gr3x',settingsTab='library';"+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
  context.showSettingsTab('imaging');assert.equal(vm.runInContext('state.profile',context),'custom');
 });
@@ -52,4 +52,19 @@ test('GR IIIx import preserves an explicitly selected custom workflow and recipe
  const h=harness();h.state.profile='custom';h.state.features=new Set(['recipes','presets','negativeGrain','rawNr']);
  await h.run(h.report('GR IIIx','a'));
  assert.equal(h.state.profile,'custom');assert.deepEqual([...h.state.features],['recipes','presets','negativeGrain','rawNr']);
+});
+
+test('GR IV import uses the shared workflow and isolated native endpoints',async()=>{
+ const h=harness('gr4');await h.run(h.report('GR IV','c'),true);
+ assert.equal(h.state.source.model,'GR IV');assert.equal(vm.runInContext('chosenModel',h.context),'gr4');
+ assert.ok(h.calls.some(c=>c.path==='/api/gr4/native-library/import-official'));
+ assert.ok(h.calls.some(c=>c.path.endsWith('/stock-presets')));
+});
+
+test('GR IV backup keeps its actual BIN format and model filename',async()=>{
+ let callback,filename;
+ const node={addEventListener(event,fn){callback=fn;}};
+ const ctx=vm.createContext({gr4Workbench:true,state:{projectId:'a'.repeat(64)},$:()=>node,api:async()=>({}),download:async(response,name)=>{filename=name;},notice(){}});
+ vm.runInContext(app.slice(app.indexOf("$('download-backup').addEventListener"),app.indexOf("$('prepare-build').addEventListener")),ctx);
+ await callback();assert.equal(filename,'fwdc248b-original.bin');
 });

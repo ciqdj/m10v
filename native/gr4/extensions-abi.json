@@ -1,0 +1,89 @@
+{
+  "schema": "m10v-gr4-extensions-abi/v1",
+  "rtos_sha256": "a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1",
+  "camera_tested": false,
+  "raw_nr": {
+    "setup": 1398970440,
+    "debug_flags": [
+      120,
+      125
+    ],
+    "output_enable_offsets": [
+      88,
+      93
+    ],
+    "mode0_b_getter": 1402103360,
+    "mode0_b_selector": 1426402956,
+    "mode0_b_pointers": 1426402364,
+    "startup_copy": {
+      "source": 1412937280,
+      "target": 1426063360,
+      "size": 357504
+    },
+    "off_sites": [
+      {
+        "address": 1398970508,
+        "expected": 36139009,
+        "replacement": 3818942464,
+        "reason": "still FE unit enable"
+      },
+      {
+        "address": 1398970540,
+        "expected": 36208641,
+        "replacement": 3818946560,
+        "reason": "still FE parameter enable"
+      },
+      {
+        "address": 1401229800,
+        "expected": 327573512,
+        "replacement": 3785359360,
+        "reason": "PPU enable mask bit3"
+      }
+    ],
+    "table_stride": 20,
+    "table_entries": 144,
+    "mode0_tables": [
+      {
+        "address": 1411206728,
+        "sha256": "62112ca700f7cbefa9017e5a7cfe495dcf538ad509a1a04b561f3a195fd841f2"
+      },
+      {
+        "address": 1411192672,
+        "sha256": "69756154df1b7f08b075655056fcf52d10fe070b9ae8d7ec3e93e1e9ccce01ef"
+      }
+    ],
+    "scope": "Still PPU Bayer NR; mode0 B enable bytes only; JPEG/LiveView NR unchanged; synthetic ARM proof, no sensor hardware claim"
+  },
+  "supported": {
+    "rawNr": true,
+    "negativeGrain": true,
+    "aspect": true,
+    "level": true
+  },
+  "negative_grain": {
+    "native_style": 24,
+    "kind": 6,
+    "kind_mapper": 1394371356,
+    "kind_result": 1394371592,
+    "directory": 1406772360,
+    "list": 1406774080,
+    "count": 10,
+    "grain_row": 9,
+    "grain_field": 16,
+    "admission": 1394384464,
+    "policy": "already present in official GR4 still detail; no binary edit required",
+    "expected_list_hex": "0200020102020203020402050206020e000f0010"
+  },
+  "aspect": {
+    "compiler": "vendor/gr4/gr4_editor/crop_compiler.py",
+    "ratios": [
+      "3:2",
+      "4:3",
+      "1:1",
+      "16:9",
+      "65:24"
+    ],
+    "additional_id": 7,
+    "policy": "Keep original four factory identities; append independently verified 65:24. Compile before M10V catalog resource expansion."
+  }
+}

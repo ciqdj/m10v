@@ -12,8 +12,8 @@ test('single studio orders source, settings and save with the library embedded d
 
 test('shared import derives the model from official identity and keeps local choice separate',async()=>{
  const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
- assert.ok(app.includes("['GR III','GR IIIx'].includes(report.model)"));
- assert.ok(app.includes("chosenModel=report.model==='GR IIIx'?'gr3x':'gr3'"));
+ assert.ok(app.includes("(gr4Workbench?['GR IV']:['GR III','GR IIIx']).includes(report.model)"));
+ assert.ok(app.includes("chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3'"));
  assert.ok(app.includes("model:$('local-source-model').value"));
  assert.ok(!app.includes('report.model!==modelLabel'));
  assert.ok(app.includes("$('build-model').textContent=`${report.model} · ${report.public_version}`"));

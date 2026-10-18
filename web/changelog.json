@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.18.2",
+      "date": "2026-10-18",
+      "title": "GR IV 原生胶卷库与完整工作台",
+      "changes": [
+        "GR IV 1.11 接入五槽、36款胶卷、SD换卷、机内参数与时间水印；保持GR3的状态协议和颜色算法，使用GR4独立菜单、按键、存储与拍摄ABI。",
+        "支持六位置配方、20原厂名称与图标，以及65:24裁切、中央水平仪滑块、原生负片颗粒和RAW降噪选择。",
+        "复用导入、草稿、预检、构建、备份和SD导出流程，输出fwdc248b.bin；原厂参考工具保留在/gr4/reference/。",
+        "新增原始ARM交互、绘图对照、存储故障、完整分辨率和最终封包回读验证；网页构建下载通过，GR IV刷入、LCD和成像仍待实机验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.18.1",
       "date": "2026-10-18",
       "title": "GR III 两阶段桥接纳入正式工作流",
@@ -10,9 +24,9 @@
         "本次桥接方案已获用户实机测试通过反馈；回执按桥接 BIN 的精确 SHA-256 绑定该反馈，不扩大到其他机型、服务版本或异常恢复。",
         "主工作台与独立导出页收起 GR III 旧单包版本适配，保留 GR IIIx 独立适配；套件包含两阶段固件、使用说明、实机反馈记录及文件校验清单。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "6544a9cc9de64cc89017a0eb3f1cceb0775f8618",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39111063374"
     },
     {
       "version": "2026.10.17.4",

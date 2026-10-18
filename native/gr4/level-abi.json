@@ -1,0 +1,121 @@
+{
+  "schema": "m10v-gr4-level-abi/v1",
+  "rtos_sha256": "a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1",
+  "camera_tested": false,
+  "contracts": {
+    "callback_pointer": 1406751328,
+    "callback": 1394137328,
+    "controller_source": 1260,
+    "controller_frames": [
+      716,
+      720
+    ],
+    "controller_mode": 724,
+    "frame_vtable": 1407813776,
+    "frame_virtual_entries": 22,
+    "frame_draw_slot": 19,
+    "frame_ctor": 1398228728,
+    "frame_size": 248,
+    "frame_last_native_field": 245,
+    "frame_private_bytes": [
+      246,
+      247
+    ],
+    "view_roll_float": 264,
+    "view_pitch_float": 272,
+    "view_pitch_aligned": 280,
+    "view_roll_aligned": 281,
+    "view_pitch_visible": 285,
+    "view_style": 287,
+    "view_rotation": 288,
+    "private_style": 2,
+    "angles": "IEEE float degrees quantized by original setter; signed quarter-degree pixel offsets clipped to96",
+    "colors": {
+      "aligned": 27,
+      "unaligned": 2,
+      "outline": 16
+    },
+    "rails": [
+      [
+        218,
+        388,
+        284,
+        44
+      ],
+      [
+        654,
+        98,
+        44,
+        284
+      ]
+    ]
+  },
+  "preimages": [
+    {
+      "address": 1406751328,
+      "expected": "f0d81853",
+      "contract": "callback pointer"
+    },
+    {
+      "address": 1394137328,
+      "expected": "0dc0a0e1f0df2de9bc5904e3355445e3",
+      "contract": "native callback"
+    },
+    {
+      "address": 1398228728,
+      "expected": "0dc0a0e1f0df2de9bc6904e3356445e3",
+      "contract": "Frame constructor"
+    },
+    {
+      "address": 1398263320,
+      "expected": "007af1ee007ab5ee3a6adfed270a20ee",
+      "contract": "level state setter"
+    },
+    {
+      "address": 1398263612,
+      "expected": "203190e50dc0a0e130d82de904b04ce2",
+      "contract": "rotation setter"
+    },
+    {
+      "address": 1398307900,
+      "expected": "0dc0a0e1f0d82de9bc4904e3354445e3",
+      "contract": "native geometry setter"
+    },
+    {
+      "address": 1394850744,
+      "expected": "0dc0a0e130d82de9245002e3085545e3",
+      "contract": "graphics ready"
+    },
+    {
+      "address": 1394851120,
+      "expected": "0dc0a0e130d82de90050a0e1040090e5",
+      "contract": "graphics context"
+    },
+    {
+      "address": 1394853256,
+      "expected": "0dc0a0e100d82de904b04ce208d04de2",
+      "contract": "graphics fill"
+    },
+    {
+      "address": 1398309040,
+      "expected": "9e20d0e50dc0a0e178d82de90030a0e3",
+      "contract": "generic drawing"
+    },
+    {
+      "address": 1398315516,
+      "expected": "a030d0e5000053e31eff2f11ebffffea",
+      "contract": "invalidate"
+    }
+  ],
+  "evidence": [
+    "Unique callback pointer word found at53d95260 points5318d8f0. No global callback entry patch.",
+    "Frame ctor535746f8 writes fields throughf5; allocationf8; f6/f7 are padding.",
+    "Native setter5357ce18 executed with VFP inputs and verified roll108/pitch110, style11f, pitchvisibility11d.",
+    "Native rotation setter5357cf3c writes word120; normalized level routine5357cbe8 writes rollaligned119 and pitchaligned118.",
+    "Frame vtable53e98890 has22 entries; index19 is53576378. Clone preserves typeinfo header and21 untouched methods.",
+    "New draw fill payloads exactly match original GR3 template across60 orientation/offset/color/clip combinations.",
+    "New callback frameoffset/color/visibility exactly matches original GR3 template across108 angle/rotation combinations.",
+    "Original native geometry setter53587c3c executes in tests; it updates local rectangle20; native layout later computes global rectangle30."
+  ],
+  "frame_vtable_sha256": "c25f4974cc773a82c7fabeb926f3edcf8ada1111ebe312c9288f02f1f1846c60"
+}

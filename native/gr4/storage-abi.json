@@ -1,0 +1,170 @@
+{
+  "schema": "m10v-gr4-storage-detail-abi/v1",
+  "rtos_sha256": "a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1",
+  "camera_tested": false,
+  "evidence": "Official decoded GR IV 1.04 RTOS disassembly; normalized matches were manually checked at function entry and calling sites. ARM tests use explicit filesystem service substitutes.",
+  "functions": {
+    "apdata_manager": {
+      "address": 1403524224,
+      "preimage": "0dc0a0e130d82de9b05604e33a5545e304b04ce2004095e5014014e20200000a",
+      "interface": "manager() -> object; manager+8 -> numeric AppData; numeric+4 -> private filesystem"
+    },
+    "private_write": {
+      "address": 1403517724,
+      "preimage": "0dc0a0e1f0df2de9bc5904e304b04ce2355445e3c8c801e354d04de2fec345e3",
+      "interface": "bool(fs,name,size,payload); fs initialized+0x4c; backing file manager+0x2c"
+    },
+    "private_sized_read": {
+      "address": 1403515188,
+      "preimage": "0dc0a0e1f0db2de9bc5904e3355445e304b04ce258d04de20060a0e1000095e5",
+      "interface": "bool(fs,name,size,out); not used because physical length must be validated first"
+    },
+    "file_size": {
+      "address": 1401139540,
+      "preimage": "0dc0a0e1f0d82de9bc4904e3354445e304b04ce20050a0e158d04de2003094e5",
+      "interface": "size(file_manager,path,error)"
+    },
+    "file_load": {
+      "address": 1401139848,
+      "preimage": "0dc0a0e1f0df2de904b04ce2bc4904e32cc04be2354445e300e0a0e30cd04de2",
+      "interface": "void(file_manager,path,out_raw,out_size); changed from GR3 return pointer ABI"
+    },
+    "file_release": {
+      "address": 1401129724,
+      "preimage": "0dc0a0e1f0d82de9006051e204b04ce208d04de20e70a0e10040a0e10600000a",
+      "interface": "release(file_manager,raw)"
+    },
+    "private_header": {
+      "address": 1403514496,
+      "preimage": "0dc0a0e1f0df2de9bc4904e3354445e30150a0e104b04ce224d04de2080055e3",
+      "interface": "bool(fs,raw_size,raw,out_payload_size,out_payload_ptr)"
+    },
+    "sd_manager": {
+      "address": 1400473912,
+      "preimage": "0dc0a0e130d82de9185c0de3375545e304b04ce2003095e5014013e20200000a",
+      "interface": "manager+0x14 -> virtual filesystem"
+    },
+    "allocate": {
+      "address": 1401817520,
+      "preimage": "0dc0a0e130d82de904b04ce20050a0e10200a0e30e40a0e114f3ffeb003090e5",
+      "interface": "allocate(size) -> pointer"
+    },
+    "free": {
+      "address": 1401817580,
+      "preimage": "0dc0a0e130d82de90050a0e104b04ce20200a0e30e40a0e105f3ffeb003090e5",
+      "interface": "free(pointer)"
+    },
+    "list_row": {
+      "address": 1398213276,
+      "preimage": "f43090e5013193e7000093e51eff2fe10801d0e51eff2fe10dc0a0e130d82de9",
+      "interface": "get(list,row); must include both LDRs; 0x53570aa4 is interior, invalid"
+    },
+    "list_selected": {
+      "address": 1398213484,
+      "preimage": "110e80e2b000d0e11eff2fe10dc0a0e118d82de904b04ce21831d0e50040a0e1",
+      "interface": "u16(list+0x110)"
+    },
+    "detail_selected": {
+      "address": 1394386480,
+      "preimage": "0dc0a0e118d82de90040a0e1980190e504b04ce248990eeb9d11d4e514c0a0e3",
+      "interface": "detail controller+0x198 list, +0x19d mode0..3,+0x19e kind0..19"
+    },
+    "set_bounds": {
+      "address": 1398307900,
+      "preimage": "0dc0a0e1f0d82de9bc4904e3354445e304b04ce220d04de2003094e50060a0e1",
+      "interface": "View::setBounds(view,rect)"
+    },
+    "slider_value": {
+      "address": 1398256716,
+      "preimage": "f83090e5010053e10300000af81080e50020a0e3fc20c0e5beffffeafc30d0e5",
+      "interface": "set slider value(slider,value)"
+    },
+    "caption": {
+      "address": 1398223756,
+      "preimage": "ba3ed0e10dc0a0e130d82de904b04ce2010053e10040a0e13b00000aba1ec4e1",
+      "interface": "caption(view,resource_id,0)"
+    },
+    "row_icon_value": {
+      "address": 1398253824,
+      "preimage": "0dc0a0e178d82de9006051e20040a0e104b04ce2ec0090e50250a0e11000000a",
+      "interface": "set row icon and ASCII value(row,icon_id,text)"
+    },
+    "reset_parameters": {
+      "address": 1396404480,
+      "preimage": "0010d0e5f0ffffea0110d0e5eeffffea0dc0a0e100d82de904b04ce23fd10deb",
+      "interface": "stock reset parameters(model)"
+    }
+  },
+  "filesystem": {
+    "numeric_appdata_manager_offset": 8,
+    "private_fs_numeric_appdata_offset": 4,
+    "ready_offset": 76,
+    "backing_manager_offset": 44,
+    "sd_fs_manager_offset": 20,
+    "sd_vtable": {
+      "open": 7,
+      "close": 8,
+      "read": 9,
+      "seek": 11,
+      "open_handle_size": 12,
+      "tell": 13
+    },
+    "sd_read_contract": "boolean read; verify seek/tell delta for exact byte count",
+    "journal_names": [
+      "M10V5A.bin",
+      "M10V5B.bin"
+    ],
+    "record_size": 104,
+    "snapshot_pattern": "M10VSNN.bin",
+    "sd_path": "C:\\M10V\\FILMS.M10",
+    "sd_import_transaction": "validate SD header and full record; persist and exact-readback snapshot before journal slot selection"
+  },
+  "detail": {
+    "carriers": [
+      36,
+      37,
+      38,
+      39,
+      40
+    ],
+    "controller_size_guard": 432,
+    "tone_offset": 412,
+    "list_offset": 408,
+    "slider_offset": 360,
+    "caption_offset": 356,
+    "stock_table": 1406772312,
+    "mode_count": 4,
+    "kind_count": 20,
+    "first_private_id": 19,
+    "last_private_id": 29,
+    "row_icon_ids": [
+      500,
+      488,
+      413,
+      493,
+      595,
+      1092,
+      424,
+      596,
+      381,
+      50,
+      647
+    ],
+    "icon_evidence": "All11match GR3 artwork byte for byte. Grain-size dot grid is original GR3 icon644 appended as GR4 icon1092; original RGBA SHA2564d4ab11bf24c60777a57b9cddff4223c771dd361035dc4338ce99b7fa9f23711."
+  },
+  "verification": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest tests.test_gr4_storage_detail -v",
+    "result": "7 tests passed",
+    "scope": [
+      "original ARM detail selector resolves appended IDs",
+      "original ARM slider setup preserves native range and handles allocation failure",
+      "all80 stock mode/kind lists preserved in each detail variant",
+      "SD page, short read and handle allocation cleanup",
+      "complete validated snapshot saved before slot journal",
+      "private settings reload without SD card",
+      "invalid snapshot and failed write never commit slot",
+      "effect journal updates and visible slider restore on failed store"
+    ],
+    "camera_tested": false
+  }
+}

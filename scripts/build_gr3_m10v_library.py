@@ -20,7 +20,7 @@ FLAGS = ['--target=armv7-none-eabi', '-mcpu=cortex-a9', '-marm', '-mfloat-abi=so
          '-fno-vectorize', '-fno-slp-vectorize', '-Wall', '-Wextra', '-Werror']
 
 
-def link_object(elf, base, externals=None, prefix='m10v_library_'):
+def link_object(elf, base, externals=None, prefix='m10v_library_', additional_exports=()):
     """Bounded ELF32 ARM relocator for our freestanding .text/.rodata module.
 
     Unknown sections, symbols, addends or relocation kinds fail closed. This
@@ -121,8 +121,9 @@ def link_object(elf, base, externals=None, prefix='m10v_library_'):
         'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
         'm10v_settings_controller_': {'m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
+        'm10v_level_': {'m10v_level_callback','m10v_level_draw','m10v_level_quarter'},
     }[prefix]
-    if set(symbols) != required or not image_sections: raise ValueError('runtime API incomplete')
+    if set(symbols) != required | set(additional_exports) or not image_sections: raise ValueError('runtime API incomplete')
     return bytes(image), symbols
 
 

@@ -1,3 +1,5 @@
+import {handleGr4CustomizationRequest} from './gr4-customization.mjs';
+import {handleGr4NativeRequest,gr4WorkbenchHtml,gr4SdLibraryHtml} from './gr4-native-routes.mjs';
 import {prepareGr3Bridge,exportGr3Bridge} from './gr3-bridge.mjs';
 import {exportSdFilms} from './gr3-sd-film-export.mjs';
 import {renderChangelog} from './changelog.mjs';
@@ -88,6 +90,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const origin=configuredOrigin||localOrigin;
     const allowedHosts=[new URL(localOrigin).host,new URL(origin).host];
     if (!allowedHosts.includes(request.headers.host)) return send(response, 403, { error: 'invalid host' });
+    if (await handleGr4CustomizationRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
+    if (await handleGr4NativeRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
     if (request.url?.startsWith('/api/gr4/')) {
       await handleGr4Request({ request, response, runtime: gr4, token, readBody, send, origin });
       return;
@@ -106,6 +110,11 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }catch{return send(response,503,{error:'deployment receiver unavailable'});}
     }
     if (request.method === 'GET') {
+      if(['/gr4','/gr4/'].includes(pathname))return send(response,200,Buffer.from(gr4WorkbenchHtml(await readFile(path.join(web,'gr3/index.html'),'utf8'))),'text/html; charset=utf-8');
+      if(pathname==='/gr4/sd-library.html')return send(response,200,Buffer.from(gr4SdLibraryHtml(await readFile(path.join(web,'gr3/sd-library.html'),'utf8'))),'text/html; charset=utf-8');
+      if(pathname==='/gr4/sd-library.js')return send(response,200,await readFile(path.join(web,'gr3/sd-library.js')),'text/javascript; charset=utf-8');
+      if(pathname==='/gr4/sd-library.css')return send(response,200,await readFile(path.join(web,'gr3/sd-library.css')),'text/css; charset=utf-8');
+      if(['/gr4/reference','/gr4/reference/'].includes(pathname))return send(response,200,await readFile(path.join(web,'gr4/index.html')),'text/html; charset=utf-8');
       if(pathname==='/changelog/'||pathname==='/changelog'){
         try{return send(response,200,Buffer.from(renderChangelog()),'text/html; charset=utf-8');}
         catch{return send(response,503,{error:'release history unavailable'});}

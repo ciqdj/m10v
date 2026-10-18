@@ -1,14 +1,16 @@
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture} from './native-library-state.mjs';
-export function mountNativeLibrary(root=document,{onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
+export function mountNativeLibrary(root=document,{model='gr3',onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
+const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
+const storageKey=model==='gr4'?'m10v-gr4-native-library-v1':'m10v-native-library-v1';
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
-let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel='gr3';
-try{const saved=localStorage.getItem('m10v-native-library-v1');if(saved)configuration=normalizeConfiguration(JSON.parse(saved));}catch{}
+let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
+try{const saved=localStorage.getItem(storageKey);if(saved)configuration=normalizeConfiguration(JSON.parse(saved));}catch{}
 // Retired M10V sketches migrate by slot; their numeric IDs remain firmware-compatible.
 configuration.slots.forEach((s,i)=>{if(s.film<33)s.film=[34,35,36,37,33][i];});
 const message=(text,error=false)=>{$('#progress').textContent=text;$('#progress').dataset.error=String(error);};
-function invalidate(meta={}){onChange(normalizeConfiguration(configuration),meta);for(const u of urls)URL.revokeObjectURL(u);urls=[];$('#downloads').hidden=true;message('');try{localStorage.setItem('m10v-native-library-v1',JSON.stringify(configuration));}catch{}}
+function invalidate(meta={}){onChange(normalizeConfiguration(configuration),meta);for(const u of urls)URL.revokeObjectURL(u);urls=[];$('#downloads').hidden=true;message('');try{localStorage.setItem(storageKey,JSON.stringify(configuration));}catch{}}
 function versionUnlockSnapshot(){
  if(sourceModel!=='gr3x')return normalizeVersionUnlock({enabled:false},sourceModel);
  const enabled=$('#native-version-unlock').checked;
@@ -84,7 +86,7 @@ $('#build').onclick=async()=>{
  message(`候选已生成 · ${(blob.size/1024/1024).toFixed(1)} MB · ${receipt.verified_hooks} 处挂钩、${receipt.icon_count} 个图标回读通过。${debug_mode?'调试已开启，复现后请复制 SD 卡根目录的 M10VMN0/1.BIN、M10VCP0/1.BIN。':''}相机结果待验证。`);$('#bin-link').click();
  }catch(e){message(e.name==='AbortError'?'已取消构建；没有导出固件。':e.message,true);}finally{abort=null;setBusy(false);}
 };
-(async()=>{try{const [status,catalog]=await Promise.all([fetch('/api/status').then(jsonResponse),fetch('/api/gr3/native-library/catalog').then(jsonResponse)]);token=status.session_token;films=catalog.films;for(const group of [...new Set(films.map(f=>f.group))]){const option=document.createElement('option');option.value=group;option.textContent=group;option.dataset.icon=films.find(f=>f.group===group)?.icon_url;$('#film-group').append(option);}enhanceFilmSelect($('#film-group'),{caption:'COLLECTION / 胶卷分类',searchable:false});$('#local-source').dataset.available=catalog.local_source_available?'1':'';$('#source-status').textContent=catalog.local_source_available?'已找到目录中的官方包，请选择使用。':'请选择对应的官方固件包。';render();}catch(e){message(e.message,true);$('#source-status').textContent='服务暂不可用，请刷新页面。';}})();render();
+(async()=>{try{const [status,catalog]=await Promise.all([fetch('/api/status').then(jsonResponse),fetch(catalogApi).then(jsonResponse)]);token=status.session_token;films=catalog.films;for(const group of [...new Set(films.map(f=>f.group))]){const option=document.createElement('option');option.value=group;option.textContent=group;option.dataset.icon=films.find(f=>f.group===group)?.icon_url;$('#film-group').append(option);}enhanceFilmSelect($('#film-group'),{caption:'COLLECTION / 胶卷分类',searchable:false});$('#local-source').dataset.available=catalog.local_source_available?'1':'';$('#source-status').textContent=catalog.local_source_available?'已找到目录中的官方包，请选择使用。':'请选择对应的官方固件包。';render();}catch(e){message(e.message,true);$('#source-status').textContent='服务暂不可用，请刷新页面。';}})();render();
 
 return {getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{active=slot;configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=normalizeConfiguration(value);invalidate();render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
 }

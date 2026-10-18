@@ -2,14 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('product home exposes GR IV editor and GR II read-only inspection with truthful limits', async () => {
+test('product home exposes GR IV native workbench and GR II inspection with truthful limits', async () => {
   const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
   assert.match(html, /href="\/gr3\/"/);
   assert.match(html, /class="camera-card gr-family"/);
   assert.match(html,/href="\/gr4\/"/);
   assert.match(html,/href="\/gr2\/"/);
   assert.match(html,/只读检查/);
-  assert.match(html,/原生胶卷库仍在移植/);
+  assert.match(html,/原生胶卷工作台/);
+  assert.match(html,/Firmware 1.11 · 待实机验证/);
   assert.match(html, /为你的 GR 定制/);
   assert.doesNotMatch(html, /id="candidate-analyze"/);
   assert.doesNotMatch(html, /fonts\.googleapis\.com/);

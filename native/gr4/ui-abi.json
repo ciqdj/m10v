@@ -1,0 +1,357 @@
+{
+  "schema": "m10v-gr4-ui-abi/v1",
+  "source_sha256": "a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1",
+  "camera_tested": false,
+  "functions": [
+    {
+      "gr3": "0x5320ad88",
+      "gr4": "0x5323ea84",
+      "preimage": "0dc0a0e118d82de97c4002e3084545e3"
+    },
+    {
+      "gr3": "0x5320ba9c",
+      "gr4": "0x5323f928",
+      "preimage": "0dc0a0e118d82de9104102e3084545e3"
+    },
+    {
+      "gr3": "0x532c26c0",
+      "gr4": "0x533b70cc",
+      "preimage": "0dc0a0e130d82de90050a0e104b04ce2"
+    },
+    {
+      "gr3": "0x5319aa68",
+      "gr4": "0x531b421c",
+      "preimage": "0dc0a0e1f0db2de90040a0e104b04ce2"
+    },
+    {
+      "gr3": "0x5316c8d4",
+      "gr4": "0x53182d40",
+      "preimage": "00319fe50dc0a0e1f0db2de90040a0e1"
+    },
+    {
+      "gr3": "0x5316ce8c",
+      "gr4": "0x5318334c",
+      "preimage": "0dc0a0e178d82de904b04ce20040a0e1"
+    },
+    {
+      "gr3": "0x5316c774",
+      "gr4": "0x53182be4",
+      "preimage": "0dc0a0e178d82de90050a0e130309fe5"
+    },
+    {
+      "gr3": "0x5316d354",
+      "gr4": "0x53183830",
+      "preimage": "0dc0a0e1060051e3f0df2de9bc4904e3"
+    },
+    {
+      "gr3": "0x5316ca28",
+      "gr4": "0x53182e9c",
+      "preimage": "501190e50dc0a0e118d82de9010251e3"
+    },
+    {
+      "gr3": "0x53228c4c",
+      "gr4": "0x5325ca14",
+      "preimage": "000090e51eff2fe1c83801e30dc0a0e1"
+    },
+    {
+      "gr3": "0x533ad3c0",
+      "gr4": "0x53589ab4",
+      "preimage": "9e20d0e50dc0a0e118d82de904b04ce2"
+    },
+    {
+      "gr3": "0x53393e00",
+      "gr4": "0x5357013c",
+      "preimage": "ea20d0e5010052e11eff2f01ea10c0e5"
+    },
+    {
+      "gr3": "0x53396f80",
+      "gr4": "0x5357338c",
+      "preimage": "ba3ed0e10dc0a0e130d82de904b04ce2"
+    },
+    {
+      "gr3": "0x5339199c",
+      "gr4": "0x5356dc6c",
+      "preimage": "0dc0a0e1f0db2de904b04ce208d04de2"
+    },
+    {
+      "gr3": "0x5339a908",
+      "gr4": "0x53576da0",
+      "preimage": "0dc0a0e1f0db2de904b04ce208d04de2"
+    },
+    {
+      "gr3": "0x53393d84",
+      "gr4": "0x535700c0",
+      "preimage": "0dc0a0e1f0db2de904b04ce208d04de2"
+    },
+    {
+      "gr3": "0x53396944",
+      "gr4": "0x53572d50",
+      "preimage": "0dc0a0e1f0db2de904b04ce208d04de2"
+    },
+    {
+      "gr3": "0x53390ca0",
+      "gr4": "0x5356d080",
+      "preimage": "0dc0a0e1f0df2de904b04ce20040a0e1"
+    },
+    {
+      "gr3": "0x536af2a8",
+      "gr4": "0x538e09b0",
+      "preimage": "0dc0a0e130d82de904b04ce20050a0e1"
+    },
+    {
+      "gr3": "0x533aba64",
+      "gr4": "0x53588158",
+      "preimage": "0dc0a0e170d82de9bc4904e3354445e3"
+    },
+    {
+      "gr3": "0x5316cde8",
+      "gr4": "0x531832a8",
+      "preimage": "0dc0a0e178d82de9006052e204b04ce2"
+    },
+    {
+      "gr3": "0x5339aa30",
+      "gr4": "0x53576ec8",
+      "preimage": "f020d0e5010052e11eff2f01f010c0e5"
+    },
+    {
+      "gr3": "0x5339aa44",
+      "gr4": "0x53576edc",
+      "preimage": "f120d0e5010052e11eff2f01f110c0e5"
+    },
+    {
+      "gr3": "0x5339a9a0",
+      "gr4": "0x53576e38",
+      "preimage": "ba2ed0e1010052e11eff2f01ba1ec0e1"
+    },
+    {
+      "gr3": "0x53390ef8",
+      "gr4": "0x5356d1c8",
+      "preimage": "0dc0a0e1f8d92de9008051e204b04ce2"
+    },
+    {
+      "gr3": "0x5339658c",
+      "gr4": "0x53572994",
+      "preimage": "ee20d0e5010052e11eff2f01ee10c0e5"
+    },
+    {
+      "gr3": "0x533ad308",
+      "gr4": "0x535899fc",
+      "preimage": "a030d0e5000053e31eff2f11ebffffea"
+    },
+    {
+      "gr3": "0x531ac074",
+      "gr4": "0x531c615c",
+      "preimage": "0dc0a0e118d82de90040a0e104b04ce2"
+    },
+    {
+      "gr3": "0x53395430",
+      "gr4": "0x53571788",
+      "preimage": "0dc0a0e10020a0e378d82de904b04ce2"
+    },
+    {
+      "gr3": "0x53394820",
+      "gr4": "0x53570b6c",
+      "preimage": "110e80e2b000d0e11eff2fe10dc0a0e1"
+    },
+    {
+      "gr3": "0x532bd6b4",
+      "gr4": "0x533b64e0",
+      "preimage": "0dc0a0e100d82de904b04ce24bd40deb"
+    },
+    {
+      "gr3": "0x532922b4",
+      "gr4": "0x5337f824",
+      "preimage": "0a0051e32900009a0b0051e32900000a"
+    },
+    {
+      "gr3": "0x532935dc",
+      "gr4": "0x53380fac",
+      "preimage": "0a0051e32b00009a0b0051e32b00000a"
+    },
+    {
+      "gr3": "0x532a985c",
+      "gr4": "0x53397044",
+      "preimage": "0dc0a0e100d82de904b04ce208d04de2"
+    },
+    {
+      "gr3": "0x532a9988",
+      "gr4": "0x533971cc",
+      "preimage": "0dc0a0e100d82de904b04ce208d04de2"
+    }
+  ],
+  "contracts": {
+    "base_controller_size": 344,
+    "top_menu_size": 5100,
+    "image_control_list_offset": 376,
+    "image_control_caption_offset": 356,
+    "image_control_model": 1426630364,
+    "model_kind_offset": 31,
+    "model_last_stock_field": 32,
+    "model_private_padding": [
+      33,
+      34
+    ],
+    "stock_footer_count": 3,
+    "carrier_tones": [
+      36,
+      37,
+      38,
+      39,
+      40
+    ],
+    "menu_stock_entries_before_vendor_extensions": 20,
+    "menu_append_policy": "stock count + 1; library index equals stock count (25 with five style carriers)",
+    "text_resource_delta_from_gr3": 238,
+    "icon_resource_delta_from_gr3": 353,
+    "top_menu_setup_descriptor": 1406781968,
+    "top_menu_setup_original_count": 31,
+    "top_menu_setup_capacity": 38,
+    "top_menu_canonical_route": 33554528,
+    "private_footer_count": 2,
+    "icon_lookup_signature": "r0=translator,r1=style,r2=flags; any nonzero flags return zero",
+    "name_lookup_signature": "r0=translator,r1=style; result is native text resource id"
+  },
+  "evidence_notes": [
+    "Base ctor53182d40 initializes through155; derived top ctor531b421c starts members158 and memset230..13ec.",
+    "Factory53187880 MOVW allocation13ec;5318788c BL531b421c.",
+    "ImageControl redraw531c615c calls native model getter5323f928; its singleton pointer immediates5508a6dc and ctor533cc890 agree.",
+    "ImageControl focus531c57b8 calls count533bebdc,index533bedb0,live getter533b64e0 and tail setter533b70cc; list loads178.",
+    "Stock ctor533cc890 initializes fields1e,1f,20 and vector24/28/2c;21..23 are padding.",
+    "GR4 key handler531c635c maps d6/d7,da/db,e0,e2,e6,8a/8b/8d by same native action targets as GR3 handler531ac270.",
+    "Primitive functions paired by normalized function bodies, reviewed call graph and matching fixed offsets; no real camera proof.",
+    "Unicorn executed official factory53185f7c for512 routes02000000..020001ff: only02000060..63 allocated13ec. GR3 route4a instead allocated184 and MUST NOT be reused.",
+    "Regression: former name/icon classification from call-site shape was reversed. Official5337f824 returns text4 Standard;53380fac returns icon366 for style11 flags0 and0 for flags1. Native caption path531c56c8 calls text value53397044; icon row path531c5bfc calls icon value533971cc. Verified original lookups against _Memory native text descriptors and ICONBIN pixels for all20 stock styles."
+  ],
+  "image_control_entries": {
+    "setter": {
+      "address": 1396404428,
+      "preimage": "0dc0a0e130d82de90050a0e104b04ce2"
+    },
+    "name": {
+      "address": 1396176932,
+      "preimage": "0a0051e32900009a0b0051e32900000a"
+    },
+    "value_name": {
+      "address": 1396273220,
+      "preimage": "0dc0a0e100d82de904b04ce208d04de2"
+    },
+    "icon": {
+      "address": 1396182956,
+      "preimage": "0a0051e32b00009a0b0051e32b00000a"
+    },
+    "key": {
+      "address": 1394369372,
+      "preimage": "0dc0a0e118d82de904b04ce2b030d1e1"
+    },
+    "confirm": {
+      "address": 1394369336,
+      "preimage": "0dc0a0e118d82de904b04ce20040a0e1"
+    },
+    "count": {
+      "address": 1396435932,
+      "preimage": "283090e5240090e5030060e07000efe6"
+    },
+    "index": {
+      "address": 1396436400,
+      "preimage": "0dc0a0e148250ee330d82de904b04ce2"
+    },
+    "max_count": {
+      "address": 1396435952,
+      "preimage": "1400a0e31eff2fe10dc0a0e110d82de9"
+    },
+    "focus": {
+      "address": 1394366392,
+      "preimage": "0dc0a0e130d82de904b04ce208d04de2"
+    },
+    "enter": {
+      "address": 1394369064,
+      "preimage": "0dc0a0e130d82de904b04ce20040a0e1"
+    },
+    "value_icon": {
+      "address": 1396273612,
+      "preimage": "0dc0a0e100d82de904b04ce208d04de2"
+    },
+    "rows": {
+      "address": 1394366692,
+      "preimage": "0dc0a0e100d82de904b04ce263e401eb"
+    }
+  },
+  "image_control_scoped_hooks": [
+    {
+      "address": 1394365904,
+      "expected": "0xeb07e581",
+      "target": 1396435932,
+      "symbol": "m10v_menu_count",
+      "link": true
+    },
+    {
+      "address": 1394366176,
+      "expected": "0xeb07e5b2",
+      "target": 1396436400,
+      "symbol": "m10v_menu_index",
+      "link": true
+    },
+    {
+      "address": 1394366424,
+      "expected": "0xeb07e4ff",
+      "target": 1396435932,
+      "symbol": "m10v_menu_count",
+      "link": true
+    },
+    {
+      "address": 1394366560,
+      "expected": "0xeb07e552",
+      "target": 1396436400,
+      "symbol": "m10v_menu_index",
+      "link": true
+    },
+    {
+      "address": 1394366712,
+      "expected": "0xeb07e4b7",
+      "target": 1396435932,
+      "symbol": "m10v_menu_count",
+      "link": true
+    },
+    {
+      "address": 1394367272,
+      "expected": "0xeb07e430",
+      "target": 1396435952,
+      "symbol": "m10v_menu_max_count",
+      "link": true
+    },
+    {
+      "address": 1394367340,
+      "expected": "0xeb07e41a",
+      "target": 1396435932,
+      "symbol": "m10v_menu_count",
+      "link": true
+    },
+    {
+      "address": 1394367376,
+      "expected": "0xeb07e486",
+      "target": 1396436400,
+      "symbol": "m10v_menu_index",
+      "link": true
+    },
+    {
+      "address": 1394368168,
+      "expected": "0xeb07e34b",
+      "target": 1396435932,
+      "symbol": "m10v_menu_count",
+      "link": true
+    },
+    {
+      "address": 1394368316,
+      "expected": "0xeb07e39b",
+      "target": 1396436400,
+      "symbol": "m10v_menu_index",
+      "link": true
+    },
+    {
+      "address": 1394366692,
+      "expected": "0xe1a0c00d",
+      "symbol": "m10v_menu_rows",
+      "link": false
+    }
+  ]
+}

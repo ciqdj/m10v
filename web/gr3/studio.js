@@ -6,8 +6,10 @@ import { previewFilmPixels } from './film-preview.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {mountNativeLibrary} from './native-library.js';
 import {defaultConfiguration,migrateSimulationSelection,nativeSelection} from './native-library-state.mjs';
-let chosenModel=location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
-let modelLabel=chosenModel==='gr3x'?'GR IIIx':'GR III';
+const gr4Workbench=location.pathname.startsWith('/gr4');
+const nativeApi=gr4Workbench?'/api/gr4/native-library':'/api/gr3/native-library';
+let chosenModel=gr4Workbench?'gr4':location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
+let modelLabel=chosenModel==='gr4'?'GR IV':chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
 let settingsTab='imaging';
 let debugMode=false;
@@ -57,7 +59,7 @@ let saving=false,riskAcceptedRevision=-1;
 let bridgeBusy=false,bridgePlan=null,bridgeProject=null;
 let draftTimer, activeBuildController, fitController, fitSequence=0;
 window.addEventListener('pagehide', () => { clearTimeout(draftTimer); saveDraft(); filmPreview.destroy(); });
-const draftKey = 'm10v-gr3-street-draft-v2';
+const draftKey = gr4Workbench?'m10v-gr4-draft-v1':'m10v-gr3-street-draft-v2';
 const slotById = new Map(slots.map((slot) => [slot[0], slot]));
 const featureName = Object.fromEntries(definitions.map(([id, name]) => [id, name]));
 const zeroParams = () => Object.fromEntries(fields.map(([key]) => [key, 0]));
@@ -79,6 +81,12 @@ function notice(message, error = false) {
   $('notice').hidden = !message;
 }
 async function api(path, options = {}) {
+  if(gr4Workbench){
+    const custom=/^\/api\/projects\/([0-9a-f]{64})\/(stock-presets|edit\/(prepare|build))$/.exec(path);
+    if(custom)path='/api/gr4/customization/'+custom[1]+'/'+(custom[3]||'stock-presets');
+    const match=/^\/api\/projects\/([0-9a-f]{64})\/(native-library\/(prepare|build)|backup)$/.exec(path);
+    if(match){path=nativeApi+'/'+(match[3]||'backup');options={...options,body:JSON.stringify({...JSON.parse(options.body||'{}'),project_id:match[1]})};}
+  }
   const response = await fetch(path, { ...options,
     headers: { 'X-M10V-Token': state.token, ...(options.headers || {}) } });
   if (!response.ok) {
@@ -232,12 +240,13 @@ function renderFeatures() {
     const heading = document.createElement('div');
     heading.className = 'feature-title';
     heading.append(textNode('span', String(index + 1).padStart(2, '0'), 'feature-num'), textNode('h3', name));
-    copy.append(heading, textNode('p', description), textNode('span', '● ' + tag, 'feature-tag'));
+    copy.append(heading, textNode('p', description), textNode('span', '● ' + (gr4Workbench&&id==='presets'?'20 个原厂预设':tag), 'feature-tag'));
     const button = textNode('button', active ? '移除' : '加入', 'feature-toggle' + (active ? ' selected' : ''));
     button.type = 'button';
+    if(gr4Workbench&&id==='timestamp'&&state.profile!=='native'&&!active){button.disabled=true;button.textContent='在胶卷库设置';}
     button.addEventListener('click', () => {
       if(id==='film'){
-        if(active){state.features.delete('film');state.profile='custom';}
+        if(active){state.features.delete('film');if(gr4Workbench)state.features.delete('timestamp');state.profile='custom';}
         else{try{enterNativeSelection();}catch(e){notice(e.message,true);return;}}
       }else if(state.profile==='native'){
         if(!['timestamp','aspect','level','negativeGrain','rawNr'].includes(id)){notice('胶卷库可组合时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；其他工具请先移除胶卷库。',true);return;}
@@ -300,7 +309,7 @@ function updateStock(slot,patch){
 }
 function renderStockDetail(target){
   if(!state.stockCapabilities.length){target.append(textNode('p','请先在固件来源页面导入官方 BIN，核对实际名称空间与图标。'));return;}
-  target.append(textNode('p','名称支持英文、数字和可打印符号。加长名称可能共享另一种菜单语言存储，构建预检会列出受影响的语言编号。'));
+  target.append(textNode('p',gr4Workbench?'名称支持英文、数字和可打印符号；每个预设使用独立名称和图标资源，名称同步到全部菜单语言。':'名称支持英文、数字和可打印符号。加长名称可能共享另一种菜单语言存储，构建预检会列出受影响的语言编号。'));
   for(const preset of state.stockCapabilities){
     const row=document.createElement('div');row.className='stock-preset-row';
     const current=state.stockPresets.find(p=>p.slot===preset.slot)||{};
@@ -493,11 +502,11 @@ async function importSource(file,local=false) {
   try {
     let report;
     if(local){
-      const imported=await (await api('/api/gr3/native-library/import-official',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:$('local-source-model').value})})).json();
-      report=await (await api(`/api/projects/${imported.project_id}`)).json();
-    }else report=await (await api('/api/import',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})).json();
-    if(!['GR III','GR IIIx'].includes(report.model))throw Error('当前工作台仅支持 GR III 和 GR IIIx 官方包。');
-    chosenModel=report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;
+      const imported=await (await api(nativeApi+'/import-official',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:$('local-source-model').value})})).json();
+      report=gr4Workbench?imported:await (await api(`/api/projects/${imported.project_id}`)).json();
+    }else report=await (await api(gr4Workbench?nativeApi+'/import':'/api/import',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})).json();
+    if(!(gr4Workbench?['GR IV']:['GR III','GR IIIx']).includes(report.model))throw Error('当前工作台仅支持 GR III 和 GR IIIx 官方包。');
+    chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
     $('build-model').textContent=`${report.model} · ${report.public_version}`;
@@ -539,7 +548,7 @@ async function prepare() {
     if(revision!==state.revision||activeBuildController!==controller)return;
     state.preparation = report.ready ? report : null;state.preparationRequest=report.ready?request:null;
     $('preflight-result').className = 'preflight-result ' + (report.ready ? 'ok' : 'error');
-    $('preflight-result').textContent = report.ready ? '方案核验通过，保存时继续构建与独立回读。' :
+    $('preflight-result').textContent = report.ready ? '方案核验通过，保存时继续构建与独立回读。'+(report.reset_required?'配方默认值在相机对应影像控制的详细设置内执行重置后生效；请仅重置该影像控制的参数。':'') :
       `预检未通过：${(report.blockers||[]).join('；')}`;
     $('build-firmware').disabled = !(report.ready && (riskAcceptedRevision===state.revision));
     renderLedger();
@@ -570,8 +579,8 @@ async function build() {
       const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
       assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock,chosenModel);
     }
-    await download(response, state.preparation.filename||(chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
-    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。';
+    await download(response, state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
+    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
     $('build-result').className = 'build-result error';
@@ -650,7 +659,7 @@ dropzone.addEventListener('drop', (event) => {
 });
 $('download-backup').addEventListener('click', async () => {
   try { await download(await api(`/api/projects/${state.projectId}/backup`, { method: 'POST', body: '' }),
-    'm10v-gr3-official-backup.zip'); notice('官方固件备份已下载。'); }
+    gr4Workbench?'fwdc248b-original.bin':'m10v-gr3-official-backup.zip'); notice('官方固件备份已下载。'); }
   catch (error) { notice(error.message, true); }
 });
 $('prepare-build').addEventListener('click', prepare);
@@ -676,17 +685,17 @@ try {
     fetch('/api/status').then((r) => r.json()),
     fetch('/gr3/film-catalog.json').then((r) => r.json()),
     fetch('/gr3/community-data.json').then((r) => r.json()),
-    fetch('/api/gr3/native-library/catalog').then(r=>r.json()),
+    fetch(nativeApi+'/catalog').then(r=>r.json()),
     fetch('/gr3/native-library-controls.html').then(r=>{if(!r.ok)throw Error('胶卷库控件加载失败');return r.text();}),
   ]);
-  state.token = status.session_token; state.runtime = status.gr3_custom_runtime === true;
+  state.token = status.session_token; state.runtime = gr4Workbench || status.gr3_custom_runtime === true;
   state.nativeCatalog=nativeCatalog.films;
-  $('native-editor').innerHTML=nativeMarkup;
-  nativeEditor=mountNativeLibrary($('native-editor'),{onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';state.features.add('film');configuration.stamp?state.features.add('timestamp'):state.features.delete('timestamp');if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
+  $('native-editor').innerHTML=gr4Workbench?nativeMarkup.replaceAll('GR III STREET · 2.10','GR IV · 1.11').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replaceAll('fwdc239b.bin','fwdc248b.bin'):nativeMarkup;
+  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';state.features.add('film');configuration.stamp?state.features.add('timestamp'):state.features.delete('timestamp');if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
   state.nativeConfig=nativeEditor.getConfiguration();
   if(state.nativeConfig.stamp)state.features.add('timestamp');
   state.films = film.looks; state.community = community;
-  restoreDraft();showSettingsTab(state.profile==='native'?'library':'imaging');
+  restoreDraft();if(gr4Workbench)state.profile=state.features.has('film')?'native':'custom';showSettingsTab(state.profile==='native'?'library':'imaging');
   renderFeatures();
   if (!state.runtime&&state.profile==='custom') notice('构建组件尚未就绪，固件导出会被阻止。', true);
 } catch (error) { notice(`工作区载入失败：${error.message}`, true); }
