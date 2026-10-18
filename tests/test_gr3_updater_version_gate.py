@@ -117,4 +117,24 @@ class UpdaterVersionGateTests(unittest.TestCase):
                     u.mem_write(buffer+0x90,bytes.fromhex('020a151b'))
                     self.assertEqual(self.call(u,0x536284e0,obj),want)
 
+    def test_bridge_version_transition_and_inner_cpu_gate(self):
+        # Synthetic service versions, not anniversary measurements. This tests
+        # only the stock comparison, not installation or a CPU runtime patch.
+        cases = [
+            ('first_package_both_ceilings', 2, 0x020a1528, 0x020a1528, 0x020affff, 0x020affff, 0x020affff, 1),
+            ('outer_only_cpu_raise_is_insufficient', 6, 0x020a1528, 0x020a1528, 0x020affff, 0x020affff, 0x020a151b, 0),
+            ('second_stock_package_cpu_still_high', 2, 0x020a151b, 0x020a15ff, 0x020a151b, 0x020a151b, 0x020a151b, 0),
+            ('second_stock_package_both_runtime_baseline', 2, 0x020a151b, 0x020a151b, 0x020a151b, 0x020a151b, 0x020a151b, 1),
+        ]
+        for name,kind,dsp,cpu,outer_dsp,outer_cpu,inner_cpu,want in cases:
+            with self.subTest(case=name):
+                u,_=self.machine(current_dsp=dsp,current_cpu=cpu)
+                obj=0x55001000;buffer=0x55010000;parser=0x55002000
+                for at,value in ((obj+8,0x55003000),(obj+0x1c,parser),(obj+0x20,parser),
+                                 (obj+0x24,parser),(parser+0xc,0x55004000),(obj+0x2c,kind),(obj+0x38,buffer)):
+                    u.mem_write(at,struct.pack('<I',value))
+                for offset,value in ((0x38,outer_dsp),(0x50,outer_cpu),(0x90,inner_cpu)):
+                    u.mem_write(buffer+offset,value.to_bytes(4,'big'))
+                self.assertEqual(self.call(u,0x536284e0,obj),want)
+
 if __name__=='__main__':unittest.main()

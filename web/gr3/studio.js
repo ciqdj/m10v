@@ -54,6 +54,7 @@ function historyConfiguration(){return {...selection(),profile:state.profile,nat
 const editHistory=createEditorState(historyConfiguration());
 const iconImports=createImportGate();
 let saving=false,riskAcceptedRevision=-1;
+let bridgeBusy=false,bridgePlan=null,bridgeProject=null;
 let draftTimer, activeBuildController, fitController, fitSequence=0;
 window.addEventListener('pagehide', () => { clearTimeout(draftTimer); saveDraft(); filmPreview.destroy(); });
 const draftKey = 'm10v-gr3-street-draft-v2';
@@ -161,12 +162,17 @@ function showStep(step) {
   if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
 }
 function versionUnlockSnapshot(){
+ if(chosenModel!=='gr3x')return normalizeVersionUnlock({enabled:false},chosenModel);
  const enabled=state.profile==='native'&&$('version-unlock').checked;
  const option=$('version-known').checked?{enabled,dsp:$('version-dsp').value,cpu:$('version-cpu').value}:{enabled,mode:'dsp-package-only'};
  return normalizeVersionUnlock(option,chosenModel);
 }
 function renderVersionUnlock(){
- const supported=state.profile==='native'&&['gr3','gr3x'].includes(chosenModel),toggle=$('version-unlock'),known=$('version-known');
+ if($('bridge-option'))$('bridge-option').hidden=chosenModel!=='gr3';
+ if($('bridge-open'))$('bridge-open').disabled=!state.projectId||saving||Boolean(activeBuildController)||bridgeBusy;
+ const bridgeResult=$('bridge-result'),sourceHint='请先在“导入固件”中选择 GR III 官方包，再下载桥接套件。';
+ if(bridgeResult){if(!state.projectId)bridgeResult.textContent=sourceHint;else if(bridgeResult.textContent===sourceHint)bridgeResult.textContent='官方来源已核验，可下载桥接套件。';}
+ const supported=state.profile==='native'&&chosenModel==='gr3x',toggle=$('version-unlock'),known=$('version-known');
  $('version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=saving||Boolean(activeBuildController)||!supported;$('version-unlock-fields').hidden=!toggle.checked;
  known.disabled=saving||Boolean(activeBuildController)||!supported||!toggle.checked;
@@ -510,7 +516,7 @@ async function importSource(file,local=false) {
     }
     node.append(dl);
     $('download-backup').disabled = false; $('source-next').disabled = false;
-    showStep('features');showSettingsTab(state.profile==='native'?'library':'imaging');notice('官方固件核验通过，继续设置方案。');
+    showStep(globalThis.location?.hash==='#bridge'&&chosenModel==='gr3'?'build':'features');showSettingsTab(state.profile==='native'?'library':'imaging');notice('官方固件核验通过，继续设置方案。');
   } catch (error) { notice(error.message, true); }
 }
 async function download(response, filename) {
@@ -691,3 +697,28 @@ $('version-unlock').addEventListener('change',()=>invalidate(false));
 for(const key of ['dsp','cpu'])$('version-'+key).addEventListener('input',()=>invalidate(false));
 
 $('version-known').addEventListener('change',()=>invalidate(false));
+
+$('bridge-open')?.addEventListener('click',async()=>{
+ if(chosenModel!=='gr3'||!state.projectId||bridgeBusy)return;
+ bridgeBusy=true;renderVersionUnlock();$('bridge-result').textContent='正在核验桥接来源…';
+ try{
+  bridgeProject=state.projectId;
+  bridgePlan=await(await api(`/api/projects/${bridgeProject}/bridge/prepare`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+  if(state.projectId!==bridgeProject||chosenModel!=='gr3')throw Error('来源已变化，请重新打开桥接预检');
+  $('bridge-ack').checked=false;$('bridge-export').disabled=true;$('bridge-dialog').showModal();$('bridge-result').textContent='预检通过：2.10.22.27 · 用户实机反馈通过。';
+ }catch(e){$('bridge-result').textContent=e.message;}
+ finally{bridgeBusy=false;renderVersionUnlock();}
+});
+$('bridge-ack')?.addEventListener('change',()=>{$('bridge-export').disabled=!$('bridge-ack').checked||bridgeBusy;});
+$('bridge-cancel')?.addEventListener('click',()=>{$('bridge-dialog').close();});
+$('bridge-export')?.addEventListener('click',async()=>{
+ if(bridgeBusy||!$('bridge-ack').checked||!bridgePlan)return;
+ if(state.projectId!==bridgeProject||chosenModel!=='gr3'){$('bridge-dialog').close();$('bridge-result').textContent='来源已变化，请重新预检';return;}
+ bridgeBusy=true;$('bridge-export').disabled=true;$('bridge-dialog').close();renderVersionUnlock();$('bridge-result').textContent='正在生成并独立校验桥接套件…';
+ try{
+  const response=await api(`/api/projects/${bridgeProject}/bridge/export`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted_plan_id:bridgePlan.plan_id,acknowledge_instructions:true})});
+  await download(response,'M10V-GRIII-bridge-2.10.22.27.zip');
+  $('bridge-result').textContent='两阶段桥接套件已生成并发起下载。请按 README.txt 先刷桥接包，再刷官方 2.10。';
+ }catch(e){$('bridge-result').textContent=e.message;}
+ finally{bridgeBusy=false;bridgePlan=null;renderVersionUnlock();}
+});

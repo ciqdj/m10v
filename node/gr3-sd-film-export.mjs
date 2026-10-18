@@ -1,5 +1,5 @@
 import {buildSdFilmPack,auditSdFilmPack,sdCrc} from "./gr3-sd-film-pack.mjs";
-function encodeZip(rows) {
+export function encodeZip(rows) {
   const local = [];
   const central = [];
   let offset = 0;

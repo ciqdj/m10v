@@ -1,3 +1,4 @@
+import {prepareGr3Bridge,exportGr3Bridge} from './gr3-bridge.mjs';
 import {exportSdFilms} from './gr3-sd-film-export.mjs';
 import {renderChangelog} from './changelog.mjs';
 import { fitXmp } from './gr3-xmp-fit.mjs';
@@ -182,12 +183,13 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const candidateMatch = /^\/api\/projects\/([0-9a-f]{64})\/candidates\/shutdown\/analyze$/.exec(pathname);
     const candidateExportMatch = /^\/api\/projects\/([0-9a-f]{64})\/candidates\/shutdown\/export$/.exec(pathname);
     const versionMatch = /^\/api\/projects\/([0-9a-f]{64})\/versions\/probe$/.exec(pathname);
+    const bridgeMatch = /^\/api\/projects\/([0-9a-f]{64})\/bridge\/(prepare|export)$/.exec(pathname);
     const nativeMatch = /^\/api\/projects\/([0-9a-f]{64})\/native-library\/(prepare|build)$/.exec(pathname);
     const haloMatch = /^\/api\/projects\/([0-9a-f]{64})\/800t\/(prepare|build)$/.exec(pathname);
     const editMatch = /^\/api\/projects\/([0-9a-f]{64})\/edit\/(prepare|build)$/.exec(pathname);
     if (!['/api/import', '/api/backup/inspect', '/api/backup/restore', '/api/gr3/film/fit',
       '/api/gr3/sd-library/export','/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
-      !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch)
+      !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch && !bridgeMatch)
       return send(response, 404, { error: 'not found' });
     if (request.headers['x-m10v-token'] !== token ||
       (request.headers.origin && request.headers.origin !== origin))
@@ -196,7 +198,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       const body = await readBody(request, ['/api/gr3/sd-library/export','/api/gr3/film-bay/pack'].includes(pathname) ? 2048 :
         pathname === '/api/platform/inspect-official' ? 4096 :
         pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
-        nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
+        bridgeMatch || nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
         sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
       if(pathname==='/api/gr3/sd-library/export'){const {zip}=exportSdFilms(JSON.parse(body.toString('utf8')));return send(response,200,zip,'application/zip','M10V-SD-films.zip');}
       if(pathname==='/api/platform/inspect'||pathname==='/api/platform/inspect-official'){
@@ -206,6 +208,15 @@ export function createServer(store = new Store(path.join(root, 'data')),
       if(pathname === '/api/gr3/native-library/import-official') {
         const original=await readNativeOfficial(JSON.parse(body.toString('utf8')).model||'gr3'),record=await store.importOfficial(original);
         return send(response,200,{project_id:record.id,source_sha256:record.sha256});
+      }
+      if(bridgeMatch) {
+        const original=await store.readOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
+        if(bridgeMatch[2]==='prepare'){
+          if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)throw Error('桥接预检不接受自定义版本或补丁');
+          return send(response,200,prepareGr3Bridge(original));
+        }
+        const {zip}=exportGr3Bridge(original,input);
+        return send(response,200,zip,'application/zip','M10V-GRIII-bridge-2.10.22.27.zip');
       }
       if(nativeMatch) {
         const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));

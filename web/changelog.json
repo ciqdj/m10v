@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.18.1",
+      "date": "2026-10-18",
+      "title": "GR III 两阶段桥接纳入正式工作流",
+      "changes": [
+        "GR III 官方包因机内隐藏版本较高而无法更新时，可下载 2.10.22.27 两阶段桥接套件，先刷桥接包，再刷官方 2.10，之后按普通流程生成 M10V 功能包。",
+        "本次桥接方案已获用户实机测试通过反馈；回执按桥接 BIN 的精确 SHA-256 绑定该反馈，不扩大到其他机型、服务版本或异常恢复。",
+        "主工作台与独立导出页收起 GR III 旧单包版本适配，保留 GR IIIx 独立适配；套件包含两阶段固件、使用说明、实机反馈记录及文件校验清单。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.17.4",
       "date": "2026-10-17",
       "title": "更新纯文字 Logo，开放 GR IIIx 完整功能导出",
@@ -12,9 +25,9 @@
         "通过共用代码差异移植保留 IIIx 独立型号、版本、焦距相关19个原厂 word和完整 CPU 载荷，逐分区独立回读；不直接刷入 GR III 型号内容。",
         "新增 IIIx 实际组合构建、网页 HTTP、型号保护与最终固件 ARM 路径验证；IIIx 实机启动和成像仍待验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "b47f32db06d31cf87a39da8592f3168808b0c264",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39046964394"
     },
     {
       "version": "2026.10.17.3",

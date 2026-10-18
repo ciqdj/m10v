@@ -10,12 +10,14 @@ configuration.slots.forEach((s,i)=>{if(s.film<33)s.film=[34,35,36,37,33][i];});
 const message=(text,error=false)=>{$('#progress').textContent=text;$('#progress').dataset.error=String(error);};
 function invalidate(meta={}){onChange(normalizeConfiguration(configuration),meta);for(const u of urls)URL.revokeObjectURL(u);urls=[];$('#downloads').hidden=true;message('');try{localStorage.setItem('m10v-native-library-v1',JSON.stringify(configuration));}catch{}}
 function versionUnlockSnapshot(){
+ if(sourceModel!=='gr3x')return normalizeVersionUnlock({enabled:false},sourceModel);
  const enabled=$('#native-version-unlock').checked;
  const option=$('#native-version-known').checked?{enabled,dsp:$('#native-version-dsp').value,cpu:$('#native-version-cpu').value}:{enabled,mode:'dsp-package-only'};
  return normalizeVersionUnlock(option,sourceModel);
 }
 function renderVersionUnlock(){
- const supported=['gr3','gr3x'].includes(sourceModel),toggle=$('#native-version-unlock'),known=$('#native-version-known');
+ if($('#native-bridge-guide'))$('#native-bridge-guide').hidden=sourceModel!=='gr3';
+ const supported=sourceModel==='gr3x',toggle=$('#native-version-unlock'),known=$('#native-version-known');
  $('#native-version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=busy||!supported;$('#native-version-unlock-fields').hidden=!toggle.checked;
  known.disabled=busy||!supported||!toggle.checked;

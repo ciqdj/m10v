@@ -60,13 +60,15 @@ test('actual studio prepare/build reuse one captured snapshot and validate versi
  const bad=studioHarness({mismatch:true});await bad.context.prepare();await bad.context.build();
  assert.equal(bad.downloads.length,0);assert.match(bad.$('build-result').textContent,/版本回读/);
 });
-test('actual studio controls reject invalid input, lock while busy and use the GR IIIx version line',()=>{
- const $=nodes();$('version-unlock').checked=true;$('version-known').checked=true;$('version-dsp').value='2.10.21.40';$('version-cpu').value='2.10.21.27';
+test('actual studio retires GR III controls and validates the remaining GR IIIx input while busy',()=>{
+ const $=nodes();$('version-unlock').checked=true;$('version-known').checked=true;
  const context=vm.createContext({$,state:{profile:'native'},normalizeVersionUnlock});
  vm.runInContext("let chosenModel='gr3',saving=true,activeBuildController=null;"+studio.slice(studio.indexOf('function versionUnlockSnapshot()'),studio.indexOf('function renderLedger()')),context);
+ assert.equal(context.renderVersionUnlock(),true);assert.equal($('version-unlock-option').hidden,true);assert.equal(context.versionUnlockSnapshot().enabled,false);
+ vm.runInContext("chosenModel='gr3x'",context);$('version-unlock').checked=true;$('version-known').checked=true;$('version-dsp').value='1.60.11.18';$('version-cpu').value='1.60.11.17';
  assert.equal(context.renderVersionUnlock(),true);for(const id of ['version-unlock','version-dsp','version-cpu'])assert.equal($(id).disabled,true);
- vm.runInContext('saving=false',context);$('version-cpu').value='2.10';assert.equal(context.renderVersionUnlock(),false);assert.match($('version-error').textContent,/四段/);
- vm.runInContext("chosenModel='gr3x'",context);$('version-dsp').value='1.60.11.18';$('version-cpu').value='1.60.11.17';assert.equal(context.renderVersionUnlock(),true);assert.equal($('version-unlock-option').hidden,false);assert.equal($('version-unlock').checked,true);
+ vm.runInContext('saving=false',context);$('version-cpu').value='1.60';assert.equal(context.renderVersionUnlock(),false);assert.match($('version-error').textContent,/四段/);
+ $('version-cpu').value='1.60.11.17';assert.equal(context.renderVersionUnlock(),true);assert.equal($('version-unlock-option').hidden,false);assert.equal($('version-unlock').checked,true);
 });
 test('both entries invalidate previous output when toggle or version inputs change',()=>{
  assert.match(independent,/native-version-known'\)\.onchange=\(\)=>\{invalidate\(\);render\(\);\}/);
@@ -107,8 +109,8 @@ test('DSP-package-only mode needs no unknown version numbers and requires matchi
  for(const receipt of [{enabled:true},{enabled:false},{enabled:true,current_versions:{dsp:'2.10.21.40',cpu:'2.10.21.27'}}])assert.throws(()=>assertVersionUnlockReceipt(receipt,input),/回读/);
  assert.deepEqual(normalizeVersionUnlock(input,'gr3x'),input);
 });
-test('both actual control handlers default to DSP package mode and only require known versions after explicit advanced opt-in',()=>{
- for(const [source,prefix,declarations,end] of [[studio,'',"let chosenModel='gr3',saving=false,activeBuildController=null;",'function renderLedger()'],[independent,'#native-',"let sourceModel='gr3',busy=false;",'function segment(']]){
+test('GR IIIx control handlers default to DSP package mode and only require known versions after explicit advanced opt-in',()=>{
+ for(const [source,prefix,declarations,end] of [[studio,'',"let chosenModel='gr3x',saving=false,activeBuildController=null;",'function renderLedger()'],[independent,'#native-',"let sourceModel='gr3x',busy=false;",'function segment(']]){
   const $=nodes(),context=vm.createContext({$,state:{profile:'native'},normalizeVersionUnlock});
   const key=s=>prefix+s;
   $(key('version-unlock')).checked=true;
@@ -118,8 +120,8 @@ test('both actual control handlers default to DSP package mode and only require 
   assert.equal($(key('version-known-fields')).hidden,true);
   for(const k of ['dsp','cpu']){assert.equal($(key('version-'+k)).disabled,true);assert.equal($(key('version-'+k)).required,false);}
   $(key('version-known')).checked=true;assert.equal(context.renderVersionUnlock(),false);assert.match($(key('version-error')).textContent,/四段/);
-  $(key('version-dsp')).value='2.10.21.40';$(key('version-cpu')).value='2.10.21.27';
-  assert.equal(context.renderVersionUnlock(),true);assert.deepEqual(JSON.parse(JSON.stringify(context.versionUnlockSnapshot())),{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'});
+  $(key('version-dsp')).value='1.60.11.18';$(key('version-cpu')).value='1.60.11.17';
+  assert.equal(context.renderVersionUnlock(),true);assert.deepEqual(JSON.parse(JSON.stringify(context.versionUnlockSnapshot())),{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'});
   for(const k of ['dsp','cpu'])assert.equal($(key('version-'+k)).required,true);
   $(key('version-known')).checked=false;assert.equal(context.renderVersionUnlock(),true);assert.equal(context.versionUnlockSnapshot().mode,'dsp-package-only');
  }

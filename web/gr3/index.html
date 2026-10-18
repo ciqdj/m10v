@@ -62,7 +62,13 @@
         <div id="preflight-result" class="preflight-result" role="status">保存时自动核验来源和方案。</div>
 
         <label class="debug-option" id="debug-option"><input type="checkbox" id="debug-mode" aria-describedby="debug-mode-hint"><span>调试模式<small id="debug-mode-hint">将菜单切换和拍摄阶段记录到 SD 卡，便于排查黑屏；开启后操作和拍摄可能变慢。</small></span></label>
-        <section class="version-unlock-option" id="version-unlock-option" hidden><label class="debug-option"><input type="checkbox" id="version-unlock" aria-describedby="version-unlock-hint"><span>突破版本锁<small id="version-unlock-hint">支持 GR III 2.10 与 GR IIIx 1.60。默认仅适配DSP更新包版本，CPU版本更高的机身仍可能拒绝；周年机尚待验证。</small></span></label><div class="version-unlock-fields" id="version-unlock-fields" hidden><label class="version-known-toggle"><input id="version-known" type="checkbox" aria-controls="version-known-fields">按已知 DSP/CPU 版本适配</label><div class="version-known-fields" id="version-known-fields" hidden><label for="version-dsp">当前 DSP 完整版本<input id="version-dsp" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><label for="version-cpu">当前 CPU 完整版本<input id="version-cpu" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><p class="hint" id="version-input-hint">填写机身记录中的 DSP Version: 和 CPU Version: 四段数字，每段0–255，不要猜测。适配后重新安装较低版本的官方包仍可能受限。</p></div><p class="version-error" id="version-error" role="status" aria-live="polite"></p></div></section>
+        <section id="bridge-option" class="version-unlock-option" hidden>
+          <h3 id="bridge">GR III 固件桥接</h3>
+          <p class="hint">官方包因机内隐藏版本较高而无法更新时，先安装桥接包 2.10.22.27，再安装套件内的官方 2.10，之后即可按普通流程生成 M10V 功能包。用户实机反馈通过；适用 GR III，不适用 GR IIIx 或 GR IV。机内组件高于 2.10.22.27 时仍可能拒绝。</p>
+          <button type="button" class="outline wide" id="bridge-open">下载两阶段桥接套件</button>
+          <p id="bridge-result" role="status" aria-live="polite"></p>
+        </section>
+        <section class="version-unlock-option" id="version-unlock-option" hidden><label class="debug-option"><input type="checkbox" id="version-unlock" aria-describedby="version-unlock-hint"><span>单包版本适配<small id="version-unlock-hint">仅用于 GR IIIx 1.60 的高级单包适配；CPU 版本较高时仍可能拒绝。GR III 请使用固件桥接。</small></span></label><div class="version-unlock-fields" id="version-unlock-fields" hidden><label class="version-known-toggle"><input id="version-known" type="checkbox" aria-controls="version-known-fields">按已知 DSP/CPU 版本适配</label><div class="version-known-fields" id="version-known-fields" hidden><label for="version-dsp">当前 DSP 完整版本<input id="version-dsp" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><label for="version-cpu">当前 CPU 完整版本<input id="version-cpu" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><p class="hint" id="version-input-hint">填写机身记录中的 DSP Version: 和 CPU Version: 四段数字，每段0–255，不要猜测。适配后重新安装较低版本的官方包仍可能受限。</p></div><p class="version-error" id="version-error" role="status" aria-live="polite"></p></div></section>
         <button class="primary wide" id="build-firmware" disabled>保存固件 →</button>
         <button class="outline wide" id="cancel-build" hidden>取消当前构建</button>
         <div id="build-result" class="build-result" role="status" aria-live="polite"></div>
@@ -90,6 +96,14 @@
     </div>
     <div class="dialog-actions"><button class="outline" value="cancel">取消</button><button class="primary" id="apply-recipe" value="apply">应用到此位置</button></div>
   </form></dialog>
+  <dialog id="bridge-dialog" class="firmware-disclaimer" aria-labelledby="bridge-title">
+    <h2 id="bridge-title">GR III 固件桥接 · 2.10.22.27</h2>
+    <p>本套件已获用户实机反馈通过，并绑定同一份桥接固件。仅用于 GR III，不适用 GR IIIx 或 GR IV；不能据此保证其他服务版本兼容或异常恢复。</p>
+    <ol><li>解压后只将 stage-1-bridge 中的 fwdc239b.bin 放入 SD 根目录，按官方流程更新。</li><li>明确更新成功并正常重启后，将卡上文件替换为 stage-2-official 中的同名文件，再更新。</li><li>第二阶段成功后，再生成普通 M10V 功能包，无需再开启版本适配。</li></ol>
+    <p>不要同时复制两个阶段文件。第一阶段异常时停止并记录提示。包版本是 2.10.22.27，机内菜单仍可能显示 2.10，不能仅凭菜单数字判定失败。</p>
+    <label><input type="checkbox" id="bridge-ack">我已了解两阶段顺序，每次只将对应阶段的 BIN 放入 SD 卡根目录。</label>
+    <div class="disclaimer-actions"><button type="button" class="outline" id="bridge-cancel">返回</button><button type="button" class="primary" id="bridge-export" disabled>下载桥接套件 ZIP</button></div>
+  </dialog>
   <dialog id="firmware-disclaimer" class="firmware-disclaimer" aria-labelledby="disclaimer-title" aria-describedby="disclaimer-summary">
     <p class="disclaimer-kicker">保存前，请了解风险</p>
     <h2 id="disclaimer-title">刷入修改固件可能导致变砖。</h2>
