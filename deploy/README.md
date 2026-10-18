@@ -36,7 +36,13 @@ python3 -m venv .venv
 mkdir -p bin data
 ```
 
-首次上线无需恢复未开放的 GR IV 校准 DNG。原生胶卷库不依赖 GRLife 兼容运行时；如果开放 GR III 其他原厂工具，再按根 README 安装兼容运行时。
+首次上线无需恢复未开放的 GR IV 校准 DNG。完整发布会构建 GR III 扩展组合包及 GR IV 定制能力，必须安装已锁定的兼容运行时：
+
+```bash
+node scripts/sync-grlife-runtime.mjs --current
+```
+
+脚本对上游 manifest 和每个文件校验 SHA-256，上游版本变化时停止，不能关闭校验。也可从已验证主机安全传输 `.runtime/grlife-current` 后以 www 调用 `runtimeAvailable()` 复核。缓存脚本生成的目录和文件默认仅所有者可读，安装后只对该运行时目录设置目录 755、文件 644，保证 www 可读取；不把运行时源码提交到 Git。
 
 将三份本机已有官方 BIN 上传至（GR IV 同样用于发布构建检查）：
 

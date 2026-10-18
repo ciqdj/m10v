@@ -19,6 +19,7 @@ admin 可使用 sudo。服务器 Ed25519 指纹应为 `SHA256:14wdxfbNTDj0zIp43y
 - systemd `m10v` 以 www 运行，只监听 `127.0.0.1:3000`。
 - Node 24 LTS（初始化时 24.22.0）放在 `/opt/m10v-node`，固定入口 `/usr/local/bin/m10v-node`；Python 为项目 `.venv`。
 - Ubuntu 依赖：`git python3 python3-venv clang lld build-essential`；venv 包 `pillow numpy capstone unicorn`。
+- 完整发布的 GR III 扩展组合和 GR IV 定制需要锁定的 `.runtime/grlife-current`。初始化必须运行 `node scripts/sync-grlife-runtime.mjs --current`，或传输已核验缓存并以 www 验证 `runtimeAvailable()` 为 true；保持 manifest 与逐文件 SHA-256 校验。缓存默认权限为 600/700，需要仅对该目录改为文件 644、目录 755。缺失会导致发布回退，不能跳过组合构建。
 - 三个官方输入分别为 `bin/fwdc239b-gr3-official.bin`、`bin/fwdc243b-gr3x-official.bin`、`bin/fwdc248b-gr4-officical.bin`。它们不在 Git，重建服务器时单独安全传输并核对完整 SHA-256。
 - 2 GB 节点保留 2 GB swap，并对服务及发布构建设置 `NODE_OPTIONS=--max-old-space-size=128`。这是 JS 堆限制，Buffer、Python、编译器仍需额外内存。
 - Nginx 使用仓库 `deploy/nginx-location.conf`：300 秒超时、16k 响应头缓冲、`proxy_buffers 4 16k`、`proxy_busy_buffers_size 32k`，避免约 7 KB 审计头超过默认缓冲。先 `nginx -t`，再 reload。Nginx 由宝塔官方极速安装器安装，当前 1.28.3。
@@ -37,7 +38,7 @@ GitHub 仓库 `zhaoo/m10v` 的 main 推送触发 `Deploy Baota`；develop 不重
 
 ## 排障与验证
 
-`systemctl status m10v`、`journalctl -u m10v` 检查后端；宝塔 Nginx 配置在 `/www/server/panel/vhost/nginx/`。面板入口与登录信息由服务器管理员运行 `sudo bt default` 获取，不写入此文件。
+`systemctl status m10v`、`journalctl -u m10v` 检查后端；宝塔 Nginx 配置在 `/www/server/panel/vhost/nginx/`。面板安全入口可通过 `sudo cat /www/server/panel/data/admin_path.pl` 查询。用户名及密码由用户持有，不写入此文件。修改密码后 `bt default` 可能仍显示失效的初始密码，不能把它当作当前密码。
 
 应用能访问但保存失败时，检查站点 error.log 的 upstream timeout / too big header，以及 `free -m`、`vmstat`、Node RSS/Swap。不要仅延长超时。完整验收应经 HTTPS 代理执行导入、预检、构建和下载，并核对下载文件 SHA-256 与 `X-M10V-Native-Receipt` 中的 candidate_sha256。
 

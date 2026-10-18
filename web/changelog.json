@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.2",
+      "date": "2026-10-19",
+      "title": "补齐独立服务器的组合构建依赖与建站说明",
+      "changes": [
+        "为 GR III 扩展组合及 GR IV 定制补齐锁定兼容运行时，并校验 www 服务用户可读及逐文件完整性。",
+        "记录宝塔静态缓存规则导致 JS、CSS、图片 404 的处理，以及改密后的面板入口查询方式。",
+        "适用于 GR III、GR IIIx、GR IV 的服务器部署；不改变相机补丁或实机验证结论。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.1",
       "date": "2026-10-19",
       "title": "迁移 Ubuntu 宝塔服务器并修复固件保存超时",
@@ -10,9 +23,9 @@
         "为低内存节点设置 Node 堆回收参数，并扩大固件审计响应头的 Nginx 代理缓冲区。",
         "保留固件构建、独立回读与型号保护；服务器验证不代表相机刷入或成像验证。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "e8f3f255297d0641bdbc86ed5603ebe147d1ea99",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/e8f3f255297d0641bdbc86ed5603ebe147d1ea99"
     },
     {
       "version": "2026.10.18.5",
