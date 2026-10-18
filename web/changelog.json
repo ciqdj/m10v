@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.1",
+      "date": "2026-10-19",
+      "title": "迁移 Ubuntu 宝塔服务器并修复固件保存超时",
+      "changes": [
+        "GR III、GR IIIx、GR IV 工作台迁至独立 Ubuntu 服务器，GitHub 推送 main 经专用受限 SSH 自动部署。",
+        "为低内存节点设置 Node 堆回收参数，并扩大固件审计响应头的 Nginx 代理缓冲区。",
+        "保留固件构建、独立回读与型号保护；服务器验证不代表相机刷入或成像验证。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.18.5",
       "date": "2026-10-18",
       "title": "按实测 DSP 子版本修正 GR III 桥接包",
@@ -10,9 +23,9 @@
         "桥接更新为 2.10.33.27，保持 2.10 与尾号27，仅增加第三段；同步外层DSP/CPU、RTOS和CPU载荷版本与补数，保留两阶段更新流程。",
         "恢复新版测试套件下载并使旧预检失效；回执明确CPU版本未知、新版完整刷写与恢复待实机验证，不再标记实机通过。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "7fce12e034943bdf12fd8951ecc52fc1841160db",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39130646879"
     },
     {
       "version": "2026.10.18.4",

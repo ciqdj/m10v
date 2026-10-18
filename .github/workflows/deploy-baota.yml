@@ -30,10 +30,12 @@ jobs:
           python3 -m unittest tests.test_baota_publish tests.test_ssh_deploy
       - name: Deploy verified Git bundle over restricted SSH
         env:
+          DEPLOY_HOST: ${{ vars.M10V_DEPLOY_HOST }}
           DEPLOY_SSH_KEY: ${{ secrets.M10V_DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ vars.M10V_DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          test -n "$DEPLOY_HOST"
           test -n "$DEPLOY_SSH_KEY"
           test -n "$DEPLOY_KNOWN_HOSTS"
           key="$RUNNER_TEMP/m10v-deploy-key"
@@ -47,6 +49,6 @@ jobs:
           ssh -T -i "$key" -o IdentitiesOnly=yes -o BatchMode=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" \
             -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
-            root@114.55.142.234 "deploy $GITHUB_SHA" \
+            root@"$DEPLOY_HOST" "deploy $GITHUB_SHA" \
             < /tmp/m10v-release.bundle | tee /tmp/m10v-deploy.log
           grep -F "DEPLOY_OK commit=$GITHUB_SHA " /tmp/m10v-deploy.log

@@ -94,7 +94,7 @@ for model in gr3 gr3x gr4; do
   else
     build_args=(scripts/check_gr4_release.mjs)
   fi
-  if ! runuser -u www -- env M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
+  if ! runuser -u www -- env NODE_OPTIONS=--max-old-space-size=128 M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
     "${build_args[@]}" >"$work/$model.log" 2>&1; then
     cat "$work/$model.log" >&2; exit 1
   fi

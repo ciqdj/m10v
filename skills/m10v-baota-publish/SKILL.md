@@ -5,7 +5,7 @@ description: Use when the user asks to push or deploy the M10V GitHub project to
 
 # M10V 宝塔快速发布
 
-发布目标：GitHub `https://github.com/zhaoo/m10v.git` 的 `main` 与 `develop`，生产 `/www/wwwroot/m10v`，systemd `m10v`（www、loopback3000），公网 `https://m10v.izhaoo.com`。宝塔入口由用户提供；当前服务器 IP 为 `114.55.142.234`。先确认仍匹配现场状态。
+发布目标：GitHub `https://github.com/zhaoo/m10v.git` 的 `main` 与 `develop`，生产 `/www/wwwroot/m10v`，systemd `m10v`（www、loopback3000），公网 `https://m10v.izhaoo.com`。宝塔入口由用户提供；当前服务器 IP 为 `47.96.158.25`（Ubuntu 24.04）；旧 `114.55.142.234` 不再作为新发布目标。先确认仍匹配现场状态。
 
 用户明确要求推送并部署该项目时，按既有授权完成，不重复索取确认。只要求检查时，不执行推送或部署。登录凭据、cookie、私钥不放进 skill、Git 或输出。
 
@@ -18,6 +18,8 @@ description: Use when the user asks to push or deploy the M10V GitHub project to
 发布前在仓库运行 `node scripts/check_changelog.mjs --base 上次推送的完整SHA`，并运行 `node --test node/changelog.test.mjs`。检查器要求新增版本并保留历史；只改旧条目、漏写或复用版本号都会失败。changelog 与功能一起提交、一起推送，不能留待上线后补写。GitHub Actions 在 SSH 部署前强制执行同一检查。
 
 发布成功后核对 `/changelog/` 为 200，确认最上方记录与本次版本、改动一致，再报告发布完成。维护技能时同步仓库版与本机 `~/.codex/skills/m10v-baota-publish/SKILL.md`。
+
+新服务器的管理连接、初始化、低内存配置和排障见 [Ubuntu 宝塔运维](references/ubuntu-server.md)，仅在初始化、迁移或排障时读取。
 
 ## 本地推送
 
@@ -38,7 +40,7 @@ git ls-remote origin refs/heads/main refs/heads/develop
 
 当前生产方式见仓库 `deploy/SSH.md`。原子推送 main/develop 后，跟踪 main 对应的 `Deploy Baota`：`gh run list --workflow deploy-baota.yml` 找到本次 SHA，`gh run watch RUN_ID --exit-status` 等到终态，并检查实际日志中的 `DEPLOY_OK commit=此次完整SHA ... service=active`。不能把 push 成功或任务启动当作部署完成。失败先读首个构建/健康检查错误，修复后重新发布；同一 SHA 的重试使用 `gh run rerun RUN_ID`。
 
-服务器用 root 持有的受限入口传入 Git bundle，以 www 构建 GR III 调试组合包，并检查 GR IIIx 官方基线及原生详细菜单导出拦截；800T 原厂详细菜单地址当前仅验证 GR III。不要为通过发布检查关闭机型保护。修改 root 持有的发布脚本后，需通过现有管理入口安装已校验的新脚本，再重跑；不新增 SSH 授权。
+服务器用 root 持有的受限入口传入 Git bundle，以 www 构建 GR III 调试组合包，并检查 GR IIIx 官方基线及原生详细菜单导出拦截；800T 原厂详细菜单地址当前仅验证 GR III。不要为通过发布检查关闭机型保护。修改 root 持有的发布脚本后，需通过现有管理入口安装已校验的新脚本，再重跑；常规发布不新增 SSH 授权。用户明确要求初始化新服务器时可建立专用受限发布密钥。
 
 以下手动链路仅作为已授权发布的备用，执行前同样先更新并校验 changelog。
 

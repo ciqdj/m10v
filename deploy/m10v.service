@@ -9,6 +9,7 @@ Group=www
 WorkingDirectory=/www/wwwroot/m10v
 ExecStart=/usr/local/bin/m10v-node node/server.mjs
 Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=128
 Environment=M10V_PORT=3000
 Environment=M10V_PUBLIC_ORIGIN=https://m10v.izhaoo.com
 Environment=M10V_NO_BROWSER=1

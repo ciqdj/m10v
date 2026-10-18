@@ -4,7 +4,7 @@
 
 Actions 先运行部署保护测试，再创建相对固定初始版本 f34a53636bae0bb9939d4ae9f5057b1d2c005762 的 Git bundle，通过受限 SSH 传入服务器；服务器无需拉取 GitHub。远端核验 bundle 前置对象、完整目标 SHA 和 fast-forward 关系，然后以 www 构建完整 GR III 组合包，并实际构建 GR IIIx 全功能候选，独立核验 IIIx 型号与完整 CPU 保留，以 www 运行 GR IV 全功能构建与独立封包回读（需要 clang、llvm、lld 和官方 GR IV BIN），再重启 m10v 并检查健康状态。只有本次 SHA 的 DEPLOY_OK 返回后，Actions 才显示绿色。构建或健康检查失败会尝试回退。
 
-专用公钥在 root authorized_keys 中使用 restrict 和固定 command；拒绝交互 shell、PTY、端口转发、agent 转发及任意远端命令，仅接受 `deploy <40位SHA>`。私钥存储于仓库 Actions Secret `M10V_DEPLOY_SSH_KEY`，不写入 Git。服务器 Ed25519 指纹通过宝塔核对，固定于仓库变量 `M10V_DEPLOY_KNOWN_HOSTS`，SSH 严格验证。
+专用公钥在 root authorized_keys 中使用 restrict 和固定 command；拒绝交互 shell、PTY、端口转发、agent 转发及任意远端命令，仅接受 `deploy <40位SHA>`。新服务器为 Ubuntu 24.04（47.96.158.25）；目标地址由仓库变量 `M10V_DEPLOY_HOST` 指定。私钥存储于仓库 Actions Secret `M10V_DEPLOY_SSH_KEY`，不写入 Git。服务器 Ed25519 指纹通过用户提供的 Workbench 终端指纹核对，固定于仓库变量 `M10V_DEPLOY_KNOWN_HOSTS`，SSH 严格验证。
 
 服务器入口 `/usr/local/lib/m10v-deploy/receive-ssh.sh` 与 update-server.sh 均由 root 持有；日志 `/var/log/m10v-deploy-ssh.log`。站点服务仍由 www 运行，监听 loopback 3000；未新增公网端口。增量包上限 24 MiB，超限明确失败。
 

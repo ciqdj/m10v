@@ -2,6 +2,8 @@
 
 支持 Ubuntu 24.04 和 Alibaba Cloud Linux 3。宝塔管理 Nginx／证书，systemd 守护 Node；也可使用宝塔 Node 项目或附带的 PM2 模板。两种进程管理方式任选一种，不要重复启动同一端口。先用 `cat /etc/os-release` 核对实际系统。
 
+当前生产节点：Ubuntu 24.04，`47.96.158.25`；运维连接与迁移排障见 [Ubuntu 宝塔运维](../skills/m10v-baota-publish/references/ubuntu-server.md)。
+
 ## 1. 域名与网络
 
 为 `m10v.izhaoo.com` 添加指向服务器公网 IP 的 A 记录。阿里云安全组和服务器防火墙放行 80、443。应用端口 3000 仅监听 127.0.0.1，不需要对公网放行。
@@ -83,6 +85,7 @@ sudo journalctl -u m10v -n 80 --no-pager
 
 ```text
 M10V_PORT=3000
+NODE_OPTIONS=--max-old-space-size=128
 M10V_PUBLIC_ORIGIN=https://m10v.izhaoo.com
 M10V_NO_BROWSER=1
 M10V_LLVM_CLANG=/usr/bin/clang
@@ -99,7 +102,8 @@ GR IV 同时需要 LLVM 的 `llvm-objcopy`、`llvm-nm` 和 LLD 的 `ld.lld`，�
 2. 申请 SSL 证书，开启 HTTPS，并将 HTTP 跳转到 HTTPS。
 3. 反向代理目标填写 `http://127.0.0.1:3000`，关闭代理缓存。保留浏览器的 Origin，发送 Host 为请求的原始域名；不要改成 localhost，也不要清空 Origin。
 4. 在 HTTPS server 中使用 `nginx-location.conf` 的 location 内容：上传上限 64m，代理读写超时 300s。如果宝塔已经生成 `location /`，编辑它，不能再添加一个重复块。
-5. 保存配置并重载 Nginx。宝塔的 ACME 验证和证书相关 location 保留原样。
+5. 移除宝塔自动生成的图片与 JS/CSS 本地缓存 location，它们会截获应用静态资源并从空站点目录返回 404。保留敏感文件拦截及 ACME 验证规则。
+6. 保留示例中的 16k 响应头缓冲、4×16k buffers 与 32k busy buffers，先 nginx -t，通过后再重载。原生下载审计响应头约 7 KB。
 
 测试阶段建议开启宝塔网站的“密码访问”，限制访问人员。`/api/status` 的令牌用于请求校验，不是账号登录；当前服务不是具备访客数据隔离、配额和权限体系的多用户 SaaS。
 
