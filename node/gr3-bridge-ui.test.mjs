@@ -26,19 +26,18 @@ test('GR IIIx keeps its separate opt-in adaptation and never gains a GR III brid
  assert.equal(h.$('bridge-option').hidden,true);assert.equal(h.$('version-unlock-option').hidden,false);
  assert.equal(h.context.versionUnlockSnapshot().mode,'dsp-package-only');
 });
-test('failed first-stage bridge stays disabled and no longer claims hardware success',async()=>{
+test('formal bridge entry and guidance name user hardware feedback and retain both stages',async()=>{
  const html=await readFile(new URL('../web/gr3/index.html',import.meta.url),'utf8');
- assert.match(html,/<button[^>]+id="bridge-open" disabled>桥接下载已暂停/);
- assert.match(html,/确认更新后立即失败/);assert.doesNotMatch(html,/用户实机反馈通过/);
- const h=controls(studio,'gr3');h.context.state.projectId='official';h.context.renderVersionUnlock();assert.equal(h.$('bridge-open').disabled,true);
- const guide=await readFile(new URL('../web/guide.html',import.meta.url),'utf8');assert.match(guide,/已经下载的桥接包也应停止使用/);assert.doesNotMatch(guide,/已获用户实机.*通过/);
- for(const file of ['native-library.html','native-library-controls.html']){
-  const content=await readFile(new URL('../web/gr3/'+file,import.meta.url),'utf8');assert.match(content,/已暂停下载/);assert.doesNotMatch(content,/已获用户实机反馈通过/);
- }
+ const bridge=html.slice(html.indexOf('<section id="bridge-option"'),html.indexOf('<section class="version-unlock-option" id="version-unlock-option"'));
+ assert.match(bridge,/待实机验证/);assert.match(bridge,/下载两阶段桥接测试套件/);
+ assert.match(bridge,/2.10.32.27/);
+ const dialog=html.slice(html.indexOf('<dialog id="bridge-dialog"'),html.indexOf('<dialog id="firmware-disclaimer"'));
+ assert.match(dialog,/stage-1-bridge/);assert.match(dialog,/stage-2-official/);assert.match(dialog,/待实机验证/);assert.doesNotMatch(dialog,/实机未验证/);
+ for(const file of ['native-library.html','native-library-controls.html'])assert.match(await readFile(new URL('../web/gr3/'+file,import.meta.url),'utf8'),/href="\/gr3\/#bridge"/);
 });
 
 test('source guidance clears once the official project is imported without erasing export status',()=>{
- const h=controls(studio,'gr3');h.context.renderVersionUnlock();assert.match(h.$('bridge-result').textContent,/已暂停/);
+ const h=controls(studio,'gr3');h.context.renderVersionUnlock();assert.match(h.$('bridge-result').textContent,/请先/);
  h.context.state.projectId='official';h.context.renderVersionUnlock();assert.doesNotMatch(h.$('bridge-result').textContent,/请先/);
  h.$('bridge-result').textContent='两阶段桥接套件已生成并发起下载。';h.context.renderVersionUnlock();assert.match(h.$('bridge-result').textContent,/已生成/);
 });

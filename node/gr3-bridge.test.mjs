@@ -7,15 +7,15 @@ const load=()=>import('./gr3-bridge.mjs');
 test('bridge has third-component increment component versions and only the evidenced updater code change',async()=>{
  const {buildGr3Bridge,verifyGr3Bridge}=await load();const {candidate,receipt}=buildGr3Bridge(official);
  const d=decodeFrameMap(candidate).decoded;
- assert.equal(candidate.readUInt32BE(0x38),0x020a161b);assert.equal(candidate.readUInt32BE(0x50),0x020a161b);
+ assert.equal(candidate.readUInt32BE(0x38),0x020a211b);assert.equal(candidate.readUInt32BE(0x50),0x020a211b);
  // Offsets are independently obtained from section headers below.
  let at=0,sections={};for(let n=0;n<14;n++){const name=d.toString('ascii',at,at+8).replace(/\0/g,'');const size=name==='RES'?6595272:d.readUInt32LE(at+12);sections[name]={at:at+16,size};at+=16+size;}
- assert.equal(d.readUInt32BE(sections.RTOS.at+0x2038),0x020a161b);
- assert.equal(d.readUInt32BE(sections.CPU.at+0x90),0x020a161b);
+ assert.equal(d.readUInt32BE(sections.RTOS.at+0x2038),0x020a211b);
+ assert.equal(d.readUInt32BE(sections.CPU.at+0x90),0x020a211b);
  assert.equal(d.subarray(sections.RTOS.at+0x6285dc,sections.RTOS.at+0x6285e0).toString('hex'),'e6ffffea');
  assert.equal(sum32(candidate),0);assert.equal(sum32(d),0);
  let cpuSum=0;for(let p=sections.CPU.at;p<sections.CPU.at+131072;p+=4)cpuSum=(cpuSum+d.readUInt32BE(p))>>>0;assert.equal(cpuSum,0);
- assert.equal(receipt.camera_verified,false);assert.equal(receipt.status,'hardware_failed');assert.equal(receipt.hardware_verification.status,'failed');assert.equal(receipt.hardware_verification.camera_bootable,true);assert.equal(receipt.hardware_verification.source,'user_report');assert.equal(receipt.hardware_verification.candidate_sha256,'e49cce2858e52b200b9d451100d13f3ff7ea51f30b66503cb26d503851431955');assert.equal(receipt.candidate_sha256,receipt.hardware_verification.candidate_sha256);assert.equal(receipt.package_version,'2.10.22.27');
+ assert.equal(receipt.camera_verified,false);assert.equal(receipt.hardware_verification.source,'photo_metadata_and_offline_tests');assert.equal(receipt.hardware_verification.candidate_sha256,'f58ae0ec9453024c607391fb42dcd168394adfdea97fdf166d7060b7115c5baf');assert.equal(receipt.candidate_sha256,receipt.hardware_verification.candidate_sha256);assert.equal(receipt.package_version,'2.10.33.27');
  assert.deepEqual(verifyGr3Bridge(official,candidate),receipt);
  assert.throws(()=>buildGr3Bridge(readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url))),/GR III|identity/);
  const wrong=Buffer.from(official);wrong[0x38]^=1;assert.throws(()=>buildGr3Bridge(wrong));

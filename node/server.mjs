@@ -225,7 +225,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
           return send(response,200,prepareGr3Bridge(original));
         }
         const {zip}=exportGr3Bridge(original,input);
-        return send(response,200,zip,'application/zip','M10V-GRIII-bridge-2.10.22.27.zip');
+        return send(response,200,zip,'application/zip','M10V-GRIII-bridge-2.10.33.27.zip');
       }
       if(nativeMatch) {
         const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));

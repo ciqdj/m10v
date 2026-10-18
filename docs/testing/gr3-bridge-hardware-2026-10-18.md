@@ -1,3 +1,13 @@
+最新候选 SHA-256：`f58ae0ec9453024c607391fb42dcd168394adfdea97fdf166d7060b7115c5baf`，30446032字节。11项Node专项通过；最终BIN执行55个ARM局部门禁/CPU校验场景通过，包括实测DSP32对旧22的拒绝、新33准入、超出候选拒绝和桥接后的官方包准入。当前版本getter为替身，不模拟闪存或硬件解压。原厂外层容器解析与真实整包补数对官方/新版另行执行通过。
+
+# 原图版本证据与新版候选
+
+用户 JPG（10888066字节）与 DNG（28830707字节）均为 RICOH GR III，Software 显示 2.10。两份 MakerNote 的 0x0027（type7/count4）原始值均为 `fdf5dfe4`，按 ExifTool Pentax FirmwareID 逐字节 XOR ff 得 `020a201b`，即 DSP **2.10.32.27**。DNG MakerNote 起点882。未发现 CPU 0x0028，不将DSP数值外推为CPU。
+
+旧桥接 2.10.22.27 = 020a161b，明确小于实测DSP。新桥接 2.10.33.27 = 020a211b，在公共更新器版本比较规则下覆盖实测DSP；未知CPU或不同服务更新器仍可能拒绝。新版完整实机安装和回刷尚未通过，camera_verified=false。
+
+参考解码规则：https://github.com/exiftool/exiftool/blob/master/lib/Image/ExifTool/Pentax.pm （pentaxFirmwareID及0x0027）。不把照片内容、序列号或完整MakerNote放进仓库。
+
 # 最新结果：一阶失败，撤销通过结论
 
 2026-10-18 后续实机反馈：“确认后立即失败，还能正常开机”。此前“测试通过”不能继续作为此桥接方案成功依据。公开下载已暂停，完整 DSP/CPU 版本及具体拒绝原因未知。下文保留历史反馈，不能用作当前验收结论。

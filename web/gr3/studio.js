@@ -177,9 +177,9 @@ function versionUnlockSnapshot(){
 }
 function renderVersionUnlock(){
  if($('bridge-option'))$('bridge-option').hidden=chosenModel!=='gr3';
- if($('bridge-open'))$('bridge-open').disabled=true;
- const bridgeResult=$('bridge-result'),sourceHint='桥接下载已暂停：一阶包确认后立即失败，原因仍在调查。';
- if(bridgeResult){if(!state.projectId)bridgeResult.textContent=sourceHint;else if(bridgeResult.textContent===sourceHint)bridgeResult.textContent='官方来源已核验；桥接下载仍暂停。';}
+ if($('bridge-open'))$('bridge-open').disabled=!state.projectId||saving||Boolean(activeBuildController)||bridgeBusy;
+ const bridgeResult=$('bridge-result'),sourceHint='请先在“导入固件”中选择 GR III 官方包，再下载桥接测试套件。';
+ if(bridgeResult){if(!state.projectId)bridgeResult.textContent=sourceHint;else if(bridgeResult.textContent===sourceHint)bridgeResult.textContent='官方来源已核验，可下载桥接测试套件。';}
  const supported=state.profile==='native'&&chosenModel==='gr3x',toggle=$('version-unlock'),known=$('version-known');
  $('version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=saving||Boolean(activeBuildController)||!supported;$('version-unlock-fields').hidden=!toggle.checked;
@@ -715,7 +715,7 @@ $('bridge-open')?.addEventListener('click',async()=>{
   bridgePlan=await(await api(`/api/projects/${bridgeProject}/bridge/prepare`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
   if(state.projectId!==bridgeProject||chosenModel!=='gr3')throw Error('来源已变化，请重新打开桥接预检');
   if(!bridgePlan.download_available)throw Error(bridgePlan.suspension_reason);
-  $('bridge-ack').checked=false;$('bridge-export').disabled=true;$('bridge-dialog').showModal();$('bridge-result').textContent='预检通过：2.10.22.27 · 下载已暂停。';
+  $('bridge-ack').checked=false;$('bridge-export').disabled=true;$('bridge-dialog').showModal();$('bridge-result').textContent='预检通过：2.10.33.27 · 待实机验证。';
  }catch(e){$('bridge-result').textContent=e.message;}
  finally{bridgeBusy=false;renderVersionUnlock();}
 });
@@ -727,7 +727,7 @@ $('bridge-export')?.addEventListener('click',async()=>{
  bridgeBusy=true;$('bridge-export').disabled=true;$('bridge-dialog').close();renderVersionUnlock();$('bridge-result').textContent='正在生成并独立校验桥接套件…';
  try{
   const response=await api(`/api/projects/${bridgeProject}/bridge/export`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted_plan_id:bridgePlan.plan_id,acknowledge_instructions:true})});
-  await download(response,'M10V-GRIII-bridge-2.10.22.27.zip');
+  await download(response,'M10V-GRIII-bridge-2.10.33.27.zip');
   $('bridge-result').textContent='两阶段桥接套件已生成并发起下载。请按 README.txt 先刷桥接包，再刷官方 2.10。';
  }catch(e){$('bridge-result').textContent=e.message;}
  finally{bridgeBusy=false;bridgePlan=null;renderVersionUnlock();}

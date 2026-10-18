@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.18.5",
+      "date": "2026-10-18",
+      "title": "按实测 DSP 子版本修正 GR III 桥接包",
+      "changes": [
+        "用户 JPG 与 DNG 均记录 DSP 2.10.32.27，高于旧桥接 2.10.22.27，确认旧版本覆盖不足。",
+        "桥接更新为 2.10.33.27，保持 2.10 与尾号27，仅增加第三段；同步外层DSP/CPU、RTOS和CPU载荷版本与补数，保留两阶段更新流程。",
+        "恢复新版测试套件下载并使旧预检失效；回执明确CPU版本未知、新版完整刷写与恢复待实机验证，不再标记实机通过。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.18.4",
       "date": "2026-10-18",
       "title": "修复 GR IV 服务器构建缺少链接器",
@@ -10,9 +23,9 @@
         "发布检查加入 GR IV 实际编译、封包及独立回读，避免只检查 GR III／IIIx 而遗漏 GR IV 依赖。",
         "本次验证范围为服务器构建与下载；GR IV 刷入和成像仍待实机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "41bbab10489710382794726033e90f95d12253db",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/41bbab10489710382794726033e90f95d12253db"
     },
     {
       "version": "2026.10.18.3",
