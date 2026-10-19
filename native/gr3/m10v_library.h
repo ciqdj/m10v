@@ -47,6 +47,19 @@ int m10v_library_stamp(m10v_library_state *, uint32_t enabled, uint32_t format,
  * effect that the native owner has not actually executed. */
 enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
        M10V_NATIVE_HALO=8u, M10V_NATIVE_LEAK=16u, M10V_NATIVE_ALL=31u };
+/* CPU residual plan after the recipe owner has authenticated completion.
+ * No pixel access and no state mutation. A disabled halo has no spatial pass;
+ * uncompleted native work always retains its software fallback. */
+#define M10V_CPU_STAMP 32u
+static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,uint32_t slot,uint32_t completed){
+    const m10v_slot *v=&state->slots[slot];
+    uint32_t stages=(completed&M10V_NATIVE_COLOR)?0:M10V_NATIVE_COLOR;
+    if(v->grain&&!(completed&M10V_NATIVE_GRAIN))stages|=M10V_NATIVE_GRAIN;
+    if((v->film==33||v->film==67)&&v->halo_gain&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
+    if(state->effects[slot].leak_gain&&!(completed&M10V_NATIVE_LEAK))stages|=M10V_NATIVE_LEAK;
+    if(state->stamp)stages|=M10V_CPU_STAMP;
+    return stages;
+}
 int m10v_library_render_native(m10v_library_image *,const m10v_library_state *,uint32_t,
         const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t completed);
 int m10v_library_render(m10v_library_image *, const m10v_library_state *, uint32_t slot,
@@ -54,6 +67,9 @@ int m10v_library_render(m10v_library_image *, const m10v_library_state *, uint32
                         uint32_t scratch_bytes);
 /* Nonnegative load provenance: 0=new journal, 1=defaults, 2=v2 migration,
  * 3=v1 migration. All are usable validated states; negative is failure. */
+int m10v_camera_library_preview(m10v_library_state *);
+void m10v_camera_library_preview_init(uint32_t);
+void m10v_camera_library_preview_clear(uint32_t);
 int m10v_camera_library_load(m10v_library_state *);
 int m10v_camera_library_select(m10v_library_state *, uint32_t slot, uint32_t film);
 int m10v_camera_library_texture(m10v_library_state *, uint32_t slot, uint32_t grain, uint32_t soft);

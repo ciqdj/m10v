@@ -31,7 +31,9 @@ class NativeRenderHandoffTests(unittest.TestCase):
    for row in range(im.height):
     for x in range(im.width):y[row*im.stride+x]=(row*3+x*5)&255
    y[20*im.stride+20]=255;y[20*im.stride+21]=255;before=(bytes(y),bytes(uv))
-   self.assertEqual(self.native(state,im,scratch,mask),0);self.assertNotEqual((bytes(y),bytes(uv)),before,effect)
+   self.assertEqual(self.native(state,im,scratch,mask),0)
+   if effect=='halo':self.assertNotEqual((bytes(y),bytes(uv)),before,effect)
+   else:self.assertEqual((bytes(y),bytes(uv)),before,'retired per-film soft must not reappear')
  def test_unknown_completion_bits_reject_before_writes(self):
   state,im,y,uv,scratch=self.fixture();before=(bytes(y),bytes(uv))
   self.assertLess(self.native(state,im,scratch,32),0);self.assertEqual((bytes(y),bytes(uv)),before)

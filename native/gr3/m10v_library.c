@@ -338,7 +338,17 @@ static void phoenix_halation_source(const m10v_library_image *im,const m10v_slot
 }
 static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,const uint8_t *scratch,uint32_t gw,uint32_t gh,uint32_t shift){
     const uint16_t *a=(const uint16_t *)scratch;
-    for(uint32_t row=0;row<im->height;++row)for(uint32_t x=0;x<im->width;x+=2){
+    uint32_t step=1u<<shift,half=step>>1;
+    for(uint32_t row=0;row<im->height;++row){
+      uint32_t py=row<half?0:row-half,gy=py>>shift,ny=gy+1<gh?gy+1:gy;
+      for(uint32_t x=0;x<im->width;){
+        uint32_t px=x<half?0:x-half,gx=px>>shift,nx=gx+1<gw?gx+1:gx;
+        uint32_t end=(((gx+1)<<shift)+half+1u)&~1u;
+        if(end<=x)end=x+2;if(end>im->width)end=im->width;
+        /* Bilinear energy is exactly zero over this interval iff all four
+         * support samples are zero. Never threshold a weak real halo. */
+        if(!(a[gy*gw+gx]|a[gy*gw+nx]|a[ny*gw+gx]|a[ny*gw+nx])){x=end;continue;}
+        for(;x<end;x+=2){
         uint32_t at=row*im->stride+x,y0=im->y[at],y1=im->y[at+1],peak=y0>y1?y0:y1;
         /* Shared chroma must not tint either member of a clipped bright pair. */
         if(peak>=240)continue;
@@ -352,6 +362,8 @@ static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,c
         im->y[at]=clamp((int)(y0+lift));im->y[at+1]=clamp((int)(y1+lift));
         im->chroma[at]=clamp((int)im->chroma[at]-(int)((43*red+85*green+128)>>8));
         im->chroma[at+1]=clamp((int)im->chroma[at+1]+(int)((128*red-107*green+128)>>8));
+        }
+      }
     }
 }
 static int render_stages(m10v_library_image *image,const m10v_library_state *state,

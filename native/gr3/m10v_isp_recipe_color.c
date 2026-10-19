@@ -215,3 +215,46 @@ void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uin
     (void)context;(void)params;(void)result;
 #endif
 }
+
+/* Only the LiveView Make vtable callback calls this. It updates bounded ISP
+ * parameter banks, never photo pixels, live buffers, filesystem or graph queues. */
+int m10v_isp_frame_live_color(void *tuning,void *info){
+#if M10V_ISP_LIVE_COLOR
+    uintptr_t a=(uintptr_t)tuning,f=(uintptr_t)info;
+    if((a&3)||(f&3)||a<0x55000000u||a>0x80000000u-0x400u||f<0x55000000u||f>0x80000000u-0x9000u||
+       *(const uint32_t *)tuning!=0x53dbd938u)return 0;
+    const uint8_t *frame=info;
+    uint32_t si=*(const uint32_t *)(frame+0x82d0);
+    if(frame[0x82ac]>1||!si||si<0x55000000u||si>0x80000000u-0x80000u)return 0;
+    const uint8_t *shot=(const uint8_t *)(uintptr_t)si+(frame[0x82ac]?0x71248:0);
+    uint32_t tone=shot[0x77c],slot=tone==12?0:tone>=18&&tone<=21?tone-17:5;
+    if(slot>=5)return 0;
+    m10v_library_state state;if(!m10v_camera_library_preview(&state))return 0;
+    uint32_t film=state.slots[slot].film,exposure=film==68?state.effects[slot].film_exposure:0;
+    m10v_isp_native_look look;
+    return m10v_isp_native_look_prepare(&look,film,exposure,state.sequence+1u)&&
+        m10v_isp_native_look_apply(&look,*(const void *const *)((const uint8_t *)tuning+0x17c),info,shot[0x7be]==1);
+#else
+    (void)tuning;(void)info;return 0;
+#endif
+}
+
+void m10v_isp_frame_live_prepare(void *tuning,const void *info){
+#if M10V_ISP_LIVE_COLOR
+    uintptr_t a=(uintptr_t)tuning,f=(uintptr_t)info;
+    if((a&3)||(f&3)||a<0x55000000u||a>0x80000000u-0x400u||f<0x55000000u||f>0x80000000u-0x9000u||*(const uint32_t *)tuning!=0x53dbd938u)return;
+    const uint8_t *frame=info;uint32_t si=*(const uint32_t *)(frame+0x82d0);
+    if(frame[0x82ac]>1||si<0x55000000u||si>0x80000000u-0x80000u)return;
+    uint32_t tone=*((const uint8_t *)(uintptr_t)si+(frame[0x82ac]?0x71248:0)+0x77c);
+    uint32_t slot=tone==12?0:tone>=18&&tone<=21?tone-17:5;
+    m10v_library_state state;
+    if(slot<5&&m10v_camera_library_preview(&state)&&state.slots[slot].film>=33){
+        /* Original Live Make otherwise reuses already written frame banks.
+         * Invalidate only its internal cached-tone byte; original Make restores
+         * it from unmodified SI and reconstructs clean base parameters. */
+        ((uint8_t *)tuning)[0x1a8]=255;
+    }
+#else
+    (void)tuning;(void)info;
+#endif
+}

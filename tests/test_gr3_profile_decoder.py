@@ -55,3 +55,8 @@ class ProfileDecoderTests(unittest.TestCase):
         self.assertEqual(row['texture_backend']['batch_pixels'],12000)
         self.assertTrue(row['texture_backend']['cache_selected'])
         self.assertFalse(row['texture_backend']['batch_rejected'])
+
+    def test_native_fast_path_keeps_film_and_residual_work_without_pixel_markers(self):
+        result=decode_logs([page([(150,1,1,100,0),(138,1,3,0,67),(150,1,12,101,0)])])
+        row=result['capture_profiles'][0]
+        self.assertEqual((row['film'],row['cpu_plan']['native_mask'],row['cpu_plan']['stages']),(67,3,0))

@@ -126,7 +126,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_library_': {'m10v_library_init', 'm10v_library_valid', 'm10v_library_name',
             'm10v_library_reset','m10v_library_detail','m10v_library_effects','m10v_library_select', 'm10v_library_texture', 'm10v_library_halation', 'm10v_library_tables', 'm10v_library_stamp', 'm10v_library_render','m10v_library_render_native'},
         'm10v_camera_library_': {'m10v_camera_library_load', 'm10v_camera_library_select',
-            'm10v_camera_library_reset','m10v_camera_library_detail','m10v_camera_library_effects','m10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp'},
+            'm10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_reset','m10v_camera_library_detail','m10v_camera_library_effects','m10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp'},
         'm10v_menu_': {'m10v_menu_count', 'm10v_menu_max_count', 'm10v_menu_index', 'm10v_menu_name',
             'm10v_menu_value_name', 'm10v_menu_icon', 'm10v_menu_value_icon', 'm10v_menu_focus',
             'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter'},
@@ -150,7 +150,8 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False):
+    if live_color and (not native_color or not sd_library):raise ValueError('live color requires native color and owned settings')
     if type(texture_neon) is not bool or (texture_neon and (not spatial_neon or not debug_mode)):raise ValueError('full texture blocks require debug NEON ownership')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native color/snapshot ownership')
     if type(view_deferred)is not bool or (view_deferred and not lifecycle_trace):raise ValueError('view recovery requires diagnostic owned pipeline')
@@ -259,7 +260,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             struct.pack_into('<II', image, offset, word, 0xea000000 | ((delta >> 2) & 0xffffff))
         (out / 'm10v-library-arm.o').write_bytes(obj.read_bytes())
         camera_obj = folder / 'camera.o'
-        subprocess.run([compiler, *FLAGS, '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
+        subprocess.run([compiler, *FLAGS, '-DM10V_LIVE_COLOR='+str(int(live_color)), '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
                        check=True, capture_output=True)
         camera_base = (base + len(image) + 15) & ~15
         camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, symbols, 'm10v_camera_library_')
@@ -335,7 +336,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if recipe_snapshot:
                 from scripts.build_gr3_isp_recipe_color import build as build_recipe_color
                 snapshot_base=(base+len(image)+15)&~15
-                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain)
+                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain,live_color=live_color)
                 image+=bytes(snapshot_base-base-len(image))+snapshot_code;symbols.update(snapshot_report['exports'])
                 lifecycle_report['snapshot']=snapshot_report
                 lifecycle_report['patches']+=snapshot_report['patches']
@@ -371,13 +372,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix)
                 image+=bytes(start-base-len(image))+code;symbols.update(entries)
             controller_obj=folder/'settings-controller.o'
-            subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*FLAGS,*debug_flags,'-DM10V_LIVE_COLOR='+str(int(live_color)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
             placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable']}
             provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_')
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
-            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries})
+            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=live_color)
             code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_')
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
@@ -689,9 +690,10 @@ if __name__ == '__main__':
     parser.add_argument('--debug',action='store_true')
     parser.add_argument('--debug-build-id',type=lambda v:int(v,0),default=0)
     parser.add_argument('--native-color',action='store_true')
+    parser.add_argument('--live-color',action='store_true')
     parser.add_argument('--native-grain',action='store_true')
     parser.add_argument('--view-deferred',action='store_true')
     parser.add_argument('--hdf-only',action='store_true')
     parser.add_argument('--hdf-default',type=int,default=0)
     parser.add_argument('--no-hdf',action='store_true')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else None), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else None), indent=2))

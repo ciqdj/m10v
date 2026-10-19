@@ -26,6 +26,60 @@ static uint32_t filesystem(void) {
 static void copy(m10v_library_state *dst, const m10v_library_state *src) {
     for (uint32_t i = 0; i < sizeof(*src); ++i) ((uint8_t *)dst)[i] = ((const uint8_t *)src)[i];
 }
+#ifndef M10V_LIVE_COLOR
+#define M10V_LIVE_COLOR 0
+#endif
+#if M10V_LIVE_COLOR
+#define PREVIEW_OFFSET 0x193cu
+#define PREVIEW_BYTES 128u
+#define PREVIEW_MAGIC 0x3856504du
+typedef struct {uint32_t magic,version; m10v_library_state state;} preview_cache;
+_Static_assert(sizeof(preview_cache)<=PREVIEW_BYTES,"preview owner capacity");
+static preview_cache *preview_owner(void){
+    /* Original5316f350 singleton guard,5316fce0 factory+74 TopMenu owner.
+     * Read only: never initialize a UI singleton or allocate from LiveView. */
+    if(!(*(const volatile uint32_t *)0x55063910u&1u))return 0;
+    uint32_t owner=*(const volatile uint32_t *)(0x55063914u+0x74u);
+    if(!ram((const void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))return 0;
+    preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
+    return p->magic==PREVIEW_MAGIC?p:0;
+}
+static void publish_preview(preview_cache *p,const m10v_library_state *s){
+    if(!p||!m10v_library_valid(s))return;
+    uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
+    if((v&1u)||!__atomic_compare_exchange_n(&p->version,&v,v+1,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return;
+    copy(&p->state,s);__atomic_store_n(&p->version,v+2,__ATOMIC_RELEASE);
+}
+#endif
+int m10v_camera_library_preview(m10v_library_state *out){
+#if M10V_LIVE_COLOR
+    preview_cache *p=preview_owner();if(!p||!ram(out,sizeof(*out)))return 0;
+    uint32_t before=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
+    if(!before||(before&1u))return 0;
+    copy(out,&p->state);__atomic_thread_fence(__ATOMIC_ACQUIRE);
+    return p->magic==PREVIEW_MAGIC&&before==__atomic_load_n(&p->version,__ATOMIC_RELAXED)&&m10v_library_valid(out);
+#else
+    (void)out;return 0;
+#endif
+}
+void m10v_camera_library_preview_init(uint32_t owner){
+#if M10V_LIVE_COLOR
+    if(!ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))return;
+    preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
+    p->magic=0;p->version=0;p->magic=PREVIEW_MAGIC;
+    m10v_library_state s;if(m10v_camera_library_load(&s)>=0)publish_preview(p,&s);
+#else
+    (void)owner;
+#endif
+}
+void m10v_camera_library_preview_clear(uint32_t owner){
+#if M10V_LIVE_COLOR
+    if(ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))
+        ((preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET))->magic=0;
+#else
+    (void)owner;
+#endif
+}
 static int store(void *context, const m10v_library_state *next) {
     uint32_t fs = (uint32_t)(uintptr_t)context;
     const char *name = state_names[next->sequence & 1];
@@ -36,6 +90,9 @@ static int store(void *context, const m10v_library_state *next) {
         !m10v_library_valid(&readback)) return -1;
     for (uint32_t i = 0; i < sizeof(readback); ++i)
         if (((const uint8_t *)&readback)[i] != ((const uint8_t *)next)[i]) return -1;
+#if M10V_LIVE_COLOR
+    publish_preview(preview_owner(),next);
+#endif
     return 0;
 }
 static uint32_t little32(const uint8_t *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
@@ -97,7 +154,7 @@ static int read_texture_v3(uint32_t fs,const char *name,m10v_library_state *stat
     for(uint32_t i=0;i<5;i++)if(state->slots[i].film>66||state->effects[i].film_exposure)return 0;
     state->version=4;state->crc=texture_crc(state);return m10v_library_valid(state);
 }
-int m10v_camera_library_load(m10v_library_state *state) {
+static int load_library(m10v_library_state *state) {
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     m10v_library_init(state);
     uint32_t fs = filesystem(); if (!fs) return M10V_LIBRARY_INVALID;
@@ -126,6 +183,13 @@ int m10v_camera_library_load(m10v_library_state *state) {
         uint32_t crc=0xffffffffu;for(uint32_t i=0;i<100;i++){crc^=((uint8_t *)state)[i];for(uint32_t bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}state->crc=~crc;return 2;
     }
     return M10V_LIBRARY_OK;
+}
+int m10v_camera_library_load(m10v_library_state *state){
+    int result=load_library(state);
+#if M10V_LIVE_COLOR
+    if(result>=0)publish_preview(preview_owner(),state);
+#endif
+    return result;
 }
 int m10v_camera_library_select(m10v_library_state *state, uint32_t slot, uint32_t film) {
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;

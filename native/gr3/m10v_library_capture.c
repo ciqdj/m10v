@@ -35,7 +35,7 @@ static void trace_append(m10v_capture_trace *trace,uint32_t e,uint32_t a,uint32_
 #if M10V_CAPTURE_PROFILE
     /* Keep three one-shot film samples inside the existing 63-record page.
      * Timing checkpoints replace CPU hashes and redundant render markers. */
-    if(e!=100&&e!=101&&e!=102&&e!=112&&e!=113&&e!=121&&e!=124&&e!=125&&e!=126&&e!=132&&e!=135&&e!=137)return;
+    if(e!=100&&e!=101&&e!=102&&e!=112&&e!=113&&e!=121&&e!=124&&e!=125&&e!=126&&e!=132&&e!=135&&e!=137&&e!=138)return;
 #endif
     if(trace->count>=sizeof(trace->events)/sizeof(trace->events[0]))return;
     uint32_t *r=trace->events[trace->count++];r[0]=e;r[1]=a;r[2]=b;r[3]=c;r[4]=d;
@@ -188,9 +188,18 @@ int m10v_capture_library(uint32_t context) {
 #endif
 #endif
     CAPTURE_LOG(113,slot,(uint32_t)settings_source,state.sequence,3);
+    uint32_t cpu_stages=m10v_library_cpu_stages(&state,slot,completed);
+    CAPTURE_LOG(138,context,completed,cpu_stages,state.slots[slot].film);
+    if(!cpu_stages){
+        /* ISP owns clean completed planes. Do not touch/invalidate them merely
+         * to execute an empty CPU pass; chain the original encoder unchanged. */
+        M10V_PROFILE(4);M10V_PROFILE(5);M10V_PROFILE(6);M10V_PROFILE(7);
+        M10V_PROFILE(8);M10V_PROFILE(9);M10V_PROFILE(10);M10V_PROFILE(11);
+        return 0;
+    }
     uint32_t time[3] = {0,0,0};
     uint32_t seed = state.sequence ^ planes[0];
-    if (state.stamp || state.slots[slot].grain || state.effects[slot].leak_variation) {
+    if (state.stamp || (cpu_stages&M10V_NATIVE_GRAIN) || ((cpu_stages&M10V_NATIVE_LEAK)&&state.effects[slot].leak_variation)) {
         /* Official producer 0x534322d8/0x534fa22c writes this capture
          * metadata date. +0x948 is weekday, not hour. Prefer exposure metadata
          * over the UI cache (which may be unavailable or from a later time). */
@@ -219,7 +228,7 @@ int m10v_capture_library(uint32_t context) {
                     ((uint32_t)((const uint8_t *)time)[6] << 8);
         }
     }
-    if(state.slots[slot].film==66||state.effects[slot].leak_variation){
+    if((cpu_stages&(M10V_NATIVE_GRAIN|M10V_NATIVE_LEAK))&&(state.slots[slot].film==66||state.effects[slot].leak_variation)){
         /* Content entropy changes with captured sensor noise; identical frames
          * can retain the same seed. No unverified timer/MMIO calls. */
         for(uint32_t yy=0;yy<height;yy+=height/16+1)for(uint32_t xx=0;xx<width;xx+=width/16+1){seed^=((const uint8_t *)(uintptr_t)planes[0])[yy*stride+xx];seed*=16777619u;}
@@ -233,14 +242,14 @@ int m10v_capture_library(uint32_t context) {
         ((uint32_t)state.effects[slot].leak_spread<<16)|((uint32_t)state.effects[slot].leak_variation<<24));
 #endif
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
-    uint32_t use_halo=(state.slots[slot].film==33||state.slots[slot].film==67)&&state.slots[slot].halo_gain;
+    uint32_t use_halo=cpu_stages&M10V_NATIVE_HALO;
     uint32_t step=1,shift=0,required=0;
     while (((width+step-1)>>shift)>384 || ((height+step-1)>>shift)>256){step<<=1;++shift;}
     uint32_t cells=((width+step-1)>>shift)*((height+step-1)>>shift);
     if(use_halo)
         required=(((state.slots[slot].film==33||state.slots[slot].film==67)?6:2)*cells+3)&~3u;
     scratch_bytes=required;
-    if(state.slots[slot].film>33){
+    if((cpu_stages&M10V_NATIVE_COLOR)&&state.slots[slot].film>33){
         /* Phoenix's source occupies 4*cells; the old 6*cells allocation
          * already leaves room at full size. Other spatial passes finish
          * before color or run afterward, so reuse their storage. */

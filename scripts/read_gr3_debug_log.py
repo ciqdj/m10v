@@ -19,7 +19,7 @@ PROFILE_INTERVALS={2:'validation',3:'settings-read',4:'date-seed-allocation',5:'
     6:'cache-before',7:'spatial-before-color',8:'color-and-fused-texture',9:'post-spatial-and-texture',
     10:'stamp',11:'cache-after',12:'release-and-return'}
 EVENTS.update({204:'module.dispatch.enter',205:'module.dispatch.return',206:'module.store.opcode',207:'module.dispatch.time'})
-EVENTS.update({132:'capture.profile.settings',134:'capture.texture.backend',135:'capture.native.completed',137:'capture.native.grain.quality',150:'capture.profile.time'})
+EVENTS.update({132:'capture.profile.settings',134:'capture.texture.backend',135:'capture.native.completed',137:'capture.native.grain.quality',138:'capture.cpu.residual',150:'capture.profile.time'})
 EVENTS.update({180:'save.begin',181:'save.callback.payload',182:'save.return',
     183:'raw.setter.after',184:'raw.pool.dispatch.return',185:'raw.transfer',186:'raw.release.before',
     187:'raw.setter.before',188:'raw.allocation.return',189:'raw.release.after',
@@ -113,6 +113,8 @@ def capture_profiles(records):
             packed=args[3];current['leak']={'gain':packed&255,'position':(packed>>8)&255,'spread':(packed>>16)&255,'variation':packed>>24}
         elif current is not None and event==126 and current['context']==hex(args[0]):
             current['raw_lifetime']={'status':args[1],'backing':hex(args[2]),'source':hex(args[3])}
+        elif current is not None and event==138 and current['context']==hex(args[0]):
+            current['cpu_plan']={'native_mask':args[1],'stages':args[2]};current['film']=args[3]
         elif current is not None and event==137 and current['context']==hex(args[0]):
             current['native_grain_quality']={'strength':args[1],'size':args[2],'noise_shaped':bool(args[3])}
         elif current is not None and event==135 and current['context']==hex(args[0]):

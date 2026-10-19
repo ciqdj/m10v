@@ -3,6 +3,9 @@
 #include "m10v_settings_controller.h"
 #include "m10v_debug.h"
 #include "m10v_sd_library.h"
+#ifndef M10V_LIVE_COLOR
+#define M10V_LIVE_COLOR 0
+#endif
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
@@ -31,7 +34,7 @@ static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
-uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES;}
+uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?128u:0u);}
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
  ((fn1)0x5319aa68u)(owner);
  for(uint32_t i=0;i<2;i++){
@@ -41,6 +44,9 @@ uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
   *(uint32_t *)p=m10v_settings_controller_vtable();
   p->page=i?M10V_SETTINGS_STAMP:M10V_SETTINGS_FILMS;
  }
+#if M10V_LIVE_COLOR
+ m10v_camera_library_preview_init(owner);
+#endif
  return owner;
 }
 uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
@@ -50,6 +56,9 @@ uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
  return (uint32_t)(uintptr_t)p;
 }
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
+#if M10V_LIVE_COLOR
+ m10v_camera_library_preview_clear(owner);
+#endif
  for(uint32_t i=0;i<2;i++)m10v_settings_controller_destroy(page(owner,i));
  return m10v_settings_top_dtor_original(owner);
 }

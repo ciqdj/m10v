@@ -7,11 +7,11 @@ const branch=(a,b,link=false)=>{const d=b-a-8;need(Number.isInteger(b)&&d%4===0&
 const stockVtable=[0x5316c7e0,0x5316c774,0x5316c7bc,0x5316c740,0x5316c748,0x5316dfa8,0x5316c74c,0x5316c750,0x5316c754,0x5316c758,0x5316c760,0x5316c768,0x5316d0f0,0x5316c76c,0x5316cec8];
 export function settingsPatches(m){
  if(!m.sd_library)return [];
- const d=m.settings_menu,s=m.symbols;
- need(d&&d.owner_bytes===0x193c&&JSON.stringify(d.private_routes)==='[33616128,33616129]'&&d.rows?.length===2,'missing route/owner contract');
+ const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.live_color?0x19bc:0x193c;
+ need(d&&d.owner_bytes===ownerBytes&&JSON.stringify(d.private_routes)==='[33616128,33616129]'&&d.rows?.length===2,'missing route/owner contract');
  const patches=[];
  for(const [a,e,n,l] of [[0x5316f3b8,0xe300313b,'factory',false],[0x5319667c,0xe1a0c00d,'top_dtor',false],[0x5316fcf8,0xeb00ab5a,'top_ctor',true],[0x53221a4c,0xeb001c7e,'key_route',true]])patches.push({address:a,expected:e,replacement:branch(a,s['m10v_settings_controller_'+n],l),name:'settings '+n});
- patches.push({address:0x5316fcec,expected:0xe30103bc,replacement:movw(0,0x193c),name:'TopMenu owned tail'}, {address:0x53b36adc,expected:0x1e1d1b19,replacement:0x201d1b19,name:'Setup appended count'});
+ patches.push({address:0x5316fcec,expected:0xe30103bc,replacement:movw(0,ownerBytes),name:'TopMenu owned tail'}, {address:0x53b36adc,expected:0x1e1d1b19,replacement:0x201d1b19,name:'Setup appended count'});
  for(let i=0;i<2;i++)patches.push({address:0x53b36bd0+i*8,expected:0,replacement:d.rows[i],name:'settings row '+i},{address:0x53b36c88+i*4,expected:0x10000000,replacement:0x0200f100+i,name:'settings route '+i});
  return patches;
 }

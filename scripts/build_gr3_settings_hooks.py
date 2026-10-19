@@ -9,7 +9,7 @@ BASE_VTABLE=[0x5316c7e0,0x5316c774,0x5316c7bc,0x5316c740,0x5316c748,
  0x5316dfa8,0x5316c74c,0x5316c750,0x5316c754,0x5316c758,
  0x5316c760,0x5316c768,0x5316d0f0,0x5316c76c,0x5316cec8]
 
-def build_settings_hooks(base,symbols):
+def build_settings_hooks(base,symbols,live_color=False):
  image=bytearray();exports={};patches=[];rows=[]
  def data(raw):
   image.extend(bytes(-len(image)&3));a=base+len(image);image.extend(raw);return a
@@ -31,7 +31,7 @@ def build_settings_hooks(base,symbols):
    (0x5319667c,0xe1a0c00d,'top_dtor',False),(0x5316fcf8,0xeb00ab5a,'top_ctor',True),
    (0x53221a4c,0xeb001c7e,'key_route',True)]:
   word(address,original,branch(address,symbols['m10v_settings_controller_'+name],link),'settings '+name)
- word(0x5316fcec,0xe30103bc,movw(0,0x193c),'TopMenu owned controller tail')
+ word(0x5316fcec,0xe30103bc,movw(0,0x19bc if live_color else 0x193c),'TopMenu owned controller tail')
  word(0x53b36adc,0x1e1d1b19,0x201d1b19,'Setup row count30 to32')
  for i in range(2):
   caption=937+i
@@ -40,5 +40,5 @@ def build_settings_hooks(base,symbols):
   rows.append(render)
   patch(0x53b36bd0+i*8,bytes(8),struct.pack('<II',render,0),'Setup independent row renderer')
   word(0x53b36c88+i*4,0x10000000,0x0200f100+i,'Setup independent destination')
- return bytes(image),dict(exports=exports,vtable=vt,rows=rows,patches=patches,owner_bytes=0x193c,
+ return bytes(image),dict(exports=exports,vtable=vt,rows=rows,patches=patches,owner_bytes=0x19bc if live_color else 0x193c,
    private_routes=[0x0200f100,0x0200f101],camera_tested=False)
