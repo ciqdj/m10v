@@ -12,7 +12,7 @@ const configuration=defaultConfiguration();
  s.halo={gain:film===33?3:film===67?2:0,spread:3,threshold:5,profile:2};
  s.effects={grainSize:0,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0,filmExposure:0};
 });
-const options={debug_mode:true,live_color:true,hdf_enabled:false,extensions:{aspect:true,level:true,negativeGrain:true}};
+const options={debug_mode:true,live_color:true,hdf_enabled:true,extensions:{aspect:true,level:true,negativeGrain:true}};
 const official=await readNativeOfficial('gr3'),plan=prepareNative(official,configuration,options);
 const result=await generateNative(official,configuration,plan.configuration_sha256,options);
 if(!result.receipt.live_view_base?.film_color_preview||result.manifest.capture_lifecycle.snapshot.live_color!==true)throw Error('Missing live color hook');

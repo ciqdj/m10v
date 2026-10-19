@@ -12,6 +12,9 @@
 #ifndef M10V_ISP_RECIPE_COLOR_PRODUCER
 #define M10V_ISP_RECIPE_COLOR_PRODUCER 0
 #endif
+#if M10V_ISP_SHARED_HDF
+extern uint32_t m10v_hdf_settings(uint32_t,uint32_t);
+#endif
 _Static_assert(sizeof(m10v_isp_recipe_color)==M10V_SAVE_COLOR_BYTES,"recipe color extent");
 static m10v_isp_recipe_color *owned(void *recipe){
     uintptr_t address=(uintptr_t)recipe;
@@ -72,8 +75,9 @@ int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info){
 #if M10V_ISP_NATIVE_LOOK
     /* Native completion is consumed by this recipe's own JPEG. Cross-recipe
      * configurations keep their original software route until the ownership
-     * transfer itself supplies an explicit completion handoff. */
-    if((uintptr_t)context!=(uintptr_t)s-M10V_SAVE_COLOR_OFFSET+0x970u)return 0;
+     * transfer itself supplies an explicit completion handoff. Stock setup
+     * writes R+99c=C+30, R+9a0=C+34: C begins at R+96c. */
+    if((uintptr_t)context!=(uintptr_t)s-M10V_SAVE_COLOR_OFFSET+0x96cu)return 0;
 #endif
     const uint8_t *f=info;
     uint32_t si=*(const uint32_t *)(f+0x82d0);
@@ -167,28 +171,32 @@ static m10v_isp_recipe_color *grain_owner(const void *context){
 uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,uint32_t execution){
 #if M10V_ISP_NATIVE_GRAIN_MODE
     if(execution>1||!grain_ram((uintptr_t)context,0x40)||*(const uint32_t *)context!=0x53d0fc60u||!grain_ram((uintptr_t)params,0x34))return 0;
+    uint32_t hdf=0;
+#if M10V_ISP_SHARED_HDF
+    hdf=m10v_hdf_settings((uint32_t)(uintptr_t)context,(uint32_t)(uintptr_t)params);
+#endif
     uint32_t si=((const uint32_t *)context)[0x34/4];
-    if(!grain_ram(si,0x94c))return 0;
+    if(!grain_ram(si,0x94c))return hdf;
     uint32_t tone=*(const uint8_t *)(uintptr_t)(si+0x77c),slot;
-    if(tone==12)slot=0;else if(tone>=18&&tone<=21)slot=tone-17;else return 0;
+    if(tone==12)slot=0;else if(tone>=18&&tone<=21)slot=tone-17;else return hdf;
     uintptr_t values=((const uint32_t *)params)[0x10/4];
-    if(!grain_ram(values,12))return 0;
+    if(!grain_ram(values,12))return hdf;
     /* The carrier's original menu grain is not the queued custom grain. If
      * ownership/planning rejects, keep native grain off for the CPU route. */
     ((int16_t *)values)[2]=0;
     m10v_isp_recipe_color *s=grain_owner(context);
-    if(!s)return 0;
+    if(!s)return hdf;
     uint32_t grain=s->state.slots[slot].grain,size=s->state.effects[slot].grain_size;
-    if(grain>3||size>2)return 0;
+    if(grain>3||size>2)return hdf;
     if(execution){
-        if(s->native_grain.magic!=0x374e5247u||!s->native_grain.planned||s->native_grain.si!=si||s->native_grain.tone!=tone||s->native_grain.grain!=grain||s->native_grain.size!=size)return 0;
+        if(s->native_grain.magic!=0x374e5247u||!s->native_grain.planned||s->native_grain.si!=si||s->native_grain.tone!=tone||s->native_grain.grain!=grain||s->native_grain.size!=size)return hdf;
         s->native_grain.armed=1;s->native_grain.done=0;s->native_grain.noise_ready=0;
     }else{
         s->native_grain.magic=0x374e5247u;s->native_grain.si=si;s->native_grain.tone=tone;s->native_grain.grain=grain;s->native_grain.size=size;
         s->native_grain.planned=1;s->native_grain.armed=0;s->native_grain.noise_ready=0;s->native_grain.done=0;
     }
     ((int16_t *)values)[2]=(int16_t)(grain?4-grain:0);
-    return grain!=0;
+    return grain!=0||hdf;
 #else
     (void)context;(void)params;(void)execution;return 0;
 #endif

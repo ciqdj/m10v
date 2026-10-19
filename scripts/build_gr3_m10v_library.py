@@ -35,7 +35,7 @@ def capture_stock_rtos():
     return stock
 
 
-def link_object(elf, base, externals=None, prefix='m10v_library_', additional_exports=()):
+def link_object(elf, base, externals=None, prefix='m10v_library_', additional_exports=(), omitted_exports=()):
     """Bounded ELF32 ARM relocator for our freestanding .text/.rodata module.
 
     Unknown sections, symbols, addends or relocation kinds fail closed. This
@@ -146,7 +146,8 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_hdf_menu_': {'m10v_hdf_menu_top_ctor','m10v_hdf_menu_top_dtor','m10v_hdf_menu_destroy','m10v_hdf_menu_factory','m10v_hdf_menu_ready','m10v_hdf_menu_enter','m10v_hdf_menu_key','m10v_hdf_menu_key_route'},
         'm10v_level_': {'m10v_level_callback','m10v_level_draw','m10v_level_quarter'},
     }[prefix]
-    if set(symbols) != required | set(additional_exports) or not image_sections: raise ValueError('runtime API incomplete')
+    if not set(omitted_exports)<=required:raise ValueError('unknown omitted API')
+    if set(symbols) != (required-set(omitted_exports)) | set(additional_exports) or not image_sections: raise ValueError('runtime API incomplete')
     return bytes(image), symbols
 
 
@@ -188,8 +189,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if hdf_enabled is None:hdf_enabled=not lifecycle_trace
     if type(hdf_enabled)is not bool or (not hdf_enabled and (hdf_default or not film_library)):
         raise ValueError('invalid HDF enablement')
-    if lifecycle_trace and hdf_enabled:
-        raise ValueError('HDF cannot share the diagnostic recipe allocator')
+    if lifecycle_trace and hdf_enabled and not (native_color and native_grain and recipe_snapshot):
+        raise ValueError('Shared HDF requires native color/grain snapshot owners')
     for i in range(5):
         e=initial[56+i*8:64+i*8]
         if (struct.unpack_from('<H',initial,12+i*8)[0]!=68 and e[5]) or any(v>limit for v,limit in zip(e,[2,8,5,8,1,2,0,0])):raise ValueError('invalid film texture effects')
@@ -270,13 +271,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         hdf_report=None
         if hdf_enabled:
             hdf_obj=folder/'digital-hdf.o'
-            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
             hdf_base=(base+len(image)+15)&~15
-            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_')
+            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else ())
             image+=bytes(hdf_base-base-len(image))+hdf_code;symbols.update(hdf_symbols)
             from scripts.build_gr3_digital_hdf import build as build_digital_hdf
             hdf_base=(base+len(image)+15)&~15
-            hdf_code,hdf_report=build_digital_hdf(hdf_base,symbols)
+            hdf_code,hdf_report=build_digital_hdf(hdf_base,symbols,shared_recipe=lifecycle_trace)
             image+=bytes(hdf_base-base-len(image))+hdf_code
         if sd_library:
             node = os.environ.get('M10V_NODE') or shutil.which('node')
@@ -336,7 +337,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if recipe_snapshot:
                 from scripts.build_gr3_isp_recipe_color import build as build_recipe_color
                 snapshot_base=(base+len(image)+15)&~15
-                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain,live_color=live_color)
+                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain,live_color=live_color,shared_hdf=hdf_enabled)
                 image+=bytes(snapshot_base-base-len(image))+snapshot_code;symbols.update(snapshot_report['exports'])
                 lifecycle_report['snapshot']=snapshot_report
                 lifecycle_report['patches']+=snapshot_report['patches']
@@ -385,12 +386,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         hdf_menu_report=None
         if sd_library and hdf_enabled:
             menu_obj=folder/'hdf-menu.o';start=(base+len(image)+15)&~15
-            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_OWNER_OFFSET='+hex(0x193c if film_library else 0x13bc),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_OWNER_OFFSET='+hex((0x19bc if live_color else 0x193c) if film_library else 0x13bc),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
             names=['m10v_hdf_menu_parent_'+n for n in ['ctor','dtor','factory','key_route']]+['m10v_hdf_menu_vtable']
             provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start)},'m10v_hdf_menu_')
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
             hook_start=(start+len(provisional)+15)&~15
-            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library)
+            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=live_color)
             code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
         # Link dedicated stock-detail backend against the same camera journal.
@@ -706,4 +707,5 @@ if __name__ == '__main__':
     parser.add_argument('--hdf-only',action='store_true')
     parser.add_argument('--hdf-default',type=int,default=0)
     parser.add_argument('--no-hdf',action='store_true')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else None), indent=2))
+    parser.add_argument('--with-hdf',action='store_true')
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))

@@ -33,25 +33,25 @@ def official_rtos():
     script='import{readFileSync}from"node:fs";import{readOfficialSection}from"./node/firmware.mjs";process.stdout.write(readOfficialSection(readFileSync("bin/fwdc239b-gr3-official.bin"),"RTOS"));'
     return subprocess.run([node,'--input-type=module','-e',script],cwd=ROOT,check=True,capture_output=True).stdout
 
-def build(base,exports,rtos=None):
+def build(base,exports,rtos=None,shared_recipe=False):
     rom=bytes(rtos) if rtos is not None else official_rtos()
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('HDF requires exact GR III 2.10 RTOS')
     for a,w in SITES.items():
         if struct.unpack_from('<I',rom,a-0x53000000)[0]!=w:raise ValueError('HDF original instruction differs at '+hex(a))
-    for k in HELPERS:
+    for k in (HELPERS[1:] if shared_recipe else HELPERS):
         if type(exports.get(k))is not int or exports[k]&3:raise ValueError('HDF ARM helper missing: '+k)
     image=bytearray();patches=[];entries={}
     def emit(site,text,name,link=False):
         at=base+len(image);image.extend(assembly(text,at));entries[name]=at
         patches.append(dict(address=site,expected=SITES[site],replacement=branch(site,at,link),entry=at,name=name))
-    emit(0x53523e0c,'b '+hex(exports['m10v_hdf_alloc']),'factory',True)
-    for site in (0x5351aed4,0x5351b068):
+    if not shared_recipe:emit(0x53523e0c,'b '+hex(exports['m10v_hdf_alloc']),'factory',True)
+    for site in (() if shared_recipe else (0x5351aed4,0x5351b068)):
         emit(site,SAVE+'ldr r0,[r4,#0xf0];bl '+hex(exports['m10v_hdf_producer'])+';'+RESTORE+
              'ldr r2,[r4,#0xf0];b '+hex(site+4),'producer_'+hex(site))
     emit(0x5351084c,'push {r4-r8,lr};mov r5,r0;mov r6,r1;bl 0x535134fc;'+SAVE+
          'mov r0,r4;mov r1,r5;mov r2,r6;bl '+hex(exports['m10v_hdf_gate'])+';'+RESTORE+
          'pop {r4-r8,pc};','request',True)
-    for site,context in ((0x535033d8,'ip'),(0x53503aa0,'r4')):
+    for site,context in (() if shared_recipe else ((0x535033d8,'ip'),(0x53503aa0,'r4'))):
         emit(site,'push {r4-r6,lr};mov r5,r0;mov r6,'+context+';bl 0x5350304c;'+SAVE+
              'mov r0,r6;mov r1,r5;bl '+hex(exports['m10v_hdf_settings'])+
              ';cmp r0,#1;ldreq r0,[sp,#8];orreq r0,r0,#1;streq r0,[sp,#8];'+RESTORE+
@@ -69,8 +69,8 @@ def build(base,exports,rtos=None):
     if len(image)>1024:raise ValueError('HDF hooks exceed fixed1KiB budget')
     return bytes(image),dict(schema='m10v-gr3-digital-hdf/v1',base=base,bytes=len(image),
         patches=patches,entries=entries,rows=table,required_rtos_sha256=SHA,
-        recipe_bytes=0x4778,recipe_extra_bytes=16,native_parameter_values=[5,6,7],
-        helpers={k:exports[k] for k in HELPERS},isp_filesystem_calls=0,
+        recipe_bytes=0x4778,recipe_extra_bytes=0 if shared_recipe else 16,shared_recipe=shared_recipe,shared_offset=0x50e4 if shared_recipe else None,native_parameter_values=[5,6,7],
+        helpers={k:exports[k] for k in (HELPERS[1:] if shared_recipe else HELPERS)},isp_filesystem_calls=0,
         producer_load='one validated journal snapshot per post-mutex producer',
         pixel_loops=0,mutable_global_bytes=0,independent_dma=False,
         stock_clarity_table=0x538f1fd4,stock_clarity_bytes=198,camera_tested=False)

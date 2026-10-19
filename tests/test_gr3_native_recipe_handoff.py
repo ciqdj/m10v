@@ -7,7 +7,14 @@ from scripts.build_gr3_isp_recipe_color import build
 class NativeRecipeHandoffTests(unittest.TestCase):
  def fixture(self,tone=12,stage=0):
   e,r,o,i,c,si=prior.RecipeColorTests.fixture(self,tone,stage)
-  own=r+0x970;e.u.mem_write(own,bytes(e.u.mem_read(c,0x100)))
+  # Execute the actual stock case5 metadata writes. The first field is
+  # at R+96c: stock writes source+1a8 to R+99c (C+30), not R+9a0.
+  e.w32(r+0x44c8,si);e.w32(r+0x5c,e.alloc(64))
+  e.u.reg_write(A.UC_ARM_REG_R0,r);e.u.reg_write(A.UC_ARM_REG_R4,r)
+  e.u.emu_start(0x5350eb10,0x5350eb38,count=100)
+  own=r+0x96c
+  self.assertEqual(int.from_bytes(e.u.mem_read(own+0x30,4),'little'),r+0x1a8)
+  self.assertEqual(int.from_bytes(e.u.mem_read(own+0x34,4),'little'),si)
   return e,r,o,i,own,si
  snapshot=prior.RecipeColorTests.snapshot
  callback=prior.RecipeColorTests.callback

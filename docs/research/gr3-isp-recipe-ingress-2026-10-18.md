@@ -8,7 +8,7 @@ Locked RTOS SHA256: `8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb40
 
 `BEStillRecipe` vptr `0x53d0fc90`, original allocation0x4778. The sole factory at53523db0 calls allocator5351091c at53523e0c then constructor5350f160 at53523e1c. The coordinated trace allocator grows this to0x50c0: traceR+4778/656bytes, colorR+4a08/1716bytes, final4bytes alignment. Color header40bytes, target1572bytes, full validated state104bytes. No invented RAM address or mutable appendRX object is used.
 
-Develop config `C=R+970` has C+30=sourceRecipe+1a8, C+34=ShootingInfo and C+38=input config. This is populated at5350eb10..eb34; other5350e624 dispatch branches also populate the same fields. This source recipe can differ from the destination config owner; derivation follows C+30 rather than subtracting970 from arbitrary C.
+Develop config `C=R+96c` has C+30=sourceRecipe+1a8, C+34=ShootingInfo and C+38=input config. This is populated at5350eb10..eb34; other5350e624 dispatch branches also populate the same fields. This source recipe can differ from the destination config owner; derivation follows C+30 rather than subtracting96c from arbitrary C.
 
 DevelopMacroProcess vtable begins53c627b8. Its process53501c38 receives context via message+8 at53501c60 (r6). At53501d04..1d2c, the metadata initializer receives r0=module,r1=module+40 R2Y info,r2=module+8314,r3=C. Default initializer535059ec reads C+34/C+38, stores info+82d0=ShootingInfo at53505afc and info+82ac=0 at53505b1c. Therefore this real Develop call uses stage0, unlike earlier manually initialized stage1 research fixtures. It does not identify all stage0 calls as LiveView.
 

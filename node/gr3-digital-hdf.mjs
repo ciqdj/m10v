@@ -7,18 +7,19 @@ const save=[0xe92d5fff,0xe10f0000,0xe92d0003],restore=[0xe8bd0003,0xe12cf000,0xe
 export function hdfPatches(runtime,m){
  const h=m.digital_hdf;
  if(!h){need(m.hdf_enabled===false&&m.hdf_default===0&&!m.hdf_menu,'missing native HDF owner');return [];}
- need(!m.capture_lifecycle&&h.schema==='m10v-gr3-digital-hdf/v1'&&h.recipe_bytes===0x4778&&h.recipe_extra_bytes===16&&h.isp_filesystem_calls===0&&h.pixel_loops===0&&h.mutable_global_bytes===0&&h.independent_dma===false,'owner/performance contract differs');
+ const shared=!!m.capture_lifecycle;
+ need((!shared||h.shared_recipe===true&&h.shared_offset===0x50e4&&m.capture_lifecycle.snapshot?.shared_hdf===true)&&h.schema==='m10v-gr3-digital-hdf/v1'&&h.recipe_bytes===0x4778&&h.recipe_extra_bytes===(shared?0:16)&&h.isp_filesystem_calls===0&&h.pixel_loops===0&&h.mutable_global_bytes===0&&h.independent_dma===false,'owner/performance contract differs');
  const inside=(a,n=4)=>Number.isInteger(a)&&a%4===0&&a>=m.base&&a+n<=m.base+runtime.length;
- need(inside(h.base,h.bytes)&&h.bytes<=1024&&h.patches?.length===8,'hook extent/inventory differs');
- for(const name of ['alloc','producer','gate','settings'])need(inside(m.symbols['m10v_hdf_'+name])&&h.helpers?.['m10v_hdf_'+name]===m.symbols['m10v_hdf_'+name],'helper outside runtime');
+ need(inside(h.base,h.bytes)&&h.bytes<=1024&&h.patches?.length===(shared?3:8),'hook extent/inventory differs');
+ for(const name of (shared?['producer','gate','settings']:['alloc','producer','gate','settings']))need(inside(m.symbols['m10v_hdf_'+name])&&h.helpers?.['m10v_hdf_'+name]===m.symbols['m10v_hdf_'+name],'helper outside runtime');
  const sym=name=>m.symbols['m10v_hdf_'+name];
  const check=(at,template)=>{need(inside(at,template.length*4),'shim bounds');template.forEach((word,i)=>{if(Array.isArray(word))word=branch(at+i*4,word[0],word[1]);need(runtime.readUInt32LE(at-m.base+i*4)===(word>>>0),'instruction differs at '+(at+i*4).toString(16));});};
  const result=[];
  function shim(site,expected,name,words,link=false){const at=h.entries[name];check(at,words);result.push({address:site,expected,replacement:branch(site,at,link),name:'digital HDF '+name});}
- shim(0x53523e0c,0xebffb2c2,'factory',[[sym('alloc'),false]],true);
- for(const site of [0x5351aed4,0x5351b068])shim(site,0xe59420f0,'producer_0x'+site.toString(16),[...save,0xe59400f0,[sym('producer'),true],...restore,0xe59420f0,[site+4,false]]);
+ if(!shared)shim(0x53523e0c,0xebffb2c2,'factory',[[sym('alloc'),false]],true);
+ for(const site of (shared?[]:[0x5351aed4,0x5351b068]))shim(site,0xe59420f0,'producer_0x'+site.toString(16),[...save,0xe59400f0,[sym('producer'),true],...restore,0xe59420f0,[site+4,false]]);
  shim(0x5351084c,0xeb000b2a,'request',[0xe92d41f0,0xe1a05000,0xe1a06001,[0x535134fc,true],...save,0xe1a00004,0xe1a01005,0xe1a02006,[sym('gate'),true],...restore,0xe8bd81f0],true);
- for(const [site,reg] of [[0x535033d8,12],[0x53503aa0,4]])shim(site,site===0x535033d8?0xebffff1b:0xebfffd69,'settings_0x'+site.toString(16),[0xe92d4070,0xe1a05000,0xe1a06000|reg,[0x5350304c,true],...save,0xe1a00006,0xe1a01005,[sym('settings'),true],0xe3500001,0x059d0008,0x03800001,0x058d0008,...restore,0xe8bd8070],true);
+ for(const [site,reg] of (shared?[]:[[0x535033d8,12],[0x53503aa0,4]]))shim(site,site===0x535033d8?0xebffff1b:0xebfffd69,'settings_0x'+site.toString(16),[0xe92d4070,0xe1a05000,0xe1a06000|reg,[0x5350304c,true],...save,0xe1a00006,0xe1a01005,[sym('settings'),true],0xe3500001,0x059d0008,0x03800001,0x058d0008,...restore,0xe8bd8070],true);
  result.push({address:0x5367c1b0,expected:0xe3580008,replacement:0xe358000b,name:'digital HDF clarity bound'});
  const row=h.rows-48;
  check(row,[0xe92d1001,0xe10fc000,0xe3580008,0x90281893,0x9a000003,0xe2488009,mov(0,h.rows&65535),mov(0,h.rows>>>16,true),0xe0280893,0xe12cf00c,0xe8bd1001,[0x5367c7e8,false]]);
@@ -31,7 +32,7 @@ export function hdfPatches(runtime,m){
 
 export function hdfMenuPatches(runtime,m){
  const d=m.hdf_menu;if(!d)return [];
- const full=m.film_library_enabled!==false,offset=full?0x193c:0x13bc;
+ const full=m.film_library_enabled!==false,offset=full?(m.capture_lifecycle?.snapshot?.live_color?0x19bc:0x193c):0x13bc;
  need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===offset+0x1c0&&d.controller_bytes===0x1c0&&d.route===0x0200f102&&d.rows.length===(full?3:1),'independent menu ownership differs');
  const s=m.symbols,base=m.base;
  const words=(at,list)=>{need(Number.isInteger(at)&&at%4===0&&at>=base&&at+list.length*4<=base+runtime.length,'menu code bounds');list.forEach((v,i)=>need(runtime.readUInt32LE(at-base+i*4)===(v>>>0),'menu instruction differs'));};

@@ -67,8 +67,9 @@ class HdfExecutionTests(HdfArmTests):
    else:return
    uc.reg_write(A.UC_ARM_REG_PC,uc.reg_read(A.UC_ARM_REG_LR))
   u.hook_add(UC_HOOK_CODE,services)
-  self.call(e,self.manifest['symbols']['m10v_hdf_alloc'],0x4778)
-  self.assertEqual(e['allocs'],[0x4788]);put(e['recipe'],0x53d0fc90)
+  shared=self.manifest['digital_hdf'].get('shared_recipe',False)
+  self.call(e,self.manifest['symbols']['m10v_save_trace_recipe_alloc' if shared else 'm10v_hdf_alloc'],0x4778)
+  self.assertEqual(e['allocs'],[0x50f0 if shared else 0x4788]);put(e['recipe'],0x53d0fc90)
   ctx=e['recipe']+0x4320;put(ctx,0x53d0fc60);put(ctx+0x30,e['recipe']+0x1a8);put(ctx+0x34,e['si']);put(e['recipe']+0x5c,e['request']);put(e['params']+0x10,e['values'])
   u.mem_write(e['si']+0x793,bytes([4,4,0,0]));u.mem_write(e['si']+0x77c,b'\x0c');u.mem_write(e['request'],bytes([0x5a])*64)
   return e
@@ -89,7 +90,11 @@ class HdfExecutionTests(HdfArmTests):
  def gate(self,e):
   return self.call(e,self.manifest['digital_hdf']['entries']['request'],e['request'],e['si'],1,regs={'R4':e['recipe']})
  def settings(self,e,execution):
-  ctx=e['recipe']+0x4320;entry=self.manifest['digital_hdf']['entries']['settings_'+('0x53503aa0' if execution else '0x535033d8')]
+  ctx=e['recipe']+0x4320
+  if self.manifest['digital_hdf'].get('shared_recipe'):
+   site=0x53503aa0 if execution else 0x535033d8
+   entry=next(p['entry'] for p in self.manifest['capture_lifecycle']['native_grain']['patches'] if p['address']==site)
+  else:entry=self.manifest['digital_hdf']['entries']['settings_'+('0x53503aa0' if execution else '0x535033d8')]
   self.call(e,entry,e['params'],e['si'],1,regs={'R4':ctx,'R12':ctx})
   return struct.unpack('<4hf',e['u'].mem_read(e['values'],12))
  def test_each_grade_uses_identical_planning_and_execution_and_no_hot_fs(self):
@@ -120,7 +125,7 @@ class HdfExecutionTests(HdfArmTests):
    self.assertEqual(self.call(e,0x5367c158,0,desc,0,clarity&0xffffffff,stack=(0,size)),1)
    sizes.append(struct.unpack('<I',u.mem_read(size,4))[0])
   self.assertEqual(sizes[0],0);self.assertGreater(sizes[1],0);self.assertEqual(sizes[1:], [sizes[1]]*5)
-  self.assertEqual(e['allocs'],[0x4788]);self.assertEqual(e['loads'],0)
+  self.assertEqual(e['allocs'],[0x50f0 if self.manifest['digital_hdf'].get('shared_recipe') else 0x4788]);self.assertEqual(e['loads'],0)
  def test_original_and_extended_row_addresses_and_status_flags(self):
   from unicorn import arm_const as A
   e=self.machine();u=e['u'];at=self.manifest['digital_hdf']['rows']-48

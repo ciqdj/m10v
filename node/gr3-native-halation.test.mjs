@@ -10,6 +10,8 @@ test('local preview candidate binds a distinct pipeline and rejects unsupported 
  assert.notEqual(normal.configuration_sha256,live.configuration_sha256);
  assert.equal(normal.capture_pipeline,'gr3-native-v7');
  assert.throws(()=>prepareNative(source,value,{live_color:true}),/原生色调预览/);
- assert.throws(()=>prepareNative(source,{...value,hdf:1},{debug_mode:true,live_color:true}),/原生色调预览/);
+ const combined=prepareNative(source,{...value,hdf:1},{debug_mode:true,live_color:true});
+ assert.equal(combined.capture_pipeline,'gr3-native-v8');assert.equal(combined.hdf_enabled,true);
+ assert.notEqual(combined.configuration_sha256,live.configuration_sha256);
  const x=await readNativeOfficial('gr3x');assert.throws(()=>prepareNative(x,value,{debug_mode:true,live_color:true}),/原生色调预览/);
 });

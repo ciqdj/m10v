@@ -1,20 +1,38 @@
 /* GR III 2.10 only. No writable globals, pixel loops, locks, DMA, wait or
  * buffer allocation here. The original Clarity owner sizes/submits/waits/frees
  * its unchanged pyramid. Only settings values and coefficient rows change.
- * A sixteen-byte tail belongs to each original BEStillRecipe allocation. */
+ * Standalone uses a16-byte tail; combined builds use the sole trace allocator
+ * and its explicitly reserved per-shot words. */
 #include <stdint.h>
 #ifndef M10V_HDF_DEFAULT
 #define M10V_HDF_DEFAULT 0u
 #endif
+#if M10V_HDF_SHARED_RECIPE
+#include "m10v_save_trace.h"
+#endif
 #define STOCK_BYTES 0x4778u
 #define HDF_BYTES (STOCK_BYTES+16u)
 #define HDF_MAGIC 0x31464448u
+#if M10V_HDF_SHARED_RECIPE
+/* Sole trace allocator owns these three previously reserved token words.
+ * Raw lifetime transitions preserve them; initialization zeroes them. */
+typedef struct {uint32_t ready,strength,si;} hdf_shot;
+#else
 typedef struct {uint32_t magic,ready,strength,si;} hdf_shot;
+#endif
 static int ram(uintptr_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-n;}
 static hdf_shot *owner(uintptr_t p){
     if(!ram(p,HDF_BYTES)||*(const uint32_t *)p!=0x53d0fc90u)return 0;
+#if M10V_HDF_SHARED_RECIPE
+    if(!ram(p,M10V_SAVE_RECIPE_EXTENDED_BYTES)||
+       *(const uint32_t *)(p+M10V_SAVE_RECIPE_BYTES)!=M10V_SAVE_TRACE_MAGIC)return 0;
+    m10v_capture_raw_lifetime *token=(void *)(p+M10V_CAPTURE_RAW_TOKEN_OFFSET);
+    if(token->magic!=0x31574c52u||token->owner!=p)return 0;
+    return (hdf_shot *)token->reserved;
+#else
     hdf_shot *s=(hdf_shot *)(p+STOCK_BYTES);
     return s->magic==HDF_MAGIC?s:0;
+#endif
 }
 /* A separate 24-byte journal. No film state or film defaults are read. */
 typedef struct {uint32_t magic,version,sequence,strength,reserved,crc;} hdf_record;
@@ -51,6 +69,7 @@ int m10v_hdf_save(uint32_t strength){
     !((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[r.sequence&1],24,&back)||!valid(&back))return -1;
  for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -1;return 0;
 }
+#if !M10V_HDF_SHARED_RECIPE
 uint32_t m10v_hdf_alloc(uint32_t bytes){
     uint32_t p=((uint32_t (*)(uint32_t))0x5351091cu)(bytes==STOCK_BYTES?HDF_BYTES:bytes);
     if(bytes==STOCK_BYTES&&ram(p,HDF_BYTES)){
@@ -59,6 +78,7 @@ uint32_t m10v_hdf_alloc(uint32_t bytes){
     }
     return p;
 }
+#endif
 void m10v_hdf_producer(uint32_t recipe){
     hdf_shot *s=owner(recipe);if(!s)return;
     /* These two callsites are AFTER the original producer mutex release,
