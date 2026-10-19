@@ -18,7 +18,7 @@ class NativeLookTests(unittest.TestCase):
  def call(self,e,name,*args):
   e.call(self.manifest['symbols']['m10v_isp_native_look_'+name],*args);return e.u.reg_read(UC_ARM_REG_R0)
  def test_all_films_and_red_exposures_apply_owned_frame_without_cached_mutation(self):
-  for film,exposure in [(f,0) for f in range(33,69)]+[(68,1),(68,2)]:
+  for film,exposure in [(f,0) for f in range(33,72)]+[(68,1),(68,2)]:
    with self.subTest(film=film,exposure=exposure):
     e,s,f,g=self.fixture();before=bytes(e.u.mem_read(f,0x9000));cached=bytes(e.u.mem_read(g,0x3240));obj=bytes(e.u.mem_read(0x60000000,0x400))
     self.assertEqual(self.call(e,'prepare',s,film,exposure,41),1)
@@ -28,7 +28,7 @@ class NativeLookTests(unittest.TestCase):
     self.assertEqual(self.call(e,'matches',s,film,exposure,42),0)
     after=bytes(e.u.mem_read(f,0x9000));diff=[i for i,(a,b) in enumerate(zip(before,after)) if a!=b]
     self.assertTrue(diff)
-    self.assertTrue(all(0x140<=i<0x152 or 0x12a0<=i<0x12b2 or 0x2688<=i<0x5088 or (film in (66,67) and 0x1c0<=i<0x12a0) for i in diff))
+    self.assertTrue(all(0x140<=i<0x152 or 0x12a0<=i<0x12b2 or 0x2688<=i<0x5088 or ((film in (66,67) or film>=69) and 0x1c0<=i<0x12a0) for i in diff))
     self.assertEqual(bytes(e.u.mem_read(g,0x3240)),cached)
     self.assertEqual(bytes(e.u.mem_read(0x60000000,0x400)),obj)
     self.assertEqual(self.call(e,'apply',s,g,f,0),0)
@@ -36,7 +36,7 @@ class NativeLookTests(unittest.TestCase):
  def test_rejection_and_reprepare_prevent_stale_cpu_skip(self):
   e,s,f,g=self.fixture()
   self.assertEqual(self.call(e,'prepare',s,66,0,7),1);self.assertEqual(self.call(e,'apply',s,g,f,0),1)
-  for film,exposure,generation in [(32,0,8),(69,0,8),(66,1,8),(68,3,8),(68,0,0)]:
+  for film,exposure,generation in [(32,0,8),(72,0,8),(66,1,8),(68,3,8),(68,0,0)]:
    self.assertEqual(self.call(e,'prepare',s,film,exposure,generation),0)
    self.assertEqual(self.call(e,'matches',s,66,0,7),0)
   self.assertEqual(self.call(e,'prepare',s,67,0,9),1)

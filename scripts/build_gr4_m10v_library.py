@@ -34,7 +34,7 @@ def validate_state(raw):
     if len(raw)!=104 or struct.unpack_from('<IHHI',raw)!=(0x5630314d,4,104,0) or zlib.crc32(raw[:100])!=struct.unpack_from('<I',raw,100)[0]:raise ValueError('invalid GR4 initial state')
     for i in range(5):
         f,g,s,a,b,c,p=struct.unpack_from('<H6B',raw,12+i*8)
-        if not 1<=f<=68 or g>3 or s>3 or max(a,b,c)>8 or p>3:raise ValueError('invalid GR4 initial slot')
+        if not 1<=f<=71 or g>3 or s>3 or max(a,b,c)>8 or p>3:raise ValueError('invalid GR4 initial slot')
         e=raw[56+i*8:64+i*8]
         if any(x>v for x,v in zip(e,[2,8,5,8,1,2,0,0])) or (f!=68 and e[5]):raise ValueError('invalid GR4 texture')
     if raw[52]>2 or max(raw[53:56])>3 or any(raw[96:100]):raise ValueError('invalid GR4 stamp')
@@ -70,6 +70,7 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
                 additional_exports=('m10v_menu_rows',) if prefix=='m10v_menu_' else (),
                 omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear') if prefix=='m10v_camera_library_' else ())
             append(blob);symbols.update(entries)
+        module('native/gr3/film_curated.c','m10v_curated_')
         module('native/gr3/film_harman.c','m10v_harman_')
         module('native/gr3/film_5207.c','m10v_5207_')
         module('native/gr3/m10v_library.c','m10v_library_',('-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial)),))
@@ -131,13 +132,14 @@ m10v_chain_capture:
     if len(image)>512*1024 or base+len(image)>=0x55000000:raise ValueError('GR4 runtime exceeds executable budget')
     from scripts.verify_gr3_5207_reference import verify
     from scripts.verify_gr3_harman_reference import verify as harman
-    payloads=[verify(ROOT),*harman(ROOT)]
+    from scripts.verify_gr3_curated_reference import verify as curated
+    payloads=[verify(ROOT),*harman(ROOT),*curated(ROOT)]
     if any(bytes(image).find(p)<0 for p in payloads):raise ValueError('film table readback failed')
     sources.update(str(p.relative_to(ROOT)) for p in (ROOT/'native/gr3').glob('*.h'))
     sources.update(str(p.relative_to(ROOT)) for p in (ROOT/'native/gr4').glob('*.h'))
     sources.update(['native/gr4/ui-abi.json','scripts/build_gr4_settings_hooks.py','scripts/build_gr4_native_detail.py'])
     m={'schema':'m10v-gr4-native-film-runtime/v1','base':base,'code_bytes':len(image),
-        'code_sha256':sha(image),'symbols':symbols,'film_count':68,'slots':5,'carrier_tones':[36,37,38,39,40],
+        'code_sha256':sha(image),'symbols':symbols,'film_count':71,'slots':5,'carrier_tones':[36,37,38,39,40],
         'initial_state_hex':initial.hex(),'initial_state_offset':bytes(image).find(initial),
         'settings_menu':settings,'detail':detail,'continuations':continuations,
         'debug_mode':debug_mode,'debug_build_id':debug_build_id,'sd_library':True,'camera_tested':False,

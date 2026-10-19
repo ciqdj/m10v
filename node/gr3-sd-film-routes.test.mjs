@@ -13,7 +13,7 @@ test('SD export endpoint is authenticated, serves complete subsets and rejects b
   const res=await post({ids:[65,33,50]});assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'application/zip');
   const b=Buffer.from(await res.arrayBuffer());let at=0;const entries=new Map();
   while(b.readUInt32LE(at)===0x04034b50){const size=b.readUInt32LE(at+18),nl=b.readUInt16LE(at+26),el=b.readUInt16LE(at+28),start=at+30+nl+el;entries.set(b.toString('utf8',at+30,at+30+nl),b.subarray(start,start+size));at=start+size;}
-  assert.deepEqual(auditSdFilmPack(entries.get('SD/M10V/FILMS.M10')).ids,[65,33,50]);assert.ok(entries.get('README.txt').toString().includes('GR III'));
+  assert.deepEqual(auditSdFilmPack(entries.get('SD/M10V/FILMS.M10')).ids,[33,65,50]);assert.ok(entries.get('README.txt').toString().includes('GR III'));
   assert.equal((await fetch(base+'/gr3/sd-library.html')).status,200);
  }finally{await new Promise(r=>server.close(r));}
 });

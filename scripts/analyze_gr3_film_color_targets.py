@@ -138,7 +138,7 @@ def verify_native(output, models, seed):
     """Cross-check Python integer sampler against compiled firmware C functions."""
     import ctypes
     import subprocess
-    sources = [ROOT/'native/gr3/film_5207.c', ROOT/'native/gr3/film_harman.c']
+    sources = [ROOT/'native/gr3/film_5207.c', ROOT/'native/gr3/film_harman.c',ROOT/'native/gr3/film_curated.c']
     library = output.resolve()/'libfilm_color_check.dylib'
     subprocess.run(['cc', '-shared', '-fPIC', '-O2', *map(str, sources), '-o', str(library)], check=True)
     lib = ctypes.CDLL(str(library))

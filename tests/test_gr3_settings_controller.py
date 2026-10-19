@@ -116,6 +116,15 @@ class ControllerLifetimeTests(unittest.TestCase):
  def count(self,name):return sum(e[0]==name for e in self.events)
  def setup_owner(self,u):self.call(u,'top_ctor',OWNER)
 
+ def test_dynamic_card_ids_resolve_all_five_owned_descriptors(self):
+  u=self.machine();owner=0x55040000;page=owner+0x13bc;heap=0x55080000
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner))
+  u.mem_write(page,struct.pack('<I',STUB+0x800))
+  u.mem_write(page+VIEW+160,struct.pack('<I',37));u.mem_write(page+VIEW+39*4,struct.pack('<I',heap))
+  for i in range(5):u.mem_write(heap+470440+4*i,struct.pack('<I',heap+470400+8*i))
+  directory=self.call(u,'card_directory')
+  for i in range(5):self.assertEqual(self.word(u,directory+(742+i)*4),heap+470400+8*i)
+
  def test_embedded_initialization_and_stable_factory_identity(self):
   u=self.machine();u.mem_write(OWNER+0x193c,b"CANARY!!");self.setup_owner(u)
   self.assertEqual(bytes(u.mem_read(OWNER+0x193c,8)),b"CANARY!!")

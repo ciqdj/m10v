@@ -24,7 +24,7 @@ unsigned probe(m10v_library_image *im,const m10v_film_effects *e,unsigned grain,
 }
 ''')
             out=path.with_suffix('.dylib')
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-I',str(ROOT/'native/gr3'),str(path),str(ROOT/'native/gr3/film_harman.c'),'-o',str(out)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-I',str(ROOT/'native/gr3'),str(path),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),'-o',str(out)],check=True,capture_output=True)
             lib=C.CDLL(str(out));lib.probe.argtypes=[C.POINTER(Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];cls.libs.append(lib)
 
     def run_texture(self,width,height,size,gain=0,color=1,grain=768,seed=42,position=5):

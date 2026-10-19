@@ -1,3 +1,4 @@
+import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // Opt-in version metadata adaptation AFTER the native/composition audit.
 // This is a second, differential audit; it does not replace that first audit.
 import {createHash} from 'node:crypto';
@@ -45,7 +46,7 @@ function read(bytes){
  need(
   bytes.readUInt32LE(0x7c)===0xa55a5aa5&&bytes.readUInt32LE(tail)===profile.magic&&
   bytes.readUInt32LE(tail+4)===0xa55a5aa5&&bytes.readUInt32LE(tail+8)===2,'公共基线候选机型/标记无效');
- need(size>=59718388&&size<=59718388+672*1024&&!(size&3)&&
+ need(size>=59718388&&size<=59718388+MAX_NATIVE_RTOS_GROWTH&&!(size&3)&&
   ((128+encoded+3)&~3)===tail&&bytes.subarray(128+encoded,tail).every(v=>v===0),'容器布局无效');
  need(sum32(bytes)===0,'容器 checksum 无效');
  const {decoded,frames}=decodeFrameMap(bytes,size);need(sum32(decoded)===0,'decoded checksum 无效');
@@ -54,7 +55,7 @@ function read(bytes){
   need(at+16<=decoded.length-4,'分区头越界');
   need(decoded.toString('ascii',at,at+8).split('\0')[0]===name&&decoded.readUInt32LE(at+8)===flags,'分区次序/类型无效');
   const field=decoded.readUInt32LE(at+12),length=name==='RTOS'?field:fixed;
-  need((name==='RTOS'?length>=RTOS_BYTES&&length<=RTOS_BYTES+672*1024&&!(length&3):field===(name==='RES'?35:fixed))&&
+  need((name==='RTOS'?length>=RTOS_BYTES&&length<=RTOS_BYTES+MAX_NATIVE_RTOS_GROWTH&&!(length&3):field===(name==='RES'?35:fixed))&&
    at+16+length<=decoded.length-4,'分区长度无效');
   sections[name]={offset:at+16,size:length};at+=16+length;
  }

@@ -33,17 +33,17 @@ test('final joined firmware contains all selected components and rejects repaire
  assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.equal(result.manifest.base,0x540ba000);
  assert.ok(result.receipt.composition.verified);
- assert.equal(result.receipt.composition.aspect_resource_id,978);
+ assert.equal(result.receipt.composition.aspect_resource_id,981);
  assert.equal(result.receipt.composition.native_resource_range[0],786);
- assert.equal(result.receipt.composition.native_resource_range[1],977);
+ assert.equal(result.receipt.composition.native_resource_range[1],980);
  assert.equal(sum32(result.candidate),0);
  const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
  let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
- // Independent opcode expectations: three native bounds stay977; only
- // aspect's caption ID is978. Do not reuse the composer's mapping helper.
- for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe30033d1);
- assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe30003d2);
- for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c3d2);
+ // Independent opcode expectations: three native bounds stay980; only
+ // aspect's caption ID is981. Do not reuse the composer's mapping helper.
+ for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe30033d4);
+ assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe30003d5);
+ for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c3d5);
  assert.equal(d.readUInt32LE(at+16+0xb348c0),10);
  assert.equal(d.subarray(at+16+0xb3501e,at+16+0xb35020).toString('hex'),'020f');
  assert.deepEqual(auditIntegratedNative(source,result.candidate,result.nativeCandidate,result.runtime,result.manifest,result.component,extensions),result.receipt.composition);

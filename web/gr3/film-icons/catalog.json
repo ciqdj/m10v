@@ -610,5 +610,32 @@
     "color": "#c74435",
     "icon_url": "/gr3/film-icons/68.png",
     "sha256": "b993b6e0faf757fe61a474a7c15fae86eaeae3d988fa5fa7ad6f786292c30198"
+  },
+  {
+    "id": 69,
+    "name": "Portra 160",
+    "title": "PORTR",
+    "code": "160",
+    "color": "#a484ad",
+    "icon_url": "/gr3/film-icons/69.png",
+    "sha256": "41dff0c39745e6517e24b5f10cef90f19ca9b8da6e2eaa69fb541e08040d33b7"
+  },
+  {
+    "id": 70,
+    "name": "富士业务用 100",
+    "title": "FUJI",
+    "code": "100",
+    "color": "#41a66b",
+    "icon_url": "/gr3/film-icons/70.png",
+    "sha256": "6cccbbdd48299b364db295f8b17231304521479c3b0d9f5ef6b6a528bacb7715"
+  },
+  {
+    "id": 71,
+    "name": "乐凯 C200",
+    "title": "LUCKY",
+    "code": "C200",
+    "color": "#d94735",
+    "icon_url": "/gr3/film-icons/71.png",
+    "sha256": "a8705bcc4b7af0e14402798c0d38d86b877903e74c9a9f6304f5a7a883253751"
   }
 ]

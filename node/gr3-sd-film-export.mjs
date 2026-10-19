@@ -50,7 +50,7 @@ export function exportSdFilms(input){
  '左右选卷、上下翻页，选卷按 OK 装入，成功后返回五槽列表。MENU 返回上一级，五槽页按 MENU 退出。最多五个活动槽，卡上可存全部当前平台胶卷。\n'+
  '时间水印：MENU > 设置 > 时间水印，设置模式、日期格式、位置、颜色，OK 保存，MENU 取消当前编辑。\n'+
  '装入成功后重启或换卡仍保留。无卡、损坏或不兼容文件不替换原槽。失败提示后请保留原配置重试。\n'+
- '文件包含配方身份快照和图标；5207、Phoenix II、HARMAN RED 通过 SHA-256 绑定固件内完整 LUT（含 RED 三档曝光），不在文件中存放 LUT。当前运行时只接受与其支持版本完全匹配的 36 款，未来新配方需匹配固件。\n'+
+ '文件包含配方身份快照和图标；5207、Phoenix II、HARMAN RED 通过 SHA-256 绑定固件内完整 LUT（含 RED 三档曝光），不在文件中存放 LUT。当前运行时只接受与其支持版本完全匹配的 39 款，未来新配方需匹配固件。\n'+
  '离线验证候选，尚未通过真机 SD 换卷验收。胶卷仅作用于保存的静态 JPEG，实时取景尚不随换卷变化。800T 已合入新版能量扩散与原厂 FN 五项中文调节，旧版胶卷包需重新导出。\n';
  return {receipt,zip:encodeZip({'SD/M10V/FILMS.M10':pack,'README.txt':Buffer.from(instructions),'manifest.json':Buffer.from(JSON.stringify(receipt,null,2)+'\n')})};
 }

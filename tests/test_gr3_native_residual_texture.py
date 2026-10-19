@@ -9,7 +9,7 @@ class NativeResidualTextureTests(unittest.TestCase):
   cls.temp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.temp.cleanup);cls.libs=[]
   for baseline in (True,False):
    output=Path(cls.temp.name)/('baseline.dylib' if baseline else 'native.dylib')
-   sources=[str(ROOT/('tests/fixtures/gr3_texture_reference.c' if baseline else 'native/gr3/film_5207.c')),str(ROOT/'native/gr3/film_harman.c')]
+   sources=[str(ROOT/('tests/fixtures/gr3_texture_reference.c' if baseline else 'native/gr3/film_5207.c')),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c')]
    if not baseline:sources.extend(str(ROOT/'native/gr3'/n) for n in ('m10v_spatial_accel.c','m10v_texture_accel.c'))
    subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-DM10V_SPATIAL_NEON='+str(int(not baseline)),'-DM10V_TEXTURE_NEON='+str(int(not baseline)),'-I',str(ROOT/'native/gr3'),*sources,'-o',str(output)],check=True,capture_output=True)
    lib=C.CDLL(str(output));lib.m10v_5207_texture_q8.argtypes=[C.POINTER(Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];cls.libs.append(lib)
@@ -19,7 +19,7 @@ class NativeResidualTextureTests(unittest.TestCase):
   from scripts.build_gr3_save_trace import sections
   frozen=baseline is True;vector=baseline is False
   folder=Path(cls.temp.name)/('arm-baseline' if frozen else 'arm-native' if vector else 'arm-current-scalar');folder.mkdir(exist_ok=True);objects=[]
-  sources=[ROOT/('tests/fixtures/gr3_texture_reference.c' if frozen else 'native/gr3/film_5207.c'),ROOT/'native/gr3/film_harman.c']
+  sources=[ROOT/('tests/fixtures/gr3_texture_reference.c' if frozen else 'native/gr3/film_5207.c'),ROOT/'native/gr3/film_harman.c',ROOT/'native/gr3/film_curated.c']
   if not frozen:sources.extend(ROOT/'native/gr3'/n for n in ('m10v_spatial_accel.c','m10v_texture_accel.c'))
   for i,source in enumerate(sources):
    obj=folder/(str(i)+'.o');subprocess.run(['clang',*FLAGS,'-ffunction-sections','-fdata-sections','-DM10V_SPATIAL_NEON='+str(int(not frozen)),'-DM10V_TEXTURE_NEON='+str(int(vector)),'-I',str(ROOT/'native/gr3'),'-c',str(source),'-o',str(obj)],check=True,capture_output=True);objects.append(str(obj))

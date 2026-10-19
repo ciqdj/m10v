@@ -12,11 +12,12 @@ class SdLibraryTests(unittest.TestCase):
   cls.lib=C.CDLL(str(out));cls.lib.m10v_sd_header.argtypes=[C.c_void_p,C.c_uint32];cls.lib.m10v_sd_record.argtypes=[C.c_void_p,C.c_uint32,C.c_uint32]
   cls.pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
  def test_all_current_recipes_and_indices(self):
-  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),36)
-  for i in range(36):
+  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),39)
+  for i in range(39):
+   id=struct.unpack_from('<I',self.pack,64+i*12)[0]
    r=self.pack[4096+i*12288:4096+(i+1)*12288]
-   self.assertEqual(self.lib.m10v_sd_record(r,len(r),i+33),i+33)
-   self.assertEqual(self.lib.m10v_sd_record(r,len(r),i+34),0)
+   self.assertEqual(self.lib.m10v_sd_record(r,len(r),id),id)
+   self.assertEqual(self.lib.m10v_sd_record(r,len(r),id+1),0)
  def test_repaired_crc_cannot_authorize_changed_recipe(self):
   for at in (16,64,80,116,1652,2048,9000):
    r=bytearray(self.pack[4096:4096+12288]);r[at]^=1;struct.pack_into('<I',r,12284,zlib.crc32(r[:-4]));self.assertEqual(self.lib.m10v_sd_record(bytes(r),len(r),33),0)

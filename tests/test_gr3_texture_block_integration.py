@@ -18,12 +18,12 @@ class TextureBlockIntegrationTests(unittest.TestCase):
    out=Path(cls.temp.name)/f'path{enabled}.dylib'
    subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-DM10V_SPATIAL_NEON=1',f'-DM10V_TEXTURE_NEON={enabled}',
     '-DM10V_FILM_COLOR_CANDIDATE=1','-I',str(ROOT/'native/gr3'),str(ROOT/'native/gr3/film_5207.c'),
-    str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/m10v_spatial_accel.c'),str(wrap),'-o',str(out)],check=True,capture_output=True)
+    str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/m10v_spatial_accel.c'),str(wrap),'-o',str(out)],check=True,capture_output=True)
    lib=C.CDLL(str(out));lib.m10v_5207_texture_q8.argtypes=[C.POINTER(Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32]
    cls.libs.append(lib)
  def test_enabled_full_color_uses_blocks_and_retains_all_effects_and_tails(self):
   for width,height in ((2,1),(6,3),(8,3),(10,5),(18,7),(6000,2)):
-   for color in (1,2,3,4,5):
+   for color in (1,2,3,4,5,6,7,8):
     for size,grain,gain in ((0,0,0),(1,768,8),(2,333,3)):
      with self.subTest(width=width,color=color,size=size,grain=grain,gain=gain):
       n=(width+8)*height;rng=random.Random(width+color+grain)
@@ -38,7 +38,7 @@ class TextureBlockIntegrationTests(unittest.TestCase):
       self.assertEqual(self.libs[1].block_calls()-count,(width//8)*height)
  def test_cache_enabled_image_still_executes_exact_blocks_and_reports_real_coverage(self):
   width,height,stride=66,5,74;n=stride*height
-  for color in (1,2,3,4,5):
+  for color in (1,2,3,4,5,6,7,8):
    for grain in (0,768,921):
     outputs=[]
     for lib in self.libs:

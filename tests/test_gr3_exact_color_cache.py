@@ -53,7 +53,7 @@ class ExactColorCacheTests(unittest.TestCase):
             path=Path(tmp)/'probe.c'
             path.write_text('static unsigned lut_calls;\n'+source+'\nunsigned probe_calls(void){return lut_calls;}\nunsigned probe_enabled(void *memory,const m10v_library_image *im){return m10v_color_cache_prepare(memory,im)!=0;}\n')
             out=Path(tmp)/'probe.dylib'
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-I',str(root/'native/gr3'),str(path),str(root/'native/gr3/film_harman.c'),'-o',str(out)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-I',str(root/'native/gr3'),str(path),str(root/'native/gr3/film_harman.c'),str(root/'native/gr3/film_curated.c'),'-o',str(out)],check=True,capture_output=True)
             lib=C.CDLL(str(out));render=lib.m10v_5207_texture_cached_q8
             render.argtypes=[C.POINTER(host.Image),C.c_void_p,C.c_uint,C.c_uint,C.c_uint,C.c_void_p]
             n=6000*4;y=(C.c_uint8*n)(*([64]*n));uv=(C.c_uint8*n)(*([128]*n))

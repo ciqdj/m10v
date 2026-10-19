@@ -19,6 +19,8 @@ def label(name,i):
  # Labels describe existing presets; this does not add or rename any recipe.
  if name=='蓝凤凰':return 'PHNX','II200','#397ac4'
  if name=='哈曼 RED':return 'RED','125','#c74435'
+ if name=='富士业务用 100':return 'FUJI','100','#41a66b'
+ if name=='乐凯 C200':return 'LUCKY','C200','#d94735'
  if name=='5207':return '5207','250D','#b59a45'
  if name=='800T':return 'CINE','800T','#c83737'
  if name=='Gold 200':return 'KODA','200','#d5a844'
@@ -50,15 +52,15 @@ def text(d,x,y,s,c):
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
  names += [v['name'] for v in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]
- names += ['5207','蓝凤凰','哈曼 RED']
- if len(names)!=68:raise ValueError('catalog must contain 68 films')
+ names += ['5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200']
+ if len(names)!=71:raise ValueError('catalog must contain 71 films')
  # Preserve exact official directory pointers; original descriptors stay in RAM.
  import subprocess,struct
  js="import {readFileSync} from 'node:fs';import {officialResources} from './node/gr3-stock-presets.mjs';const {decoded:d,sections:s}=officialResources(readFileSync('bin/fwdc239b-gr3-official.bin'));process.stdout.write(d.subarray(s.RTOS.offset+0x107b540+0x20fc,s.RTOS.offset+0x107b540+0x20fc+671*4));"
  directory=subprocess.check_output(['node','--input-type=module','-e',js],cwd=ROOT)
  if len(directory)!=2684:raise ValueError('official icon directory invalid')
  (ROOT/'native/gr3/m10v_stock_icon_directory.bin').write_bytes(directory)
- pixels=bytearray();meta=[];sheet=Image.new('RGBA',(10*120,7*130),'#171a18')
+ pixels=bytearray();meta=[];sheet=Image.new('RGBA',(10*120,8*130),'#171a18')
  out=ROOT/'web/gr3/film-icons';out.mkdir(exist_ok=True)
  for i,name in enumerate(names,1):
   title,code,color=label(name,i);im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)

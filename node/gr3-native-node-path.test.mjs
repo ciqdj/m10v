@@ -38,9 +38,9 @@ test('web debug export uses the running Node when the service PATH contains no n
    const bytes=Buffer.from(await built.arrayBuffer());
    const receipt=JSON.parse(Buffer.from(built.headers.get('X-M10V-Native-Receipt'),'base64'));
    assert.equal(receipt.candidate_sha256,createHash('sha256').update(bytes).digest('hex'));
-   assert.equal(receipt.debug_mode,true);assert.equal(receipt.sd_film_library.supported_films,36);
+   assert.equal(receipt.debug_mode,true);assert.equal(receipt.sd_film_library.supported_films,39);
    assert.equal(receipt.capture_pipeline,'gr3-native-v8');assert.equal(receipt.live_view_base.film_color_preview,true);assert.equal(receipt.experimental_capture.native_color,true);assert.equal(receipt.experimental_capture.native_grain,true);
-   assert.equal(receipt.composition.verified,true);assert.equal(receipt.composition.aspect_resource_id,978);
+   assert.equal(receipt.composition.verified,true);assert.equal(receipt.composition.aspect_resource_id,981);
    console.log('WEB_BUILD_OK bytes='+bytes.length);
   } finally {await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
  `;

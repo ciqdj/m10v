@@ -40,9 +40,9 @@ static void defaults(m10v_library_state *s,uint32_t target,uint32_t film){
  m10v_library_init(s);
  if(s->slots[target].film==film)return;
  m10v_slot *v=&s->slots[target];v->film=(uint16_t)film;
- v->grain=film==68?2:film==66||film==67?1:0;v->soft=0;
+ v->grain=film==68||film==71?2:film>=66?1:0;v->soft=0;
  v->halo_gain=film==33?3:film==67?2:0;v->halo_spread=3;v->halo_threshold=5;
- m10v_film_effects e={film==67?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
+ m10v_film_effects e={film==67||film==69||film==70?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
 }
 uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  /* Every visible row passes this operation before the original ID switch.
@@ -99,7 +99,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    * shuffle, and exposure compensation. No resource directory is modified.
    * Enum values retain the slider's exact 0-based range; RED uses EI125/64/250.
    * Its three-digit value alone gets 60px, still inside the native 120px rail. */
-  static const uint16_t icons[11]={500,488,413,493,595,1092,424,596,381,50,647};
+  static const uint16_t icons[11]={500,488,413,493,595,1095,424,596,381,50,647};
   v=value(&s,(uint32_t)target,field);char text[4]={(char)('0'+v),0,0,0};
   if(field==10){text[0]=v==1?'6':v==2?'2':'1';text[1]=v==1?'4':v==2?'5':'2';text[2]=v==1?0:v==2?'0':'5';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x198);if(!ram(list,4))return 0;

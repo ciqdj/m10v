@@ -1,3 +1,4 @@
+import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 import {createHash} from 'node:crypto';
 import {inspectOfficial} from './firmware.mjs';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
@@ -29,7 +30,7 @@ function pack(base,target){
 }
 export function applyPatchPlan(official,base,edits){
  const report=inspectOfficial(official),source=officialResources(official);
- if(!base.equals(official))auditGr3Candidate(official,base,{maxRtosGrowth:672*1024});
+ if(!base.equals(official))auditGr3Candidate(official,base,{maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
  const size=base.readUInt32LE(base.length-8),{decoded}=decodeFrameMap(base,size);
  const map=sectionMap(decoded,report.sections),target=Buffer.from(decoded),spans=[];
  for(const row of report.sections){

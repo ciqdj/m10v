@@ -5,13 +5,13 @@ import {nativeCatalog,initialState} from './gr3-native-library.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture,migrateSimulationSelection} from '../web/gr3/native-library-state.mjs';
 
 test('Harman films append stable IDs and shared 40px icon records',async()=>{
- const c=await nativeCatalog();assert.equal(c.films.length,36);
+ const c=await nativeCatalog();assert.equal(c.films.length,39);
  for(const [id,name] of [[67,'蓝凤凰'],[68,'哈曼 RED']]){
   const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'M10V精选');
   assert.equal(f.camera_calibrated,false);assert.equal(f.film_calibrated,false);
  }
  const icons=JSON.parse(await readFile(new URL('../web/gr3/film-icons/catalog.json',import.meta.url)));
- assert.equal(icons.length,68);assert.equal((await readFile(new URL('../native/gr3/m10v_icons.rgba',import.meta.url))).length,68*40*40*4);
+ assert.equal(icons.length,71);assert.equal((await readFile(new URL('../native/gr3/m10v_icons.rgba',import.meta.url))).length,71*40*40*4);
  assert.equal(icons[66].color,'#397ac4');assert.equal(icons[67].color,'#c74435');
 });
 test('film selection supplies the two stock defaults without changing other slots',()=>{
@@ -48,7 +48,7 @@ test('schema4 packs EI in each effects reserved byte and common reset preserves 
 test('both UI surfaces keep stock controls alongside shared texture',async()=>{
  for(const file of ['native-library.html','native-library-controls.html']){
   const html=await readFile(new URL('../web/gr3/'+file,import.meta.url),'utf8');
-  assert.match(html,/36 套/);assert.match(html,/id="effect-filmExposure"/);assert.match(html,/模拟曝光EI/);
+  assert.match(html,/39 套/);assert.match(html,/id="effect-filmExposure"/);assert.match(html,/模拟曝光EI/);
   for(const ei of [125,64,250])assert.match(html,new RegExp('EI '+ei));
   assert.match(html,/非机身 ISO|不改变机身 ISO/);assert.match(html,/非 push|不模拟增感冲洗/);
  }

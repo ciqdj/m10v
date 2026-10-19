@@ -1,3 +1,4 @@
+import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // Compose reviewed camera components with the native library, then compare every final byte.
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -26,7 +27,7 @@ const resourceAdaptations=[
  [0x540b8c14,0xe3003311,0xe30033a8],
 ];
 export function integrationFingerprint(){
- return sha(JSON.stringify(['gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3x-native-port.mjs','gr3-candidate-audit.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
+ return sha(JSON.stringify(['gr3-native-budget.mjs','gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3x-native-port.mjs','gr3-candidate-audit.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
 }
 function parts(source,candidate){
  const report=inspectOfficial(source),decoded=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
@@ -118,7 +119,7 @@ function encode(base,target){
  candidate.writeUInt32LE(-sum32(candidate)>>>0,candidate.length-4);return candidate;
 }
 export function auditIntegratedNative(source,candidate,nativeCandidate,runtime,manifest,component,extensions){
- auditGr3Candidate(source,candidate,{maxRtosGrowth:672*1024});
+ auditGr3Candidate(source,candidate,{maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
  const {target,composition}=expectedImage(source,nativeCandidate,runtime,manifest,component,extensions);
  need(parts(source,candidate).decoded.equals(target),'integrated final bytes differ from verified components');
  return composition;
@@ -126,6 +127,6 @@ export function auditIntegratedNative(source,candidate,nativeCandidate,runtime,m
 export function composeNative(source,nativeCandidate,runtime,manifest,component,extensions){
  const {target}=expectedImage(source,nativeCandidate,runtime,manifest,component,extensions),candidate=encode(nativeCandidate,target);
  const composition=auditIntegratedNative(source,candidate,nativeCandidate,runtime,manifest,component,extensions);
- const structure=auditGr3Candidate(source,candidate,{maxRtosGrowth:672*1024});
+ const structure=auditGr3Candidate(source,candidate,{maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
  return {candidate,composition,structure};
 }

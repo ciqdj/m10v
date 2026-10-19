@@ -15,7 +15,7 @@ class Gr4NativeRuntimeTests(unittest.TestCase):
                 self.assertLess(m['symbols'][name],m['base']+len(code))
             for name in ['m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_settings_controller_card_directory']:
                 self.assertNotIn(name,m['symbols']) # GR III-only APIs must not leak into GR IV.
-            self.assertEqual(m['film_count'],68)
+            self.assertEqual(m['film_count'],71)
             self.assertEqual(m['carrier_tones'],[36,37,38,39,40])
             self.assertTrue(m['settings_menu']['patches'])
             self.assertTrue(m['detail']['patches'])

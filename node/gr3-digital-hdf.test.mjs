@@ -16,8 +16,8 @@ test('exported HDF candidate independently verifies coefficients and rejects cha
  const source=await readNativeOfficial(),c=defaultConfiguration();c.hdf=2;
  const plan=prepareNative(source,c),result=await generateNative(source,c,plan.configuration_sha256);
  assert.equal(result.receipt.configuration.hdf,2);assert.equal(result.manifest.hdf_default,2);assert.equal(result.receipt.camera_tested,false);
- assert.equal(hdfPatches(result.runtime,result.manifest).length,8);
- for(const address of [result.manifest.digital_hdf.rows,result.manifest.digital_hdf.entries.request,result.manifest.digital_hdf.entries.settings_0x535033d8]){
+ assert.equal(hdfPatches(result.runtime,result.manifest).length,3);
+ for(const address of [result.manifest.digital_hdf.rows,result.manifest.digital_hdf.entries.request,result.manifest.digital_hdf.rows-48]){
   const broken=Buffer.from(result.runtime);broken[address-result.manifest.base]^=1;
   assert.throws(()=>hdfPatches(broken,result.manifest),/digital HDF/);
  }

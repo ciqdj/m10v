@@ -1,3 +1,4 @@
+import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // M10V's original runtime is injected into the exact official GR III source.
 // No browser compatibility runtime, signed film file or external catalog is used.
 import { createHash } from 'node:crypto';
@@ -40,7 +41,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
@@ -69,7 +70,7 @@ function checkRuntime(runtime, manifest) {
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 68 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
+  need(manifest.film_count === 71 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
@@ -109,6 +110,12 @@ function checkRuntime(runtime, manifest) {
     const payload=Buffer.from(w.values);
     need(m.film_id===w.id&&m.ei===w.ei&&m.bytes===payload.length&&m.sha256===sha(payload)&&spec.table_sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'Harman compiled payload differs');
   }
+  const curated=JSON.parse(readFileSync(new URL('../web/gr3/curated-luts.json',import.meta.url)));
+  need(curated.stocks.length===3&&manifest.film_curated?.length===3,'curated inventory differs');
+  for(let i=0;i<3;i++){
+    const w=curated.stocks[i],m=manifest.film_curated[i],payload=Buffer.from(w.values);
+    need(w.id===69+i&&m.film_id===w.id&&payload.length===10125&&m.bytes===payload.length&&m.sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'curated compiled payload differs');
+  }
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
   need(init.length === 104 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+104).equals(init), 'native initial settings readback differs');
   const quietDebugSinks=!!manifest.capture_lifecycle&&manifest.experimental_capture?.native_color===true&&['m10v_debug_log','m10v_debug_batch'].every(name=>{const at=manifest.symbols?.[name]-BASE;return Number.isInteger(at)&&at>=0&&at+8<=runtime.length&&runtime.readUInt32LE(at)===0xe3a00000&&runtime.readUInt32LE(at+4)===0xe12fff1e;});
@@ -124,23 +131,23 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
-  need(icons?.first_id===671&&icons.last_id===738&&icons.width===40&&icons.height===40&&artwork.length===68*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,(manifest.sd_library?744:739)*4],[icons.descriptors,(manifest.sd_library?73:68)*8],[icons.pixels,68*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+(manifest.sd_library?744:739)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?73:68)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
-  for(let i=0;i<68;i++){
+  need(icons?.first_id===671&&icons.last_id===741&&icons.width===40&&icons.height===40&&artwork.length===71*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
+  for(const [address,length] of [[icons.table,(manifest.sd_library?747:742)*4],[icons.descriptors,(manifest.sd_library?76:71)*8],[icons.pixels,71*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+(manifest.sd_library?747:742)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?76:71)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(let i=0;i<71;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
   }
   if(manifest.sd_library){
     const c=manifest.film_cards;
-    need(c?.first_id===739&&c.last_id===743&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===742&&c.last_id===746&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
     }
-    for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(739+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
+    for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(742+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?192:151;
+  const resourceCount=manifest.sd_library?195:154;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -327,7 +334,7 @@ function patchList(manifest,runtime) {
       else p.replacement=0xe1a00000;
     }
   }
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?743:738),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?746:741),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){
@@ -380,7 +387,9 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
-  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=672*1024,'native RTOS growth invalid');
+  // Reserve 64 KiB for the new immutable LUT/icon bank and native profiles.
+  // Mapping/readback/section preservation checks below still cover the whole extent.
+  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,'native RTOS growth invalid');
   const insertion=rtos.offset+rtos.size;
   const target=Buffer.concat([decoded.subarray(0,insertion),Buffer.alloc(growth),decoded.subarray(insertion)]);
   target.writeUInt32LE(newPayload,rtos.offset+12);
@@ -397,7 +406,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
 export function auditNativeLibrary(source,candidate,runtime,manifest) {
   const BASE=manifest?.base;
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
-  const structural=auditGr3Candidate(source,candidate,{maxRtosGrowth:672*1024});
+  const structural=auditGr3Candidate(source,candidate,{maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
   const before=decodeFrameMap(source).decoded,after=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
   const oldRows=sectionMap(before,report),newRows=sectionMap(after,report,structural.rtosGrowth);
   const old=oldRows.find(row=>row.name==='RTOS'),fresh=newRows.find(row=>row.name==='RTOS');
@@ -434,7 +443,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:68,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:68,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:36,max_records:256,page_rows:8}:null,
+    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:71,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:71,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:39,max_records:256,page_rows:8}:null,
     menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},

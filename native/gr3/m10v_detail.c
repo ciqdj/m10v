@@ -40,9 +40,9 @@ static void defaults(m10v_library_state *s,uint32_t target,uint32_t film){
  m10v_library_init(s);
  if(s->slots[target].film==film)return;
  m10v_slot *v=&s->slots[target];v->film=(uint16_t)film;
- v->grain=film==68?2:film==66||film==67?1:0;v->soft=0;
+ v->grain=film==68||film==71?2:film>=66?1:0;v->soft=0;
  v->halo_gain=film==33?3:film==67?2:0;v->halo_spread=3;v->halo_threshold=5;
- m10v_film_effects e={film==67?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
+ m10v_film_effects e={film==67||film==69||film==70?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
 }
 uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  /* Every visible row passes this operation before the original ID switch.

@@ -18,7 +18,7 @@ static void lettering(uint32_t *p,const char *s,uint32_t x,uint32_t y,uint32_t s
  }
 }
 int m10v_film_card_render(uint32_t *p,uint32_t film,uint32_t slot,uint32_t selected){
- if(!p||!film||film>68||slot>=5)return -1;
+ if(!p||!film||film>71||slot>=5)return -1;
  for(uint32_t y=0;y<M10V_CARD_HEIGHT;y++)for(uint32_t x=0;x<M10V_CARD_WIDTH;x++){
   uint32_t rail=y<24||y>=172,hole=(y>=6&&y<18)||(y>=178&&y<190);
   p[y*M10V_CARD_WIDTH+x]=rgba(rail?hole&&x%24>=6&&x%24<18?0xff11191cu:0xff344349u:0xff182327u);

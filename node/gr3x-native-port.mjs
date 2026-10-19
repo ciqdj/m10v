@@ -1,3 +1,4 @@
+import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // Differential port of an already audited GR III native image onto exact GR IIIx stock.
 import {createHash} from 'node:crypto';
 import {inspectOfficial} from './firmware.mjs';
@@ -27,7 +28,7 @@ function expected(g,x,c){
   const b=x.sections[name],p=c.sections[name];
   need(a.offset===b.offset&&a.size===b.size,'official section offsets differ at '+name);
   if(name==='RTOS'){
-   need(p.size>=a.size&&p.size-a.size<=672*1024,'RTOS growth exceeds bounds');
+   need(p.size>=a.size&&p.size-a.size<=MAX_NATIVE_RTOS_GROWTH,'RTOS growth exceeds bounds');
    need(a.block.subarray(0,12).equals(p.block.subarray(0,12))&&a.block.subarray(0,16).equals(b.block.subarray(0,16)),'RTOS header differs');
    const target=Buffer.from(p.block);
    for(let off=0;off<a.payload.length;off+=4){
@@ -50,7 +51,7 @@ function expected(g,x,c){
 function inputs(gr3official,xofficial,gr3candidate){
  const g=inspectOfficial(gr3official),x=inspectOfficial(xofficial);
  need(g.model==='GR III'&&x.model==='GR IIIx','exact GR III and GR IIIx baselines required');
- auditGr3Candidate(gr3official,gr3candidate,{minRtosGrowth:0,maxRtosGrowth:672*1024});
+ auditGr3Candidate(gr3official,gr3candidate,{minRtosGrowth:0,maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
  const original=read(gr3official,g.sections),other=read(xofficial,x.sections),native=read(gr3candidate,g.sections);
  const intent=expected(original,other,native);
  need(intent.words.length===19&&intent.words.reduce((n,w)=>n+Buffer.from(w.gr3_hex,'hex').reduce((m,v,i)=>m+(v!==Buffer.from(w.gr3x_hex,'hex')[i]),0),0)===31,'official RTOS parity differs');

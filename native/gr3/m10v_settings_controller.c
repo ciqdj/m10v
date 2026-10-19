@@ -3,6 +3,7 @@
 #include "m10v_settings_controller.h"
 #include "m10v_debug.h"
 #include "m10v_sd_library.h"
+#include "m10v_film_card.h"
 #ifndef M10V_LIVE_COLOR
 #define M10V_LIVE_COLOR 0
 #endif
@@ -117,5 +118,5 @@ uint32_t m10v_settings_controller_card_directory(void){
  if(*(uint32_t *)p!=m10v_settings_controller_vtable()||p->view.count!=M10V_VIEW_COUNT)return 0;
  uint32_t heap=p->view.widgets[39];
  if((heap&3)||heap<0x55000000u||heap>0x80000000u-470464u)return 0;
- return heap+470440u-739u*4u;
+ return heap+470440u-M10V_CARD_FIRST*4u;
 }

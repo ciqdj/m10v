@@ -86,19 +86,19 @@ class Gr4StorageDetailTests(unittest.TestCase):
   u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.symbols.get(name,name),0x550ff000,count=10000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x550ff000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp);return u.reg_read(UC_ARM_REG_R0)
  def test_sd_pages_exact_read_and_handle_cleanup(self):
-  for page,row,want in [(0,0,33),(4,3,68),(4,4,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
+  for page,row,want in [(0,0,33),(0,3,68),(4,7,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
   self.short=True;self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
   self.assertEqual((self.opened,self.allocations),(0,0))
  def test_complete_sd_snapshot_before_journal_and_without_card(self):
-  self.assertEqual(self.call('m10v_sd_camera_install',4,3,68,2),0)
+  self.assertEqual(self.call('m10v_sd_camera_install',0,3,68,2),0)
   self.assertEqual(self.calls[0],('save','M10VS68.bin'))
-  self.assertEqual(self.files['M10VS68.bin'],self.pack[4096+35*12288:4096+36*12288])
+  self.assertEqual(self.files['M10VS68.bin'],self.pack[4096+3*12288:4096+4*12288])
   self.card=b'';self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   self.assertEqual(struct.unpack('<H',self.u.mem_read(0x5500a000+28,2))[0],68)
   self.assertEqual((self.opened,self.allocations),(0,0))
  def test_bad_snapshot_or_failed_write_never_commits_slot(self):
   for attribute in ['bad_load','fail_save']:
-   setattr(self,attribute,True);self.assertNotEqual(self.call('m10v_sd_camera_install',4,3,68,2),0);setattr(self,attribute,False)
+   setattr(self,attribute,True);self.assertNotEqual(self.call('m10v_sd_camera_install',0,3,68,2),0);setattr(self,attribute,False)
   self.assertFalse(any(name.startswith('M10V5') for name in self.files))
  def test_detail_journals_effects_and_restores_failed_slider(self):
   ui=0x5500b000;self.u.mem_write(ui+0x19c,bytes([36,0,0,0,0,0]));self.w(ui+0x168,0x5500c000);self.w(ui+0x164,0x5500d000)
