@@ -5,7 +5,7 @@
 #include <stddef.h>
 _Static_assert(sizeof(m10v_isp_native_look)==1600,"bounded recipe color storage");
 _Static_assert(sizeof(native_frame_packed)==48,"lossless profile storage");
-static int supported(uint32_t film,uint32_t exposure){return film>=33&&film<=71&&exposure<3&&(film==68||!exposure);}
+static int supported(uint32_t film,uint32_t exposure){return film>=33&&film<=72&&exposure<3&&(film==68||!exposure);}
 int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t exposure,uint32_t generation){
  if(!s)return 0;
  s->magic=M10V_ISP_NATIVE_LOOK_MAGIC;s->version=M10V_ISP_NATIVE_LOOK_VERSION;

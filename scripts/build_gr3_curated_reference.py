@@ -21,11 +21,16 @@ STOCKS=[
  {'id':71,'key':'lucky-c200-new','name':'乐凯 C200','iso':200,'grain':2,'grain_size':1,
   'reference':'new C200 community-look interpretation; no downloaded Lucky LUT or official density curves available',
   'official':'https://www.lucky.cn/'},
+ {'id':72,'key':'ccd-classic','name':'CCD Classic','iso':100,'grain':0,'grain_size':0,
+  'reference':'GR DIGITAL low-ISO Standard/Vivid-inspired interpretation; no measured GR DIGITAL transform',
+  'official':'https://www.ricoh-imaging.co.jp/english/r_dc/support/faq/bp/grd4/gr04404.html'},
 ]
 PARAMETERS={
  'input':'encoded display sRGB D65 after ISP; no recovery of scene exposure',
  'output':'encoded display sRGB D65',
  'fuji_proxy_strength':.8,
+ 'ccd':{'contrast':.32,'saturation':1.065,'blue_gain':.055,'green_gain':.025,
+        'red_gain':.015,'highlight_saturation_reduction':.18},
  'lucky':{'contrast':.18,'shoulder':.025,'red_chroma':.13,'blue_chroma':.09,
           'green_shadow':.014,'magenta_highlight':.012},
  'status':'all adaptation strengths are design assumptions, not manufacturer measurements',
@@ -53,6 +58,18 @@ def render(film,rgb):
   file='kodak_portra_160.cube' if film==69 else 'fuji_superia_100.cube'
   y=sample_tetrahedral(cube(ROOT/'third_party/curated-film-luts'/file),x)
   return y if film==69 else x+PARAMETERS['fuji_proxy_strength']*(y-x)
+ if film==72:
+  # Neutral-preserving bounded contrast. Chroma-axis weights protect orange
+  # skin tones and neutral highlights; no fake film base or spatial artifacts.
+  p=PARAMETERS['ccd'];x=x+p['contrast']*x*(1-x)*(2*x-1)
+  l=x@np.array([.2126,.7152,.0722]);chroma=x-l[:,None]
+  spread=np.max(x,axis=1)-np.min(x,axis=1)
+  blue=np.maximum(x[:,2]-np.maximum(x[:,0],x[:,1]),0)
+  green=np.maximum(x[:,1]-np.maximum(x[:,0],x[:,2]),0)
+  red=np.maximum(x[:,0]-np.maximum(x[:,1],x[:,2]),0)
+  strength=p['saturation']+p['blue_gain']*blue+p['green_gain']*green+p['red_gain']*red
+  strength-=p['highlight_saturation_reduction']*np.maximum((l-.75)/.25,0)**2*spread
+  return np.clip(l[:,None]+chroma*strength[:,None],0,1)
  if film!=71:raise ValueError('unknown curated stock')
  p=PARAMETERS['lucky'];x=x+p['contrast']*x*(1-x)*(2*x-1)
  # Explicit, bounded community-inspired chromatic adjustments, not a spectral model.
@@ -80,7 +97,7 @@ def generate():
   # This surrogate input does NOT constitute measured GR3 ISP calibration.
   q=fit_target(grid,values/255,iterations=10)
   q['holdout']=summarize(q,test,approx);q['film_id']=spec['id'];profiles.append(q)
- header='/* Generated curated display LUTs. See curated-reference.json and third-party notices. */\nstatic const uint8_t m10v_curated_luts[3][3375][3]={\n'
+ header='/* Generated curated display LUTs. See curated-reference.json and third-party notices. */\nstatic const uint8_t m10v_curated_luts[4][3375][3]={\n'
  header+=''.join('{\n'+''.join('{%d,%d,%d},\n'%tuple(v) for v in t)+'},\n' for t in tables)+'};\n'
  (ROOT/'native/gr3/film_curated_data.h').write_text(header)
  (ROOT/'web/gr3/curated-luts.json').write_text(json.dumps({'size':15,'bits':8,'order':'RGB, blue fastest','stocks':stocks},ensure_ascii=False,separators=(',',':'))+'\n')

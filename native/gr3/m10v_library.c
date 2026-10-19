@@ -98,7 +98,7 @@ int m10v_library_valid(const m10v_library_state *state) {
     return 1;
 }
 const char *m10v_library_name(uint32_t id) {
-    static const char appended_names[6][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200"};
+    static const char appended_names[7][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200","CCD Classic"};
     return !id || id>M10V_FILM_COUNT ? (const char *)0 : id>=66 ? appended_names[id-66] : id<=33 ? films[id-1].name : legacy_records[id-34].name;
 }
 static int commit(m10v_library_state *state, m10v_library_state *next,
@@ -114,9 +114,9 @@ int m10v_library_reset(m10v_library_state *state,uint32_t slot,m10v_library_stor
     uint32_t id=state->slots[slot].film;
     if(defaults.slots[slot].film!=id){
         m10v_slot *v=&defaults.slots[slot];v->film=(uint16_t)id;
-        v->grain=id==68||id==71?2:id>=66?1:0;v->soft=0;
+        v->grain=id==72?0:id==68||id==71?2:id>=66?1:0;v->soft=0;
         v->halo_gain=id==33?3:id==67?2:0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=id==66?1:2;
-        m10v_film_effects e={id==67||id==69||id==70?0:1,0,0,4,0,0,{0,0}};defaults.effects[slot]=e;
+        m10v_film_effects e={id==67||id==69||id==70||id==72?0:1,0,0,4,0,0,{0,0}};defaults.effects[slot]=e;
     }
     next.slots[slot]=defaults.slots[slot];next.effects[slot]=defaults.effects[slot];
     return commit(state,&next,store,context);
@@ -129,8 +129,8 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
     if(id==66&&state->slots[slot].film!=66){next.slots[slot].grain=1;next.slots[slot].soft=0;next.slots[slot].halo_gain=0;next.slots[slot].halo_spread=3;next.slots[slot].halo_threshold=5;next.slots[slot].halo_profile=1;
         m10v_film_effects e={1,0,0,4,0,0,{0,0}};next.effects[slot]=e;}
     if((id==67||id==68||id>=69)&&state->slots[slot].film!=id){
-        m10v_slot *v=&next.slots[slot];v->grain=id==68||id==71?2:1;v->soft=0;v->halo_gain=id==67?2:0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=2;
-        m10v_film_effects e={id==67||id==69||id==70?0:1,0,0,4,0,0,{0,0}};next.effects[slot]=e;
+        m10v_slot *v=&next.slots[slot];v->grain=id==72?0:id==68||id==71?2:1;v->soft=0;v->halo_gain=id==67?2:0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=2;
+        m10v_film_effects e={id==67||id==69||id==70||id==72?0:1,0,0,4,0,0,{0,0}};next.effects[slot]=e;
     }
     if(id!=68)next.effects[slot].film_exposure=0;
     return commit(state, &next, store, context);
@@ -172,8 +172,8 @@ int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,
     if(field==6?(state->slots[slot].film!=68||value>2):field==5?value!=0:value>limits[field])return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     if(field==5){
-        m10v_film_effects e={next.slots[slot].film==67||next.slots[slot].film==69||next.slots[slot].film==70?0:1,0,0,4,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
-        next.slots[slot].grain=next.slots[slot].film==68||next.slots[slot].film==71?2:next.slots[slot].film>=66?1:0;next.slots[slot].soft=0;
+        m10v_film_effects e={next.slots[slot].film==67||next.slots[slot].film==69||next.slots[slot].film==70||next.slots[slot].film==72?0:1,0,0,4,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
+        next.slots[slot].grain=next.slots[slot].film==72?0:next.slots[slot].film==68||next.slots[slot].film==71?2:next.slots[slot].film>=66?1:0;next.slots[slot].soft=0;
     } else if(field==6)next.effects[slot].film_exposure=(uint8_t)value;
     else ((uint8_t *)&next.effects[slot])[field]=(uint8_t)value;
     return commit(state,&next,store,ctx);

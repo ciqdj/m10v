@@ -183,7 +183,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             raise ValueError('invalid initial state header')
         for i in range(5):
             film, grain, soft, gain, spread, threshold, profile = struct.unpack_from('<H6B', initial, 12+i*8)
-            if not 1 <= film <= 71 or grain > 3 or soft > 3 or gain>8 or spread>8 or threshold>8 or profile>3: raise ValueError('invalid initial slot')
+            if not 1 <= film <= 72 or grain > 3 or soft > 3 or gain>8 or spread>8 or threshold>8 or profile>3: raise ValueError('invalid initial slot')
         if initial[52] > 2 or any(v > 3 for v in initial[53:56]) or struct.unpack_from('<I',initial,96)[0]!=0 or struct.unpack_from('<I',initial,100)[0] != zlib.crc32(initial[:100]):
             raise ValueError('invalid initial settings/checksum')
     if type(hdf_default) is not int or not 0<=hdf_default<=3:
@@ -463,7 +463,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if sd_library:
             texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
         if sd_library:texts+=['HDF 模拟','左右选择 OK保存 MENU取消','关闭','弱','中','强','读取或保存失败','全局数字柔焦 · 独立于胶卷']
-        texts+=['Portra 160','富士业务用 100','乐凯 C200']
+        texts+=['Portra 160','富士业务用 100','乐凯 C200','CCD Classic']
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
@@ -561,12 +561,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         icon_table = base + len(image)
         stock_directory = (ROOT/'native/gr3/m10v_stock_icon_directory.bin').read_bytes()
         icon_pixels = (ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
-        if len(stock_directory)!=671*4 or len(icon_pixels)!=71*6400: raise ValueError('icon inventory differs')
-        icon_count = 747 if sd_library else 742
+        if len(stock_directory)!=671*4 or len(icon_pixels)!=72*6400: raise ValueError('icon inventory differs')
+        icon_count = 748 if sd_library else 743
         icon_descriptors = icon_table + icon_count*4
-        icon_data = icon_descriptors + (76 if sd_library else 71)*8
-        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(76 if sd_library else 71))
-        image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(71))
+        icon_data = icon_descriptors + (77 if sd_library else 72)*8
+        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(77 if sd_library else 72))
+        image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(72))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
         image += icon_pixels
@@ -584,7 +584,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             movw ip,#671
             cmp r1,ip
             blo 1f
-            movw ip,#741
+            movw ip,#742
             cmp r1,ip
             bhi 1f
             lsl ip,r6,#2
@@ -599,13 +599,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             # Private resources fall back to immutable 40px icons unless their
             # live view owner has published a valid RAM descriptor directory.
             for i,index in enumerate((32,65,66,67,34)):
-                struct.pack_into('<I',image,icon_table-base+(742+i)*4,icon_descriptors+index*8)
-            text=icon_asm.read_text().replace('movw ip,#741','movw ip,#746')
+                struct.pack_into('<I',image,icon_table-base+(743+i)*4,icon_descriptors+index*8)
+            text=icon_asm.read_text().replace('movw ip,#742','movw ip,#747')
             for name,reg,idreg,ret in [('width',3,1,0x53209fd4),('height',3,1,0x5320a008),('draw',2,3,0x5320a80c)]:
                 text+=f"\n.global m10v_icon_directory_{name}\n.type m10v_icon_directory_{name},%function\nm10v_icon_directory_{name}:\n"
                 text+="push {r0-r12,lr}\nmrs ip,cpsr\npush {ip,lr}\n"
                 text+=f"movw r0,#{icon_table&65535}\nmovt r0,#{icon_table>>16}\nstr r0,[sp,#{8+reg*4}]\nldr r1,[sp,#{8+idreg*4}]\n"
-                text+=f"movw ip,#742\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#746\ncmp r1,ip\nbhi .L{name}_done\n"
+                text+=f"movw ip,#743\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#747\ncmp r1,ip\nbhi .L{name}_done\n"
                 text+=f"bl m10v_settings_controller_card_directory\ncmp r0,#0\nstrne r0,[sp,#{8+reg*4}]\n.L{name}_done:\npop {{ip,lr}}\nmsr cpsr_fs,ip\npop {{r0-r12,lr}}\nldr pc,={hex(ret)}\n.ltorg\n"
             icon_asm.write_text(text)
 
@@ -619,7 +619,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += bytes(isp_base-base-len(image)) + isp_code
     sha = lambda data: hashlib.sha256(data).hexdigest()
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
-                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 71, 'slots': 5,
+                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 72, 'slots': 5,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
                             ('native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
                              'native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py',
@@ -692,13 +692,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['film_cards']={'first_id':742,'last_id':746,'width':120,'height':196,'descriptor_storage':'view-owned-heap','descriptor_offset':470400,'directory_offset':470440,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':470464} if sd_library else None
+    manifest['film_cards']={'first_id':743,'last_id':747,'width':120,'height':196,'descriptor_storage':'view-owned-heap','descriptor_offset':470400,'directory_offset':470440,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':470464} if sd_library else None
     manifest['film_curated']=[]
     for i,payload in enumerate(curated_payloads):
         offset=bytes(image).find(payload)
         if offset<0:raise ValueError('curated LUT absent from compiled image')
         manifest['film_curated'].append({'film_id':69+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
-    manifest['icons']={'first_id':671,'last_id':741,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
+    manifest['icons']={'first_id':671,'last_id':742,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest

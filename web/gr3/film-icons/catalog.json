@@ -637,5 +637,14 @@
     "color": "#d94735",
     "icon_url": "/gr3/film-icons/71.png",
     "sha256": "a8705bcc4b7af0e14402798c0d38d86b877903e74c9a9f6304f5a7a883253751"
+  },
+  {
+    "id": 72,
+    "name": "CCD Classic",
+    "title": "GR",
+    "code": "CCD",
+    "color": "#567f8e",
+    "icon_url": "/gr3/film-icons/72.png",
+    "sha256": "9410856276b9b2d20b0e31afbefc76213a5db341cba9f03ceeb8cc05b9c35d1d"
   }
 ]

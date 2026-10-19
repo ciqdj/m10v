@@ -2,7 +2,7 @@
 #define M10V_LIBRARY_H
 #include <stdint.h>
 
-#define M10V_FILM_COUNT 71u
+#define M10V_FILM_COUNT 72u
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0
 #define M10V_LIBRARY_INVALID -1

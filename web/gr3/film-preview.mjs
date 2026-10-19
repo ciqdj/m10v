@@ -39,7 +39,7 @@ export function previewHarmanPixels(source, lut, film, filmExposure=0) {
   return previewRgbLutPixels(source,lut,table);
 }
 export function previewCuratedPixels(source,lut,film){
-  if(!Number.isInteger(film)||film<69||film>71)throw new RangeError('精选胶卷无效');
+  if(!Number.isInteger(film)||film<69||film>72)throw new RangeError('精选胶卷无效');
   return previewRgbLutPixels(source,lut,lut.stocks[film-69]?.values);
 }
 function previewRgbLutPixels(source,lut,table){
@@ -61,7 +61,7 @@ function previewRgbLutPixels(source,lut,table){
 let harmanTablesPromise,curatedTablesPromise;
 export async function renderPreviewPixels(source, look) {
   const film=look.film??look.id;
-  if([69,70,71].includes(film)){
+  if([69,70,71,72].includes(film)){
     curatedTablesPromise??=fetch(new URL('./curated-luts.json',import.meta.url)).then(r=>{
       if(!r.ok)throw new Error('精选胶卷预览色表载入失败');return r.json();
     }).catch(error=>{curatedTablesPromise=undefined;throw error;});

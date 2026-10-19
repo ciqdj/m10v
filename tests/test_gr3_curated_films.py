@@ -13,7 +13,7 @@ class CuratedFilmsTests(unittest.TestCase):
   cls.fn.argtypes=[C.c_uint32,C.POINTER(C.c_uint8),C.POINTER(C.c_uint8)]
  def test_assets_have_matching_provenance_and_c_web_bytes(self):
   from scripts.verify_gr3_curated_reference import verify
-  self.assertEqual(list(map(len,verify(ROOT))),[10125]*3)
+  self.assertEqual(list(map(len,verify(ROOT))),[10125]*4)
  def test_all_new_c_tables_match_independent_integer_tetrahedra(self):
   web=json.loads((ROOT/'web/gr3/curated-luts.json').read_text());rng=random.Random(697071)
   cases=[(r,g,b) for r in (0,255) for g in (0,255) for b in (0,255)]

@@ -18,7 +18,7 @@ class NativeLookTests(unittest.TestCase):
  def call(self,e,name,*args):
   e.call(self.manifest['symbols']['m10v_isp_native_look_'+name],*args);return e.u.reg_read(UC_ARM_REG_R0)
  def test_all_films_and_red_exposures_apply_owned_frame_without_cached_mutation(self):
-  for film,exposure in [(f,0) for f in range(33,72)]+[(68,1),(68,2)]:
+  for film,exposure in [(f,0) for f in range(33,73)]+[(68,1),(68,2)]:
    with self.subTest(film=film,exposure=exposure):
     e,s,f,g=self.fixture();before=bytes(e.u.mem_read(f,0x9000));cached=bytes(e.u.mem_read(g,0x3240));obj=bytes(e.u.mem_read(0x60000000,0x400))
     self.assertEqual(self.call(e,'prepare',s,film,exposure,41),1)
@@ -36,7 +36,7 @@ class NativeLookTests(unittest.TestCase):
  def test_rejection_and_reprepare_prevent_stale_cpu_skip(self):
   e,s,f,g=self.fixture()
   self.assertEqual(self.call(e,'prepare',s,66,0,7),1);self.assertEqual(self.call(e,'apply',s,g,f,0),1)
-  for film,exposure,generation in [(32,0,8),(72,0,8),(66,1,8),(68,3,8),(68,0,0)]:
+  for film,exposure,generation in [(32,0,8),(73,0,8),(66,1,8),(68,3,8),(68,0,0)]:
    self.assertEqual(self.call(e,'prepare',s,film,exposure,generation),0)
    self.assertEqual(self.call(e,'matches',s,66,0,7),0)
   self.assertEqual(self.call(e,'prepare',s,67,0,9),1)
@@ -64,7 +64,7 @@ class NativeLookTests(unittest.TestCase):
    self.assertEqual(bytes(e.u.mem_read(f+0x1c0,0x12a0-0x1c0)),bytes(e.u.mem_read(reference+0x1c0,0x12a0-0x1c0)))
  def test_actual_arm_stack_high_water_has_no_nested_sector_and_gamma_workspaces(self):
   rows=[]
-  for film in (33,66,67,68):
+  for film in (33,66,67,68,72):
    e,s,f,g=self.fixture(tone=12);self.assertEqual(self.call(e,'prepare',s,film,0,7),1)
    entry=0x5effff00;low=[entry]
    def observe(u,at,size,data):low[0]=min(low[0],u.reg_read(UC_ARM_REG_SP))
@@ -72,7 +72,7 @@ class NativeLookTests(unittest.TestCase):
    try:self.assertEqual(self.call(e,'apply',s,g,f,0),1)
    finally:e.u.hook_del(hook)
    used=entry-low[0];rows.append((film,used))
-   self.assertLessEqual(used,4000 if film in (66,67) else 2400)
+   self.assertLessEqual(used,4000 if film in (66,67,72) else 2400)
   self.assertGreater(dict(rows)[66],dict(rows)[33])
  def test_each_red_ei_has_distinct_profile(self):
   e,s,f,g=self.fixture();targets=[]

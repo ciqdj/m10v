@@ -70,7 +70,7 @@ function checkRuntime(runtime, manifest) {
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 71 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
+  need(manifest.film_count === 72 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
@@ -111,8 +111,8 @@ function checkRuntime(runtime, manifest) {
     need(m.film_id===w.id&&m.ei===w.ei&&m.bytes===payload.length&&m.sha256===sha(payload)&&spec.table_sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'Harman compiled payload differs');
   }
   const curated=JSON.parse(readFileSync(new URL('../web/gr3/curated-luts.json',import.meta.url)));
-  need(curated.stocks.length===3&&manifest.film_curated?.length===3,'curated inventory differs');
-  for(let i=0;i<3;i++){
+  need(curated.stocks.length===4&&manifest.film_curated?.length===4,'curated inventory differs');
+  for(let i=0;i<4;i++){
     const w=curated.stocks[i],m=manifest.film_curated[i],payload=Buffer.from(w.values);
     need(w.id===69+i&&m.film_id===w.id&&payload.length===10125&&m.bytes===payload.length&&m.sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'curated compiled payload differs');
   }
@@ -131,23 +131,23 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
-  need(icons?.first_id===671&&icons.last_id===741&&icons.width===40&&icons.height===40&&artwork.length===71*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,(manifest.sd_library?747:742)*4],[icons.descriptors,(manifest.sd_library?76:71)*8],[icons.pixels,71*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+(manifest.sd_library?747:742)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?76:71)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
-  for(let i=0;i<71;i++){
+  need(icons?.first_id===671&&icons.last_id===742&&icons.width===40&&icons.height===40&&artwork.length===72*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
+  for(const [address,length] of [[icons.table,(manifest.sd_library?748:743)*4],[icons.descriptors,(manifest.sd_library?77:72)*8],[icons.pixels,72*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+(manifest.sd_library?748:743)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?77:72)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(let i=0;i<72;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
   }
   if(manifest.sd_library){
     const c=manifest.film_cards;
-    need(c?.first_id===742&&c.last_id===746&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===743&&c.last_id===747&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
     }
-    for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(742+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
+    for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(743+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?195:154;
+  const resourceCount=manifest.sd_library?196:155;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -334,7 +334,7 @@ function patchList(manifest,runtime) {
       else p.replacement=0xe1a00000;
     }
   }
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?746:741),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?747:742),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){
@@ -443,7 +443,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:71,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:71,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:39,max_records:256,page_rows:8}:null,
+    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:72,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:72,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:40,max_records:256,page_rows:8}:null,
     menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},

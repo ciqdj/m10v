@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.1",
+      "date": "2026-10-20",
+      "title": "精选新增 CCD Classic，模拟老 GR DIGITAL 色彩",
+      "changes": [
+        "M10V 精选新增 CCD Classic，公开目录扩展到 40 款；参考老 GR DIGITAL 的清透直出方向，默认关闭颗粒、柔光、光晕和漏光，保留灰阶中性。",
+        "沿用 15³ 整数色表与原厂 ISP 拟合路径，兼顾色彩与速度；同步 GR III／GR IIIx／GR IV 共享目录、机内图标、大卡片及重置默认值。",
+        "更新配套 SD 胶卷包身份合同与资源边界，保留已有胶卷 ID 和五槽存储格式；更新固件后需重新下载匹配胶卷包。",
+        "完成 CCD 色表／ISP 专项、89 项原生与 ARM 集成测试、组合功能复测及 GR III／GR IIIx 候选构建；提供参数来源与离线对照，尚未完成老 GR 同场景真机标定。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.14",
       "date": "2026-10-19",
       "title": "降低 GR IV 固件重打包内存峰值",
@@ -10,9 +24,9 @@
         "完成来源与重放核验后立即释放大型临时副本，再执行独立解码回读；不取消型号、资源、版本、恢复与逐字节完整性检查。",
         "上一轮资源隔离已使超限构建单独退出并自动回滚，网站保持运行；本次降低构建峰值后重新执行三机型发布检查。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "61ac87619ee492b8f6f5775844c0aca0cb93272d",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/61ac87619ee492b8f6f5775844c0aca0cb93272d"
     },
     {
       "version": "2026.10.19.13",

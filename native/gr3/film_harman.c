@@ -7,7 +7,7 @@ extern const uint8_t *m10v_curated_table(uint32_t);
 static uint8_t clip(int x){return (uint8_t)(x<0?0:x>255?255:x);}
 #if M10V_TEXTURE_NEON
 const uint8_t *m10v_harman_texture_table(uint32_t variant){
-    if(variant>6)return 0;
+    if(variant>7)return 0;
 #if M10V_FILM_COLOR_CANDIDATE
     if(variant==0)return &m10v_phoenix_ii_candidate_lut[0][0];
 #endif
@@ -15,7 +15,7 @@ const uint8_t *m10v_harman_texture_table(uint32_t variant){
 }
 #endif
 void m10v_harman_rgb(uint32_t variant,const uint8_t rgb[3],uint8_t out[3]){
-    if(variant>6){for(uint32_t c=0;c<3;c++)out[c]=rgb[c];return;}
+    if(variant>7){for(uint32_t c=0;c<3;c++)out[c]=rgb[c];return;}
     const uint8_t (*table)[3]=variant>=4?(const uint8_t (*)[3])m10v_curated_table(variant-4):m10v_harman_luts[variant];
 #if M10V_FILM_COLOR_CANDIDATE
     if(variant==0)table=m10v_phoenix_ii_candidate_lut;

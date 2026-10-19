@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection} from '../web/gr3/native-library-state.mjs';
 import {initialState,nativeCatalog} from './gr3-native-library.mjs';
 test('one catalogue accepts every legacy simulation as a real camera slot',async()=>{
- const c=await nativeCatalog();assert.equal(c.films.length,39);assert.deepEqual(c.films.filter(f=>f.group==='M10V精选').map(f=>f.id),[33,66,67,68,69,70,71]);
+ const c=await nativeCatalog();assert.equal(c.films.length,40);assert.deepEqual(c.films.filter(f=>f.group==='M10V精选').map(f=>f.id),[33,66,67,68,69,70,71,72]);
  assert.equal(c.films.find(f=>f.legacy_id==='ektar100').id,34);
  const cfg=defaultConfiguration();cfg.slots[0].film=34;cfg.slots[1].film=65;
  assert.equal(normalizeConfiguration(cfg).slots[0].film,34);

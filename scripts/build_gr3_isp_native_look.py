@@ -80,10 +80,10 @@ def profiles():
     film33={'matrix_q13':[8192,0,0,0,8192,0,0,0,8192],'post_q9':post,'curves':curve}
     header+='static const native_frame_packed native_800t_frame = '+frame(film33)+';\n'
     curated=json.loads((ROOT/'native/gr3/curated-reference.json').read_text())
-    header+='static const native_frame_packed native_curated_frame[3] = {'+','.join(frame(q) for q in curated['native_profiles_full'])+'};\n'
-    header+='static const int16_t native_curated_hue[3][108] = {'+','.join(arr([v for sector in q['hue_q10'] for row in sector for v in row]) for q in curated['native_profiles_full'])+'};\n'
+    header+='static const native_frame_packed native_curated_frame[4] = {'+','.join(frame(q) for q in curated['native_profiles_full'])+'};\n'
+    header+='static const int16_t native_curated_hue[4][108] = {'+','.join(arr([v for sector in q['hue_q10'] for row in sector for v in row]) for q in curated['native_profiles_full'])+'};\n'
     header+='static const uint8_t native_curve_stream['+str(len(curve_data))+'] = '+arr(curve_data)+';\n'
-    evidence={'schema':'gr3-native-look/v1','camera_validated':False,'hardware_pixel_emulated':False,'old_cpu_color_equivalent':False,'static_profile_bytes':9*48+len(curve_data)+5*216,'curve_stream_bytes':len(curve_data),'profile_curve_encoding':'lossless 2bit delta-of-delta with8bit absolute escape; exact original256 knots',
+    evidence={'schema':'gr3-native-look/v1','camera_validated':False,'hardware_pixel_emulated':False,'old_cpu_color_equivalent':False,'static_profile_bytes':10*48+len(curve_data)+6*216,'curve_stream_bytes':len(curve_data),'profile_curve_encoding':'lossless 2bit delta-of-delta with8bit absolute escape; exact original256 knots',
        '800t':'new representable native creative definition: contrast264 saturation238 lift1 bend3, blue/cyan midtone tint; old YUV LUT equivalence unclaimed',
        'curated':{str(q['film_id']):q['holdout'] for q in curated['native_profiles_full']},
        'profiles':{'5207':fit['targets']['5207']['metrics']['random_holdout'],'phoenix':fit['targets']['phoenix_ii']['metrics']['random_holdout'],

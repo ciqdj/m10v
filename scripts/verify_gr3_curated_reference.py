@@ -12,9 +12,9 @@ def verify(root):
  text=(root/'native/gr3/film_curated_data.h').read_text()
  payloads=[bytes(map(int,v)) for v in re.findall(r'\{(\d+),(\d+),(\d+)\}',text)]
  flat=b''.join(payloads)
- if len(flat)!=3*10125 or len(web['stocks'])!=3 or len(ref['stocks'])!=3:raise ValueError('curated inventory')
+ if len(flat)!=4*10125 or len(web['stocks'])!=4 or len(ref['stocks'])!=4:raise ValueError('curated inventory')
  out=[]
- for i in range(3):
+ for i in range(4):
   w=web['stocks'][i];s=ref['stocks'][i]
   if w['id']!=69+i or s['id']!=w['id'] or s['name']!=w['name']:raise ValueError('curated identity')
   if len(w['values'])!=10125 or any(type(v) is not int or not 0<=v<=255 for v in w['values']):raise ValueError('curated bounds')

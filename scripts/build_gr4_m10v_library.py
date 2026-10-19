@@ -34,7 +34,7 @@ def validate_state(raw):
     if len(raw)!=104 or struct.unpack_from('<IHHI',raw)!=(0x5630314d,4,104,0) or zlib.crc32(raw[:100])!=struct.unpack_from('<I',raw,100)[0]:raise ValueError('invalid GR4 initial state')
     for i in range(5):
         f,g,s,a,b,c,p=struct.unpack_from('<H6B',raw,12+i*8)
-        if not 1<=f<=71 or g>3 or s>3 or max(a,b,c)>8 or p>3:raise ValueError('invalid GR4 initial slot')
+        if not 1<=f<=72 or g>3 or s>3 or max(a,b,c)>8 or p>3:raise ValueError('invalid GR4 initial slot')
         e=raw[56+i*8:64+i*8]
         if any(x>v for x,v in zip(e,[2,8,5,8,1,2,0,0])) or (f!=68 and e[5]):raise ValueError('invalid GR4 texture')
     if raw[52]>2 or max(raw[53:56])>3 or any(raw[96:100]):raise ValueError('invalid GR4 stamp')
@@ -139,7 +139,7 @@ m10v_chain_capture:
     sources.update(str(p.relative_to(ROOT)) for p in (ROOT/'native/gr4').glob('*.h'))
     sources.update(['native/gr4/ui-abi.json','scripts/build_gr4_settings_hooks.py','scripts/build_gr4_native_detail.py'])
     m={'schema':'m10v-gr4-native-film-runtime/v1','base':base,'code_bytes':len(image),
-        'code_sha256':sha(image),'symbols':symbols,'film_count':71,'slots':5,'carrier_tones':[36,37,38,39,40],
+        'code_sha256':sha(image),'symbols':symbols,'film_count':72,'slots':5,'carrier_tones':[36,37,38,39,40],
         'initial_state_hex':initial.hex(),'initial_state_offset':bytes(image).find(initial),
         'settings_menu':settings,'detail':detail,'continuations':continuations,
         'debug_mode':debug_mode,'debug_build_id':debug_build_id,'sd_library':True,'camera_tested':False,

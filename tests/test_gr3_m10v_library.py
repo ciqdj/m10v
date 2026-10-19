@@ -109,7 +109,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual([slot.film for slot in state.slots], [34,35,36,37,33])
         names = [self.lib.m10v_library_name(i) for i in range(1, 66)]
         self.assertEqual(len(set(names)), 65); self.assertTrue(all(names))
-        self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(72))
+        self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(73))
         state.slots[2].film = 31
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 0)
 
@@ -127,7 +127,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 1)
         before = bytes(state)
         self.assertLess(self.lib.m10v_library_select(C.byref(state), 5, 1, success, None), 0)
-        self.assertLess(self.lib.m10v_library_select(C.byref(state), 0, 72, success, None), 0)
+        self.assertLess(self.lib.m10v_library_select(C.byref(state), 0, 73, success, None), 0)
         self.assertEqual(bytes(state), before)
 
     def test_neutral_disabled_effects_are_byte_identical_and_padding_is_protected(self):
