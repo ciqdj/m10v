@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.14",
+      "date": "2026-10-19",
+      "title": "降低 GR IV 固件重打包内存峰值",
+      "changes": [
+        "将 GR IV 校验和工作区改为 64 KiB 分块，避免为完整解码固件额外复制整幅 word 数组及切片；计算结果保持一致。",
+        "完成来源与重放核验后立即释放大型临时副本，再执行独立解码回读；不取消型号、资源、版本、恢复与逐字节完整性检查。",
+        "上一轮资源隔离已使超限构建单独退出并自动回滚，网站保持运行；本次降低构建峰值后重新执行三机型发布检查。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.13",
       "date": "2026-10-19",
       "title": "隔离发布构建资源，避免拖住服务器",
@@ -10,9 +23,9 @@
         "每机型构建最多 10 分钟，失败或连接中断会停止整组子进程并执行原有回滚；增加阶段开始和失败日志。",
         "发布任务等待窗口覆盖三个受限构建阶段，保留 GR III、GR IIIx、GR IV 全量构建和服务健康校验。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "ee8215d81fce287bef1e8d1bf35a850f1c8583bf",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ee8215d81fce287bef1e8d1bf35a850f1c8583bf"
     },
     {
       "version": "2026.10.19.12",

@@ -17,3 +17,5 @@ HTTPS Webhook 方案因 GitHub Actions 到本站 TLS 连接重置暂不启用，
 服务器仅约 1.6 GiB 可用物理内存；Node 的 `--max-old-space-size` 不限制固件 Buffer、Python 或 clang。每个机型现在在独立 systemd transient service 内顺序执行：`MemoryMax=900M`、`MemorySwapMax=64M`、`CPUQuota=100%`、`TasksMax=64`、`RuntimeMaxSec=600`。OOM 或超时终止整个控制组；SSH 中断也显式停止当前单元并回滚。Actions 总窗口为 35 分钟，以覆盖三个各 10 分钟的阶段。不要通过取消三机型检查或无限扩大交换来绕过失败。
 
 查看 `FIRMWARE_BUILD_START` 对应 unit 的 `journalctl -u UNIT` 和 `systemctl show UNIT -p MemoryPeak -p Result`；成功仍必须以确切 SHA 的 `DEPLOY_OK` 为准。修改脚本后先通过既有管理员连接更新 `/usr/local/lib/m10v-deploy/update-server.sh` 的 root 拷贝并校验摘要。
+
+GR IV 重打包的校验和按 64 KiB 分块计算；已核验的来源解码、重放缓冲在独立回读前释放。`tests.test_gr4_codec_memory` 对校验和额外分配设定回归预算，避免重新引入整幅固件复制。900 MiB 限制保持不变。

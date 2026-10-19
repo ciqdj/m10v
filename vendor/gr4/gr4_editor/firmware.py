@@ -410,6 +410,7 @@ def _repack_frames(candidate: bytes, original: bytes, target: bytes, growth: boo
     recovered, frames = decode_payload(source_payload, len(original))
     if recovered != original:
         raise FirmwareError('repack source stream differs from imported decoded bytes')
+    del recovered  # Source verification done; drop the duplicate decoded image.
     if growth:
         aligned, insertions, changes = (_aligned_resource_target(original, target) if resource_changes else
                                        _aligned_target(original, target))
@@ -454,9 +455,12 @@ def _repack_frames(candidate: bytes, original: bytes, target: bytes, growth: boo
     encoded.extend(b'\0\0')
     if output != target:
         raise FirmwareError('repack output differs from intended target')
+    # Keep independent readback, release completed replay/history first.
+    del output, aligned, insertions, source_payload
     independent, new_frames = decode_payload(encoded, len(target))
     if independent != target:
         raise FirmwareError('fresh-history decode differs from intended target')
+    del independent
     return bytes(encoded), {'source_frames': len(frames), 'reused_frames': reused,
                             'replaced_frames': replaced, 'generated_literal_frames': generated,
                             'result_frames': len(new_frames), 'section_insertions': changes,
@@ -500,6 +504,7 @@ def repack_image(image: FirmwareImage, new_rtos: bytes, new_icon_bytes: bytes | 
     source_policy = inspect_update_policy(image.rtos)
     policy_rtos, policy_installation = prepare_update_policy(new_rtos, allow_older=allow_older)
     target_rtos = _patch_rtos_version(policy_rtos, old, new)
+    del policy_rtos
     if len(target_rtos) < len(image.rtos) or len(target_rtos) % 4:
         raise FirmwareError('RTOS replacement must be word aligned and cannot shrink')
     icons = image.icon_bytes if new_icon_bytes is None else bytes(new_icon_bytes)

@@ -11,17 +11,23 @@ import sys
 def sum32(data):
     if len(data) % 4:
         raise ValueError('32-bit additive checksum requires a word-aligned length')
-    words = array('I')
-    words.frombytes(data)
-    if sys.byteorder != 'little':
-        words.byteswap()
-    return sum(words) & 0xFFFFFFFF
+    # Bound workspace independently of a 100+ MiB decoded image.
+    view = memoryview(data)
+    total = 0
+    for offset in range(0, len(view), 64 * 1024):
+        words = array('I')
+        words.frombytes(view[offset:offset + 64 * 1024])
+        if sys.byteorder != 'little':
+            words.byteswap()
+        total += sum(words)
+    return total & 0xFFFFFFFF
+
 
 def repair_last_word(data):
     result = bytearray(data)
     if len(result) < 4 or len(result) % 4:
         raise ValueError('invalid checksum-bearing buffer length')
-    struct.pack_into('<I', result, len(result)-4, (-sum32(result[:-4])) & 0xFFFFFFFF)
+    struct.pack_into('<I', result, len(result)-4, (-sum32(memoryview(result)[:-4])) & 0xFFFFFFFF)
     return bytes(result)
 
 def inspect_container(data):

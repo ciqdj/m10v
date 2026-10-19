@@ -42,7 +42,7 @@ class BaotaPublishTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
   self.root=Path(self.tmp.name);self.bin=self.root/'commands';self.bin.mkdir()
-  for name in ('git','systemctl','systemd-run','runuser','flock','chown','curl','sleep'):
+  for name in ('git','systemctl','systemd-run','journalctl','runuser','flock','chown','curl','sleep'):
    p=self.bin/name;p.write_text(FAKE);p.chmod(0o755)
   (self.root/'head').write_text(BEFORE)
   (self.root/'.venv/bin').mkdir(parents=True)

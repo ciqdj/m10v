@@ -113,6 +113,7 @@ for model in gr3 gr3x gr4; do
   # wait is interruptible, so SSH termination reaches cleanup immediately.
   if ! wait "$build_pid"; then
     cat "$work/$model.log" >&2
+    journalctl -u "$active_unit" -n 12 --no-pager >&2 || true
     printf 'FIRMWARE_BUILD_FAILED model=%s (resource limit, timeout or build error)\n' "$model" >&2
     exit 1
   fi
