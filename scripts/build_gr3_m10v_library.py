@@ -152,15 +152,16 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
 
 
 def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False):
+    native_owned=bool(native_color and native_grain and recipe_snapshot and lifecycle_trace)
     if live_color and (not native_color or not sd_library):raise ValueError('live color requires native color and owned settings')
-    if type(texture_neon) is not bool or (texture_neon and (not spatial_neon or not debug_mode)):raise ValueError('full texture blocks require debug NEON ownership')
+    if type(texture_neon) is not bool or (texture_neon and (not spatial_neon or not (debug_mode or native_owned))):raise ValueError('full texture blocks require debug NEON ownership')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native color/snapshot ownership')
     if type(view_deferred)is not bool or (view_deferred and not lifecycle_trace):raise ValueError('view recovery requires diagnostic owned pipeline')
     if type(native_color)is not bool or (native_color and not recipe_snapshot):raise ValueError('native color requires per-recipe snapshot')
     if type(save_chain_trace) is not bool or (save_chain_trace and not lifecycle_trace):raise ValueError('save chain trace requires owned lifecycle tracing')
     if type(recipe_snapshot) is not bool or (recipe_snapshot and not lifecycle_trace):raise ValueError('per-frame snapshot requires owned lifecycle storage')
-    if type(lifecycle_trace) is not bool or (lifecycle_trace and not debug_mode):raise ValueError('lifecycle tracing requires debug mode')
-    if type(candidate_color) is not bool or type(spatial_neon) is not bool or ((candidate_color or spatial_neon) and not debug_mode):
+    if type(lifecycle_trace) is not bool or (lifecycle_trace and not (debug_mode or native_owned)):raise ValueError('lifecycle tracing requires debug mode')
+    if type(candidate_color) is not bool or type(spatial_neon) is not bool or ((candidate_color or spatial_neon) and not (debug_mode or native_owned)):
         raise ValueError('experimental color/NEON requires explicit debug mode')
     if type(profile_mode) is not bool or (profile_mode and not debug_mode):
         raise ValueError('capture profiling requires debug mode')
@@ -291,9 +292,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
                 image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
         debug_flags = [*profile_flags,f'-DM10V_HDF_SHARED_RECIPE={int(hdf_enabled and lifecycle_trace)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}',f'-DM10V_RECIPE_SNAPSHOT={int(recipe_snapshot)}',f'-DM10V_RAW_LIFETIME={int(save_chain_trace)}',f'-DM10V_ISP_NATIVE_LOOK={int(native_color)}',f'-DM10V_ISP_NATIVE_GRAIN_MODE={int(native_grain)}']
-        if debug_mode:
+        if debug_mode or lifecycle_trace:
             debug_obj = folder / 'debug.o'
-            subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_debug.c'),'-o',str(debug_obj)],check=True,capture_output=True)
+            debug_source=ROOT/'native/gr3/m10v_debug.c'
+            if not debug_mode:
+                debug_source=folder/'debug-disabled.c'
+                debug_source.write_text('#include <stdint.h>\nint m10v_debug_batch(const uint32_t *e,uint32_t n){(void)e;(void)n;return 0;}\nint m10v_debug_log(uint32_t e,uint32_t a,uint32_t b,uint32_t c,uint32_t d){(void)e;(void)a;(void)b;(void)c;(void)d;return 0;}\n')
+            subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(debug_source),'-o',str(debug_obj)],check=True,capture_output=True)
             debug_base=(base+len(image)+15)&~15
             debug,debug_symbols=link_object(debug_obj.read_bytes(),debug_base,prefix='m10v_debug_')
             image+=bytes(debug_base-base-len(image))+debug;symbols.update(debug_symbols)

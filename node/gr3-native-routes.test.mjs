@@ -52,7 +52,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(built.status,200,await built.clone().text());
   const bytes=Buffer.from(await built.arrayBuffer());const receipt=JSON.parse(Buffer.from(built.headers.get('X-M10V-Native-Receipt'),'base64'));
   assert.equal(receipt.candidate_sha256,createHash('sha256').update(bytes).digest('hex'));
-  assert.deepEqual(receipt.configuration,config);assert.equal(receipt.camera_tested,false);assert.equal(receipt.verified_hooks,61);
+  assert.deepEqual(receipt.configuration,config);assert.equal(receipt.camera_tested,false);assert.equal(receipt.verified_hooks,95);
   assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,200);
   assert.equal((await post(`/api/projects/${xid}/native-library/build`,{configuration:config,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
   const nrPlan=await (await post(route+'prepare',{configuration:config,extensions:nrExtensions})).json();
@@ -63,14 +63,14 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(nrReceipt.composition.raw_nr.patch_count,3);assert.deepEqual(nrReceipt.extensions,nrExtensions);
   assert.equal(nrReceipt.candidate_sha256,createHash('sha256').update(Buffer.from(await nrBuilt.arrayBuffer())).digest('hex'));
   assert.deepEqual(receipt.still_isp_base,{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true});
-  assert.deepEqual(receipt.live_view_base,{tone:11,carriers:[12,18,19,20,21],film_color_preview:false});
+  assert.deepEqual(receipt.live_view_base,{tone:11,carriers:[12,18,19,20,21],film_color_preview:true});
   assert.equal(receipt.debug_mode,false);
   const debugBuilt=await post(route+'build',{configuration:config,debug_mode:true,accepted_configuration_sha256:debugPlan.configuration_sha256});
   assert.equal(debugBuilt.status,200,debugBuilt.status===200?'':await debugBuilt.text());
   const debugReceipt=JSON.parse(Buffer.from(debugBuilt.headers.get('X-M10V-Native-Receipt'),'base64'));
   assert.equal(debugReceipt.debug_mode,true);assert.equal(debugReceipt.debug_log.build_id,debugPlan.configuration_sha256.slice(0,8));
   assert.equal(debugReceipt.candidate_sha256,createHash('sha256').update(Buffer.from(await debugBuilt.arrayBuffer())).digest('hex'));
-  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,94);assert.equal(debugReceipt.capture_pipeline,'gr3-native-v7');assert.equal(debugReceipt.experimental_capture.native_color,true);assert.equal(debugReceipt.experimental_capture.native_grain,true);
+  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,95);assert.equal(debugReceipt.capture_pipeline,'gr3-native-v8');assert.equal(debugReceipt.experimental_capture.native_color,true);assert.equal(debugReceipt.experimental_capture.native_grain,true);
   assert.equal(receipt.external_film_pack,true);assert.equal(receipt.initial_state_hex.length,208);
   assert.equal(receipt.version_unlock.enabled,false);
   const unlocked=await post(route+'build',{configuration:config,version_unlock,accepted_configuration_sha256:unlockPlan.configuration_sha256});
@@ -107,13 +107,13 @@ test('original M10V web workflow binds all five slots and timestamp into audited
 });
 
 
-test('HDF feature at strength zero selects its own allocator and preserves default V7',async()=>{
+test('HDF feature at strength zero selects its own allocator and shares the native owner',async()=>{
  const {readNativeOfficial,prepareNative}=await import('./gr3-native-library.mjs');
  const source=await readNativeOfficial(),configuration=defaultConfiguration();
  const original=prepareNative(source,configuration,{debug_mode:true});
- assert.equal(original.capture_pipeline,'gr3-native-v7');assert.equal(original.hdf_enabled,false);
+ assert.equal(original.capture_pipeline,'gr3-native-v8');assert.equal(original.hdf_enabled,false);
  const hdf=prepareNative(source,configuration,{debug_mode:true,hdf_enabled:true});
- assert.equal(hdf.configuration.hdf,0);assert.equal(hdf.capture_pipeline,'gr3-native-hdf');
+ assert.equal(hdf.configuration.hdf,0);assert.equal(hdf.capture_pipeline,'gr3-native-v8');
  assert.ok(hdf.features.includes('digitalHdf'));assert.notEqual(hdf.configuration_sha256,original.configuration_sha256);
  const standalone=prepareNative(source,configuration,{film_library:false});
  assert.equal(standalone.capture_pipeline,'gr3-native-hdf');assert.equal(standalone.hdf_enabled,true);

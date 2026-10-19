@@ -12,7 +12,7 @@ const configuration=defaultConfiguration();
  s.halo={gain:film===33?3:film===67?2:0,spread:3,threshold:5,profile:2};
  s.effects={grainSize:0,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0,filmExposure:0};
 });
-const options={debug_mode:true,live_color:true,hdf_enabled:true,extensions:{aspect:true,level:true,negativeGrain:true}};
+const options={debug_mode:process.env.M10V_RELEASE_BUILD!=='1',live_color:true,hdf_enabled:true,extensions:{aspect:true,level:true,negativeGrain:true}};
 const official=await readNativeOfficial('gr3'),plan=prepareNative(official,configuration,options);
 const result=await generateNative(official,configuration,plan.configuration_sha256,options);
 if(!result.receipt.live_view_base?.film_color_preview||result.manifest.capture_lifecycle.snapshot.live_color!==true)throw Error('Missing live color hook');
@@ -23,4 +23,4 @@ for(const [name,data] of Object.entries({'configuration.json':configuration,'rec
 await writeFile(path.join(out,'evidence/M10V-runtime-arm.bin'),result.runtime);
 const hash=b=>createHash('sha256').update(b).digest('hex');
 await writeFile(path.join(out,'SHA256SUMS'),`${hash(result.candidate)}  fwdc239b.bin\n${hash(pack)}  M10V/FILMS.M10\n`);
-console.log(JSON.stringify({out,bytes:result.candidate.length,sha256:hash(result.candidate),build_id:result.receipt.debug_log.build_id,verified_hooks:result.receipt.verified_hooks,live_color:true,camera_tested:false},null,2));
+console.log(JSON.stringify({out,bytes:result.candidate.length,sha256:hash(result.candidate),build_id:result.receipt.debug_log?.build_id??'release',verified_hooks:result.receipt.verified_hooks,live_color:true,camera_tested:false},null,2));

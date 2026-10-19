@@ -72,7 +72,7 @@ function checkRuntime(runtime, manifest) {
   need(manifest.film_count === 68 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
-  if(manifest.experimental_capture?.texture_neon)need(manifest.debug_mode===true&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
+  if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
   need(typeof manifest.sd_library==='boolean','missing SD capability');
   need(!manifest.sd_library||(runtime.includes(Buffer.from('C:\\M10V\\FILMS.M10'))&&['m10v_sd_camera_item','m10v_sd_camera_install'].every(n=>Number.isInteger(manifest.symbols[n])&&manifest.symbols[n]>=BASE&&manifest.symbols[n]<BASE+runtime.length)),'SD runtime incomplete');
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
@@ -83,7 +83,7 @@ function checkRuntime(runtime, manifest) {
     const header=readFileSync(new URL('../native/gr3/m10v_film_color_candidates.h',import.meta.url),'utf8');
     const names=['m10v_5207_candidate_lut','m10v_phoenix_ii_candidate_lut'];
     const metadata=JSON.parse(readFileSync(new URL('../native/gr3/isp-film-targets.json',import.meta.url))).cpu_candidates;
-    need(manifest.debug_mode===true&&manifest.color_candidates?.length===2,'color candidate requires debug runtime');
+    need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&manifest.color_candidates?.length===2,'color candidate requires debug runtime');
     for(let i=0;i<2;i++){
       const match=header.match(new RegExp(names[i]+'\\[3375\\]\\[3\\]\\s*=\\s*\\{([\\s\\S]*?)\\n\\};'));
       need(match,'missing candidate color table');
@@ -111,12 +111,13 @@ function checkRuntime(runtime, manifest) {
   }
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
   need(init.length === 104 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+104).equals(init), 'native initial settings readback differs');
+  const quietDebugSinks=!!manifest.capture_lifecycle&&manifest.experimental_capture?.native_color===true&&['m10v_debug_log','m10v_debug_batch'].every(name=>{const at=manifest.symbols?.[name]-BASE;return Number.isInteger(at)&&at>=0&&at+8<=runtime.length&&runtime.readUInt32LE(at)===0xe3a00000&&runtime.readUInt32LE(at+4)===0xe12fff1e;});
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
     manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
     /^[0-9a-f]{8}$/.test(manifest.debug_log.build_id)&&manifest.debug_log.page_bytes===4096&&manifest.debug_log.records_per_channel===63&&
     JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'])&&
     manifest.debug_log.files.every(name=>runtime.includes(Buffer.from('C:\\'+name))):
-    !manifest.debug_log&&!manifest.symbols?.m10v_debug_log&&!manifest.symbols?.m10v_debug_batch&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
+    !manifest.debug_log&&((!manifest.symbols?.m10v_debug_log&&!manifest.symbols?.m10v_debug_batch)||quietDebugSinks)&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
   for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log','m10v_debug_batch']:[])]) {
     const address = manifest.symbols?.[name];
     need(Number.isInteger(address) && address % 4 === 0 && address >= BASE + 0x100 && address < BASE + runtime.length,
@@ -241,7 +242,7 @@ function checkIspBase(runtime,manifest) {
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
  const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
- need(manifest.debug_mode===true&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x50f0&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
+ need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x50f0&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
  const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],
   ...[0x535153ec,0x53516e14,0x53516ebc,0x5351897c,0x5351af20,0x5351feb4].map(a=>[a,0x535216d0,'m10v_save_trace_recipe_allocate']),
   ...[0x5351703c,0x535170cc,0x535182f8,0x5351f3a8,0x5351fd50].map(a=>[a,0x53521d14,'m10v_save_trace_recipe_release'])];

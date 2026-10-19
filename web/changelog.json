@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.10",
+      "date": "2026-10-19",
+      "title": "GR III 原厂 ISP 胶卷、取景色彩与 HDF 发布",
+      "changes": [
+        "普通 GR III 胶卷导出默认使用经本轮测试机验收的原厂 ISP 色彩与颗粒路径，修正拍摄配置偏移错误，避免原生调色后再次进行 CPU 全图调色。",
+        "接入实时取景色彩，保留 800T 与蓝凤凰光晕；合并 HDF 独立菜单、逐张配置与原厂 Clarity 处理，保留原厂缓冲、RAW 与保存所有权。",
+        "修复胶卷库卡片元数据写入只读固件导致的菜单退出问题，卡片数据改由页面拥有并随页面释放。",
+        "将原厂处理路径与调试日志开关分离；关闭调试仍使用原生处理，开启时记录 HDF 配置、门控、参数和处理返回，便于继续排查。",
+        "上述实机确认来自当前测试机；GR IIIx 与 GR IV 保持各自既有机型处理和发布保护。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.9",
       "date": "2026-10-19",
       "title": "GR III 新增独立 HDF 模拟菜单，退役胶卷柔光",
@@ -11,9 +26,9 @@
         "数字柔焦复用原厂 Clarity 处理链，不增加全帧扫描或整帧缓冲；已完成离线 ARM、菜单与候选回读验证，机身连拍、写卡耗时和成像仍待实机验收。",
         "合并已发布的宝塔迁移、官方固件基线提取及工作台更新，保留现有机型与发布保护。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "f6078af731a32f498104bf65db8ca29ef663376a",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/f6078af731a32f498104bf65db8ca29ef663376a"
     },
     {
       "version": "2026.10.19.8",

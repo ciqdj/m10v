@@ -10,8 +10,8 @@ test('debug mode is off by default and changes the accepted firmware plan',async
  const configuration=defaultConfiguration();
  const normal=prepareNative(source,configuration),debug=prepareNative(source,configuration,{debug_mode:true});
  assert.equal(normal.debug_mode,false);
- assert.equal(normal.capture_pipeline,'software');
- assert.equal(debug.capture_pipeline,'gr3-native-v7');
+ assert.equal(normal.capture_pipeline,'gr3-native-v8');
+ assert.equal(debug.capture_pipeline,'gr3-native-v8');
  assert.equal(debug.debug_mode,true);
  assert.equal(debug.runtime_source_sha256,nativeSourceFingerprint());
  assert.match(debug.runtime_source_sha256,/^[0-9a-f]{64}$/);
