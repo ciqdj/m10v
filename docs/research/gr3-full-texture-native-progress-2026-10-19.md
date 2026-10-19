@@ -17,7 +17,7 @@ batch preflight or unbatchable tails continue through scalar processing.
 There is no new image-sized allocation, persistent pixel pointer, worker queue, DMA,
 RAW access or changed encoder/save call. The additional batch parameters occupy76
 stack bytes; the isolated ARM block module is2736 bytes. The final runtime is638760
-bytes within the655360-byte limit.
+bytes.
 
 Actual linked ARM full-width comparison uses6000x2 visible pixels, stride6008,
 seedffffffff, real candidate LUTs and complete random Y/C input. All visible pixels,

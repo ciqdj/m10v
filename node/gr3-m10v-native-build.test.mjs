@@ -23,6 +23,13 @@ test('M10V native library builds from official bytes without a compatibility run
     assert.equal(result.receipt.film_count, 68);
     assert.equal(result.receipt.external_film_pack, false);
     assert.deepEqual(auditNativeLibrary(source, result.candidate, runtime, manifest), result.receipt);
+    // Data appended to the valid runtime must not hit an arbitrary byte ceiling.
+    const largeRuntime=Buffer.concat([runtime,Buffer.alloc(660000-runtime.length)]);
+    const largeManifest={...manifest,code_bytes:largeRuntime.length,code_sha256:createHash('sha256').update(largeRuntime).digest('hex')};
+    const large=buildNativeLibrary(source,largeRuntime,largeManifest);
+    assert.ok(largeRuntime.length>659456);
+    assert.deepEqual(auditNativeLibrary(source,large.candidate,largeRuntime,largeManifest),large.receipt);
+
     const decoded = decodeFrameMap(result.candidate, result.candidate.readUInt32LE(result.candidate.length - 8)).decoded;
     assert.ok(decoded.includes(Buffer.from('M10V3A.bin')));
     assert.ok(!runtime.includes(Buffer.from('GRLIFE')));

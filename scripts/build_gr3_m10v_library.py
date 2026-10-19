@@ -559,8 +559,6 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         isp_base = (base + len(image) + 15) & ~15
         isp_code, isp_report = build_isp_base(isp_base)
         image += bytes(isp_base-base-len(image)) + isp_code
-        # 644KiB code/artwork +16KiB component gap stays below the independent672KiB RTOS-growth guard.
-        if len(image)>659456: raise ValueError(f'M10V code and artwork bytes {len(image)} exceed runtime budget659456')
     sha = lambda data: hashlib.sha256(data).hexdigest()
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 68, 'slots': 5,

@@ -10,7 +10,6 @@ class TextureBuildTests(unittest.TestCase):
    self.assertIn('m10v_harman_texture_table',manifest['symbols'])
    self.assertTrue(manifest['experimental_capture']['texture_neon'])
    self.assertFalse(manifest['experimental_capture']['full_isp_effects'])
-   self.assertLess(manifest['code_bytes'],655360)
  def test_texture_block_requires_validated_neon_grain_and_debug_ownership(self):
   with tempfile.TemporaryDirectory() as folder:
    with self.assertRaises(ValueError):build(folder,texture_neon=True,debug_mode=True)

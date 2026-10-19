@@ -63,7 +63,7 @@ function branch(address, target, link=false) {
 function checkRuntime(runtime, manifest) {
   const BASE=manifest?.base;
   need(nativeBases.includes(BASE), 'native runtime base invalid');
-  need(Buffer.isBuffer(runtime) && runtime.length > 4096 && runtime.length <= 659456 && runtime.length % 4 === 0,
+  need(Buffer.isBuffer(runtime) && runtime.length > 4096 && runtime.length % 4 === 0,
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');

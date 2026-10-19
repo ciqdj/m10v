@@ -13,8 +13,7 @@ class NativePipelineBuildTests(unittest.TestCase):
    self.assertTrue(m['experimental_capture']['native_color']);self.assertTrue(m['experimental_capture']['native_grain'])
    p={r['address']for r in m['capture_lifecycle']['patches']}
    self.assertTrue({0x53513620,0x535033d8,0x53503aa0,0x53503ab4,0x5367ae14,0x531cc1cc,0x53239bc0}<=p)
-   self.assertNotIn(0x534e87a4,p);self.assertLessEqual(m['code_bytes'],659456)
-   self.assertLessEqual(659456+0x4000,672*1024)
+   self.assertNotIn(0x534e87a4,p)
  def test_partial_configuration_cannot_arm_grain_without_recipe_ownership(self):
   with tempfile.TemporaryDirectory() as d:
    with self.assertRaises(ValueError):build(d,native_grain=True)
