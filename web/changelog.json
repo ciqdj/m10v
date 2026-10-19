@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.7",
+      "date": "2026-10-19",
+      "title": "放大机内胶卷卡片与片名，优化选卷界面",
+      "changes": [
+        "GR III／GR IIIx 机内胶卷设置和选择页采用大号彩色卷标与竖排片名，加入胶片齿孔和黄色选中框，保留一屏五卷、完整片名和原有操作。",
+        "紧凑菜单继续使用原有小图标；新卡片缓冲按需申请、翻页复用，关闭时释放，内存不足时回退至小图标。",
+        "通过 ARM 界面、绘图边界、两种运行时基址和固件回读检查，提供实际代码生成的离线预览；真机显示与运行表现仍待验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.6",
       "date": "2026-10-19",
       "title": "统一胶卷工作台、导航与配置流程",
@@ -10,9 +23,9 @@
         "统一工作台、SD胶卷、说明和日志页导航；默认进入胶卷设置，目录与当前槽位参数并列显示，优化导入、撤销与保存状态。",
         "精简中文说明和操作名称，移除装饰性英文与重复提示；保留机型、胶卷专有名称及必要使用限制。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "689c0fd344a03456af6c36a0e2bca9721d40f414",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/689c0fd344a03456af6c36a0e2bca9721d40f414"
     },
     {
       "version": "2026.10.19.5",

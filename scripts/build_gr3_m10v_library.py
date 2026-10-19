@@ -134,6 +134,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
         'm10v_icon_': {'m10v_icon_pixels'},
+        'm10v_film_card_': {'m10v_film_card_render'},
         'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
         'm10v_sd_camera_': {'m10v_sd_camera_item','m10v_sd_camera_install'},
         'm10v_debug_': {'m10v_debug_log','m10v_debug_batch'},
@@ -341,9 +342,11 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 lifecycle_report['patches']+=view_report['patches']
         settings_report = None
         if sd_library:
-            for name,prefix in [('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
+            from scripts.generate_m10v_film_cards import generate as card_data
+            if (ROOT/'native/gr3/m10v_film_card_data.h').read_text()!=card_data():raise ValueError('film card labels differ from catalog')
+            for name,prefix in [('m10v_film_card.c','m10v_film_card_'),('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
                 obj_path=folder/(name+'.o')
-                subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
+                subprocess.run([compiler,*FLAGS,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
                 start=(base+len(image)+15)&~15
                 code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix)
                 image+=bytes(start-base-len(image))+code;symbols.update(entries)
@@ -511,10 +514,16 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         stock_directory = (ROOT/'native/gr3/m10v_stock_icon_directory.bin').read_bytes()
         icon_pixels = (ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
         if len(stock_directory)!=671*4 or len(icon_pixels)!=68*6400: raise ValueError('icon inventory differs')
-        icon_descriptors = icon_table + 739*4
-        icon_data = icon_descriptors + 68*8
-        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(68))
+        icon_count = 744 if sd_library else 739
+        icon_descriptors = icon_table + icon_count*4
+        icon_data = icon_descriptors + (73 if sd_library else 68)*8
+        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(73 if sd_library else 68))
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(68))
+        if sd_library:
+            image += bytes(5*8) # Live descriptors owned by the film settings view.
+            target=icon_descriptors+68*8
+            def mov(op,v):return op|((v&0xf000)<<4)|(v&0xfff)
+            struct.pack_into('<III',image,0xe0,mov(0xe3000000,target&65535),mov(0xe3400000,target>>16),0xe12fff1e)
         image += icon_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
@@ -541,6 +550,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             ldr pc,=0x5320a838
             .ltorg
         """)
+        if sd_library:icon_asm.write_text(icon_asm.read_text().replace('movw ip,#738','movw ip,#743'))
         subprocess.run([compiler,*FLAGS,'-c',str(icon_asm),'-o',str(icon_obj)],check=True,capture_output=True)
         icon_base=(base+len(image)+15)&~15
         icon_code,icon_symbols=link_object(icon_obj.read_bytes(),icon_base,prefix='m10v_icon_')
@@ -567,6 +577,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'flags': FLAGS, 'render_flags': RENDER_FLAGS, 'debug_compile_flags': debug_flags, 'firmware_artifact': False, 'camera_tested': False,
                 'abi': 'M10V state104 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
+    if sd_library:
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','scripts/generate_m10v_film_cards.py']})
     manifest['sd_library']=sd_library
     manifest['capture_lifecycle']=lifecycle_report
     manifest['experimental_capture']={'candidate_color':candidate_color,'spatial_neon':spatial_neon,'full_isp_effects':False,'save_chain_fixed':False}
@@ -618,6 +630,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
+    manifest['film_cards']={'first_id':739,'last_id':743,'width':120,'height':196,'descriptors':icon_descriptors+68*8,'directory_accessor':base+0xe0,'heap_bytes':470400} if sd_library else None
     manifest['icons']={'first_id':671,'last_id':738,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')

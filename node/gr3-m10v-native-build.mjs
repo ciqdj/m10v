@@ -122,12 +122,21 @@ function checkRuntime(runtime, manifest) {
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===738&&icons.width===40&&icons.height===40&&artwork.length===68*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,739*4],[icons.descriptors,68*8],[icons.pixels,68*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+739*4&&icons.pixels===icons.descriptors+68*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(const [address,length] of [[icons.table,(manifest.sd_library?744:739)*4],[icons.descriptors,(manifest.sd_library?73:68)*8],[icons.pixels,68*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+(manifest.sd_library?744:739)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?73:68)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
   for(let i=0;i<68;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
   }
+  if(manifest.sd_library){
+    const c=manifest.film_cards;
+    need(c?.first_id===739&&c.last_id===743&&c.width===120&&c.height===196&&c.heap_bytes===470400&&c.descriptors===icons.descriptors+68*8&&c.directory_accessor===BASE+0xe0,'native film card inventory differs');
+    const at=c.directory_accessor-BASE,target=c.descriptors;
+    const movt=(r,v)=>(movw(r,v)|0x00400000)>>>0;
+    need(runtime.readUInt32LE(at)===movw(0,target&65535)&&runtime.readUInt32LE(at+4)===movt(0,target>>>16)&&runtime.readUInt32LE(at+8)===0xe12fff1e,'native film card accessor differs');
+    need(runtime.subarray(c.descriptors-BASE,c.descriptors-BASE+40).equals(Buffer.alloc(40)),'native film card descriptors must start empty');
+    for(let i=0;i<5;i++)need(runtime.readUInt32LE(icons.table-BASE+(739+i)*4)===c.descriptors+i*8,'native film card directory differs');
+  }else need(manifest.film_cards===null,'unexpected native film cards');
   const resourceCount=manifest.sd_library?184:151;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
@@ -297,7 +306,7 @@ function lifecyclePatches(manifest){
 function patchList(manifest) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,738),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?743:738),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   return [...lifecyclePatches(manifest),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...settingsPatches(manifest),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,

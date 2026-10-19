@@ -5,6 +5,13 @@
  * internally without a recoverable OOM contract. This is NOT a hardware proof.
  */
 #include "m10v_settings_view.h"
+#include "m10v_film_card.h"
+#ifndef M10V_NATIVE_BASE
+#define M10V_NATIVE_BASE 0x540b6000u
+#endif
+/* One film controller owns five live bitmaps; timestamp views allocate none.
+ * Reserved widgets[39] is storage, outside the 37 child-widget entries. */
+static uint32_t *card_descriptors(void){return (uint32_t *)(uintptr_t)((uint32_t (*)(void))(M10V_NATIVE_BASE+0xe0u))();}
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
@@ -27,6 +34,10 @@ static int make(m10v_settings_view *v,uint32_t type,uint32_t x,uint32_t y,uint32
 void m10v_settings_view_destroy(m10v_settings_view *v){
  if(!v||v->count>M10V_VIEW_CAPACITY)return;
  ((fn3)0x5316cde8u)(0,ptr(v->widgets),v->count);
+ if(v->widgets[39]){
+  uint32_t *d=card_descriptors();for(uint32_t i=0;i<10;i++)d[i]=0;
+  ((fn1)0x536af2e4u)(v->widgets[39]);
+ }
  for(uint32_t i=0;i<M10V_VIEW_CAPACITY;i++)v->widgets[i]=0;
  v->count=0;
 }
@@ -34,11 +45,11 @@ int m10v_settings_view_create(m10v_settings_view *v){
  if(!v||v->count)return -1;
  for(uint32_t i=0;i<M10V_VIEW_CAPACITY;i++)v->widgets[i]=0;
  if(make(v,1,0,0,720,480)||make(v,11,0,0,720,480)||
-    make(v,17,20,12,680,42)||make(v,0,20,320,680,44)||
+    make(v,17,20,12,680,42)||make(v,0,24,348,672,44)||
     make(v,17,20,430,680,40)||make(v,17,20,375,680,40))goto fail;
- for(uint32_t i=0;i<5;i++)if(make(v,11,24+i*136,150,128,128))goto fail;
- for(uint32_t i=0;i<5;i++)if(make(v,11,32+i*136,158,112,112))goto fail;
- for(uint32_t i=0;i<5;i++)if(make(v,10,32+i*136,158,112,112))goto fail;
+ for(uint32_t i=0;i<5;i++)if(make(v,11,24+i*136,102,128,204))goto fail;
+ for(uint32_t i=0;i<5;i++)if(make(v,11,26+i*136,104,124,200))goto fail;
+ for(uint32_t i=0;i<5;i++)if(make(v,10,28+i*136,106,120,196))goto fail;
  /* Selection rectangles precede text in the child draw order. */
  for(uint32_t i=0;i<4;i++)if(make(v,11,24,84+i*72,672,64))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,11,30,90+i*72,660,52))goto fail;
@@ -81,13 +92,24 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  visible(v->widgets[NAME],films);
  visible(v->widgets[ERROR_TEXT],s->error>=1&&s->error<=3);
  if(s->error>=1&&s->error<=3)caption(v->widgets[ERROR_TEXT],M10V_VIEW_EMPTY+s->error-1);
+ if(films&&!v->widgets[39])v->widgets[39]=((fn1)0x536af2a8u)(5*M10V_CARD_PIXELS*4);
  for(uint32_t i=0;i<5;i++){
   uint32_t id=films?film(s,o,i):0;
   visible(v->widgets[FRAME+i],films);visible(v->widgets[INNER+i],films);
   visible(v->widgets[ICON+i],films&&id);
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
-  if(id)((fn2)0x5339a9a0u)(v->widgets[ICON+i],670+id);
+  if(id){
+   uint32_t icon=670+id;
+   if(v->widgets[39]){
+    uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
+    m10v_film_card_render(pixels,id,i,i==focus);
+    uint32_t *d=card_descriptors()+i*2;
+    d[0]=M10V_CARD_WIDTH|(M10V_CARD_HEIGHT<<16);d[1]=ptr(pixels)/4;
+    icon=M10V_CARD_FIRST+i;
+   }
+   ((fn2)0x5339a9a0u)(v->widgets[ICON+i],icon);
+  }
  }
  if(films){
   uint32_t id=focus<5?film(s,o,focus):0;
