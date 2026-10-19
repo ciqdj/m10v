@@ -11,7 +11,7 @@
 #endif
 /* One film controller owns five live bitmaps; timestamp views allocate none.
  * Reserved widgets[39] is storage, outside the 37 child-widget entries. */
-static uint32_t *card_descriptors(void){return (uint32_t *)(uintptr_t)((uint32_t (*)(void))(M10V_NATIVE_BASE+0xe0u))();}
+static uint32_t *card_descriptors(const m10v_settings_view *v){return (uint32_t *)(uintptr_t)(v->widgets[39]+5*M10V_CARD_PIXELS*4);}
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
@@ -35,8 +35,8 @@ void m10v_settings_view_destroy(m10v_settings_view *v){
  if(!v||v->count>M10V_VIEW_CAPACITY)return;
  ((fn3)0x5316cde8u)(0,ptr(v->widgets),v->count);
  if(v->widgets[39]){
-  uint32_t *d=card_descriptors();for(uint32_t i=0;i<10;i++)d[i]=0;
-  ((fn1)0x536af2e4u)(v->widgets[39]);
+  uint32_t heap=v->widgets[39];v->widgets[39]=0;
+  ((fn1)0x536af2e4u)(heap);
  }
  for(uint32_t i=0;i<M10V_VIEW_CAPACITY;i++)v->widgets[i]=0;
  v->count=0;
@@ -92,7 +92,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  visible(v->widgets[NAME],films);
  visible(v->widgets[ERROR_TEXT],s->error>=1&&s->error<=3);
  if(s->error>=1&&s->error<=3)caption(v->widgets[ERROR_TEXT],M10V_VIEW_EMPTY+s->error-1);
- if(films&&!v->widgets[39])v->widgets[39]=((fn1)0x536af2a8u)(5*M10V_CARD_PIXELS*4);
+ if(films&&!v->widgets[39])v->widgets[39]=((fn1)0x536af2a8u)(5*M10V_CARD_PIXELS*4+64);
  for(uint32_t i=0;i<5;i++){
   uint32_t id=films?film(s,o,i):0;
   visible(v->widgets[FRAME+i],films);visible(v->widgets[INNER+i],films);
@@ -104,8 +104,9 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
    if(v->widgets[39]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
     m10v_film_card_render(pixels,id,i,i==focus);
-    uint32_t *d=card_descriptors()+i*2;
+    uint32_t *all=card_descriptors(v),*d=all+i*2;
     d[0]=M10V_CARD_WIDTH|(M10V_CARD_HEIGHT<<16);d[1]=ptr(pixels)/4;
+    all[10+i]=ptr(d);
     icon=M10V_CARD_FIRST+i;
    }
    ((fn2)0x5339a9a0u)(v->widgets[ICON+i],icon);

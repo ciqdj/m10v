@@ -42,7 +42,9 @@ class LiveColorPreviewTests(unittest.TestCase):
   capture.M10VCaptureTests.setUpClass();self.addCleanup(capture.M10VCaptureTests.doClassCleanups)
   c=capture.M10VCaptureTests();c.manifest=self.manifest;c.code=self.code
   h,u,*_=c.fixture(film=35,raw=1,stamp=0);owner=0x550d0000
-  h.call(u,'m10v_camera_library_preview_init',owner);u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner));h.file_calls.clear()
+  h.file_calls.clear();h.call(u,'m10v_camera_library_preview_init',owner);self.assertEqual(h.file_calls,[]);u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner));h.file_calls.clear()
+  self.assertEqual(h.call(u,'m10v_camera_library_preview',0x55002000),0)
+  self.assertGreaterEqual(h.call(u,'m10v_camera_library_load',0x55001000),0);h.file_calls.clear()
   self.assertEqual(h.call(u,'m10v_camera_library_preview',0x55002000),1);self.assertEqual(h.file_calls,[])
   self.assertEqual(struct.unpack('<H',u.mem_read(0x55002000+20,2))[0],35)
   self.assertEqual(h.call(u,'m10v_camera_library_select',0x55001000,1,66),0);h.file_calls.clear()

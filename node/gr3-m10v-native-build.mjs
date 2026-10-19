@@ -132,12 +132,12 @@ function checkRuntime(runtime, manifest) {
   }
   if(manifest.sd_library){
     const c=manifest.film_cards;
-    need(c?.first_id===739&&c.last_id===743&&c.width===120&&c.height===196&&c.heap_bytes===470400&&c.descriptors===icons.descriptors+68*8&&c.directory_accessor===BASE+0xe0,'native film card inventory differs');
-    const at=c.directory_accessor-BASE,target=c.descriptors;
-    const movt=(r,v)=>(movw(r,v)|0x00400000)>>>0;
-    need(runtime.readUInt32LE(at)===movw(0,target&65535)&&runtime.readUInt32LE(at+4)===movt(0,target>>>16)&&runtime.readUInt32LE(at+8)===0xe12fff1e,'native film card accessor differs');
-    need(runtime.subarray(c.descriptors-BASE,c.descriptors-BASE+40).equals(Buffer.alloc(40)),'native film card descriptors must start empty');
-    for(let i=0;i<5;i++)need(runtime.readUInt32LE(icons.table-BASE+(739+i)*4)===c.descriptors+i*8,'native film card directory differs');
+    need(c?.first_id===739&&c.last_id===743&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    for(const name of ['width','height','draw']){
+      const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
+      need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
+    }
+    for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(739+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
   const resourceCount=manifest.sd_library?192:151;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
@@ -319,6 +319,13 @@ function lifecyclePatches(manifest,runtime){
 function patchList(manifest,runtime) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
+  if(manifest.sd_library){
+    const names=new Map([[0x53209fcc,'width'],[0x5320a000,'height'],[0x5320a804,'draw']]);
+    for(const p of iconPatches){
+      if(names.has(p.address))p.replacement=branch(p.address,manifest.film_cards.directory_hooks[names.get(p.address)]);
+      else p.replacement=0xe1a00000;
+    }
+  }
   for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?743:738),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});

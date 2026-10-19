@@ -140,7 +140,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_debug_': {'m10v_debug_log','m10v_debug_batch'},
         'm10v_settings_': {'m10v_settings_open','m10v_settings_key'},
         'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
-        'm10v_settings_controller_': {'m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
+        'm10v_settings_controller_': {'m10v_settings_controller_card_directory','m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
         'm10v_hdf_': {'m10v_hdf_alloc','m10v_hdf_producer','m10v_hdf_gate','m10v_hdf_settings','m10v_hdf_load','m10v_hdf_save'},
         'm10v_hdf_menu_': {'m10v_hdf_menu_top_ctor','m10v_hdf_menu_top_dtor','m10v_hdf_menu_destroy','m10v_hdf_menu_factory','m10v_hdf_menu_ready','m10v_hdf_menu_enter','m10v_hdf_menu_key','m10v_hdf_menu_key_route'},
@@ -553,10 +553,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(73 if sd_library else 68))
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(68))
         if sd_library:
-            image += bytes(5*8) # Live descriptors owned by the film settings view.
-            target=icon_descriptors+68*8
-            def mov(op,v):return op|((v&0xf000)<<4)|(v&0xfff)
-            struct.pack_into('<III',image,0xe0,mov(0xe3000000,target&65535),mov(0xe3400000,target>>16),0xe12fff1e)
+            image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
         image += icon_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
@@ -583,10 +580,23 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             ldr pc,=0x5320a838
             .ltorg
         """)
-        if sd_library:icon_asm.write_text(icon_asm.read_text().replace('movw ip,#738','movw ip,#743'))
+        if sd_library:
+            # Private resources fall back to immutable 40px icons unless their
+            # live view owner has published a valid RAM descriptor directory.
+            for i,index in enumerate((32,65,66,67,34)):
+                struct.pack_into('<I',image,icon_table-base+(739+i)*4,icon_descriptors+index*8)
+            text=icon_asm.read_text().replace('movw ip,#738','movw ip,#743')
+            for name,reg,idreg,ret in [('width',3,1,0x53209fd4),('height',3,1,0x5320a008),('draw',2,3,0x5320a80c)]:
+                text+=f"\n.global m10v_icon_directory_{name}\n.type m10v_icon_directory_{name},%function\nm10v_icon_directory_{name}:\n"
+                text+="push {r0-r12,lr}\nmrs ip,cpsr\npush {ip,lr}\n"
+                text+=f"movw r0,#{icon_table&65535}\nmovt r0,#{icon_table>>16}\nstr r0,[sp,#{8+reg*4}]\nldr r1,[sp,#{8+idreg*4}]\n"
+                text+=f"movw ip,#739\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#743\ncmp r1,ip\nbhi .L{name}_done\n"
+                text+=f"bl m10v_settings_controller_card_directory\ncmp r0,#0\nstrne r0,[sp,#{8+reg*4}]\n.L{name}_done:\npop {{ip,lr}}\nmsr cpsr_fs,ip\npop {{r0-r12,lr}}\nldr pc,={hex(ret)}\n.ltorg\n"
+            icon_asm.write_text(text)
+
         subprocess.run([compiler,*FLAGS,'-c',str(icon_asm),'-o',str(icon_obj)],check=True,capture_output=True)
         icon_base=(base+len(image)+15)&~15
-        icon_code,icon_symbols=link_object(icon_obj.read_bytes(),icon_base,prefix='m10v_icon_')
+        icon_code,icon_symbols=link_object(icon_obj.read_bytes(),icon_base,externals=symbols,prefix='m10v_icon_',additional_exports=tuple('m10v_icon_directory_'+n for n in ('width','height','draw')) if sd_library else ())
         image += bytes(icon_base-base-len(image))+icon_code; symbols.update(icon_symbols)
         from scripts.build_gr3_isp_base import build_isp_base
         isp_base = (base + len(image) + 15) & ~15
@@ -667,7 +677,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['film_cards']={'first_id':739,'last_id':743,'width':120,'height':196,'descriptors':icon_descriptors+68*8,'directory_accessor':base+0xe0,'heap_bytes':470400} if sd_library else None
+    manifest['film_cards']={'first_id':739,'last_id':743,'width':120,'height':196,'descriptor_storage':'view-owned-heap','descriptor_offset':470400,'directory_offset':470440,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':470464} if sd_library else None
     manifest['icons']={'first_id':671,'last_id':738,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')

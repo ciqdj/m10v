@@ -105,3 +105,17 @@ uint32_t m10v_settings_controller_key_route(uint32_t model){
  uint32_t route=((fn1)0x53228c4cu)(model);
  return route==M10V_SETTINGS_FILMS_ROUTE||route==M10V_SETTINGS_STAMP_ROUTE?0x0200004au:route;
 }
+
+/* Dynamic bitmap metadata belongs to the same heap allocation as its pixels.
+ * Only the five private icon IDs call this provider. No ROM writes or retained
+ * global heap pointers; original TopMenu/root lifetime owns the lookup. */
+uint32_t m10v_settings_controller_card_directory(void){
+ if(!(*(const volatile uint32_t *)0x55063910u&1u))return 0;
+ uint32_t owner=*(const volatile uint32_t *)0x55063988u;
+ if((owner&3)||owner<0x55000000u||owner>0x80000000u-0x193cu)return 0;
+ m10v_settings_controller *p=page(owner,0);
+ if(*(uint32_t *)p!=m10v_settings_controller_vtable()||p->view.count!=M10V_VIEW_COUNT)return 0;
+ uint32_t heap=p->view.widgets[39];
+ if((heap&3)||heap<0x55000000u||heap>0x80000000u-470464u)return 0;
+ return heap+470440u-739u*4u;
+}

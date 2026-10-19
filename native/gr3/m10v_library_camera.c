@@ -67,7 +67,8 @@ void m10v_camera_library_preview_init(uint32_t owner){
     if(!ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))return;
     preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
     p->magic=0;p->version=0;p->magic=PREVIEW_MAGIC;
-    m10v_library_state s;if(m10v_camera_library_load(&s)>=0)publish_preview(p,&s);
+    /* Constructor is allocation-only: storage may re-enter the factory.
+     * Ready/load publishes after the original factory has installed owner+74. */
 #else
     (void)owner;
 #endif

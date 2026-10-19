@@ -47,7 +47,7 @@ class SettingsViewTests(unittest.TestCase):
    if a in (0x536af2a8,0x536af31c):
     size=uc.reg_read(UC_ARM_REG_R0)
     if size in (0xf0,0xf8,0x110):self.object_count+=1
-    if (fail_object and self.object_count==fail_object and size in (0xf0,0xf8,0x110)) or (fail_cards and size==470400):p=0
+    if (fail_object and self.object_count==fail_object and size in (0xf0,0xf8,0x110)) or (fail_cards and size==470464):p=0
     else:
      p=self.heap;self.heap+=(size+15)&~15;self.live[p]=size
     uc.reg_write(UC_ARM_REG_R0,p)
@@ -80,7 +80,7 @@ class SettingsViewTests(unittest.TestCase):
   ids=[struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)]
   self.assertEqual(ids,[739,740,741,742,743])
   for i in range(5):
-   width,height,pixels=struct.unpack('<HHI',u.mem_read(0x10004000+i*8,8))
+   width,height,pixels=struct.unpack('<HHI',u.mem_read(struct.unpack('<I',u.mem_read(0x10001000+39*4,4))[0]+470400+i*8,8))
    self.assertEqual((width,height),(120,196))
    self.assertIn(pixels*4,range(0x10100000,self.heap))
    self.assertTrue(any(u.mem_read(pixels*4,120*196*4)))
@@ -89,7 +89,7 @@ class SettingsViewTests(unittest.TestCase):
   self.assertEqual(len(self.live),allocated) # Paging reuses the owned buffers.
   self.call(u,'destroy',0x10001000)
   self.assertFalse(self.live)
-  self.assertEqual(bytes(u.mem_read(0x10004000,40)),bytes(40))
+  self.assertEqual(bytes(u.mem_read(0x10001000,164)),bytes(164))
  def test_card_allocation_failure_keeps_small_icons_and_can_be_destroyed(self):
   u=self.machine(fail_cards=True);self.call(u,'create',0x10001000);w=self.widgets(u)
   self.state(u);self.call(u,'draw',0x10001000,0x10002000,0)
@@ -104,12 +104,13 @@ class SettingsViewTests(unittest.TestCase):
    self.symbols=m['symbols']
    self.call(u,'create',0x10001000);self.state(u)
    self.call(u,'draw',0x10001000,0x10002000,0)
-   d=m['film_cards']['descriptors']
+   heap=struct.unpack('<I',u.mem_read(0x10001000+39*4,4))[0]
+   d=heap+m['film_cards']['descriptor_offset']
    self.assertEqual(struct.unpack('<HH',u.mem_read(d,4)),(120,196))
    p=struct.unpack('<I',u.mem_read(d+4,4))[0]*4
    self.assertIn(p,range(0x10100000,self.heap))
    self.call(u,'destroy',0x10001000)
-   self.assertEqual(bytes(u.mem_read(d,40)),bytes(40));self.assertFalse(self.live)
+   self.assertEqual(bytes(u.mem_read(0x10001000,164)),bytes(164));self.assertFalse(self.live)
  def test_original_tree_film_selection_and_teardown(self):
   u=self.machine();self.assertEqual(self.call(u,'create',0x10001000),0)
   w=self.widgets(u);self.assertEqual(struct.unpack('<I',u.mem_read(0x100010a0,4))[0],37)
