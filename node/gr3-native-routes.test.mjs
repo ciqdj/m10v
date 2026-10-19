@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createServer} from './server.mjs';
 import {Store} from './storage.mjs';
-import {normalizeConfiguration} from '../web/gr3/native-library-state.mjs';
+import {normalizeConfiguration,defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 import {createHash} from 'node:crypto';
 
 test('original M10V web workflow binds all five slots and timestamp into audited firmware',async()=>{
@@ -104,4 +104,22 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(xr.version_unlock.checks.cpu_payload_unchanged,true);assert.equal(xr.debug_mode,true);
 
  }finally{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('HDF feature at strength zero selects its own allocator and preserves default V7',async()=>{
+ const {readNativeOfficial,prepareNative}=await import('./gr3-native-library.mjs');
+ const source=await readNativeOfficial(),configuration=defaultConfiguration();
+ const original=prepareNative(source,configuration,{debug_mode:true});
+ assert.equal(original.capture_pipeline,'gr3-native-v7');assert.equal(original.hdf_enabled,false);
+ const hdf=prepareNative(source,configuration,{debug_mode:true,hdf_enabled:true});
+ assert.equal(hdf.configuration.hdf,0);assert.equal(hdf.capture_pipeline,'gr3-native-hdf');
+ assert.ok(hdf.features.includes('digitalHdf'));assert.notEqual(hdf.configuration_sha256,original.configuration_sha256);
+ const standalone=prepareNative(source,configuration,{film_library:false});
+ assert.equal(standalone.capture_pipeline,'gr3-native-hdf');assert.equal(standalone.hdf_enabled,true);
+ assert.throws(()=>prepareNative(source,{...configuration,hdf:1},{hdf_enabled:false}),/HDF/);
+ assert.throws(()=>prepareNative(source,configuration,{film_library:false,hdf_enabled:false}),/HDF/);
+ const gr3x=await readNativeOfficial('gr3x');
+ assert.throws(()=>prepareNative(gr3x,configuration,{hdf_enabled:true}),/普通 GR III/);
+ assert.equal(prepareNative(gr3x,configuration,{hdf_enabled:false}).hdf_enabled,false);
 });

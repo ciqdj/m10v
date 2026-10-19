@@ -25,5 +25,5 @@ export function checkSettings(runtime,m){
  words(d.exports.m10v_settings_controller_vtable,[movw(0,d.vtable&65535),movt(0,d.vtable>>>16),0xe12fff1e]);
  for(let i=0;i<2;i++){const a=d.rows[i];words(a,[0xe92d4010,0xe1a04001,0xe1a00004,0xe3a01000,branch(a+16,0x5339de20,true),0xe1a00004,movw(1,937+i),0xe1a02001,0xe8bd4010,branch(a+36,0x5339dc70)]);}
  need(m.resources.texts[151]==='胶卷库'&&m.resources.texts[152]==='时间水印','root captions');
- need(JSON.stringify(m.resources.texts.slice(179))===JSON.stringify(['编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']),'focus captions');
+ need(JSON.stringify(m.resources.texts.slice(179,184))===JSON.stringify(['编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']),'focus captions');
 }

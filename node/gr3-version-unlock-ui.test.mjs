@@ -40,7 +40,7 @@ const studio=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf
 const independent=await readFile(new URL('../web/gr3/native-library.js',import.meta.url),'utf8');
 function nodes(){const map=new Map();return id=>{if(!map.has(id))map.set(id,{checked:false,value:'',hidden:false,disabled:false,textContent:'',className:''});return map.get(id);};}
 function studioHarness({mismatch=false,simple=false,model='gr3'}={}){
- const $=nodes(),calls=[],downloads=[],state={projectId:'official',profile:'native',revision:3,nativeConfig:{slots:[{film:33}]}};
+ const $=nodes(),calls=[],downloads=[],state={projectId:'official',profile:'native',revision:3,features:new Set(['film']),nativeConfig:{slots:[{film:33}]}};
  const input=simple?{enabled:true,mode:'dsp-package-only'}:model==='gr3x'?{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
  const audit=simple?{enabled:true,mode:mismatch?'observed-versions':'dsp-package-only',checks:{cpu_payload_unchanged:true}}:{enabled:true,mode:'observed-versions',current_versions:{dsp:input.dsp,cpu:mismatch?'2.10.21.28':input.cpu}};
  const context=vm.createContext({$,state,AbortController,structuredClone,atob,Uint8Array,TextDecoder,JSON,normalizeVersionUnlock,assertVersionUnlockReceipt,

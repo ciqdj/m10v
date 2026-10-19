@@ -87,3 +87,5 @@ body>.hero .hero-inner{padding-block:14px;gap:2px}body>.hero h1{font-size:25px}b
 /* The workflow and summary occupy separate sticky bands. */
 html{scroll-padding-top:96px}.studio>.steps{z-index:10}.studio>.plan-rail{top:94px;z-index:2}.stage :is(button,input,select,[tabindex]){scroll-margin-top:100px}
 @media(max-width:850px){html{scroll-padding-top:84px}.studio>.plan-rail{position:static;top:auto}.stage :is(button,input,select,[tabindex]){scroll-margin-top:88px}}
+
+.hdf-levels{display:flex;gap:8px;margin-bottom:12px}.hdf-levels button[aria-pressed="true"]{background:var(--accent,#dab268);color:#151515}

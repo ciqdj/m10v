@@ -30,7 +30,7 @@ uint32_t m10v_detail_table(uint32_t ui){
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
  if(field==0)return v->halo_gain;if(field==1)return v->halo_spread;
- if(field==2)return v->halo_threshold;if(field==3)return v->grain;if(field==4)return v->soft;
+ if(field==2)return v->halo_threshold;if(field==3)return v->grain;if(field==4)return 0;
  return ((const uint8_t *)&s->effects[target])[field-5];
 }
 static uint32_t limit(uint32_t field){
@@ -64,8 +64,8 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==3)field=arg>>16;
  if(op==4)field=((fn1)0x531b01d0u)(ui)-18;
  uint32_t film=s.slots[target].film;
- if(op!=7&&(field>10||(field<3&&film!=33&&film!=67)||(field==10&&film!=68)))return 0;
- if(op==4){m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
+ if(op!=7&&(field>10||field==4||(field<3&&film!=33&&film!=67)||(field==10&&film!=68)))return 0;
+ if(op==4){if(field==4)return 0;m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
  const m10v_slot *old=&s.slots[target];
  if(op==1)return value(&s,(uint32_t)target,field);
  if(op==2||op==7){

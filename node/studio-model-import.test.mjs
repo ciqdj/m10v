@@ -63,3 +63,10 @@ test('GR IV backup keeps its actual BIN format and model filename',async()=>{
  vm.runInContext(app.slice(app.indexOf("$('download-backup').addEventListener"),app.indexOf("$('prepare-build').addEventListener")),ctx);
  await callback();assert.equal(filename,'fwdc248b-original.bin');
 });
+
+test('opening imaging settings preserves an HDF-only selection',()=>{
+ const node=()=>({setAttribute(){}}),state={profile:'native',features:new Set(['digitalHdf'])};
+ const context=vm.createContext({state,$:node,renderFeatures(){}});
+ vm.runInContext("let settingsTab='library';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
+ context.showSettingsTab('imaging');assert.equal(state.profile,'native');assert.deepEqual([...state.features],['digitalHdf']);
+});

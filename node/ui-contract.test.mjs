@@ -89,5 +89,28 @@ test('native 800T uses the same capture chain as texture and timestamp',async()=
  const core=await readFile(new URL('../native/gr3/m10v_library.c',import.meta.url),'utf8');
  // Pixel behavior is exercised by test_gr3_800t_energy and the ARM capture tests.
  const ui=await readFile(new URL('../web/gr3/native-library-controls.html',import.meta.url),'utf8');
- for(const id of ['slots','grain','soft','stamp'])assert.match(ui,new RegExp(`id="${id}"`));
+ for(const id of ['slots','grain','stamp'])assert.match(ui,new RegExp(`id="${id}"`));
+ assert.doesNotMatch(ui,/id="soft"/);
+});
+
+test('HDF entry is independent of film and preserves the simplified workbench',async()=>{
+ const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
+ assert.match(app,/MENU → 设置 → HDF 模拟/);
+ assert.match(app,/film_library:state.features.has\('film'\)/);
+ assert.match(app,/hdf_enabled:state.features.has\('digitalHdf'\)/);
+ assert.match(app,/if\(!meta.globalHdf\)state.features.add\('film'\)/);
+ assert.match(app,/仅使用 HDF/);
+ const html=await readFile(new URL('../web/gr3/index.html',import.meta.url),'utf8');
+ assert.match(html,/>影像方案<\/button>/);
+});
+
+test('HDF-only feature cannot be removed until film is enabled',async()=>{
+ const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
+ const guard=app.slice(app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))"),app.indexOf("active?state.features.delete(id):state.features.add(id)",app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))")));
+ const {default:vm}=await import('node:vm');
+ for(const [features,blocked] of [[['digitalHdf'],true],[['digitalHdf','film'],false]]){
+  let message='';const context=vm.createContext({id:'digitalHdf',active:true,state:{features:new Set(features)},notice:value=>{message=value;}});
+  vm.runInContext('(function(){'+guard+'})()',context);
+  assert.equal(Boolean(message),blocked);if(blocked)assert.match(message,/档位设为关闭.*先启用胶卷库/);
+ }
 });

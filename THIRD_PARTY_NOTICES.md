@@ -79,3 +79,13 @@ RAW noise-reduction layout references `idontknownihil/gr3-film-mods`, commit
 The new XMP conversion uses the already pinned GPL gr-custom-tool reference
 renderer and its Adobe DNG table format decoder, then fits GR III parameters.
 It does not reuse GR IV firmware color tables or include an official BIN.
+
+## Ricoh-GRMod digital soft-focus coefficients
+
+The three Q10 coefficient rows in `scripts/build_gr3_digital_hdf.py` reference
+`idontknownihil/Ricoh-GRMod`, commit
+`16327dbe7bf9e5fd5e4db99ef47237b2240e5487`,
+`core/src/fw/clarity.ts` (GPL-2.0, compatible with this project).
+The GR III firmware addresses, recipe ownership adapters, settings integration
+and audit are independently implemented from the exact GR III 2.10 firmware.
+No GR IV executable patch or camera firmware binary is copied into the source.

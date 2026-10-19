@@ -127,8 +127,8 @@ class EnergyTests(unittest.TestCase):
         self.assertEqual(gates,sorted(gates,reverse=True));self.assertEqual(gains,sorted(gains))
         self.assertEqual(gains[0],0);self.assertGreater(gains[-1],gains[1])
 
-    def test_soft_only_and_halo_preserve_canaries_and_reject_short_scratch(self):
-        for gain,soft in [(0,3),(4,0),(4,3)]:
+    def test_halo_preserves_canaries_and_rejects_short_scratch_with_retired_soft_values(self):
+        for gain,soft in [(4,0),(4,3)]:
             state=self.state();ok=STORE(lambda *_:0)
             self.lib.m10v_library_select(C.byref(state),0,33,ok,None)
             self.lib.m10v_library_halation(C.byref(state),0,gain,3,5,2,ok,None)

@@ -21,7 +21,7 @@ class NativeDetailTests(unittest.TestCase):
 
  def test_five_controls_integrated_with_unified_runtime(self):
   self.assertIn('detail',self.manifest,'native runtime has no stock five-control detail integration')
-  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
+  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
   self.assertEqual(self.manifest['detail']['ids'],list(range(18,29)))
   self.assertEqual(self.manifest['detail']['backend'],'m10v_camera_library_detail')
 
@@ -35,7 +35,7 @@ class NativeDetailTests(unittest.TestCase):
    descriptor=resources['descriptors'][resource_id-resources['first_id']]-base
    length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
    labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
-  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','柔光','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
+  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','已停用','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
 
 class StockDetailArmTests(NativeDetailTests):
  @classmethod
@@ -90,7 +90,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     # Match the real selected private list row, including each stock prefix.
     kind=uc.mem_read(ui+0x19a,1)[0];setting=uc.mem_read(ui+0x199,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
-    ids=list(range(18,28)) if film in (33,67) else list(range(21,29 if film==68 else 28))
+    ids=[i for i in range(18,28) if i!=22] if film in (33,67) else [i for i in range(21,29 if film==68 else 28) if i!=22]
     result=n+ids.index(18+field) if 18+field in ids else n
    elif real_row and a==0x536af31c:result=0x5500c000
    elif real_row and a==0x533ad3c0:calls.append(('visible',args[0],args[1]))
@@ -185,7 +185,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
      if a in handlers:uc.reg_write(UC_ARM_REG_PC,0x531b0064)
      elif a==0x5339e274:uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
     u.hook_add(UC_HOOK_CODE,widgets);self.execute(u,0x531aff84,ui)
-    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 10)
+    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 9)
 
  def test_stock_count_and_selector_resolve_each_carrier_dynamically(self):
   for tone in (12,18,19,20,21):
@@ -194,15 +194,15 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     kind=u.mem_read(ui+0x19a,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+kind*8)
     original=sum(self.rtos[p-0x53000000+i*2]!=1 for i in range(n))
-    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(10 if film==33 else 7))
+    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(9 if film==33 else 6))
     if film==33:
-     for field in range(5):
+     for field in range(4):
       # machine's external widget-index stub supplies last field selection.
       u,ui,slider,calls,state=self.machine(tone,film,field)
       self.assertEqual(self.execute(u,0x531b01d0,ui),18+field)
  def test_actual_setup_retains_stock_closure_and_distinct_ranges(self):
   for tone in (12,18,19,20,21):
-   for field in range(5):
+   for field in range(4):
     u,ui,slider,calls,state=self.machine(tone,33,field)
     self.execute(u,0x531b05c4,ui)
     self.assertIn(('range',0,8 if field<3 else 3),calls)
@@ -211,7 +211,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   # Official grain0x531ae898 uses max3, pitch120, scale resource57.
   for address,word in ((0x531ae868,0xe3a03039),(0x531ae88c,0xe3a02003),(0x531ae890,0xe3a03078)):
    self.assertEqual(struct.unpack_from("<I",self.rtos,address-0x53000000)[0],word)
-  for field in range(5):
+  for field in range(4):
    u,ui,slider,calls,state=self.machine(field=field)
    self.execute(u,0x531b05c4,ui)
    self.assertIn(('scale',45 if field<3 else 120,560 if field<3 else 57),calls)
@@ -226,12 +226,12 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    self.assertIn(('scale',pitch,560),calls)
 
  def test_stock_current_reads_five_independent_fields(self):
-  for field,expected in enumerate((3,4,5,1,2)):
+  for field,expected in enumerate((3,4,5,1)):
    u,ui,slider,calls,state=self.machine(field=field);self.execute(u,0x531b03cc,ui)
    self.assertIn(('current',expected),calls)
  def test_real_callback_persists_selected_slot_and_failure_restores_slider(self):
   for tone in (12,18,19,20,21):
-   for field in range(5):
+   for field in range(4):
     for ok in (True,False):
      u,ui,slider,calls,state=self.machine(tone,33,field,save_ok=ok);before=bytes(state)
      u.mem_write(slider+0xf8,struct.pack('<I',2));self.execute(u,0x531b0fd0,ui)
@@ -239,7 +239,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
      if not ok:
       self.assertEqual(bytes(state),before);self.assertNotIn(('redraw',),calls,'stock redraw would overwrite the save-failure caption');self.assertIn(('caption',824),calls);self.assertIn(('current',(3,4,5,1,2)[field]),calls)
      else:
-      i=(12,18,19,20,21).index(tone);self.assertEqual(state[12+i*8+(4,5,6,2,3)[field]],2)
+      i=(12,18,19,20,21).index(tone);self.assertEqual(state[96 if field==4 else 12+i*8+(4,5,6,2,3)[field]],2)
  def test_invalid_values_and_non800t_never_write(self):
   for film in (33,34):
    for arg in (0x009,0x308,0x404,0x503,0xffff):
@@ -258,7 +258,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   # Real row dispatcher loops through all stock rows, so start at the private
   # branch with its original saved-frame contract and a sentinel continuation.
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
-  for field,text in enumerate(('3','4','5','1','2')):
+  for field,text in enumerate(('3','4','5','1')):
    u,ui,slider,calls,state=self.machine(field=field)
    u.reg_write(UC_ARM_REG_R3,18+field);u.reg_write(UC_ARM_REG_R4,10+field);u.reg_write(UC_ARM_REG_R5,ui)
    u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_LR,0x57000000)
@@ -296,7 +296,8 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   # Execute the official row setter, strlen and byte->UTF16 conversion. The
   # former mock decoded its input as UTF16 and concealed the actual ABI bug.
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP,UC_ARM_REG_LR
-  for field,expected in enumerate(('3','4','5','1','2','1','0','0','4','0','125')):
+  for field,expected in enumerate(('3','4','5','1','0','1','0','0','4','0','125')):
+   if field==4:continue # Retired row is excluded from every actual list.
    u,ui,slider,calls,state=self.machine(film=68 if field==10 else 33,field=field,real_row=True)
    u.reg_write(UC_ARM_REG_R3,18+field);u.reg_write(UC_ARM_REG_R4,10+field);u.reg_write(UC_ARM_REG_R5,ui)
    u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_LR,0x57000000)
@@ -338,7 +339,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
 
  def test_original_confirm_and_cancel_exit_without_extra_private_write(self):
   for entry in (0x531b0aa4,0x531b0aec):
-   for field in range(5):
+   for field in range(4):
     u,ui,slider,calls,state=self.machine(field=field)
     u.mem_write(slider+0xf8,struct.pack('<I',2));self.execute(u,0x531b0fd0,ui)
     before=bytes(state);calls.clear();self.execute(u,entry,ui)

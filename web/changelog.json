@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.9",
+      "date": "2026-10-19",
+      "title": "GR III 新增独立 HDF 模拟菜单，退役胶卷柔光",
+      "changes": [
+        "普通 GR III 的「影像方案」新增独立 HDF 模拟入口，机内通过 MENU → 设置 → HDF 模拟选择关闭、弱、中、强，不依赖胶卷库。",
+        "HDF 使用独立配置与双页校验存储，换卷及重置胶卷不改变档位；旧胶卷柔光调节与全帧软件柔光处理停用，旧数值不自动迁移为 HDF。",
+        "数字柔焦复用原厂 Clarity 处理链，不增加全帧扫描或整帧缓冲；已完成离线 ARM、菜单与候选回读验证，机身连拍、写卡耗时和成像仍待实机验收。",
+        "合并已发布的宝塔迁移、官方固件基线提取及工作台更新，保留现有机型与发布保护。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.8",
       "date": "2026-10-19",
       "title": "移除运行体人为体积阈值并发布机内胶卷大卡片",
@@ -10,9 +24,9 @@
         "清理更新日志及研究、测试文档中的旧体积预算表述；地址、分区布局、机型、校验和、非目标字节与独立回读验证继续执行。",
         "发布彩色胶卷大卡片、竖排片名、齿孔与黄色选中框；机内显示仍待真机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "785154172dc4db382fd81245c3f31d2fcd142c3f",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39212147396"
     },
     {
       "version": "2026.10.19.7",

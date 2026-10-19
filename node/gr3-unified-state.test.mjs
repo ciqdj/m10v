@@ -17,7 +17,7 @@ test('four halo controls and grain/soft are packed in each version4 slot',()=>{
 
 test('legacy simulation draft migrates into the same slots and flags unknown LUTs',async()=>{
  const {films}=await nativeCatalog();const migrated=migrateSimulationSelection(['ektar100','gold200','lut-private','portra400','vision3-250d'],{ektar100:{grain:2,hdf:1}},films);
- assert.equal(migrated.configuration.slots[0].film,34);assert.equal(migrated.configuration.slots[0].grain,2);assert.equal(migrated.configuration.slots[0].soft,1);
+ assert.equal(migrated.configuration.slots[0].film,34);assert.equal(migrated.configuration.slots[0].grain,2);assert.equal(migrated.configuration.slots[0].soft,0);
  assert.deepEqual(migrated.unresolved,[{slot:2,id:'lut-private'}]);
 });
 test('both colour views edit a single native configuration and do not restore the legacy film builder',async()=>{

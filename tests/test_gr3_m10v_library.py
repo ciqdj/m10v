@@ -157,7 +157,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
             self.assertEqual(bytes(y)[image.y_bytes:], bytes([173] * 32))
         self.assertEqual(outputs[0], outputs[1]); self.assertNotEqual(outputs[0], outputs[2])
 
-    def test_soft_bloom_spreads_highlight_without_chroma_or_scratch_overrun(self):
+    def test_retired_soft_does_not_spread_highlight_or_touch_chroma_or_scratch(self):
         @STORE
         def save(_, proposed): return 0
         state = self.state(); self.lib.m10v_library_texture(C.byref(state), 0, 0, 3, save, None)
@@ -165,7 +165,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         image, y, uv, scratch = self.image(); at = 48 * image.stride + 64; y[at] = 255
         before_uv = bytes(uv)
         self.assertEqual(self.render(image, state, scratch), 0)
-        self.assertGreater(y[at + 2], 64); self.assertEqual(y[at], 255)
+        self.assertEqual(y[at + 2], 64); self.assertEqual(y[at], 255)
         self.assertEqual(bytes(uv), before_uv); self.assertEqual(bytes(scratch)[-32:], bytes([91] * 32))
 
     def test_timestamp_draws_valid_date_in_all_corners_and_rejects_bad_date_before_mutation(self):

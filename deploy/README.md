@@ -111,6 +111,12 @@ GR IV 同时需要 LLVM 的 `llvm-objcopy`、`llvm-nm` 和 LLD 的 `ld.lld`，�
 5. 移除宝塔自动生成的图片与 JS/CSS 本地缓存 location，它们会截获应用静态资源并从空站点目录返回 404。保留敏感文件拦截及 ACME 验证规则。
 6. 保留示例中的 16k 响应头缓冲、4×16k buffers 与 32k busy buffers，先 nginx -t，通过后再重载。原生下载审计响应头约 7 KB。
 
+低内存服务器使用上述 Node 堆设置，促使固件处理期间及时回收临时对象；它并不把整个进程内存限制在 128 MiB。固件 Buffer 和编译进程仍需额外内存。不要与其他高内存服务共用仅 2 GB 的节点。
+
+保留 `proxy_buffer_size 16k`、`proxy_buffers 4 16k` 和 `proxy_busy_buffers_size 32k`：原生固件下载包含约 7 KB 的审计响应头，默认小缓冲区可能拒绝响应。修改后先执行 `nginx -t`，通过后再重载。
+
+若公网 HTTP 返回阿里云 `Non-compliance ICP Filing`，但服务器本地 HTTPS 验证正常，应处理大陆节点备案接入，或迁移到香港/海外节点。更换证书不能解决该类网络入口拦截。
+
 测试阶段建议开启宝塔网站的“密码访问”，限制访问人员。`/api/status` 的令牌用于请求校验，不是账号登录；当前服务不是具备访客数据隔离、配额和权限体系的多用户 SaaS。
 
 ## 5. 验收

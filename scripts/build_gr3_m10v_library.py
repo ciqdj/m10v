@@ -142,13 +142,15 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
         'm10v_settings_controller_': {'m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
+        'm10v_hdf_': {'m10v_hdf_alloc','m10v_hdf_producer','m10v_hdf_gate','m10v_hdf_settings','m10v_hdf_load','m10v_hdf_save'},
+        'm10v_hdf_menu_': {'m10v_hdf_menu_top_ctor','m10v_hdf_menu_top_dtor','m10v_hdf_menu_destroy','m10v_hdf_menu_factory','m10v_hdf_menu_ready','m10v_hdf_menu_enter','m10v_hdf_menu_key','m10v_hdf_menu_key_route'},
         'm10v_level_': {'m10v_level_callback','m10v_level_draw','m10v_level_quarter'},
     }[prefix]
     if set(symbols) != required | set(additional_exports) or not image_sections: raise ValueError('runtime API incomplete')
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None):
     if type(texture_neon) is not bool or (texture_neon and (not spatial_neon or not debug_mode)):raise ValueError('full texture blocks require debug NEON ownership')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native color/snapshot ownership')
     if type(view_deferred)is not bool or (view_deferred and not lifecycle_trace):raise ValueError('view recovery requires diagnostic owned pipeline')
@@ -178,8 +180,15 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         for i in range(5):
             film, grain, soft, gain, spread, threshold, profile = struct.unpack_from('<H6B', initial, 12+i*8)
             if not 1 <= film <= 68 or grain > 3 or soft > 3 or gain>8 or spread>8 or threshold>8 or profile>3: raise ValueError('invalid initial slot')
-        if initial[52] > 2 or any(v > 3 for v in initial[53:56]) or any(initial[96:100]) or struct.unpack_from('<I',initial,100)[0] != zlib.crc32(initial[:100]):
+        if initial[52] > 2 or any(v > 3 for v in initial[53:56]) or struct.unpack_from('<I',initial,96)[0]!=0 or struct.unpack_from('<I',initial,100)[0] != zlib.crc32(initial[:100]):
             raise ValueError('invalid initial settings/checksum')
+    if type(hdf_default) is not int or not 0<=hdf_default<=3:
+        raise ValueError('invalid HDF default')
+    if hdf_enabled is None:hdf_enabled=not lifecycle_trace
+    if type(hdf_enabled)is not bool or (not hdf_enabled and (hdf_default or not film_library)):
+        raise ValueError('invalid HDF enablement')
+    if lifecycle_trace and hdf_enabled:
+        raise ValueError('HDF cannot share the diagnostic recipe allocator')
     for i in range(5):
         e=initial[56+i*8:64+i*8]
         if (struct.unpack_from('<H',initial,12+i*8)[0]!=68 and e[5]) or any(v>limit for v,limit in zip(e,[2,8,5,8,1,2,0,0])):raise ValueError('invalid film texture effects')
@@ -257,6 +266,17 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += bytes(camera_base - base - len(image)) + camera
         symbols.update(camera_symbols)
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
+        hdf_report=None
+        if hdf_enabled:
+            hdf_obj=folder/'digital-hdf.o'
+            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
+            hdf_base=(base+len(image)+15)&~15
+            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_')
+            image+=bytes(hdf_base-base-len(image))+hdf_code;symbols.update(hdf_symbols)
+            from scripts.build_gr3_digital_hdf import build as build_digital_hdf
+            hdf_base=(base+len(image)+15)&~15
+            hdf_code,hdf_report=build_digital_hdf(hdf_base,symbols)
+            image+=bytes(hdf_base-base-len(image))+hdf_code
         if sd_library:
             node = os.environ.get('M10V_NODE') or shutil.which('node')
             if not node:
@@ -361,6 +381,17 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_')
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
+        hdf_menu_report=None
+        if sd_library and hdf_enabled:
+            menu_obj=folder/'hdf-menu.o';start=(base+len(image)+15)&~15
+            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_OWNER_OFFSET='+hex(0x193c if film_library else 0x13bc),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
+            names=['m10v_hdf_menu_parent_'+n for n in ['ctor','dtor','factory','key_route']]+['m10v_hdf_menu_vtable']
+            provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start)},'m10v_hdf_menu_')
+            from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
+            hook_start=(start+len(provisional)+15)&~15
+            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library)
+            code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
+            image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
         # Link dedicated stock-detail backend against the same camera journal.
         from scripts.build_gr3_native_detail import build_detail, STOCK_TABLE
         detail_obj=folder/'detail.o'
@@ -393,7 +424,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if len(names) != 33 or len(set(names)) != 33: raise ValueError('original catalog names incomplete')
         texts = names[:32] + [f'M10V Slot {i}' for i in range(1, 6)] + [
             'M10V Film Library', 'Save failed. Try again.', 'M10V Library',
-            'Choose Film', '颗粒', '柔光', 'Timestamp', 'Choose Slot',
+            'Choose Film', '颗粒', '已停用', 'Timestamp', 'Choose Slot',
             'Grain Off', 'Grain Weak', 'Grain Medium', 'Grain Strong',
             'Diffusion Off', 'Diffusion Weak', 'Diffusion Medium', 'Diffusion Strong',
             'Timestamp Off', 'Date Only', 'Date and Time', 'Date Format', 'Stamp Corner', 'Stamp Color', 'Back',
@@ -408,7 +439,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             translations={'M10V Film Library':'胶卷库','Save failed. Try again.':'读取或保存失败，请检查存储卡','M10V Library':'胶卷设置',
                 'Choose Film':'内置胶卷','Timestamp':'时间戳','Choose Slot':'设置槽位',
                 'Grain Off':'颗粒关闭','Grain Weak':'颗粒弱','Grain Medium':'颗粒中','Grain Strong':'颗粒强',
-                'Diffusion Off':'柔光关闭','Diffusion Weak':'柔光弱','Diffusion Medium':'柔光中','Diffusion Strong':'柔光强',
+                'Diffusion Off':'HDF 关闭','Diffusion Weak':'HDF 弱','Diffusion Medium':'HDF 中','Diffusion Strong':'HDF 强',
                 'Timestamp Off':'时间戳关闭','Date Only':'仅日期','Date and Time':'日期和时间','Date Format':'日期格式',
                 'Stamp Corner':'显示位置','Stamp Color':'文字颜色','Back':'返回','Done':'完成','Top Left':'左上','Top Right':'右上',
                 'Bottom Left':'左下','Bottom Right':'右下','White':'白色','Orange':'橙色','Red':'红色','Yellow':'黄色',
@@ -416,6 +447,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts=[translations.get(t,t) for t in texts]
         if sd_library:
             texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
+        if sd_library:texts+=['HDF 模拟','左右选择 OK保存 MENU取消','关闭','弱','中','强','读取或保存失败','全局数字柔焦 · 独立于胶卷']
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
@@ -578,6 +610,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','scripts/generate_m10v_film_cards.py']})
     manifest['sd_library']=sd_library
+    manifest['film_library_enabled']=film_library
+    manifest['hdf_menu']=hdf_menu_report
+    manifest['digital_hdf']=hdf_report
+    manifest['hdf_default']=hdf_default
+    manifest['hdf_enabled']=hdf_enabled
+    manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py']})
     manifest['capture_lifecycle']=lifecycle_report
     manifest['experimental_capture']={'candidate_color':candidate_color,'spatial_neon':spatial_neon,'full_isp_effects':False,'save_chain_fixed':False}
     if native_color:manifest['experimental_capture']['native_color']=True
@@ -653,4 +691,7 @@ if __name__ == '__main__':
     parser.add_argument('--native-color',action='store_true')
     parser.add_argument('--native-grain',action='store_true')
     parser.add_argument('--view-deferred',action='store_true')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,native_grain=args.native_grain,view_deferred=args.view_deferred), indent=2))
+    parser.add_argument('--hdf-only',action='store_true')
+    parser.add_argument('--hdf-default',type=int,default=0)
+    parser.add_argument('--no-hdf',action='store_true')
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else None), indent=2))

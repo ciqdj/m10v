@@ -87,7 +87,7 @@ void m10v_library_init(m10v_library_state *state) {
 }
 int m10v_library_valid(const m10v_library_state *state) {
     if (!state || state->magic != 0x5630314du || state->version != 4 ||
-        state->size != sizeof(*state) || state->reserved || state->stamp > 2 ||
+        state->size != sizeof(*state) || state->reserved != 0 || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
         if (!state->slots[i].film || state->slots[i].film > M10V_FILM_COUNT ||
@@ -311,30 +311,6 @@ static int legacy_color(m10v_library_image *image,uint32_t id,void *memory){
     return memory?legacy_color_loop(image,id,memory,1):legacy_color_loop(image,id,0,0);
 }
 
-static void soft_diffusion(m10v_library_image *image,const m10v_slot *choice,uint8_t *scratch,uint32_t cells,uint32_t gw,uint32_t gh,uint32_t shift){
-
-        uint8_t *temp = scratch + cells;
-        for (uint32_t i = 0; i < cells; ++i) scratch[i] = 0;
-        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
-            uint8_t v = image->y[row * image->stride + x]; uint32_t at = (row >> shift) * gw + (x >> shift);
-            v = v > 192 ? (uint8_t)(v - 192) : 0; if (v > scratch[at]) scratch[at] = v;
-        }
-        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
-            uint32_t total = 0;
-            for (int dx = -2; dx <= 2; ++dx) { int xx = (int)x + dx; if (xx >= 0 && xx < (int)gw) total += scratch[y * gw + (uint32_t)xx]; }
-            temp[y * gw + x] = (uint8_t)(total / 5);
-        }
-        for (uint32_t y = 0; y < gh; ++y) for (uint32_t x = 0; x < gw; ++x) {
-            uint32_t total = 0;
-            for (int dy = -2; dy <= 2; ++dy) { int yy = (int)y + dy; if (yy >= 0 && yy < (int)gh) total += temp[(uint32_t)yy * gw + x]; }
-            scratch[y * gw + x] = (uint8_t)(total / 5);
-        }
-        for (uint32_t row = 0; row < image->height; ++row) for (uint32_t x = 0; x < image->width; ++x) {
-            uint32_t at = row * image->stride + x; uint32_t v = image->y[at];
-            uint32_t bloom = scratch[(row >> shift) * gw + (x >> shift)];
-            image->y[at] = clamp((int)(v + bloom * choice->soft * 3 * (255 - v) / 255));
-        }
-}
 /* Assumed Phoenix II orange/red scatter, weaker than the 800T grade. Build
  * the source from ORIGINAL luminance, then composite after colour rendering.
  * The vendor provides no measured PSF or hue: these are bounded design choices. */
@@ -409,7 +385,9 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     }
     uint32_t cells = gw * gh;
     uint32_t use_halo = !(completed&M10V_NATIVE_HALO) && (choice->film == 33 || choice->film == 67) && choice->halo_gain;
-    uint32_t soft=(completed&M10V_NATIVE_SOFT)?0:choice->soft;
+    /* Legacy per-film soft is retired, including imported SD/journal values.
+     * Digital HDF runs upstream in the original native Clarity owner. */
+    const uint32_t soft=0;
     uint32_t grain=(completed&M10V_NATIVE_GRAIN)?0:choice->grain;
     m10v_film_effects effects=state->effects[slot];
     if(completed&M10V_NATIVE_LEAK)effects.leak_gain=0;
@@ -452,7 +430,6 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
         m10v_800t_effects(image,&spatial_choice,scratch,gw,gh,shift);
     }
     if(choice->film==67&&use_halo)phoenix_halation_source(image,choice,scratch,gw,gh,shift);
-    if(choice->film==66&&soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     M10V_PROFILE(7);
     uint32_t *texture_stats=0;
 #if M10V_CAPTURE_PROFILE
@@ -492,7 +469,6 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
 #endif
     M10V_PROFILE(8);
     if(choice->film==67&&use_halo)phoenix_halation_compose(image,choice,scratch,gw,gh,shift);
-    if (soft && choice->film!=66 && choice->film!=33)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
     if(choice->film<66)m10v_5207_texture(image,&effects,grain,seed,0);
     M10V_PROFILE(9);
     if (state->stamp) stamp(image, state, date);

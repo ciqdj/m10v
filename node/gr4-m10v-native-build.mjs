@@ -14,6 +14,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 export function validateGr4Source(source){if(!Buffer.isBuffer(source)||hash(source)!==GR4_OFFICIAL_SHA256)throw Error('GR IV 官方固件摘要不匹配');}
 export function normalizeGr4Request(value={}){
  const configuration=normalizeConfiguration(value.configuration),extensions=normalizeExtensions(value.extensions);
+ if(configuration.hdf)throw Error('数字 HDF 模拟当前仅支持普通 GR III');
  const debug_mode=value.debug_mode??false;if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');
  const version_unlock=value.version_unlock??{enabled:false};if(version_unlock?.enabled!==false||Object.keys(version_unlock).some(k=>k!=='enabled'))throw Error('GR IV 版本适配尚未验证');
  return {configuration,extensions,debug_mode,version_unlock:{enabled:false}};

@@ -7,7 +7,7 @@ test('custom film drafts migrate supported selections and block unresolved slots
  const result=normalizeWorkbenchDraft(old,[{id:67,legacy_id:'supported'}]);
  assert.equal(result.profile,'native');assert.deepEqual(result.features,['film','aspect','rawNr']);
  assert.deepEqual(result.recipes,[]);assert.deepEqual(result.stockPresets,[]);
- assert.equal(result.nativeConfiguration.slots[0].film,67);assert.equal(result.nativeConfiguration.slots[0].grain,2);assert.equal(result.nativeConfiguration.slots[0].soft,1);
+ assert.equal(result.nativeConfiguration.slots[0].film,67);assert.equal(result.nativeConfiguration.slots[0].grain,2);assert.equal(result.nativeConfiguration.slots[0].soft,0);
  assert.deepEqual(result.unresolvedSlots,[{slot:1,id:'lut-old'}]);assert.deepEqual(result.rawNr,{mode:'threshold',iso:6400});
  assert.equal(old.recipes.length,1);
 });
@@ -29,4 +29,19 @@ test('legacy backup retains the exact first draft before future saves',()=>{
 test('legacy undo snapshots cannot restore custom recipe or preset modes',()=>{
  const result=normalizeWorkbenchDraft({profile:'custom',features:['recipes','presets','negativeGrain'],recipes:[{slotId:'builtin-15'}]});
  assert.equal(result.profile,'native');assert.deepEqual(result.features,['film','negativeGrain']);assert.deepEqual(result.recipes,[]);
+});
+
+test('HDF-only native drafts preserve independence through restore and undo normalization',()=>{
+ const config=defaultConfiguration();config.hdf=2;
+ const result=normalizeWorkbenchDraft({profile:'native',features:['digitalHdf','aspect'],nativeConfiguration:config});
+ assert.deepEqual(result.features,['digitalHdf','aspect']);assert.equal(result.nativeConfiguration.hdf,2);
+ assert.equal(result.nativeConfiguration.slots[0].soft,0);
+ const restored=normalizeWorkbenchDraft(result);assert.deepEqual(restored.features,result.features);
+ assert.equal(restored.nativeConfiguration.hdf,2);
+});
+
+test('combined HDF and film drafts retain film and preserve global HDF separately',()=>{
+ const config=defaultConfiguration();config.hdf=3;
+ const result=normalizeWorkbenchDraft({profile:'native',features:['film','digitalHdf'],nativeConfiguration:config});
+ assert.deepEqual(result.features,['film','digitalHdf']);assert.equal(result.nativeConfiguration.hdf,3);
 });

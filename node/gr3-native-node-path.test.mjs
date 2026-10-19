@@ -40,7 +40,7 @@ test('web debug export uses the running Node when the service PATH contains no n
    assert.equal(receipt.candidate_sha256,createHash('sha256').update(bytes).digest('hex'));
    assert.equal(receipt.debug_mode,true);assert.equal(receipt.sd_film_library.supported_films,36);
    assert.equal(receipt.capture_pipeline,'gr3-native-v7');assert.equal(receipt.experimental_capture.native_color,true);assert.equal(receipt.experimental_capture.native_grain,true);
-   assert.equal(receipt.composition.verified,true);assert.equal(receipt.composition.aspect_resource_id,970);
+   assert.equal(receipt.composition.verified,true);assert.equal(receipt.composition.aspect_resource_id,978);
    console.log('WEB_BUILD_OK bytes='+bytes.length);
   } finally {await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
  `;

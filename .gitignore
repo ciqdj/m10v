@@ -1,11 +1,11 @@
 /fwdc239b.bin
 /fwdc239b-modify.bin
-/.runtime/
+/.runtime
 /data/
-/.venv/
+/.venv
 /node_modules/
 /dist/
-/builds/
+/builds
 /coverage/
 /__pycache__/
 **/__pycache__/
@@ -14,7 +14,7 @@
 /.superpowers/
 
 # Firmware inputs, local credentials and session exports are never published.
-/bin/
+/bin
 /fwdc239b-offical.bin
 .env
 .env.*

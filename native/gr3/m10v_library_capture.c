@@ -237,7 +237,7 @@ int m10v_capture_library(uint32_t context) {
     uint32_t step=1,shift=0,required=0;
     while (((width+step-1)>>shift)>384 || ((height+step-1)>>shift)>256){step<<=1;++shift;}
     uint32_t cells=((width+step-1)>>shift)*((height+step-1)>>shift);
-    if(state.slots[slot].soft||use_halo)
+    if(use_halo)
         required=(((state.slots[slot].film==33||state.slots[slot].film==67)?6:2)*cells+3)&~3u;
     scratch_bytes=required;
     if(state.slots[slot].film>33){

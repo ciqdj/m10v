@@ -1,8 +1,9 @@
 import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection,normalizeRawNr} from './native-library-state.mjs';
-export const extensionFeatures=['timestamp','aspect','level','negativeGrain','rawNr'];
+export const extensionFeatures=['digitalHdf','timestamp','aspect','level','negativeGrain','rawNr'];
 // Old custom selections remain recoverable in a separate local-storage backup.
 export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfiguration()) {
- const features=['film',...extensionFeatures.filter(id=>draft.features?.includes(id))];
+ const hdfOnly=draft.profile==='native'&&draft.features?.includes('digitalHdf')&&!draft.features.includes('film');
+ const features=[...(hdfOnly?[]:['film']),...extensionFeatures.filter(id=>draft.features?.includes(id))];
  let configuration=normalizeConfiguration(draft.nativeConfiguration||current);
  let unresolved=Array.isArray(draft.unresolvedSlots)?draft.unresolvedSlots:[];
  const legacy=draft.profile!=='native'&&draft.features?.includes('film');

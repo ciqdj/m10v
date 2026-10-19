@@ -99,7 +99,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u,'m10v_menu_icon',0,21),703)
 
     def test_detail_lists_offer_only_controls_consumed_by_each_film(self):
-        common = [21,22,23,24,25,26,27]
+        common = [21,23,24,25,26,27]
         for film, ids in ((33,[18,19,20]+common),(35,common),(66,common),
                           (67,[18,19,20]+common),(68,common+[28])):
             with self.subTest(film=film):
@@ -198,7 +198,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.current_tone = 21
         self.focus = 12; self.call(u, 'm10v_menu_confirm', 0x55005000)
         self.assertEqual(u.mem_read(model, 1), b'\x12')
-        self.focus = 6; self.call(u, 'm10v_menu_confirm', 0x55005000)
+        self.focus = 5; self.call(u, 'm10v_menu_confirm', 0x55005000)
         self.focus = 0; self.call(u, 'm10v_menu_confirm', 0x55005000)
         self.assertEqual(u.mem_read(model + 0x1d, 1), b'\x0b')
         self.assertEqual(self.focus, 8)
@@ -367,7 +367,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.focus = 12; self.call(u, 'm10v_menu_confirm', controller)
         self.assertEqual(u.mem_read(model + 0x1d, 1), b'\x01')
 
-        self.assertEqual(self.call(u, 'm10v_menu_count', model), 6)
+        self.assertEqual(self.call(u, 'm10v_menu_count', model), 5)
         self.focus = 0; self.call(u, 'm10v_menu_confirm', controller)
         self.assertEqual(self.call(u, 'm10v_menu_count', model), 36)
         self.call(u, 'm10v_menu_focus', controller, 31)
@@ -494,14 +494,14 @@ class FilmLibraryArmTests(unittest.TestCase):
 
     def test_menu_texture_and_timestamp_actions_commit_real_runtime_settings(self):
         u = self.machine(); model = 0x55068200; controller = 0x55005000
-        for group, value in ((3, 3), (4, 2), (5, 2), (7, 2), (8, 3), (9, 1)):
+        for group, value in ((3, 3), (5, 2), (7, 2), (8, 3), (9, 1)):
             u.mem_write(model + 0x1d, bytes([group])); self.focus = value
             self.call(u, 'm10v_menu_confirm', controller)
         self.call(u, 'm10v_camera_library_load', 0x55001000)
         state = State.from_buffer_copy(u.mem_read(0x55001000, C.sizeof(State)))
-        self.assertEqual((state.slots[1].grain, state.slots[1].soft), (3, 2))
+        self.assertEqual((state.slots[1].grain, state.slots[1].soft, state.reserved), (3, 0, 0))
         self.assertEqual((state.stamp, state.format, state.corner, state.color), (2, 2, 3, 1))
-        self.assertEqual(state.sequence, 6)
+        self.assertEqual(state.sequence, 5)
         self.assertEqual(self.call(u, 'm10v_library_valid', 0x55001000), 1)
         self.assertEqual([self.call(u, 'm10v_menu_name', 0, 144 + i) for i in range(32)], list(range(786, 818)))
 
@@ -529,7 +529,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.manifest=build(Path(tmp),sd_library=True)
             self.code=(Path(tmp)/'m10v-library-arm.bin').read_bytes()
-        self.assertEqual(self.manifest['resources']['last_id'],969)
+        self.assertEqual(self.manifest['resources']['last_id'],977)
         self.test_private_utf16_resource_hooks_preserve_stock_fallback_and_locale()
 
     def test_v2_journal_migrates_to_v3_and_keeps_old_bytes_on_failed_save(self):
@@ -616,7 +616,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         u=self.machine();state=0x55001000;model=0x55068200;controller=0x55005000
         self.call(u,'m10v_library_init',state)
         self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,68),0)
-        u.mem_write(model+0x1d,b'\x01');self.focus=6
+        u.mem_write(model+0x1d,b'\x01');self.focus=5
         self.call(u,'m10v_menu_confirm',controller)
         self.assertEqual(u.mem_read(model+0x1d,1),b'\x15')
         for index in range(3):
@@ -637,9 +637,9 @@ class FilmLibraryArmTests(unittest.TestCase):
         for film in range(1,69):
             self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,film),0)
             u.mem_write(model+0x1d,b'\x01')
-            self.assertEqual(self.call(u,'m10v_menu_count',model),7 if film in (33,67,68) else 6)
-            self.assertEqual(self.call(u,'m10v_menu_index',model,5),300)
-            self.assertEqual(self.call(u,'m10v_menu_index',model,6),214 if film==33 else 339 if film==67 else 340 if film==68 else 0)
+            self.assertEqual(self.call(u,'m10v_menu_count',model),6 if film in (33,67,68) else 5)
+            self.assertEqual(self.call(u,'m10v_menu_index',model,4),300)
+            self.assertEqual(self.call(u,'m10v_menu_index',model,5),214 if film==33 else 339 if film==67 else 340 if film==68 else 0)
         u.mem_write(model+0x1d,b'\x03')
         self.assertEqual(self.call(u,'m10v_menu_count',model),5)
         self.assertEqual(self.call(u,'m10v_menu_index',model,4),301)
@@ -698,6 +698,3 @@ class FilmLibraryArmTests(unittest.TestCase):
             u.reg_write(UC_ARM_REG_CPSR, cpsr); u.reg_write(UC_ARM_REG_SP, sp); u.reg_write(UC_ARM_REG_LR, 0x550ff000)
             u.emu_start(self.manifest['symbols']['m10v_chain_capture'], 0x550ff000, count=1000)
             self.assertEqual(seen, [0x536abd28]); self.assertEqual(u.reg_read(UC_ARM_REG_R0), 99)
-
-
-if __name__ == '__main__': unittest.main()

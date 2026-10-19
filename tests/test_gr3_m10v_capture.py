@@ -152,7 +152,7 @@ class M10VCaptureTests(unittest.TestCase):
                 1, C.byref(date), seed, scratch, len(scratch)), 0)
             self.assertEqual(bytes(u.mem_read(0x55010000, len(y))), bytes(hy))
             self.assertEqual(bytes(u.mem_read(0x55020000, len(uv))), bytes(hc))
-            self.assertEqual(len(cache), 4); self.assertEqual(frees, [0x550b0000])
+            self.assertEqual(len(cache), 4); self.assertEqual(frees, []); self.assertEqual(h.allocations, [], "retired soft must not allocate a frame buffer")
 
     def test_unavailable_or_invalid_date_skips_only_stamp_and_preserves_saved_setting(self):
         # Regression: returning -7 (or passing invalid date to render) loses
@@ -324,7 +324,7 @@ class M10VCaptureTests(unittest.TestCase):
                 self.assertFalse(any(address==0x53825fa8 for address,_ in h.file_calls))
 
     def test_failed_scratch_allocation_preserves_image(self):
-        h, u, context, y, uv, cache, frees, *_ = self.fixture(allocation=False)
+        h, u, context, y, uv, cache, frees, *_ = self.fixture(allocation=False,film=33)
         self.assertLess(h.call(u, 'm10v_capture_library', context), 0)
         self.assertEqual(bytes(u.mem_read(0x55010000, len(y))), bytes(y))
         self.assertEqual(bytes(u.mem_read(0x55020000, len(uv))), bytes(uv))

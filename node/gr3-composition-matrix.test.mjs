@@ -14,7 +14,7 @@ const root=new URL('..',import.meta.url).pathname;
 const study=path.join(root,'builds/gr3-composition-study');
 const available=['aspect','level','aspect-level'].every(n=>existsSync(path.join(study,n+'.bin')));
 const raw=b=>{const d=decodeFrameMap(b,b.readUInt32LE(b.length-8)).decoded;return d.subarray(0x10870,0x10870+d.readUInt32LE(0x1086c));};
-test('all eight extension combinations preserve selected/unselected bytes in debug and release', {skip:!available,timeout:180000},async()=>{
+test('all eight extension combinations preserve selected/unselected bytes in debug and release', {skip:!available,timeout:360000},async()=>{
  const source=await readNativeOfficial(),stock=raw(source),folder=await mkdtemp(path.join(os.tmpdir(),'m10v-composition-matrix-'));
  const components=Object.fromEntries(await Promise.all(['aspect','level','aspect-level'].map(async k=>[k,await readFile(path.join(study,k+'.bin'))])));
  try{

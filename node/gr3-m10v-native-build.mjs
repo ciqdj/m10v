@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { inspectOfficial } from './firmware.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
 import {settingsSources,settingsPatches,checkSettings} from './gr3-settings-menu.mjs';
+import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 
 const LOAD = 0x53000000;
@@ -45,6 +46,7 @@ const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_har
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
 sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c');
 sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
+sources.push(...hdfSources);
 sources.push('native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
 const nativeGrainSources=['native/gr3/m10v_isp_native_effects.c','native/gr3/m10v_isp_native_effects.h','scripts/build_gr3_native_grain_hooks.py','scripts/build_gr3_native_grain_noise_hook.py'];
@@ -137,7 +139,7 @@ function checkRuntime(runtime, manifest) {
     need(runtime.subarray(c.descriptors-BASE,c.descriptors-BASE+40).equals(Buffer.alloc(40)),'native film card descriptors must start empty');
     for(let i=0;i<5;i++)need(runtime.readUInt32LE(icons.table-BASE+(739+i)*4)===c.descriptors+i*8,'native film card directory differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?184:151;
+  const resourceCount=manifest.sd_library?192:151;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -162,10 +164,10 @@ detailInstructions.row_dispatch=[0xe92d500f,0xe1a02803,0xe1822004,0xe1a01005,0xe
 function checkDetail(runtime,manifest,raw) {
  const d=manifest.detail,base=manifest.base;
  need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&
-  JSON.stringify(d.ids)==='[18,19,20,21,22,23,24,25,26,27,28]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']), 'native detail contract differs');
+  JSON.stringify(d.ids)==='[18,19,20,21,22,23,24,25,26,27,28]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']), 'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
  const captions=read(d.captions,116);
- const variants={halo:[18,19,20,21,22,23,24,25,26,27],common:[21,22,23,24,25,26,27],red:[21,22,23,24,25,26,27,28]};
+ const variants={halo:[18,19,20,21,23,24,25,26,27],common:[21,23,24,25,26,27],red:[21,23,24,25,26,27,28]};
  need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
  const expectedIds=[862,863,864,827,828,913,914,915,916,917,933];
  for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
@@ -303,13 +305,20 @@ function lifecyclePatches(manifest){
  }
  return expected;
 }
-function patchList(manifest) {
+function patchList(manifest,runtime) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
   for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?743:738),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
-  return [...lifecyclePatches(manifest),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...settingsPatches(manifest),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  if(manifest.film_library_enabled===false){
+    need(manifest.sd_library&&manifest.hdf_menu,'independent HDF menu required');
+    return [...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),
+      ...hooks.filter(row=>row[2].startsWith('m10v_resource_')).map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.symbols[name],link),name})),
+      {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
+      {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
+  }
+  return [...hdfPatches(runtime,manifest),...lifecyclePatches(manifest),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},
@@ -357,7 +366,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const target=Buffer.concat([decoded.subarray(0,insertion),Buffer.alloc(growth),decoded.subarray(insertion)]);
   target.writeUInt32LE(newPayload,rtos.offset+12);
   runtime.copy(target,rtos.offset+16+programOffset);
-  for(const patch of patchList(manifest)) {
+  for(const patch of patchList(manifest,runtime)) {
     const at=rtos.offset+16+patch.address-LOAD;
     need(decoded.readUInt32LE(at)===patch.expected,'official native hook preimage differs: '+patch.name);
     target.writeUInt32LE(patch.replacement,at);
@@ -387,7 +396,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   need(fresh.size-16===BASE-LOAD+runtime.length,'native RTOS extent differs');
   need(after.readUInt32LE(fresh.offset+8)===before.readUInt32LE(old.offset+8),'native RTOS flags differ');
   const expected=Buffer.from(before.subarray(old.offset+16,old.offset+old.size));
-  for(const patch of patchList(manifest)) {
+  for(const patch of patchList(manifest,runtime)) {
     const at=patch.address-LOAD;
     need(expected.readUInt32LE(at)===patch.expected,'native audit stock preimage differs');
     expected.writeUInt32LE(patch.replacement,at);
@@ -406,10 +415,10 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest).length,icon_count:68,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:68,active_slots:5,external_film_pack:manifest.sd_library,sd_film_library:manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:36,max_records:256,page_rows:8}:null,
-    menu_entry:manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
-    still_isp_base:{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
-    live_view_base:{tone:11,carriers:[12,18,19,20,21],film_color_preview:false},
+    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:68,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:68,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:1,path:"M10V/FILMS.M10",supported_films:36,max_records:256,page_rows:8}:null,
+    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
+    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
+    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],film_color_preview:false},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
-    camera_scope:'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
+    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }

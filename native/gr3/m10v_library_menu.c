@@ -34,7 +34,7 @@ static uint32_t slot(const uint8_t *m) {
     return 0;
 }
 static uint32_t group_count(uint32_t group,const uint8_t *m){
-    if(group==1){m10v_library_state state;return m10v_camera_library_load(&state)>=0&&(state.slots[slot(m)].film==33||state.slots[slot(m)].film>=67)?7:6;}
+    if(group==1){m10v_library_state state;return m10v_camera_library_load(&state)>=0&&(state.slots[slot(m)].film==33||state.slots[slot(m)].film>=67)?6:5;}
     (void)m;
     return counts[group];
 }
@@ -51,6 +51,7 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!group) return index == 12 ? 128 : ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     if (index >= group_count(group,m)) return 0;
     static const uint8_t first[15] = {0,129,144,176,180,184,208,192,196,200,218,224,224,224,233};
+    if(group==1&&index>=2)index++;
     if(group==2)return index==0?213:index>=33?288+index-33:256+index-1;
     if(group==1&&index==5)return 300;
     if(group==1&&index==6){m10v_library_state s;
@@ -157,7 +158,7 @@ static void redraw(uint32_t controller) {
             /* Hidden historical looks stay active until an explicit confirm.
              * Their browsing cursor safely starts at 800T without a write. */
             if(group==2)selected=v->film>=33?v->film-33:0;
-            else if(group==3)selected=v->grain;else if(group==4)selected=v->soft;
+            else if(group==3)selected=v->grain;else if(group==4)selected=0;
             else if(group==5)selected=state.stamp;else if(group==7)selected=state.format;
             else if(group==8)selected=state.corner;else if(group==9)selected=state.color;
             else if(group>=16)selected=((const uint8_t *)&state.effects[target])[group-16];
@@ -199,6 +200,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     }
     if (index >= group_count(group,m)) return 0;
     if (group == 1) {
+        if(index>=2)index++;
         m10v_library_state s;uint32_t extra=m10v_camera_library_load(&s)>=0&&s.slots[slot(m)].film==68?21:10;
         m[0x1d]=(uint8_t)(index==6?extra:index==5?15:index==4?6:index+2);redraw(controller);return 0; }
     if(group==3&&index==4){m[0x1d]=16;redraw(controller);return 0;}
@@ -226,7 +228,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     }
     else if (group == 2) result = m10v_camera_library_select(&state, target, index + 33);
     else if (group == 3) result = m10v_camera_library_texture(&state, target, index, state.slots[target].soft);
-    else if (group == 4) result = m10v_camera_library_texture(&state, target, state.slots[target].grain, index);
+    else if (group == 4) return M10V_LIBRARY_INVALID;
     else result = m10v_camera_library_stamp(&state, group == 5 ? index : state.stamp,
         group == 7 ? index : state.format, group == 8 ? index : state.corner, group == 9 ? index : state.color);
     M10V_LOG(61,controller,(uint32_t)result,group,state.slots[target].film);
