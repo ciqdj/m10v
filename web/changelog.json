@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.11",
+      "date": "2026-10-19",
+      "title": "修复 GR IV 与 GR III 原生接口的构建兼容",
+      "changes": [
+        "将 GR III 专用的取景缓存与胶卷卡片目录接口从 GR IV 的链接契约中分离，修复多机型发布检查中的 runtime API incomplete。",
+        "保留 GR IV 原有界面、拍摄处理和完整固件检查，GR III 原厂 ISP、HDF 与调试开关方案不变。",
+        "上一轮部署因 GR IV 检查失败已自动回退，本次重新执行全部服务器机型构建与服务校验。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.10",
       "date": "2026-10-19",
       "title": "GR III 原厂 ISP 胶卷、取景色彩与 HDF 发布",
@@ -12,9 +25,9 @@
         "将原厂处理路径与调试日志开关分离；关闭调试仍使用原生处理，开启时记录 HDF 配置、门控、参数和处理返回，便于继续排查。",
         "上述实机确认来自当前测试机；GR IIIx 与 GR IV 保持各自既有机型处理和发布保护。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "6c5a2d388efc189b2feda81c38f906caed293e0b",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/6c5a2d388efc189b2feda81c38f906caed293e0b"
     },
     {
       "version": "2026.10.19.9",

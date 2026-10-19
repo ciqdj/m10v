@@ -46,7 +46,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
     subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}','-c',str(ROOT/('native/gr4' if 'controller' in file else 'native/gr3')/file),'-o',str(obj)],check=True,capture_output=True)
-    blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_')
+    blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',omitted_exports=('m10v_settings_controller_card_directory',) if 'controller' in file else ())
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs
 

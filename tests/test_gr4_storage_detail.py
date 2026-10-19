@@ -17,7 +17,7 @@ class Gr4StorageDetailTests(unittest.TestCase):
   def compile_one(name,base,prefix,externals):
    obj=cls.folder/(Path(name).name+'.o')
    subprocess.run([os.environ.get('M10V_LLVM_CLANG','clang'),*FLAGS,'-I',str(ROOT/'native/gr3'),'-c',str(ROOT/'native/gr4'/name),'-o',str(obj)],check=True)
-   raw,symbols=link_object(obj.read_bytes(),base,externals,prefix)
+   raw,symbols=link_object(obj.read_bytes(),base,externals,prefix,omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear') if prefix=='m10v_camera_library_' else ())
    cls.images.append((base,raw));cls.symbols.update(symbols);return symbols
   compile_one('../gr3/m10v_sd_library.c',0x54470000,'m10v_sd_',cls.symbols)
   compile_one('m10v_library_camera.c',0x54480000,'m10v_camera_library_',cls.symbols)

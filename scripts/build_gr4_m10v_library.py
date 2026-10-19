@@ -67,7 +67,8 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
         def module(relative,prefix,extra=()):
             obj=compile_source(relative,extra);at=(base+len(image)+15)&~15
             blob,entries=link_object(obj,at,symbols,prefix,
-                additional_exports=('m10v_menu_rows',) if prefix=='m10v_menu_' else ())
+                additional_exports=('m10v_menu_rows',) if prefix=='m10v_menu_' else (),
+                omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear') if prefix=='m10v_camera_library_' else ())
             append(blob);symbols.update(entries)
         module('native/gr3/film_harman.c','m10v_harman_')
         module('native/gr3/film_5207.c','m10v_5207_')
@@ -80,10 +81,10 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
         module('native/gr4/m10v_settings_view.c','m10v_settings_view_')
         obj=compile_source('native/gr4/m10v_settings_controller.c');at=(base+len(image)+15)&~15
         external=['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable']
-        provisional,entries=link_object(obj,at,{**symbols,**dict.fromkeys(external,at)},'m10v_settings_controller_')
+        provisional,entries=link_object(obj,at,{**symbols,**dict.fromkeys(external,at)},'m10v_settings_controller_',omitted_exports=('m10v_settings_controller_card_directory',))
         hookbase=(at+len(provisional)+15)&~15
         hooks,settings=build_settings_hooks(hookbase,{**symbols,**entries},rtos)
-        code,entries=link_object(obj,at,{**symbols,**settings['exports']},'m10v_settings_controller_')
+        code,entries=link_object(obj,at,{**symbols,**settings['exports']},'m10v_settings_controller_',omitted_exports=('m10v_settings_controller_card_directory',))
         append(code);append(hooks);symbols.update(entries)
         obj=compile_source('native/gr4/m10v_detail.c');at=(base+len(image)+15)&~15
         names=['m10v_detail_tables','m10v_detail_common_tables','m10v_detail_red_tables']
