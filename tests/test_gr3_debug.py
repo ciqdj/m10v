@@ -41,7 +41,7 @@ class DebugLogArmTests(unittest.TestCase):
         elif address==0x536af2e4: result=0
         elif address==0x53900100:
             name=bytes(u.mem_read(args[1],16)).split(b'\0')[0].decode()
-            self.assertIn(name,('C:\\M10VMN0.BIN','C:\\M10VMN1.BIN','C:\\M10VCP0.BIN','C:\\M10VCP1.BIN'))
+            self.assertIn(name,('C:\\M10VMN0.BIN','C:\\M10VMN1.BIN','C:\\M10VCP0.BIN','C:\\M10VCP1.BIN','C:\\M10VIO0.BIN','C:\\M10VIO1.BIN'))
             self.assertIn(args[2],(0,1)); self.calls.append(('open',name,args[2]))
             result=int(args[2]==0 or name in self.files)
             if result:
@@ -95,6 +95,30 @@ class DebugLogArmTests(unittest.TestCase):
         self.u.mem_write(0x55008000,struct.pack('<10I',100,1,2,3,4,30,1,2,3,4))
         self.assertEqual(self.invoke('m10v_debug_batch',0x55008000,2),0)
         self.assertEqual(self.calls,[])
+
+    def test_profile_sized_batches_fill_ring_and_reject_overflow_before_io(self):
+        events=[(150,0x550709b8,1,100+i,0) for i in range(32)]
+        self.u.mem_write(0x55008000,b''.join(struct.pack('<5I',*event) for event in events))
+        for _ in range(2):self.assertEqual(self.invoke('m10v_debug_batch',0x55008000,32),1)
+        rows=self.decoded()['records']
+        self.assertEqual(len(rows),64)
+        self.assertEqual([r['sequence'] for r in rows],list(range(1,65)))
+        self.assertEqual(sum(c[0]=='write' for c in self.calls),2)
+        self.assertEqual(sum(c[0]=='close' for c in self.calls),self.successful_opens)
+        before=list(self.calls)
+        self.assertEqual(self.invoke('m10v_debug_batch',0x55008000,33),0)
+        self.assertEqual(self.calls,before)
+
+    def test_lifecycle_channel_preserves_capture_history_and_rejects_mixed_batches(self):
+        self.assertEqual(self.log(150,1,2,3,4),1)
+        self.assertEqual(self.log(190,5,6,7,8),1)
+        rows=self.decoded()['records']
+        self.assertEqual([(r['channel'],r['event']) for r in rows],[('capture',150),('io',190)])
+        self.assertTrue(any('M10VIO' in name for name in self.files))
+        self.u.mem_write(0x55008000,struct.pack('<10I',190,1,2,3,4,150,1,2,3,4))
+        before=list(self.calls)
+        self.assertEqual(self.invoke('m10v_debug_batch',0x55008000,2),0)
+        self.assertEqual(self.calls,before)
 
     def test_independent_page_trace_decodes_keys_state_and_error(self):
         self.assertEqual(self.log(83,0xcf,4,2,(3<<16)|1),1)
@@ -167,7 +191,7 @@ class DebugLogArmTests(unittest.TestCase):
         for i in range(70):self.assertEqual(self.log(30,b=i),1)
         self.assertEqual(self.log(100),1)
         records=self.decoded()['records'];menu=[r for r in records if r['channel']=='menu']
-        self.assertEqual(len(menu),63);self.assertEqual(menu[0]['arguments'][1],7)
+        self.assertEqual(len(menu),64);self.assertEqual(menu[0]['arguments'][1],6)
         self.assertEqual(menu[-1]['sequence'],70)
         self.assertEqual(len([r for r in records if r['channel']=='capture']),1)
 

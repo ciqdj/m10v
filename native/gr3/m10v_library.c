@@ -1,9 +1,11 @@
+#include "m10v_capture_profile.h"
 /* Original M10V runtime. Existing simulation tables are embedded losslessly
  * with their source notices; no third-party camera runtime or signed film
  * package is loaded. Camera services have separately verified ABI boundaries. */
 #include "m10v_library.h"
 #include "halation_core.h"
 #include "film_5207.h"
+#include "m10v_color_cache.h"
 #include <stddef.h>
 #include "m10v_legacy_data.h"
 #include "halation_energy.h"
@@ -279,13 +281,22 @@ static void legacy_rgb(uint8_t y,uint8_t cb,uint8_t cr,const int16_t *m,const in
         if(color<0)color=0;if(color>16383)color=16383;out[row]=(color*255+8191)/16383;
     }
 }
-static int legacy_color(m10v_library_image *image,uint32_t id){
+static __attribute__((always_inline)) inline int legacy_color_loop(m10v_library_image *image,uint32_t id,void *memory,uint32_t cached){
     int16_t matrix[9],post[9];uint16_t curves[768],knots[99];
     if(m10v_library_tables(id,matrix,post,curves,knots))return -1;
     for(uint32_t row=0;row<image->height;++row)for(uint32_t x=0;x<image->width;x+=2){
         uint32_t at=row*image->stride+x;int a[3],b[3];
         uint8_t cb=image->chroma[at],cr=image->chroma[at+1];
-        legacy_rgb(image->y[at],cb,cr,matrix,post,curves,a);legacy_rgb(image->y[at+1],cb,cr,matrix,post,curves,b);
+        for(uint32_t k=0;k<2;k++){
+            uint8_t rgb[3];int *out=k?b:a;
+            uint32_t key=(uint32_t)image->y[at+k]|((uint32_t)cb<<8)|((uint32_t)cr<<16);
+            uint32_t *entry=cached?m10v_color_cache_slot(memory,key):0;
+            if(!cached||entry[0]!=(key|0x01000000u)){
+                legacy_rgb(image->y[at+k],cb,cr,matrix,post,curves,out);
+                for(uint32_t c=0;c<3;c++)rgb[c]=(uint8_t)out[c];
+                if(cached)m10v_color_cache_write(entry,key,rgb);
+            }else {m10v_color_cache_read(entry,rgb);for(uint32_t c=0;c<3;c++)out[c]=rgb[c];}
+        }
         image->y[at]=clamp(rounded(19595*a[0]+38470*a[1]+7471*a[2],16));
         image->y[at+1]=clamp(rounded(19595*b[0]+38470*b[1]+7471*b[2],16));
         int r=a[0]+b[0],g=a[1]+b[1],blue=a[2]+b[2];
@@ -293,6 +304,11 @@ static int legacy_color(m10v_library_image *image,uint32_t id){
         image->chroma[at+1]=clamp(128+rounded(32768*r-27439*g-5329*blue,17));
     }
     return 0;
+}
+
+static int legacy_color(m10v_library_image *image,uint32_t id,void *memory){
+    memory=m10v_color_cache_prepare(memory,image);
+    return memory?legacy_color_loop(image,id,memory,1):legacy_color_loop(image,id,0,0);
 }
 
 static void soft_diffusion(m10v_library_image *image,const m10v_slot *choice,uint8_t *scratch,uint32_t cells,uint32_t gw,uint32_t gh,uint32_t shift){
@@ -352,6 +368,7 @@ static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,c
         if(peak>=240)continue;
         uint32_t protect=(255-peak)*4;if(protect>255)protect=255;
         uint32_t red=(energy_sample(a,gw,gh,x,row,shift)*v->halo_gain*protect)>>12;
+        if(!red)continue;
         uint32_t limit=6u*v->halo_gain;if(red>limit)red=limit;
         /* Orange shoulder: more green than 800T, with a six-level red cap
          * per gain step (800T permits 192). All products fit uint32_t. */
@@ -361,9 +378,14 @@ static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,c
         im->chroma[at+1]=clamp((int)im->chroma[at+1]+(int)((128*red-107*green+128)>>8));
     }
 }
-int m10v_library_render(m10v_library_image *image, const m10v_library_state *state,
-                        uint32_t slot, const m10v_library_date *date, uint32_t seed,
-                        uint8_t *scratch, uint32_t scratch_bytes) {
+static int render_stages(m10v_library_image *image,const m10v_library_state *state,
+                        uint32_t slot,const m10v_library_date *date,uint32_t seed,
+                        uint8_t *scratch,uint32_t scratch_bytes,uint32_t completed
+#if M10V_CAPTURE_PROFILE
+                        ,m10v_capture_profile *profile
+#endif
+                        ) {
+    if(completed & ~M10V_NATIVE_ALL)return M10V_LIBRARY_INVALID;
     if (!image || !m10v_library_valid(state) || slot >= M10V_SLOT_COUNT ||
         !image->y || !image->chroma || image->width < 2 || image->width > 6144 ||
         (image->width & 1) || !image->height || image->height > 4096 ||
@@ -386,9 +408,13 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         gw = (image->width + mask) >> shift; gh = (image->height + mask) >> shift;
     }
     uint32_t cells = gw * gh;
-    uint32_t use_halo = (choice->film == 33 || choice->film == 67) && choice->halo_gain;
+    uint32_t use_halo = !(completed&M10V_NATIVE_HALO) && (choice->film == 33 || choice->film == 67) && choice->halo_gain;
+    uint32_t soft=(completed&M10V_NATIVE_SOFT)?0:choice->soft;
+    uint32_t grain=(completed&M10V_NATIVE_GRAIN)?0:choice->grain;
+    m10v_film_effects effects=state->effects[slot];
+    if(completed&M10V_NATIVE_LEAK)effects.leak_gain=0;
     uint32_t needed = ((((choice->film == 33 || choice->film == 67) ? 6 : 2)) * cells + 3) & ~3u;
-    if ((choice->soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
+    if ((soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
         (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
         overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
         overlap(scratch, needed, image, sizeof(*image)) ||
@@ -406,15 +432,43 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
             overlap(scratch,scratch_bytes,image,sizeof(*image)) ||
             (state->stamp && overlap(scratch,scratch_bytes,date,sizeof(*date)))) return M10V_LIBRARY_INVALID;
     }
-    if(choice->film==33 && (use_halo || choice->soft))m10v_800t_effects(image,choice,scratch,gw,gh,shift);
+    /* Optional exact color cache follows spatial storage. Missing capacity
+     * keeps the previous ABI and renderer. Validate before the first write. */
+    uint32_t spatial=(choice->film==67&&use_halo)?4*cells:0;
+    void *color_memory=0;
+    if(choice->film>33 && scratch && !((uintptr_t)scratch&3) &&
+       scratch_bytes>=spatial+M10V_COLOR_CACHE_BYTES &&
+       (uintptr_t)scratch<=UINTPTR_MAX-scratch_bytes &&
+       !overlap(scratch,scratch_bytes,image->y,image->y_bytes) &&
+       !overlap(scratch,scratch_bytes,image->chroma,image->chroma_bytes) &&
+       !overlap(scratch,scratch_bytes,state,sizeof(*state)) &&
+       !overlap(scratch,scratch_bytes,image,sizeof(*image)) &&
+       !(state->stamp&&overlap(scratch,scratch_bytes,date,sizeof(*date))))
+        color_memory=scratch+spatial;
+    if(choice->film==33 && (use_halo || soft)){
+        m10v_slot spatial_choice=*choice;
+        if(completed&M10V_NATIVE_HALO)spatial_choice.halo_gain=0;
+        spatial_choice.soft=(uint8_t)soft;
+        m10v_800t_effects(image,&spatial_choice,scratch,gw,gh,shift);
+    }
     if(choice->film==67&&use_halo)phoenix_halation_source(image,choice,scratch,gw,gh,shift);
-    if(choice->film==66&&choice->soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
-    if(choice->film==66){m10v_5207_render(image,&state->effects[slot],choice->grain,seed);}
+    if(choice->film==66&&soft)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
+    M10V_PROFILE(7);
+    uint32_t *texture_stats=0;
+#if M10V_CAPTURE_PROFILE
+    uint32_t texture_work[3];texture_stats=texture_work;
+#endif
+    if(completed&M10V_NATIVE_COLOR){
+        uint32_t amount=grain<<8;
+        if(choice->film==68){uint32_t exposure=effects.film_exposure;amount=grain*(exposure==1?218:exposure==2?307:256);}
+        if(choice->film>=66)m10v_5207_texture_cached_stats_q8(image,&effects,amount,seed,0,0,texture_stats);
+    }
+    else if(choice->film==66){m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,1,color_memory,texture_stats);}
     else if(choice->film>=67){
         uint32_t exposure=state->effects[slot].film_exposure;
-        m10v_5207_texture_q8(image,&state->effects[slot],choice->grain*(choice->film==68?(exposure==1?218:exposure==2?307:256):256),seed,choice->film==67?2:3+exposure);
+        m10v_5207_texture_cached_stats_q8(image,&effects,grain*(choice->film==68?(exposure==1?218:exposure==2?307:256):256),seed,choice->film==67?2:3+exposure,color_memory,texture_stats);
     }
-    else if(choice->film>33){if(legacy_color(image,choice->film))return M10V_LIBRARY_INVALID;}
+    else if(choice->film>33){if(legacy_color(image,choice->film,color_memory))return M10V_LIBRARY_INVALID;}
     else {
     const film *look = &films[choice->film - 1];
     uint8_t curve[256];
@@ -430,9 +484,38 @@ int m10v_library_render(m10v_library_image *image, const m10v_library_state *sta
         image->y[at] = curve[image->y[at]]; image->y[at + 1] = curve[image->y[at + 1]];
     }
     }
+#if M10V_CAPTURE_PROFILE
+    if(choice->film>=66&&profile&&profile->count<32){
+        uint32_t *e=profile->events[profile->count++];e[0]=134;e[1]=profile->context;
+        e[2]=texture_work[0];e[3]=texture_work[1];e[4]=texture_work[2];
+    }
+#endif
+    M10V_PROFILE(8);
     if(choice->film==67&&use_halo)phoenix_halation_compose(image,choice,scratch,gw,gh,shift);
-    if (choice->soft && choice->film!=66 && choice->film!=33)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
-    if(choice->film<66)m10v_5207_texture(image,&state->effects[slot],choice->grain,seed,0);
+    if (soft && choice->film!=66 && choice->film!=33)soft_diffusion(image,choice,scratch,cells,gw,gh,shift);
+    if(choice->film<66)m10v_5207_texture(image,&effects,grain,seed,0);
+    M10V_PROFILE(9);
     if (state->stamp) stamp(image, state, date);
+    M10V_PROFILE(10);
     return M10V_LIBRARY_OK;
 }
+
+
+int m10v_library_render_native(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed){
+    return render_stages(image,state,slot,date,seed,scratch,bytes,completed
+#if M10V_CAPTURE_PROFILE
+      ,0
+#endif
+    );
+}
+int m10v_library_render(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes){
+    return m10v_library_render_native(image,state,slot,date,seed,scratch,bytes,0);
+}
+#if M10V_CAPTURE_PROFILE
+int m10v_library_render_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,m10v_capture_profile *profile){
+    return render_stages(image,state,slot,date,seed,scratch,bytes,0,profile);
+}
+int m10v_library_render_native_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed,m10v_capture_profile *profile){
+    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,profile);
+}
+#endif

@@ -42,6 +42,13 @@ int m10v_library_detail(m10v_library_state *, uint32_t slot, uint32_t gain, uint
 int m10v_library_tables(uint32_t film, int16_t *, int16_t *, uint16_t *, uint16_t *);
 int m10v_library_stamp(m10v_library_state *, uint32_t enabled, uint32_t format,
                        uint32_t corner, uint32_t color, m10v_library_store, void *);
+/* Upstream completion is per recipe; callers must validate generation and
+ * frame identity before supplying this mask. These bits never disable an
+ * effect that the native owner has not actually executed. */
+enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
+       M10V_NATIVE_HALO=8u, M10V_NATIVE_LEAK=16u, M10V_NATIVE_ALL=31u };
+int m10v_library_render_native(m10v_library_image *,const m10v_library_state *,uint32_t,
+        const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t completed);
 int m10v_library_render(m10v_library_image *, const m10v_library_state *, uint32_t slot,
                         const m10v_library_date *, uint32_t seed, uint8_t *scratch,
                         uint32_t scratch_bytes);

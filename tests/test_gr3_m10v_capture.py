@@ -43,7 +43,7 @@ class M10VCaptureTests(unittest.TestCase):
         cls.official = subprocess.check_output(['node', '--input-type=module', '-e', js], cwd=Path(__file__).resolve().parents[1])
         host_tests.NativeFilmLibraryTests.setUpClass(); cls.addClassCleanup(host_tests.NativeFilmLibraryTests.doClassCleanups)
 
-    def fixture(self, tone=18, jpeg=1, raw=0, raw_alias=False, allocation=True, raw_bank=0x60000000, film=2, clock_ready=1, date=(2026, 10, 14, 23, 59, 17), stamp=2, debug=False, capture_date=None):
+    def fixture(self, tone=18, jpeg=1, raw=0, raw_alias=False, allocation=True, raw_bank=0x60000000, film=2, clock_ready=1, date=(2026, 10, 14, 23, 59, 17), stamp=2, debug=False, capture_date=None, allocation_fail_first=False):
         h = arm_tests.FilmLibraryArmTests(); h.manifest = self.debug_manifest if debug else self.manifest; h.code = self.debug_code if debug else self.code; u = h.machine()
         h.capture_events = []
         for address in (0x536af000, 0x5383c000, 0x532b3000): u.mem_map(address, 4096)
@@ -55,11 +55,11 @@ class M10VCaptureTests(unittest.TestCase):
             u.mem_write(page, self.official[page - 0x53000000:page - 0x53000000 + 4096])
         u.mem_write(0x550062ac, struct.pack('<I', clock_ready))
         u.mem_write(0x550063c0, struct.pack('<H6BH', *date, 0, 0))
-        cache = []; frees = []
+        cache = []; frees = []; h.allocations=[]
         def camera(uc, address, size, data):
             if h.manifest.get('debug_mode') and address == h.manifest['symbols'].get('m10v_debug_batch'):
                 pointer=uc.reg_read(UC_ARM_REG_R0);count=uc.reg_read(UC_ARM_REG_R1)
-                self.assertGreater(count,0);self.assertLessEqual(count,16)
+                self.assertGreater(count,0);self.assertLessEqual(count,32)
                 h.capture_events.extend(struct.unpack('<5I',uc.mem_read(pointer+i*20,20)) for i in range(count))
                 uc.reg_write(UC_ARM_REG_R0,0)
             elif h.manifest.get('debug_mode') and address == h.manifest['symbols']['m10v_debug_log']:
@@ -69,7 +69,9 @@ class M10VCaptureTests(unittest.TestCase):
                 uc.reg_write(UC_ARM_REG_R0, 0)
             elif address == 0x536af2a8:
                 self.assertLessEqual(uc.reg_read(UC_ARM_REG_R0), 589824)
-                uc.reg_write(UC_ARM_REG_R0, 0x550b0000 if allocation else 0)
+                h.allocations.append(uc.reg_read(UC_ARM_REG_R0))
+                available=allocation and not (allocation_fail_first and len(h.allocations)==1)
+                uc.reg_write(UC_ARM_REG_R0, 0x550b0000 if available else 0)
             elif address == 0x536af2e4: frees.append(uc.reg_read(UC_ARM_REG_R0))
             elif address == 0x5383c8a8: cache.append((uc.reg_read(UC_ARM_REG_R0), uc.reg_read(UC_ARM_REG_R1)))
             elif address == 0x5320b97c: uc.reg_write(UC_ARM_REG_R0, 0x55006000)
@@ -239,7 +241,8 @@ class M10VCaptureTests(unittest.TestCase):
             self.assertEqual(h.call(u,'m10v_capture_library',context),0)
             clock = [e for e in h.capture_events if e[0] == 120]
             self.assertEqual(clock,[(120,context,status,2,0x55006000)])
-            self.assertEqual([e[0] for e in h.capture_events],[100,113,120,121,124,122,110,112,111,123,101])
+            self.assertEqual([e[0] for e in h.capture_events],[100,125,113,120,121,124,122,110,112,111,123,101])
+            self.assertEqual([e for e in h.capture_events if e[0]==125],[(125,context,18,0,0x60000000)])
             self.assertFalse(any(e[0]==114 for e in h.capture_events))
             self.assertEqual(h.capture_events[-1][2],0)
 
@@ -303,6 +306,23 @@ class M10VCaptureTests(unittest.TestCase):
         h.call(u,'m10v_camera_library_halation',0x55001000,1,0,8,0,3)
         self.assertEqual(h.call(u,'m10v_capture_library',context),0);self.assertFalse(frees)
 
+    def test_repeated_raw_jpeg_frames_release_scratch_without_cross_frame_pixel_state(self):
+        # Sequential recipe calls are not a hardware burst simulation. They
+        # catch retained lattice/blur state and unbalanced scratch ownership.
+        for film in (33,66,67):
+            with self.subTest(film=film):
+                h,u,context,y,uv,cache,frees,*_=self.fixture(raw=1,raw_bank=0xa3000000,film=film,stamp=0)
+                outputs=[];before_files=dict(h.files)
+                for frame in range(3):
+                    u.mem_write(0x55010000,bytes(y));u.mem_write(0x55020000,bytes(uv))
+                    self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+                    outputs.append((bytes(u.mem_read(0x55010000,len(y))),bytes(u.mem_read(0x55020000,len(uv)))))
+                    self.assertEqual(len(frees),frame+1)
+                    self.assertEqual(len(cache),4*(frame+1))
+                self.assertEqual(outputs[0],outputs[1]);self.assertEqual(outputs[0],outputs[2])
+                self.assertEqual(h.files,before_files)
+                self.assertFalse(any(address==0x53825fa8 for address,_ in h.file_calls))
+
     def test_failed_scratch_allocation_preserves_image(self):
         h, u, context, y, uv, cache, frees, *_ = self.fixture(allocation=False)
         self.assertLess(h.call(u, 'm10v_capture_library', context), 0)
@@ -310,5 +330,21 @@ class M10VCaptureTests(unittest.TestCase):
         self.assertEqual(bytes(u.mem_read(0x55020000, len(uv))), bytes(uv))
         self.assertFalse(cache); self.assertFalse(frees)
 
+
+
+    def test_optional_cache_allocation_failure_retries_required_spatial_storage(self):
+        h,u,context,y,uv,cache,frees,*_=self.fixture(film=67,allocation_fail_first=True,stamp=0)
+        self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+        self.assertEqual(h.allocations,[4*128*96+65536,6*128*96])
+        self.assertEqual(frees,[0x550b0000]);self.assertEqual(len(cache),4)
+        self.assertNotEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
+
+    def test_optional_only_allocation_failure_keeps_render_and_stock_handoff(self):
+        h,u,context,y,uv,cache,frees,*_=self.fixture(film=35,allocation=False,stamp=0)
+        self.assertEqual(h.call(u,'m10v_camera_library_texture',0x55001000,1,0,0),0)
+        self.assertEqual(h.call(u,'m10v_capture_library',context),0)
+        self.assertEqual(h.allocations,[65536]);self.assertEqual(frees,[])
+        self.assertEqual(len(cache),4)
+        self.assertNotEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
 
 if __name__ == '__main__': unittest.main()

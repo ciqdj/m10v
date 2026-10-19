@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.4",
+      "date": "2026-10-19",
+      "title": "GR III 调试导出接入原厂色彩、颗粒与回放恢复",
+      "changes": [
+        "GR III 调试导出采用 V7：逐张在原厂 ISP 中应用胶卷色彩，重做5207、蓝凤凰与RED不同EI；非调试导出及GR IIIx保持既有处理链。",
+        "颗粒复用原厂计划、分配、执行与释放流程，记录逐张完成状态，防止软件重复叠加；光晕、柔光、漏光保留全分辨率软件处理，需同步更新匹配胶卷资源。",
+        "修补原厂回放完成通知与停止回复交错时的等待状态，隔离连拍旧消息；保留实际保存与RAW释放诊断，不强制释放保存缓冲。",
+        "69项本地／ARM回归、11项交付固件回读及扩展组合检查已通过；秒回放、持续连拍、成像与卡上照片完整性仍待实机验收，不宣称已经修复。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.3",
       "date": "2026-10-19",
       "title": "完善新站 HTTPS 与宝塔维护流程",
@@ -10,9 +24,9 @@
         "技能补充 DNS 证书验证、备案后自动续期切换、宝塔 HTTPS IP 入口及来源限制的验证方法。",
         "仅更新 GR III、GR IIIx、GR IV 的部署维护说明，不改变固件补丁。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "615b7351cf1058c4ccf150fda31f6b5947c18679",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39144825619"
     },
     {
       "version": "2026.10.19.2",

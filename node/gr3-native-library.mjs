@@ -3,7 +3,7 @@ import {readFile,mkdtemp,rm,access} from 'node:fs/promises';
 import {promisify} from 'node:util';
 import {execFile} from 'node:child_process';
 import path from 'node:path';
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {normalizeConfiguration,normalizeExtensions,activeExtensions} from '../web/gr3/native-library-state.mjs';
@@ -49,9 +49,10 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
  if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');
  const integration_source_sha256=integrationFingerprint();
  const reference=JSON.parse(readFileSync(path.join(root,'native/gr3/5207-reference.json'),'utf8'));
- const configuration=normalizeConfiguration(value),runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256}));
+ const capture_pipeline=debug_mode&&report.model==='GR III'?'gr3-native-v7':'software';
+ const configuration=normalizeConfiguration(value),runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256,capture_pipeline}));
  return {schema:'m10v-native-library-plan/v1',ready:true,extensions,version_unlock,integration_source_sha256,features:['film','800t','5207','phoenix-ii-200','harman-red-125','grain','soft','timestamp',...activeExtensions(extensions)],source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
-  debug_mode,debug_log:debug_mode?{schema:'m10v-gr3-sd-debug/v1',build_id:configuration_sha256.slice(0,8),files:['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'],page_bytes:4096,records_per_channel:63}:null,
+  capture_pipeline,debug_mode,debug_log:debug_mode?{schema:'m10v-gr3-sd-debug/v1',build_id:configuration_sha256.slice(0,8),files:['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'],page_bytes:4096,records_per_channel:63}:null,
   stock_detail:{ids:Array.from({length:11},(_,i)=>18+i),fields:['gain','spread','threshold','grain','soft','grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'],films:'all',halation_films:[33,67],film_exposure:{only_film:68,values:[125,64,250]},slots:5,lifecycle:'stock immediate callback'},
   initial_state_hex:initialState(configuration).toString('hex'),film_5207_reference:{table_sha256:reference.table_sha256,table_size:reference.table_size,table_bits:reference.table_bits,input:reference.input,camera_calibrated:false,film_calibrated:false,halation:false},film_count:68,active_slots:5,camera_tested:false,external_film_pack:true,
   scope:'静态 JPEG 色彩、颗粒、柔光与时间戳；五槽机内替换并持久化。取景采用 Standard 基底，无实时胶卷色彩；RAW 再开发未接入。',
@@ -65,9 +66,14 @@ export async function generateNative(source,value,accepted,{signal,debug_mode=fa
  try{
   folder=await mkdtemp(path.join(os.tmpdir(),'m10v-native-export-'));
   let python=path.join(root,'.venv/bin/python');try{await access(python);}catch{python='python3';}
+  // Child hooks invoke LLVM tools too; systemd may have only Node's absolute path.
+  const compiler=process.env.M10V_LLVM_CLANG||['/opt/homebrew/opt/llvm/bin/clang','/usr/local/opt/llvm/bin/clang','/usr/bin/clang'].find(existsSync);
+  const linker=[process.env.M10V_LLVM_LD,compiler&&path.join(path.dirname(compiler),'ld.lld'),'/opt/homebrew/opt/lld/bin/ld.lld','/usr/local/opt/lld/bin/ld.lld','/usr/bin/ld.lld'].find(p=>p&&existsSync(p));
+  const toolPaths=[compiler&&path.dirname(compiler),linker&&path.dirname(linker),process.env.PATH].filter(Boolean);
+  const buildEnv={...process.env,M10V_NODE:process.execPath,PATH:toolPaths.join(path.delimiter),...(compiler?{M10V_LLVM_CLANG:compiler}:{})};
   const commonSource=plan.model==='GR IIIx'?await readNativeOfficial('gr3'):source;
   const component=await buildCameraComponents(commonSource,plan.extensions,{signal});
-  await run(python,['scripts/build_gr3_m10v_library.py','--base',component?'0x540ba000':'0x540b6000','--out',folder,'--initial-state-hex',plan.initial_state_hex,'--sd-library',...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[])],{cwd:root,signal,env:{...process.env,M10V_NODE:process.execPath},timeout:120000,maxBuffer:2*1024*1024});
+  await run(python,['scripts/build_gr3_m10v_library.py','--base',component?'0x540ba000':'0x540b6000','--out',folder,'--initial-state-hex',plan.initial_state_hex,'--sd-library',...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[]),...(plan.capture_pipeline==='gr3-native-v7'?['--profile','--candidate-color','--spatial-neon','--texture-neon','--lifecycle-trace','--save-chain-trace','--recipe-snapshot','--native-color','--native-grain','--view-deferred']:[])],{cwd:root,signal,env:buildEnv,timeout:120000,maxBuffer:2*1024*1024});
   const manifest=JSON.parse(await readFile(path.join(folder,'m10v-library-arm.json'),'utf8'));
   if(manifest.initial_state_hex!==plan.initial_state_hex)throw Error('ARM 初始配置回读不同');
   if(manifest.debug_mode!==debug_mode||(debug_mode&&manifest.debug_log?.build_id!==plan.debug_log.build_id))throw Error('ARM 调试模式回读不同');
@@ -76,7 +82,7 @@ export async function generateNative(source,value,accepted,{signal,debug_mode=fa
   const joined=composeNative(commonSource,result.candidate,runtime,manifest,component,plan.extensions);
   const ported=plan.model==='GR IIIx'?portNativeToGr3x(commonSource,source,joined.candidate):null;
   const unlocked=applyVersionUnlock(ported?ported.candidate:joined.candidate,plan.version_unlock);
-  return {...result,candidate:unlocked.candidate,nativeCandidate:result.candidate,component,manifest,runtime,receipt:{...result.receipt,extensions:plan.extensions,version_unlock:unlocked.receipt,features:plan.features,film_5207_reference:plan.film_5207_reference,integration_source_sha256:plan.integration_source_sha256,composition:joined.composition,candidate_sha256:hash(unlocked.candidate),candidate_bytes:unlocked.candidate.length,rtos_growth:joined.structure.rtosGrowth,configuration:plan.configuration,configuration_sha256:plan.configuration_sha256,runtime_source_sha256:plan.runtime_source_sha256,
+  return {...result,candidate:unlocked.candidate,nativeCandidate:result.candidate,component,manifest,runtime,receipt:{...result.receipt,capture_pipeline:plan.capture_pipeline,experimental_capture:manifest.experimental_capture??null,extensions:plan.extensions,version_unlock:unlocked.receipt,features:plan.features,film_5207_reference:plan.film_5207_reference,integration_source_sha256:plan.integration_source_sha256,composition:joined.composition,candidate_sha256:hash(unlocked.candidate),candidate_bytes:unlocked.candidate.length,rtos_growth:joined.structure.rtosGrowth,configuration:plan.configuration,configuration_sha256:plan.configuration_sha256,runtime_source_sha256:plan.runtime_source_sha256,
    source_sha256:plan.source_sha256,reference_source_sha256:hash(commonSource),gr3x_port:ported?.receipt??null,model:plan.model,public_version:plan.public_version,filename:plan.filename,initial_state_hex:plan.initial_state_hex,initial_settings_policy:plan.initial_settings_policy}};
  }finally{if(folder)await rm(folder,{recursive:true,force:true});building=false;}
 }

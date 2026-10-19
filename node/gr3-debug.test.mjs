@@ -10,11 +10,18 @@ test('debug mode is off by default and changes the accepted firmware plan',async
  const configuration=defaultConfiguration();
  const normal=prepareNative(source,configuration),debug=prepareNative(source,configuration,{debug_mode:true});
  assert.equal(normal.debug_mode,false);
+ assert.equal(normal.capture_pipeline,'software');
+ assert.equal(debug.capture_pipeline,'gr3-native-v7');
  assert.equal(debug.debug_mode,true);
  assert.equal(debug.runtime_source_sha256,nativeSourceFingerprint());
  assert.match(debug.runtime_source_sha256,/^[0-9a-f]{64}$/);
  assert.notEqual(normal.configuration_sha256,debug.configuration_sha256);
- assert.deepEqual(debug.debug_log.files,['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN']);
+ assert.deepEqual(debug.debug_log.files,['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN']);
  assert.throws(()=>prepareNative(source,configuration,{debug_mode:'true'}),/调试/);
  await assert.rejects(()=>generateNative(source,configuration,normal.configuration_sha256,{debug_mode:true}),/变化/);
+});
+
+test('GR IIIx debug export retains its own established pipeline',()=>{
+ const source=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
+ assert.equal(prepareNative(source,defaultConfiguration(),{debug_mode:true}).capture_pipeline,'software');
 });

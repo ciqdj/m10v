@@ -4,6 +4,18 @@
  */
 #include "m10v_library.h"
 #include "m10v_debug.h"
+#include "m10v_capture_profile.h"
+#include "m10v_color_cache.h"
+#if M10V_RAW_LIFETIME
+#include "m10v_save_trace.h"
+#endif
+#if M10V_RECIPE_SNAPSHOT
+#include "m10v_isp_recipe_color.h"
+#endif
+#if M10V_CAPTURE_PROFILE
+int m10v_library_render_profiled(m10v_library_image *,const m10v_library_state *,uint32_t,const m10v_library_date *,uint32_t,uint8_t *,uint32_t,m10v_capture_profile *);
+int m10v_library_render_native_profiled(m10v_library_image *,const m10v_library_state *,uint32_t,const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t,m10v_capture_profile *);
+#endif
 typedef void *(*allocate_fn)(uint32_t);
 typedef void (*free_fn)(void *);
 typedef void (*cache_fn)(void *, uint32_t);
@@ -14,9 +26,18 @@ typedef int (*clock_fn)(uint32_t, void *);
 /* Stack-owned, per-capture batches: no global page pointer or shared image state.
  * Persist pre-render and completion separately so a stalled render remains
  * diagnosable without an SD transaction for every individual event. */
+#if M10V_CAPTURE_PROFILE
+typedef m10v_capture_profile m10v_capture_trace;
+#else
 typedef struct {uint32_t count;uint32_t events[16][5];} m10v_capture_trace;
+#endif
 static void trace_append(m10v_capture_trace *trace,uint32_t e,uint32_t a,uint32_t b,uint32_t c,uint32_t d){
-    if(trace->count>=16)return;
+#if M10V_CAPTURE_PROFILE
+    /* Keep three one-shot film samples inside the existing 63-record page.
+     * Timing checkpoints replace CPU hashes and redundant render markers. */
+    if(e!=100&&e!=101&&e!=102&&e!=112&&e!=113&&e!=121&&e!=124&&e!=125&&e!=126&&e!=132&&e!=135&&e!=137)return;
+#endif
+    if(trace->count>=sizeof(trace->events)/sizeof(trace->events[0]))return;
     uint32_t *r=trace->events[trace->count++];r[0]=e;r[1]=a;r[2]=b;r[3]=c;r[4]=d;
 }
 static void trace_flush(m10v_capture_trace *trace){
@@ -29,7 +50,7 @@ static void trace_flush(m10v_capture_trace *trace){
 #endif
 /* Stable rejection IDs; preserve every existing return value and safety gate. */
 #define REJECT(result, guard, a, b) do { CAPTURE_LOG(102,context,guard,a,b); return result; } while (0)
-#if M10V_DEBUG_MODE
+#if M10V_DEBUG_MODE && !M10V_CAPTURE_PROFILE
 static void pixel_checkpoint(uint32_t event,uint32_t context,const m10v_library_image *image,m10v_capture_trace *trace){
     uint32_t y=2166136261u,c=2166136261u;
     /* A bounded 8x8 grid proves only these CPU samples, never the encoded JPEG.
@@ -77,6 +98,9 @@ static void skip_capture_stamp(m10v_library_state *state) {
 }
 #if M10V_DEBUG_MODE
 static int capture_library_impl(uint32_t context,m10v_capture_trace *trace) {
+#if M10V_CAPTURE_PROFILE
+    m10v_capture_profile *profile=trace;
+#endif
 #else
 int m10v_capture_library(uint32_t context) {
 #endif
@@ -111,13 +135,25 @@ int m10v_capture_library(uint32_t context) {
     uint32_t bytes = stride * allocated;
     if (!ram(desc[1], bytes) || !ram(desc[2], bytes) || overlap(desc[1], bytes, desc[2], bytes)) REJECT(-3,9,desc[1],desc[2]);
     uint32_t raw_source = *(const uint32_t *)(uintptr_t)(recipe + 0x60u);
-    uint32_t raw_dims = *(const uint32_t *)(uintptr_t)(recipe + 0x230u);
-    if (!ram(raw_dims, 4)) REJECT(-3,10,raw_dims,0);
-    uint32_t raw_width = ((const uint16_t *)(uintptr_t)raw_dims)[0];
-    uint32_t raw_height = ((const uint16_t *)(uintptr_t)raw_dims)[1];
-    if (!raw_width || raw_width > 8192 || !raw_height || raw_height > 8192) REJECT(-3,11,raw_width,raw_height);
-    uint32_t raw_bytes = 2 * raw_width * raw_height;
-    if (!raw_ram(raw_source, raw_bytes)) REJECT(-3,12,raw_source,raw_bytes);
+    CAPTURE_LOG(125,context,tone,sequence_mode,raw_source);
+    uint32_t raw_dims = 0, raw_bytes = 0, raw_status = 1;
+#if M10V_RAW_LIFETIME
+    uint32_t raw_backing = *(const uint32_t *)(uintptr_t)(recipe + 0x2f4u);
+    if (!raw_source) raw_status = m10v_save_trace_recipe_raw_status(recipe,shooting,raw_backing,raw_source);
+    CAPTURE_LOG(126,context,raw_status,raw_backing,raw_source);
+#endif
+    /* After a proven native release, neither CFA nor its metadata is ours.
+     * The current JPEG/preview topology remains independently validated. */
+    if (raw_status != 2) {
+        if (!raw_source) REJECT(-3,12,raw_source,0);
+        raw_dims = *(const uint32_t *)(uintptr_t)(recipe + 0x230u);
+        if (!ram(raw_dims, 4)) REJECT(-3,10,raw_dims,0);
+        uint32_t raw_width = ((const uint16_t *)(uintptr_t)raw_dims)[0];
+        uint32_t raw_height = ((const uint16_t *)(uintptr_t)raw_dims)[1];
+        if (!raw_width || raw_width > 8192 || !raw_height || raw_height > 8192) REJECT(-3,11,raw_width,raw_height);
+        raw_bytes = 2 * raw_width * raw_height;
+        if (!raw_ram(raw_source, raw_bytes)) REJECT(-3,12,raw_source,raw_bytes);
+    }
     uint32_t planes[2] = {desc[1], desc[2]};
     for (uint32_t i = 0; i < 2; ++i)
         if (overlap(planes[i], bytes, raw_source, raw_bytes) || overlap(planes[i], bytes, recipe, 0x44cc) ||
@@ -132,8 +168,25 @@ int m10v_capture_library(uint32_t context) {
     uint32_t preview_chroma_bytes = pf == 1 ? preview_bytes : preview_bytes >> 1;
     if (!ram(preview[1], preview_bytes) || !ram(preview[2], preview_chroma_bytes)) REJECT(-3,15,preview[1],preview[2]);
     m10v_library_state state;
-    int settings_source=m10v_camera_library_load(&state);
+    M10V_PROFILE(2);
+    int settings_source;
+#if M10V_RECIPE_SNAPSHOT
+    const m10v_isp_recipe_color *snapshot=(const m10v_isp_recipe_color *)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
+    if(ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)&&*(const uint32_t *)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC&&
+       snapshot->magic==M10V_ISP_RECIPE_COLOR_MAGIC&&m10v_isp_frame_recipe_state((void *)(uintptr_t)recipe,&state))settings_source=4;
+    else
+#endif
+    settings_source=m10v_camera_library_load(&state);
+    M10V_PROFILE(3);
     if (settings_source < 0) REJECT(-5,16,(uint32_t)settings_source,0);
+    uint32_t completed=0;
+#if M10V_ISP_NATIVE_LOOK
+    completed=m10v_isp_frame_recipe_completed((void *)(uintptr_t)recipe,shooting,tone,&state);
+    CAPTURE_LOG(135,context,completed,state.sequence,state.slots[slot].film);
+#if M10V_ISP_NATIVE_GRAIN_MODE
+    if(completed&M10V_NATIVE_GRAIN)CAPTURE_LOG(137,context,snapshot->native_grain.grain,snapshot->native_grain.size,snapshot->native_grain.noise_ready);
+#endif
+#endif
     CAPTURE_LOG(113,slot,(uint32_t)settings_source,state.sequence,3);
     uint32_t time[3] = {0,0,0};
     uint32_t seed = state.sequence ^ planes[0];
@@ -174,54 +227,87 @@ int m10v_capture_library(uint32_t context) {
         CAPTURE_LOG(130,context,state.slots[slot].film,seed,(uint32_t)e[0]|((uint32_t)e[1]<<8)|((uint32_t)e[2]<<16)|((uint32_t)e[3]<<24));
         CAPTURE_LOG(131,context,e[4],state.slots[slot].grain,state.slots[slot].soft);
     }
+#if M10V_CAPTURE_PROFILE
+    CAPTURE_LOG(132,context,state.slots[slot].film,state.effects[slot].grain_size,
+        state.effects[slot].leak_gain|((uint32_t)state.effects[slot].leak_position<<8)|
+        ((uint32_t)state.effects[slot].leak_spread<<16)|((uint32_t)state.effects[slot].leak_variation<<24));
+#endif
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
     uint32_t use_halo=(state.slots[slot].film==33||state.slots[slot].film==67)&&state.slots[slot].halo_gain;
-    if (state.slots[slot].soft || use_halo) {
-        uint32_t step = 1, shift = 0;
-        while (((width + step - 1) >> shift) > 384 || ((height + step - 1) >> shift) > 256) { step <<= 1; ++shift; }
-        scratch_bytes = (((state.slots[slot].film == 33 || state.slots[slot].film == 67) ? 6 : 2) * ((width + step - 1) >> shift) * ((height + step - 1) >> shift) + 3) & ~3u;
-        scratch = ((allocate_fn)0x536af2a8u)(scratch_bytes);
+    uint32_t step=1,shift=0,required=0;
+    while (((width+step-1)>>shift)>384 || ((height+step-1)>>shift)>256){step<<=1;++shift;}
+    uint32_t cells=((width+step-1)>>shift)*((height+step-1)>>shift);
+    if(state.slots[slot].soft||use_halo)
+        required=(((state.slots[slot].film==33||state.slots[slot].film==67)?6:2)*cells+3)&~3u;
+    scratch_bytes=required;
+    if(state.slots[slot].film>33){
+        /* Phoenix's source occupies 4*cells; the old 6*cells allocation
+         * already leaves room at full size. Other spatial passes finish
+         * before color or run afterward, so reuse their storage. */
+        uint32_t desired=(state.slots[slot].film==67&&use_halo?4*cells:0)+M10V_COLOR_CACHE_BYTES;
+        if(desired>scratch_bytes)scratch_bytes=desired;
+    }
+    if(scratch_bytes){
+        scratch=((allocate_fn)0x536af2a8u)(scratch_bytes);
+        /* The optional cache must never turn memory pressure into a lost
+         * processing opportunity. Retry only the original required storage. */
+        if(!scratch&&scratch_bytes>required){
+            scratch_bytes=required;
+            if(required)scratch=((allocate_fn)0x536af2a8u)(required);
+        }
         uint32_t address = (uint32_t)(uintptr_t)scratch;
-        if (!ram(address, scratch_bytes)) REJECT(-6,17,address,scratch_bytes);
-        if (overlap(address, scratch_bytes, planes[0], bytes) || overlap(address, scratch_bytes, planes[1], bytes) ||
+        if (scratch_bytes&&!ram(address, scratch_bytes)) REJECT(-6,17,address,scratch_bytes);
+        if (scratch_bytes&&(overlap(address, scratch_bytes, planes[0], bytes) || overlap(address, scratch_bytes, planes[1], bytes) ||
             overlap(address, scratch_bytes, raw_source, raw_bytes) || overlap(address, scratch_bytes, recipe, 0x44cc) ||
             overlap(address, scratch_bytes, request, 0x3c) || overlap(address, scratch_bytes, shooting, 0x94c) ||
             overlap(address, scratch_bytes, raw_dims, 4) || overlap(address, scratch_bytes, preview[1], preview_bytes) ||
-            overlap(address, scratch_bytes, preview[2], preview_chroma_bytes)) {
+            overlap(address, scratch_bytes, preview[2], preview_chroma_bytes))) {
             ((free_fn)0x536af2e4u)(scratch); REJECT(-6,18,address,scratch_bytes);
         }
     }
+    M10V_PROFILE(4);
     m10v_library_image image = {(uint8_t *)(uintptr_t)planes[0], (uint8_t *)(uintptr_t)planes[1],
                                 bytes, bytes, width, height, stride};
     uint32_t touched = (height - 1) * stride + width;
+    M10V_PROFILE(5);
     ((cache_fn)0x5383c8a8u)(image.y, touched); ((cache_fn)0x5383c8a8u)(image.chroma, touched);
+    M10V_PROFILE(6);
     CAPTURE_LOG(121,context,planes[0],planes[1],(width<<16)|height);
     CAPTURE_LOG(124,context,stride,allocated,tone);
-#if M10V_DEBUG_MODE
+#if M10V_DEBUG_MODE && !M10V_CAPTURE_PROFILE
     pixel_checkpoint(122,context,&image,trace);
 #endif
     CAPTURE_LOG(110,context,slot,state.slots[slot].film,(width<<16)|height);
     CAPTURE_LOG(112,slot,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|
         ((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].grain<<12)|((uint32_t)state.slots[slot].soft<<16),state.sequence,3);
-#if M10V_DEBUG_MODE
+#if M10V_DEBUG_MODE && !M10V_CAPTURE_PROFILE
     trace_flush(trace);
 #endif
-    int result = m10v_library_render(&image, &state, slot, (const m10v_library_date *)time,
-                                     seed, scratch, scratch_bytes);
+#if M10V_CAPTURE_PROFILE
+    int result=m10v_library_render_native_profiled(&image,&state,slot,(const m10v_library_date *)time,seed,scratch,scratch_bytes,completed,profile);
+#else
+    int result = m10v_library_render_native(&image, &state, slot, (const m10v_library_date *)time,
+                                     seed, scratch, scratch_bytes,completed);
+#endif
     CAPTURE_LOG(111,context,(uint32_t)result,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].halo_profile<<12),scratch_bytes);
     if (!result) {
-#if M10V_DEBUG_MODE
+#if M10V_DEBUG_MODE && !M10V_CAPTURE_PROFILE
         pixel_checkpoint(123,context,&image,trace);
 #endif
         ((cache_fn)0x5383c8a8u)(image.y, touched); ((cache_fn)0x5383c8a8u)(image.chroma, touched); }
+    M10V_PROFILE(11);
     if (scratch) ((free_fn)0x536af2e4u)(scratch);
     return result;
 }
 #if M10V_DEBUG_MODE
 int m10v_capture_library(uint32_t context) {
     m10v_capture_trace storage;storage.count=0;m10v_capture_trace *trace=&storage;
+#if M10V_CAPTURE_PROFILE
+    m10v_capture_profile *profile=trace;profile->context=context;M10V_PROFILE(1);
+#endif
     CAPTURE_LOG(100,context,0,0,0);
     int result=capture_library_impl(context,trace);
+    M10V_PROFILE(12);
     CAPTURE_LOG(101,context,(uint32_t)result,0,0);
     trace_flush(trace);return result;
 }

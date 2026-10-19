@@ -16,7 +16,7 @@ function collectRenderer(path){
  const bytes=read(path);rendererFiles.set(path,bytes);
  for(const match of bytes.toString().matchAll(/^#include "([^"\n]+)"/gm))collectRenderer(path.slice(0,path.lastIndexOf('/')+1)+match[1]);
 }
-for(const path of ['native/gr3/m10v_library.c','native/gr3/film_5207.c','native/gr3/film_harman.c'])collectRenderer(path);
+for(const path of ['native/gr3/m10v_library.c','native/gr3/film_5207.c','native/gr3/film_harman.c','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_texture_accel.c'])collectRenderer(path);
 const rendererHash=createHash('sha256');
 for(const [path,bytes] of [...rendererFiles].sort(([a],[b])=>a.localeCompare(b))){rendererHash.update(path+'\0'+bytes.length+'\0').update(bytes);}
 const rendererContract=rendererHash.digest();

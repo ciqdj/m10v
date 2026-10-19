@@ -39,11 +39,20 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
-  'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','scripts/build_gr3_m10v_library.py'];
+  'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
+sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
+sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c');
+sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
+sources.push('native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
+const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
+const nativeGrainSources=['native/gr3/m10v_isp_native_effects.c','native/gr3/m10v_isp_native_effects.h','scripts/build_gr3_native_grain_hooks.py','scripts/build_gr3_native_grain_noise_hook.py'];
+const viewDeferredSources=['native/gr3/m10v_view_deferred.c','native/gr3/m10v_view_deferred.h','native/gr3/m10v_view_recovery.h','scripts/build_gr3_view_deferred.py'];
+const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h'];
+const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
 const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','scripts/generate_gr3_sd_contract.mjs'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify([...sources,...sdSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify([...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
   const delta = target - address - 8;
@@ -60,13 +69,27 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 68 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=manifest.sd_library?[...sources,...sdSources]:sources;
+  const expectedSources=[...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
+  if(manifest.experimental_capture?.texture_neon)need(manifest.debug_mode===true&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
   need(typeof manifest.sd_library==='boolean','missing SD capability');
   need(!manifest.sd_library||(runtime.includes(Buffer.from('C:\\M10V\\FILMS.M10'))&&['m10v_sd_camera_item','m10v_sd_camera_install'].every(n=>Number.isInteger(manifest.symbols[n])&&manifest.symbols[n]>=BASE&&manifest.symbols[n]<BASE+runtime.length)),'SD runtime incomplete');
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);
   checkIspBase(runtime,manifest);
+  if(manifest.experimental_capture?.candidate_color){
+    const header=readFileSync(new URL('../native/gr3/m10v_film_color_candidates.h',import.meta.url),'utf8');
+    const names=['m10v_5207_candidate_lut','m10v_phoenix_ii_candidate_lut'];
+    const metadata=JSON.parse(readFileSync(new URL('../native/gr3/isp-film-targets.json',import.meta.url))).cpu_candidates;
+    need(manifest.debug_mode===true&&manifest.color_candidates?.length===2,'color candidate requires debug runtime');
+    for(let i=0;i<2;i++){
+      const match=header.match(new RegExp(names[i]+'\\[3375\\]\\[3\\]\\s*=\\s*\\{([\\s\\S]*?)\\n\\};'));
+      need(match,'missing candidate color table');
+      const payload=Buffer.from(match[1].match(/\d+/g).map(Number)),row=manifest.color_candidates[i];
+      need(metadata[['5207','phoenix_ii'][i]].table_sha256===sha(payload),'candidate color provenance differs');
+      need(payload.length===10125&&row.bytes===payload.length&&row.sha256===sha(payload)&&Number.isInteger(row.offset)&&row.offset>=0&&runtime.subarray(row.offset,row.offset+payload.length).equals(payload),'candidate color readback differs');
+    }
+  }
   checkDetail(runtime,manifest);
   checkSettings(runtime,manifest);
   const reference=JSON.parse(readFileSync(new URL('../native/gr3/5207-reference.json',import.meta.url)));
@@ -89,7 +112,7 @@ function checkRuntime(runtime, manifest) {
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
     manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
     /^[0-9a-f]{8}$/.test(manifest.debug_log.build_id)&&manifest.debug_log.page_bytes===4096&&manifest.debug_log.records_per_channel===63&&
-    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN'])&&
+    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'])&&
     manifest.debug_log.files.every(name=>runtime.includes(Buffer.from('C:\\'+name))):
     !manifest.debug_log&&!manifest.symbols?.m10v_debug_log&&!manifest.symbols?.m10v_debug_batch&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
   for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log','m10v_debug_batch']:[])]) {
@@ -204,13 +227,80 @@ function checkIspBase(runtime,manifest) {
   for(const [j,word] of words.entries())need(runtime.readUInt32LE(at-base+j*4)===(word>>>0),'native ISP instruction differs: '+name+'+'+j*4);
  }
 }
+function lifecyclePatches(manifest){
+ const m=manifest.capture_lifecycle;if(!m)return [];
+ const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
+ need(manifest.debug_mode===true&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x50f0&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
+ const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],
+  ...[0x535153ec,0x53516e14,0x53516ebc,0x5351897c,0x5351af20,0x5351feb4].map(a=>[a,0x535216d0,'m10v_save_trace_recipe_allocate']),
+  ...[0x5351703c,0x535170cc,0x535182f8,0x5351f3a8,0x5351fd50].map(a=>[a,0x53521d14,'m10v_save_trace_recipe_release'])];
+ const expected=calls.map(([address,original,name])=>{
+  const target=m.owner.exports?.[name];need(inRuntime(target),'recipe trace target outside runtime');
+  return {address,expected:branch(address,original,true),replacement:branch(address,target,true),name};
+ });
+ const setter=m.owner.exports?.m10v_save_trace_recipe_set;need(inRuntime(setter),'recipe setter outside runtime');
+ expected.push({address:0x53d0fd00,expected:0x5350d7e8,replacement:setter,name:'recipe raw setter'});
+ need(m.jpeg?.patches?.length===2,'missing JPEG lifetime borders');
+ for(const [i,address,word,link] of [[0,0x535048ec,0xe51b5060,false],[1,0x53504948,branch(0x53504948,0x536bbc30,true),true]]){
+  const row=m.jpeg.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid JPEG lifetime hook');
+  expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'JPEG lifetime '+row.event});
+ }
+ if(m.file){
+ need(m.file?.patches?.length===4&&m.file.owner?.extended_frame_sub===0x34&&m.file.owner?.pointer_fp_offset===-0x50&&m.file.callback_filesystem_calls===0,'invalid file trace ownership');
+ expected.push({address:0x534e87a4,expected:0xe24dd024,replacement:0xe24dd034,name:'file caller owned trace pointer'});
+ for(const [address,original,name]of [[0x534e8828,0x534eb8b4,'m10v_file_trace_prewrite'],[0x534eba44,0x534ecb3c,'m10v_file_trace_bridge'],[0x534e8834,0x534eb7e4,'m10v_file_trace_postcleanup']]){
+  const target=m.file.exports?.[name];need(inRuntime(target),'file trace target outside runtime');
+  expected.push({address,expected:branch(address,original,true),replacement:branch(address,target,true),name});
+ }
+ }else need(manifest.experimental_capture?.native_color===true,'file trace absent without native pipeline');
+ if(m.module_dispatch){
+  need(m.module_dispatch.patches?.length===3&&m.raw_lifetime_attestation===true,'invalid module/raw lifetime contract');
+  for(const [address,word,name,link]of [[0x53505d78,0xe12fff39,'m10v_module_trace_pre',true],[0x53505d7c,0xe51b7034,'m10v_module_trace_post',false],[0x53505dbc,0xe5950010,'m10v_module_trace_sink',false]]){
+   const target=m.module_dispatch.exports?.[name];need(inRuntime(target),'module target outside runtime');
+   expected.push({address,expected:word,replacement:branch(address,target,link),name});
+  }
+  const target=m.pool_release?.exports?.m10v_pool_release_return;
+  need(inRuntime(target)&&m.pool_release.stock_call_preserved===0x53521e14&&m.pool_release.filesystem_calls===0&&m.pool_release.patches?.length===1,'invalid pool release observer');
+  expected.push({address:0x53521e18,expected:0xe58d5008,replacement:branch(0x53521e18,target),name:'raw pool dispatch return'});
+ }
+ if(m.snapshot){
+  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1716&&m.snapshot.patches?.length===3,'invalid frame snapshot contract');
+  for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351aed4,0xe59420f0,false],[2,0x5351b068,0xe59420f0,false]]){
+   const row=m.snapshot.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid snapshot hook');
+   expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'per-frame snapshot '+address.toString(16)});
+  }
+ }
+ if(m.native_grain){
+  need(manifest.experimental_capture?.native_grain===true&&m.native_grain.patches?.length===4&&m.native_grain.independent_dma===false&&m.native_grain.filesystem_calls===0,'invalid native grain stage');
+  for(const [i,address,word,link]of [[0,0x53513620,0xe1a00004,false],[1,0x535033d8,0xebffff1b,true],[2,0x53503aa0,0xebfffd69,true],[3,0x53503ab4,0xeb05f4c0,true]]){
+   const row=m.native_grain.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid grain hook');expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'native grain '+address.toString(16)});
+  }
+  const n=m.native_grain_noise;
+  need(n?.patches?.length===1&&n.expected_stage_return===m.native_grain.patches[3].entry+16&&n.independent_dma===false,'invalid native grain owner');
+  const row=n.patches[0];need(row.address===0x5367ae14&&inRuntime(row.entry),'invalid RNG hook');
+  expected.push({address:0x5367ae14,expected:branch(0x5367ae14,0x5368a92c,true),replacement:branch(0x5367ae14,row.entry,true),name:'native grain noise shape'});
+ }
+ if(m.view_deferred){
+  const v=m.view_deferred;need(v.patches?.length===6&&v.mutable_global_bytes===0&&v.filesystem_calls===0&&v.storage?.token_offset===0x184&&v.storage.extended_bytes===0x194,'invalid view recovery ownership');
+  expected.push({address:0x531709fc,expected:0xe3a00f61,replacement:0xe3000194,name:'QuickView owner extension'});
+  for(const [address,word,name,link]of [[0x531cbdf0,0xe5c0316c,'m10v_view_hook_enter',false],[0x5323abf8,0xe5c0202f,'m10v_view_hook_capture',false],[0x53239bc0,0xe5c43030,'m10v_view_hook_reply',false],[0x53236768,branch(0x53236768,0x532288b0,true),'m10v_view_hook_producer',true],[0x531cc1cc,branch(0x531cc1cc,0x531cbe78,true),'m10v_view_deferred_on_169',true]]){
+   const target=v.exports?.[name];need(inRuntime(target),'view recovery outside runtime');expected.push({address,expected:word,replacement:branch(address,target,link),name});
+  }
+ }
+ need(m.patches?.length===expected.length,'unexpected lifetime patch inventory');
+ for(let i=0;i<expected.length;i++){
+  const row=m.patches[i],want=expected[i];
+  need(row.address===want.address&&/^[0-9a-f]{8}$/.test(row.expected_hex)&&/^[0-9a-f]{8}$/.test(row.replacement_hex)&&Buffer.from(row.expected_hex,'hex').readUInt32LE()===want.expected&&Buffer.from(row.replacement_hex,'hex').readUInt32LE()===want.replacement,'lifetime patch differs');
+ }
+ return expected;
+}
 function patchList(manifest) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
   for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,738),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
-  return [...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...settingsPatches(manifest),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...lifecyclePatches(manifest),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...settingsPatches(manifest),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

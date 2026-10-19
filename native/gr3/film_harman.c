@@ -1,9 +1,24 @@
 #include "film_harman.h"
 #include "film_harman_data.h"
+#if M10V_FILM_COLOR_CANDIDATE
+#include "m10v_film_color_candidates.h"
+#endif
 static uint8_t clip(int x){return (uint8_t)(x<0?0:x>255?255:x);}
+#if M10V_TEXTURE_NEON
+const uint8_t *m10v_harman_texture_table(uint32_t variant){
+    if(variant>3)return 0;
+#if M10V_FILM_COLOR_CANDIDATE
+    if(variant==0)return &m10v_phoenix_ii_candidate_lut[0][0];
+#endif
+    return &m10v_harman_luts[variant][0][0];
+}
+#endif
 void m10v_harman_rgb(uint32_t variant,const uint8_t rgb[3],uint8_t out[3]){
     if(variant>3){for(uint32_t c=0;c<3;c++)out[c]=rgb[c];return;}
     const uint8_t (*table)[3]=m10v_harman_luts[variant];
+#if M10V_FILM_COLOR_CANDIDATE
+    if(variant==0)table=m10v_phoenix_ii_candidate_lut;
+#endif
     /* Exact tetrahedral barycentric weights. Sorting the fractions with
      * their axis steps keeps the same four vertices as the former loops.
      * Expanding telescoping differences yields nonnegative weights summing

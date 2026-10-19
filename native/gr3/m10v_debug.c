@@ -12,7 +12,8 @@ typedef void (*free_fn)(void *);
 typedef int (*open_fn)(uint32_t,const char *,uint32_t,uint32_t *,uint32_t *);
 typedef int (*io_fn)(uint32_t,uint32_t,void *,uint32_t,uint32_t *);
 typedef int (*close_fn)(uint32_t,uint32_t,uint32_t *);
-static const char paths[4][16]={"C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN"};
+static const char paths[6][16]={"C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN","C:\\M10VIO0.BIN","C:\\M10VIO1.BIN"};
+static uint32_t event_channel(uint32_t event){return event>=180&&event<=209?3u:event>=100?2u:1u;}
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int code(uint32_t p,uint32_t n){return !(p&3)&&p>=0x53000000u&&p<0x540b6000u&&n<=0x540b6000u-p;}
 static uint32_t crc(const uint32_t *words){
@@ -40,9 +41,9 @@ static int transfer(uint32_t fs,const uint32_t *v,const char *path,uint32_t *pag
     return ok&&closed&&!closing_error;
 }
 int m10v_debug_batch(const uint32_t *events,uint32_t count){
-    if(!count||count>16||!ram((uint32_t)(uintptr_t)events,count*20))return 0;
-    uint32_t channel=events[0]>=100?2:1,mask=1;
-    for(uint32_t i=0;i<count;++i)if((events[i*5]>=100?2u:1u)!=channel)return 0;
+    if(!count||count>32||!ram((uint32_t)(uintptr_t)events,count*20))return 0;
+    uint32_t channel=event_channel(events[0]),mask=1;
+    for(uint32_t i=0;i<count;++i)if(event_channel(events[i*5])!=channel)return 0;
     /* The stock model ends at byte0x1c; byte0x1d is private menu mode,
      * byte0x1e private selected tone. Byte0x1f holds one shared logger busy bit.
      * Channels use separate files but share the stock filesystem mutex; skip
@@ -58,7 +59,7 @@ int m10v_debug_batch(const uint32_t *events,uint32_t count){
     if(!code(v[7],4)||!code(v[8],4)||!code(v[9],4)||!code(v[10],4))goto done;
     pages=((alloc_fn)0x536af2a8u)(8192);if(!ram((uint32_t)(uintptr_t)pages,8192)){pages=0;goto done;}
     for(uint32_t i=0;i<2048;++i)pages[i]=0;
-    uint32_t offset=channel==1?0:2;
+    uint32_t offset=(channel-1)*2;
     int good0=transfer(fs,v,paths[offset],pages,0)&&valid(pages,channel);
     int good1=transfer(fs,v,paths[offset+1],pages+1024,0)&&valid(pages+1024,channel);
     uint32_t selected=good1&&(!good0||pages[1024+5]>pages[5]);
