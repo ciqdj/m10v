@@ -14,6 +14,7 @@
 #endif
 #if M10V_ISP_SHARED_HDF
 extern uint32_t m10v_hdf_settings(uint32_t,uint32_t);
+extern void m10v_hdf_done(uint32_t,uint32_t,uint32_t);
 #endif
 _Static_assert(sizeof(m10v_isp_recipe_color)==M10V_SAVE_COLOR_BYTES,"recipe color extent");
 static m10v_isp_recipe_color *owned(void *recipe){
@@ -212,6 +213,9 @@ int m10v_isp_frame_recipe_grain_noise(const void *context,uint8_t *noise,uint32_
 #endif
 }
 void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uint32_t result){
+#if M10V_ISP_SHARED_HDF
+    m10v_hdf_done((uint32_t)(uintptr_t)context,(uint32_t)(uintptr_t)params,result);
+#endif
 #if M10V_ISP_NATIVE_GRAIN_MODE
     m10v_isp_recipe_color *s=grain_owner(context);
     if(!s||s->native_grain.magic!=0x374e5247u||!s->native_grain.armed)return;

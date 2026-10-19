@@ -24,6 +24,14 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
  if(event==193&&recipe<=0x80000000u-M10V_SAVE_RECIPE_EXTENDED_BYTES){
   const m10v_isp_recipe_color *s=(const m10v_isp_recipe_color *)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
   if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC)m10v_save_trace_recipe_mark(recipe,198,0x49535001u,(s->status<<16)|s->tone,s->sequence);
+#if M10V_HDF_SHARED_RECIPE
+  /* All three words belong to the same sole extended recipe allocation.
+   * Read diagnostics only; the trace never controls processing or ownership. */
+  if(*(const uint32_t *)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC){
+   const uint32_t *h=(const uint32_t *)(uintptr_t)(recipe+M10V_CAPTURE_RAW_TOKEN_OFFSET+36u);
+   m10v_save_trace_recipe_mark(recipe,198,0x48444601u,(h[0]<<8)|(h[1]&255u),h[2]);
+  }
+#endif
  }
 #endif
  int status=((int (*)(uint32_t *))0x53050b7cu)(time);

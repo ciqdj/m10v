@@ -128,7 +128,7 @@ def capture_profiles(records):
     return profiles
 
 def lifecycle_profiles(records):
-    rows=[];active={};observations={}
+    rows=[];active={};observations={};hdf_observations={}
     for record in records:
         event=record['event']
         if event==198:
@@ -139,11 +139,20 @@ def lifecycle_profiles(records):
                     'mode':'observer' if status==7 else 'unknown',
                     'stock_tone':packed&65535,'sequence':sequence,
                     'effects_offloaded':False if status==7 else None}
+            elif tag==0x48444601:
+                flags=packed>>8
+                hdf_observations[(record['build_id'],recipe)]={'strength':packed&255,
+                    'flags':flags,'snapshot_loaded':bool(flags&1),'gate_passed':bool(flags&2),
+                    'settings_written':bool(flags&4),'processing_returned_success':bool(flags&8),
+                    'processing_failed':bool(flags&16),'si_rejected':bool(flags&32),
+                    'context_rejected':bool(flags&64),'load_failed':bool(flags&128),
+                    'shooting_pointer':hex(sequence)}
             continue
         if event not in range(190,195):continue
         recipe,low,high,result=record['arguments'];key=(record['build_id'],recipe)
         if event==193 or key not in active:
             row={'build_id':key[0],'recipe':hex(recipe),'marks':{},'clock_valid':True,'file_save_proven':False}
+            if key in hdf_observations:row['hdf']=hdf_observations[key]
             if key in observations:row['isp']=observations.pop(key)
             rows.append(row);active[key]=row
         row=active[key];valid=not bool(high&0x80000000)

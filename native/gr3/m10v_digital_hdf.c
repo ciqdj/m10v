@@ -85,19 +85,19 @@ void m10v_hdf_producer(uint32_t recipe){
      * BEFORE queueing. Refresh on reuse; never load FS in ISP callbacks. */
     s->ready=0;s->si=0;s->strength=0;
     uint32_t strength;
-    if(m10v_hdf_load(&strength)<0)return;
+    if(m10v_hdf_load(&strength)<0){s->ready=128;return;}
     s->strength=strength;s->ready=1;
 }
 void m10v_hdf_gate(uint32_t recipe,uint32_t request,uint32_t si){
     hdf_shot *s=owner(recipe);
-    if(!s||!s->ready||!s->strength||s->strength>3||!ram(request,0x40)||!ram(si,0xb28)||
+    if(!s||!(s->ready&1u)||!s->strength||s->strength>3||!ram(request,0x40)||!ram(si,0xb28)||
        *(const uint32_t *)(uintptr_t)(recipe+0x5c)!=request)return;
     /* Only the still ImageControl tone range; HDR has distinct semantics.
      * Tone20 uses Standard ISP only when installed as a film carrier. Stock
      * Soft Monotone retains its own native graph; device image QA is pending. */
     uint32_t tone=*(const uint8_t *)(uintptr_t)(si+0x77c);
     if(tone<11||tone>22||tone==14)return;
-    s->si=si;
+    s->si=si;s->ready|=2u;
     *(uint8_t *)(uintptr_t)(request+0x24)=1;
 }
 uint32_t m10v_hdf_settings(uint32_t context,uint32_t params){
@@ -107,14 +107,30 @@ uint32_t m10v_hdf_settings(uint32_t context,uint32_t params){
     uint32_t recipe=source-0x1a8;
     /* The source recipe must own this very Develop context. Cross-recipe
      * transfer is not guessed; a mismatch retains the original parameters. */
-    if(context!=recipe+0x4320)return 0;
     hdf_shot *s=owner(recipe);
-    if(!s||!s->ready||s->strength<1||s->strength>3||!s->si||
-       s->si!=*(const uint32_t *)(uintptr_t)(context+0x34))return 0;
+    if(!s)return 0;
+    if(context!=recipe+0x4320){s->ready|=64u;return 0;}
+    if(!(s->ready&1u)||s->strength<1||s->strength>3)return 0;
+    if(!s->si||s->si!=*(const uint32_t *)(uintptr_t)(context+0x34)){
+        s->ready|=32u;return 0;
+    }
     uint32_t values=*(const uint32_t *)(uintptr_t)(params+0x10);
     if(!ram(values,12))return 0;
     /* Native Clarity5..7 selects new rows9..11. Original -4..4 rows and
      * original scale/shading/grain/HDR fields remain unchanged. */
     ((int16_t *)(uintptr_t)values)[1]=(int16_t)(4+s->strength);
-    return 1;
+    s->ready|=4u;return 1;
+}
+
+/* Called after the original digital-filter execution returns. Diagnostics do
+ * not authorize rendering, resize workspaces or change the original result. */
+void m10v_hdf_done(uint32_t context,uint32_t params,uint32_t result){
+    if(!ram(context,0x40)||*(const uint32_t *)(uintptr_t)context!=0x53d0fc60u||!ram(params,0x34))return;
+    uint32_t source=*(const uint32_t *)(uintptr_t)(context+0x30);
+    if(source<0x1a8||context!=source-0x1a8+0x4320)return;
+    hdf_shot *s=owner(source-0x1a8);
+    if(!s||!(s->ready&4u)||s->si!=*(const uint32_t *)(uintptr_t)(context+0x34))return;
+    uint32_t values=*(const uint32_t *)(uintptr_t)(params+0x10);
+    if(!ram(values,12))return;
+    s->ready|=result==1&&((const int16_t *)(uintptr_t)values)[1]==(int16_t)(4+s->strength)?8u:16u;
 }
