@@ -2,6 +2,7 @@
 import os
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 SCRIPT=Path(__file__).resolve().parents[1]/'skills/m10v-baota-publish/scripts/update-server.sh'
@@ -27,7 +28,11 @@ if name=='git':
   if n<int(os.environ['FAKE_FETCH_FAILURES']):sys.exit(128)
 elif name=='systemctl':
  if a[0]=='show':print('www' if a[3]=='User' else str(root))
+elif name=='systemd-run':
+ import subprocess
+ sys.exit(subprocess.run(a[a.index('--')+1:]).returncode)
 elif name=='runuser':
+ if os.getenv('FAKE_BUILD_SLEEP'):__import__('time').sleep(30)
  if os.getenv('FAKE_REQUIRE_READABLE') and not ((root/'release-source').stat().st_mode & 4):sys.exit(13)
  sys.exit(int(os.getenv('FAKE_BUILD_FAIL','0')))
 elif name=='flock':sys.exit(int(os.getenv('FAKE_LOCK_FAIL','0')))
@@ -37,7 +42,7 @@ class BaotaPublishTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
   self.root=Path(self.tmp.name);self.bin=self.root/'commands';self.bin.mkdir()
-  for name in ('git','systemctl','runuser','flock','chown','curl','sleep'):
+  for name in ('git','systemctl','systemd-run','runuser','flock','chown','curl','sleep'):
    p=self.bin/name;p.write_text(FAKE);p.chmod(0o755)
   (self.root/'head').write_text(BEFORE)
   (self.root/'.venv/bin').mkdir(parents=True)
@@ -53,6 +58,27 @@ class BaotaPublishTests(unittest.TestCase):
   trace=self.trace();self.assertIn('scripts/check_gr4_release.mjs',trace)
   self.assertLess(trace.index('scripts/check_gr4_release.mjs'),trace.index("'restart'"))
   self.assertIn('FIRMWARE_BUILD_OK model=gr4',r.stdout)
+ def test_build_process_tree_is_bounded_and_reports_stages(self):
+  r=self.run_script('--deploy',AFTER);self.assertEqual(r.returncode,0,r.stderr)
+  trace=self.trace()
+  self.assertEqual(trace.count('systemd-run '),3)
+  for control in ('MemoryMax=900M','MemorySwapMax=64M','CPUQuota=100%','TasksMax=64','RuntimeMaxSec=600','OOMPolicy=kill','KillMode=control-group'):
+   self.assertIn(control,trace)
+  self.assertIn('FIRMWARE_BUILD_START model=gr3x',r.stdout)
+  self.assertIn('FIRMWARE_BUILD_START model=gr4',r.stdout)
+ def test_term_interrupts_wait_and_stops_build_before_rollback(self):
+  proc=subprocess.Popen(['bash',str(SCRIPT),'--deploy',AFTER],env={**self.env,'FAKE_BUILD_SLEEP':'1'},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+  try:
+   deadline=time.monotonic()+5
+   while 'runuser ' not in self.trace() and time.monotonic()<deadline:time.sleep(.02)
+   self.assertIn('runuser ',self.trace())
+   proc.terminate()
+   proc.wait(timeout=3)
+   trace=self.trace();self.assertLess(trace.index("'stop'"),trace.index("'reset'"))
+   self.assertEqual((self.root/'head').read_text(),BEFORE)
+  finally:
+   if proc.poll() is None:proc.kill();proc.wait()
+   proc.stdout.close();proc.stderr.close()
  def test_invalid_sha_never_touches_server(self):
   r=self.run_script('--deploy','main');self.assertEqual(r.returncode,2);self.assertEqual(self.trace(),'')
  def test_git_status_failure_stops_before_mutation(self):
@@ -72,6 +98,7 @@ class BaotaPublishTests(unittest.TestCase):
  def test_build_failure_restores_previous_commit(self):
   r=self.run_script('--deploy',AFTER,FAKE_BUILD_FAIL='1');self.assertNotEqual(r.returncode,0)
   self.assertEqual((self.root/'head').read_text(),BEFORE);self.assertIn("'reset', '--keep'",self.trace());self.assertNotIn('DEPLOY_OK',r.stdout)
+  self.assertIn("'stop'",self.trace())
  def test_bundle_path_verifies_and_avoids_github_fetch(self):
   bundle=self.root/'release.bundle';bundle.write_bytes(b'fixture')
   r=self.run_script('--deploy',AFTER,str(bundle));self.assertEqual(r.returncode,0,r.stderr)

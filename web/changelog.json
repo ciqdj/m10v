@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.13",
+      "date": "2026-10-19",
+      "title": "隔离发布构建资源，避免拖住服务器",
+      "changes": [
+        "三机型构建改为独立 systemd 进程组，限制总内存 900 MiB、交换 64 MiB、单核 CPU 与进程数；限制覆盖 Node 缓冲区、Python 和编译器。",
+        "每机型构建最多 10 分钟，失败或连接中断会停止整组子进程并执行原有回滚；增加阶段开始和失败日志。",
+        "发布任务等待窗口覆盖三个受限构建阶段，保留 GR III、GR IIIx、GR IV 全量构建和服务健康校验。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.12",
       "date": "2026-10-19",
       "title": "新增三款精选胶卷，机内精选置顶",
@@ -11,9 +24,9 @@
         "保留官方资料、社区 LUT 来源和推定参数记录；富士采用同类社区 LUT 近似参考，新版乐凯独立建模，不混用旧 Super 200，不宣称实拍完全一致。",
         "同步 GR III／GR IIIx／GR IV 的共享目录与资源容量，修正大卡片目录偏移，并完成相关 ARM、构建及固件回读检查；新增三卷尚未真机校准。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "178525158f42bb3244a2ff5e81bd19ddf9d35f20",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/178525158f42bb3244a2ff5e81bd19ddf9d35f20"
     },
     {
       "version": "2026.10.19.11",

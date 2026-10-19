@@ -64,10 +64,14 @@ work=$(mktemp -d /tmp/m10v-deploy.XXXXXX)
 chown www:www "$work"
 changed=0
 completed=0
+active_unit=
 cleanup(){
   result=$?
   [[ $completed == 1 || $result -ne 0 ]] || result=1
   trap - EXIT
+  if [[ -n "$active_unit" ]]; then
+    systemctl stop "$active_unit" || true
+  fi
   if [[ $result -ne 0 && $changed == 1 ]]; then
     printf 'Deployment failed; restoring %s\n' "$previous" >&2
     # --keep refuses to discard unexpected concurrent working-tree edits.
@@ -94,10 +98,25 @@ for model in gr3 gr3x gr4; do
   else
     build_args=(scripts/check_gr4_release.mjs)
   fi
-  if ! runuser -u www -- env NODE_OPTIONS=--max-old-space-size=128 M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
-    "${build_args[@]}" >"$work/$model.log" 2>&1; then
-    cat "$work/$model.log" >&2; exit 1
+  # Bound the entire compiler/Python/Node process tree, not just the JS heap.
+  # 900 MiB + 64 MiB swap leaves room for the web service and host daemons.
+  active_unit="m10v-build-${expected:0:12}-$$-$model.service"
+  printf 'FIRMWARE_BUILD_START model=%s unit=%s memory=900M timeout=600s\n' "$model" "$active_unit"
+  systemd-run --quiet --wait --pipe --collect --unit="$active_unit" \
+    --property=MemoryMax=900M --property=MemorySwapMax=64M \
+    --property=CPUQuota=100% --property=TasksMax=64 \
+    --property=RuntimeMaxSec=600 --property=OOMPolicy=kill \
+    --property=KillMode=control-group --property=TimeoutStopSec=10 \
+    --working-directory="$repo" -- runuser -u www -- env NODE_OPTIONS=--max-old-space-size=128 M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
+    "${build_args[@]}" >"$work/$model.log" 2>&1 &
+  build_pid=$!
+  # wait is interruptible, so SSH termination reaches cleanup immediately.
+  if ! wait "$build_pid"; then
+    cat "$work/$model.log" >&2
+    printf 'FIRMWARE_BUILD_FAILED model=%s (resource limit, timeout or build error)\n' "$model" >&2
+    exit 1
   fi
+  active_unit=
   if [[ $model != gr3x ]]; then
     printf 'FIRMWARE_BUILD_OK model=%s\n' "$model"
   else
