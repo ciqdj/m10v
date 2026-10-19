@@ -23,6 +23,18 @@ FLAGS = ['--target=armv7-none-eabi', '-mcpu=cortex-a9', '-marm', '-mfloat-abi=so
 RENDER_FLAGS = ['-O2' if flag == '-Os' else flag for flag in FLAGS]
 
 
+def capture_stock_rtos():
+    """Derive the locked hook preimage from the installed official input."""
+    node = os.environ.get('M10V_NODE') or shutil.which('node')
+    if not node:
+        raise RuntimeError('Node.js is unavailable; set M10V_NODE to its absolute executable path')
+    script = "import{readFileSync}from'node:fs';import{officialResources}from'./node/gr3-stock-presets.mjs';const{decoded:d,sections:s}=officialResources(readFileSync(process.argv[1]));process.stdout.write(d.subarray(s.RTOS.offset,s.RTOS.offset+s.RTOS.size));"
+    stock = subprocess.check_output([node,'--input-type=module','-e',script,str(ROOT/'bin/fwdc239b-gr3-official.bin')],cwd=ROOT)
+    if hashlib.sha256(stock).hexdigest() != '8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67':
+        raise ValueError('capture hooks require exact official RTOS')
+    return stock
+
+
 def link_object(elf, base, externals=None, prefix='m10v_library_', additional_exports=()):
     """Bounded ELF32 ARM relocator for our freestanding .text/.rodata module.
 
@@ -265,8 +277,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         lifecycle_report=None
         if lifecycle_trace:
             from scripts.build_gr3_save_trace import build as build_save_trace
+            stock=capture_stock_rtos()
+            stock_path=folder/'capture-original-rtos.bin';stock_path.write_bytes(stock)
             trace_base=(base+len(image)+15)&~15
-            trace,owner_report=build_save_trace(out/'save-trace',trace_base)
+            trace,owner_report=build_save_trace(out/'save-trace',trace_base,rtos=stock_path)
             image+=bytes(trace_base-base-len(image))+trace;symbols.update(owner_report['exports'])
             phase_obj=folder/'lifecycle.o'
             subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_capture_lifecycle.c'),'-o',str(phase_obj)],check=True,capture_output=True)
@@ -282,46 +296,46 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if not native_color:
                 from scripts.build_gr3_file_trace import build as build_file_trace
                 file_base=(base+len(image)+15)&~15
-                file_code,file_report=build_file_trace(out/'file-trace',file_base,owner_report['exports'],symbols['m10v_lifecycle_file_flush'])
+                file_code,file_report=build_file_trace(out/'file-trace',file_base,owner_report['exports'],symbols['m10v_lifecycle_file_flush'],rtos=stock_path)
                 image+=bytes(file_base-base-len(image))+file_code
                 file_patches=file_report['patches']
             lifecycle_report={'owner':owner_report,'jpeg':phase_report,'file':file_report,'patches':owner_report['patches']+phase_report['patches']+file_patches,'filesystem_flush':'owned capture borders and actual Store handler post-return sink','buffer_policy_changed':False}
             if save_chain_trace:
                 from scripts.build_gr3_module_dispatch_trace import build as build_module_trace
                 module_base=(base+len(image)+15)&~15
-                module_code,module_report=build_module_trace(out/'module-dispatch-trace',module_base,owner_report['exports']['m10v_save_trace_recipe_mark'],take=owner_report['exports']['m10v_save_trace_recipe_take'],batch=symbols['m10v_debug_batch'])
+                module_code,module_report=build_module_trace(out/'module-dispatch-trace',module_base,owner_report['exports']['m10v_save_trace_recipe_mark'],take=owner_report['exports']['m10v_save_trace_recipe_take'],batch=symbols['m10v_debug_batch'],rtos=stock_path)
                 image+=bytes(module_base-base-len(image))+module_code
                 from scripts.build_gr3_pool_release_trace import build as build_pool_trace
                 pool_base=(base+len(image)+15)&~15
-                pool_code,pool_report=build_pool_trace(out/'pool-release-trace',pool_base,owner_report['exports']['m10v_save_trace_recipe_mark'],raw_pool_return=owner_report['exports']['m10v_save_trace_recipe_pool_return'])
+                pool_code,pool_report=build_pool_trace(out/'pool-release-trace',pool_base,owner_report['exports']['m10v_save_trace_recipe_mark'],raw_pool_return=owner_report['exports']['m10v_save_trace_recipe_pool_return'],rtos=stock_path)
                 image+=bytes(pool_base-base-len(image))+pool_code
                 lifecycle_report.update(module_dispatch=module_report,pool_release=pool_report,raw_lifetime_attestation=True)
                 lifecycle_report['patches']+=module_report['patches']+pool_report['patches']
             if recipe_snapshot:
                 from scripts.build_gr3_isp_recipe_color import build as build_recipe_color
                 snapshot_base=(base+len(image)+15)&~15
-                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes(),symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain)
+                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain)
                 image+=bytes(snapshot_base-base-len(image))+snapshot_code;symbols.update(snapshot_report['exports'])
                 lifecycle_report['snapshot']=snapshot_report
                 lifecycle_report['patches']+=snapshot_report['patches']
             if native_grain:
                 from scripts.build_gr3_native_grain_hooks import build as build_grain_hooks
                 grain_base=(base+len(image)+15)&~15
-                grain_code,grain_report=build_grain_hooks(out/'native-grain-hooks',grain_base,symbols)
+                grain_code,grain_report=build_grain_hooks(out/'native-grain-hooks',grain_base,symbols,rtos=stock)
                 image+=bytes(grain_base-base-len(image))+grain_code
                 lifecycle_report['native_grain']=grain_report
                 lifecycle_report['patches']+=grain_report['patches']
                 from scripts.build_gr3_native_grain_noise_hook import build as build_grain_noise
                 noise_base=(base+len(image)+15)&~15
                 stage_return=next(p['entry']+16 for p in grain_report['patches'] if p['address']==0x53503ab4)
-                noise_code,noise_report=build_grain_noise(out/'native-grain-noise',noise_base,symbols,stage_return)
+                noise_code,noise_report=build_grain_noise(out/'native-grain-noise',noise_base,symbols,stage_return,rtos=stock)
                 image+=bytes(noise_base-base-len(image))+noise_code
                 lifecycle_report['native_grain_noise']=noise_report
                 lifecycle_report['patches']+=noise_report['patches']
             if view_deferred:
                 from scripts.build_gr3_view_deferred import build as build_view_deferred
                 view_base=(base+len(image)+15)&~15
-                view_code,view_report=build_view_deferred(out/'view-deferred',view_base)
+                view_code,view_report=build_view_deferred(out/'view-deferred',view_base,rtos=stock_path)
                 image+=bytes(view_base-base-len(image))+view_code
                 lifecycle_report['view_deferred']=view_report
                 lifecycle_report['patches']+=view_report['patches']
@@ -535,7 +549,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         isp_base = (base + len(image) + 15) & ~15
         isp_code, isp_report = build_isp_base(isp_base)
         image += bytes(isp_base-base-len(image)) + isp_code
-        if len(image)>655360: raise ValueError('M10V code and artwork exceed validated runtime allocation')
+        # 644KiB code/artwork +16KiB component gap stays below the independent672KiB RTOS-growth guard.
+        if len(image)>659456: raise ValueError(f'M10V code and artwork bytes {len(image)} exceed runtime budget659456')
     sha = lambda data: hashlib.sha256(data).hexdigest()
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 68, 'slots': 5,

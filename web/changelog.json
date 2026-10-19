@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.5",
+      "date": "2026-10-19",
+      "title": "修复 GR III V7 服务器构建对调试缓存的依赖",
+      "changes": [
+        "GR III V7 原厂处理链的补丁基线直接从已安装官方固件提取，校验完整RTOS SHA-256后再生成补丁；不再要求服务器存在开发机的builds调试缓存。",
+        "校准LLVM18生成的ROM运行体预算，保留原有672KiB RTOS扩展硬界与独立回读；未增加图像缓冲、降低画质或关闭效果。",
+        "补齐无调试缓存的真实构建回归，保留原厂色彩、颗粒、回放恢复和全部效果；本次不改变相机端算法及实机验收结论。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.4",
       "date": "2026-10-19",
       "title": "GR III 调试导出接入原厂色彩、颗粒与回放恢复",
@@ -11,9 +24,9 @@
         "修补原厂回放完成通知与停止回复交错时的等待状态，隔离连拍旧消息；保留实际保存与RAW释放诊断，不强制释放保存缓冲。",
         "69项本地／ARM回归、11项交付固件回读及扩展组合检查已通过；秒回放、持续连拍、成像与卡上照片完整性仍待实机验收，不宣称已经修复。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "ffee8aa1006045c7b6c26da0bfe0577519a5faab",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ffee8aa1006045c7b6c26da0bfe0577519a5faab"
     },
     {
       "version": "2026.10.19.3",
