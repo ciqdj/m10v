@@ -25,5 +25,5 @@ test('both colour views edit a single native configuration and do not restore th
  const detail=app.slice(app.indexOf('function renderFilmDetail'),app.indexOf('function openRecipe'));
  assert.ok(detail.includes('state.nativeConfig.slots'));assert.ok(detail.includes('nativeEditor.setFilm'));assert.ok(!detail.includes('state.filmIds'));
  const tab=app.slice(app.indexOf('function showSettingsTab'),app.indexOf("$('tab-imaging').onclick"));
- assert.ok(tab.includes("state.features.has('film')"));
+ assert.ok(tab.includes('enterNativeSelection()'));assert.ok(!tab.includes("?'native':'custom'"));
 });

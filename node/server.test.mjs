@@ -90,7 +90,7 @@ test('HTTP serves isolated product workspaces and authorizes GR IV mutations', a
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     const home = await (await fetch(`${base}/`)).text();
-    assert.match(home, /为你的 GR 定制/);
+    assert.match(home, /选择相机型号/);
     const gr3 = await (await fetch(`${base}/gr3/`)).text();
     assert.match(gr3, /id="feature-list"/);
     const gr4Page = await (await fetch(`${base}/gr4/`)).text();

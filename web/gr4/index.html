@@ -11,20 +11,20 @@
   <link rel="stylesheet" href="/gr4/studio-theme.css">
   <script src="/gr4/calibration-ui.js" defer></script>
   <script src="/gr4/app.js" defer></script>
-<link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/shared/model-studio.css"><script type="module" src="/shared/model-studio.js"></script><link rel="icon" type="image/png" sizes="128x128" href="/shared/m10v-favicon.png"><link rel="stylesheet" href="/shared/brand.css"></head>
+<link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/shared/model-studio.css"><script type="module" src="/shared/model-studio.js"></script><link rel="icon" type="image/png" sizes="128x128" href="/shared/m10v-favicon.png"><link rel="stylesheet" href="/shared/brand.css"><link rel="stylesheet" href="/shared/navigation.css"><script type="module" src="/shared/navigation.js"></script></head>
 <body data-studio-model="gr4">
   <header class="product-topbar">
     <a class="product-brand m10v-brand" href="/" aria-label="m10v · GR固件工作台 首页"><img class="m10v-mark" src="/shared/m10v-logo.png" width="48" height="48" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a>
     <nav class="model-switch" aria-label="切换机型"><a href="/gr3/">GR III</a><a class="active" href="/gr4/">GR IV</a><a href="/changelog/">更新日志</a></nav>
-    <div class="product-actions"><span class="local-state">LOCAL WORKSPACE</span><details id="more-menu" class="more-menu"><summary class="button quiet">项目菜单</summary><div class="more-actions"><button id="open-setup" class="button quiet" type="button">设置</button><button id="open-drafts" class="button quiet" type="button">已保存项目</button><button id="import-project" class="button quiet" type="button">导入项目</button><button id="export-project" class="button quiet" type="button" disabled>导出编辑备份</button><button id="download-original" class="button quiet" type="button" disabled>备份原始固件</button><button id="refresh-status" class="button quiet" type="button">刷新状态</button></div></details></div>
+    <div class="product-actions"><span class="local-state">本地工作区</span><details id="more-menu" class="more-menu"><summary class="button quiet">项目菜单</summary><div class="more-actions"><button id="open-setup" class="button quiet" type="button">设置</button><button id="open-drafts" class="button quiet" type="button">已保存项目</button><button id="import-project" class="button quiet" type="button">导入项目</button><button id="export-project" class="button quiet" type="button" disabled>导出编辑备份</button><button id="download-original" class="button quiet" type="button" disabled>备份原始固件</button><button id="refresh-status" class="button quiet" type="button">刷新状态</button></div></details></div>
   </header>
-  <section class="gr4-hero"><div><p>RICOH GR IV / M10V EDIT DESK</p><h1>为下一次出街，准备好相机。</h1><span>滤镜 · 裁切比例 · 关机图案　/　独立机型工作区</span></div></section>
+  <section class="gr4-hero"><div><p>GR IV · 固件工作台</p><h1>为下一次出街，准备好相机。</h1><span>滤镜 · 裁切比例 · 关机图案　/　独立机型工作区</span></div></section>
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
   <main id="editor-workspace" class="workspace product-workspace">
     <input id="firmware-file" type="file" accept=".bin,application/octet-stream" hidden>
     <input id="project-file" type="file" accept=".json,application/json" hidden>
     <aside class="sidebar panel product-panel">
-      <div class="gr4-desk-label"><span>01 / CREATIVE TOOLS</span><strong>影像工具台</strong><small>选择一个区域，直接编辑对应内容。</small></div>
+      <div class="gr4-desk-label"><span>影像设置</span><strong>影像工具台</strong><small>选择一个区域，直接编辑对应内容。</small></div>
       <nav class="function-nav" aria-label="编辑功能">
         <button id="nav-filters" class="function-button active" type="button" aria-pressed="true" aria-controls="filter-section editor-content">◈　滤镜档案</button>
         <button id="nav-crops" class="function-button" type="button" aria-pressed="false" aria-controls="crop-section crop-editor">▣　画幅裁切</button>
@@ -95,7 +95,7 @@
       </div>
     </section>
     <aside class="firmware-rail" aria-label="固件与生成">
-      <div class="gr4-rail-label"><span>02 / BUILD LEDGER</span><strong>固件清单</strong></div>
+      <div class="gr4-rail-label"><span>方案摘要</span><strong>固件清单</strong></div>
       <section id="source-summary" class="source-summary panel product-panel" aria-label="当前固件"><h2>当前固件</h2><h1 id="source-meta">未载入</h1><p id="source-name" class="muted"></p><span id="source-sha" class="mono muted"></span><div class="source-actions"><button id="import-firmware" class="button secondary full" type="button">导入固件</button><button id="import-official" class="button quiet full" type="button">读取本地官方样本</button><button id="resume-edit" class="button quiet full" type="button" hidden>继续上次编辑</button></div><p class="muted">原生 65 卷胶卷库仍在移植；当前为原厂编辑工具。</p></section>
       <section id="build-panel" class="build-panel panel product-panel" hidden>
         <h2>生成新固件</h2>

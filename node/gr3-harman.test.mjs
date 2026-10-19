@@ -50,7 +50,7 @@ test('both UI surfaces keep stock controls alongside shared texture',async()=>{
   const html=await readFile(new URL('../web/gr3/'+file,import.meta.url),'utf8');
   assert.match(html,/36 套/);assert.match(html,/id="effect-filmExposure"/);assert.match(html,/模拟曝光EI/);
   for(const ei of [125,64,250])assert.match(html,new RegExp('EI '+ei));
-  assert.match(html,/非机身 ISO/);assert.match(html,/非 push/);
+  assert.match(html,/非机身 ISO|不改变机身 ISO/);assert.match(html,/非 push|不模拟增感冲洗/);
  }
 });
 test('Harman preview uses the same 15-cube for each RED EI and preserves source alpha',async()=>{

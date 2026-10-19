@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.19.6",
+      "date": "2026-10-19",
+      "title": "统一胶卷工作台、导航与配置流程",
+      "changes": [
+        "网页只保留胶卷库配置主线，移除与胶卷库互斥的配方入口；扩展功能独立分组，旧草稿迁移前保留本地备份。",
+        "统一工作台、SD胶卷、说明和日志页导航；默认进入胶卷设置，目录与当前槽位参数并列显示，优化导入、撤销与保存状态。",
+        "精简中文说明和操作名称，移除装饰性英文与重复提示；保留机型、胶卷专有名称及必要使用限制。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.19.5",
       "date": "2026-10-19",
       "title": "修复 GR III V7 服务器构建对调试缓存的依赖",
@@ -10,9 +23,9 @@
         "校准LLVM18生成的ROM运行体预算，保留原有672KiB RTOS扩展硬界与独立回读；未增加图像缓冲、降低画质或关闭效果。",
         "补齐无调试缓存的真实构建回归，保留原厂色彩、颗粒、回放恢复和全部效果；本次不改变相机端算法及实机验收结论。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "b0bc96e961cdc5b758b183baeb0de9134a8fcc88",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/b0bc96e961cdc5b758b183baeb0de9134a8fcc88"
     },
     {
       "version": "2026.10.19.4",

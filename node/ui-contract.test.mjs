@@ -10,8 +10,8 @@ test('product home exposes GR IV native workbench and GR II inspection with trut
   assert.match(html,/href="\/gr2\/"/);
   assert.match(html,/只读检查/);
   assert.match(html,/原生胶卷工作台/);
-  assert.match(html,/Firmware 1.11 · 待实机验证/);
-  assert.match(html, /为你的 GR 定制/);
+  assert.match(html,/固件 1.11 · 待实机验证/);
+  assert.match(html, /选择相机型号/);
   assert.doesNotMatch(html, /id="candidate-analyze"/);
   assert.doesNotMatch(html, /fonts\.googleapis\.com/);
 });

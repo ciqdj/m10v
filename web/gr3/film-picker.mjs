@@ -7,7 +7,7 @@ export function groupedFilmOptions(options){
  for(const option of options){const key=option.dataset.group||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(option);}
  return [...groups.values()].flat();
 }
-export function enhanceFilmSelect(select,{placeholder='搜索胶卷…',caption='FILM COLLECTION',searchable=true}={}){
+export function enhanceFilmSelect(select,{placeholder='搜索胶卷…',caption='胶卷目录',searchable=true}={}){
  if(select.dataset.enhanced)return;
  select.dataset.enhanced='true';select.classList.add('film-picker-native');select.tabIndex=-1;select.setAttribute('aria-hidden','true');
  const wrap=document.createElement('div');wrap.className='film-picker';select.before(wrap);wrap.append(select);

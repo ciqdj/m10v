@@ -38,27 +38,22 @@ test('GR IIIx import preserves all selected native extensions',async()=>{
  assert.deepEqual([...h.state.features],['film','timestamp','aspect','level','negativeGrain','rawNr']);
 });
 
-test('GR IIIx uses the shared stock capability endpoint',async()=>{
+test('GR IIIx native workflow does not fetch retired stock customization resources',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));
- assert.ok(h.calls.some(c=>c.path.endsWith('/stock-presets')));
+ assert.ok(!h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
-test('GR IIIx imaging tab can select the custom workflow after removing native film',()=>{
+test('GR IIIx extension tab retains the native workflow',()=>{
  const node=()=>({setAttribute(){}}),context=vm.createContext({gr4Workbench:false,state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
  vm.runInContext("let chosenModel='gr3x',settingsTab='library';"+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
- context.showSettingsTab('imaging');assert.equal(vm.runInContext('state.profile',context),'custom');
+ context.showSettingsTab('imaging');assert.equal(vm.runInContext('state.profile',context),'native');
 });
 
-test('GR IIIx import preserves an explicitly selected custom workflow and recipes',async()=>{
- const h=harness();h.state.profile='custom';h.state.features=new Set(['recipes','presets','negativeGrain','rawNr']);
- await h.run(h.report('GR IIIx','a'));
- assert.equal(h.state.profile,'custom');assert.deepEqual([...h.state.features],['recipes','presets','negativeGrain','rawNr']);
-});
 
 test('GR IV import uses the shared workflow and isolated native endpoints',async()=>{
  const h=harness('gr4');await h.run(h.report('GR IV','c'),true);
  assert.equal(h.state.source.model,'GR IV');assert.equal(vm.runInContext('chosenModel',h.context),'gr4');
  assert.ok(h.calls.some(c=>c.path==='/api/gr4/native-library/import-official'));
- assert.ok(h.calls.some(c=>c.path.endsWith('/stock-presets')));
+ assert.ok(!h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
 
 test('GR IV backup keeps its actual BIN format and model filename',async()=>{
