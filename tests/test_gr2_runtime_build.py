@@ -57,6 +57,36 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
                 self.assertTrue(drawn['native_card_matches_reference'])
                 self.assertTrue(drawn['native_card_pool_restored'])
 
+    def test_compiled_modal_overlay_registers_consumes_keys_exits_once_and_preserves_camera_root(self):
+        from scripts.analyze_gr2_native_contract import probe_effect_view_draw
+        report=self.build();self.assertTrue('gr2_overlay_attach' in report['symbols'])
+        result=probe_effect_view_draw(component('gr2','b01firm8'),component('gr2','b01firm6'),native_runtime=report,attach=True,overlay=True)
+        self.assertEqual(result['overlay_attach_return'],1)
+        self.assertEqual(result['overlay_duplicate_return'],0)
+        self.assertEqual(result['overlay_detach_return'],1)
+        self.assertEqual(result['overlay_second_detach_return'],0)
+        self.assertEqual(result['overlay_events'],[0x60000003,0x60002004,0x60000005])
+        self.assertEqual(result['overlay_destructor_calls'],1)
+        self.assertEqual(result['overlay_underlying_effects'],[6,7])
+        self.assertTrue(result['active_root_matches'])
+        self.assertTrue(result['overlay_full_rejected'])
+
+    def test_compiled_rectangle_fill_matches_both_stock_pixel_formats_without_outside_writes(self):
+        from scripts.analyze_gr2_native_contract import probe_effect_view_draw
+        report=self.build();self.assertTrue('gr2_fill_rect' in report['symbols'])
+        result=probe_effect_view_draw(component('gr2','b01firm8'),component('gr2','b01firm6'),native_runtime=report,native_fill=True)
+        self.assertEqual(result['native_fill_returns'],[1,1])
+        self.assertTrue(result['native_fill_matches_reference'])
+        self.assertEqual(result['native_fill_outside_bounds'],0)
+
+    def test_compiled_full_resolution_text_bridge_uses_original_720_coordinate_context(self):
+        from scripts.analyze_gr2_native_contract import probe_effect_view_draw
+        report=self.build();self.assertTrue('gr2_text_draw_full' in report['symbols'])
+        result=probe_effect_view_draw(component('gr2','b01firm8'),component('gr2','b01firm6'),native_runtime=report,native_text_full=True)
+        self.assertEqual(result['native_text_return'],1)
+        self.assertGreater(result['native_text_changed_bytes'],100)
+        self.assertEqual(result['native_text_outside_bounds'],0)
+
     def test_be32_runtime_preserves_original_post_load_result_and_audits_all_sections(self):
         report=self.build();self.assertEqual(report['endianness'],'big');self.assertFalse(report['be8'])
         self.assertFalse(report['can_package']);self.assertLess(report['memory_bytes'],0x68000)

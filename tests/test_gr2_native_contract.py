@@ -171,6 +171,19 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertEqual(report['colors'][4]['rgb4444'],0x000f)
         self.assertEqual(report['helpers_intercepted'],[])
 
+    def test_original_root_transition_and_draw_dispatch_own_the_stock_effect_page(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=module.probe_effect_view_draw(component('gr2','b01firm8'),component('gr2','b01firm6'),attach=True)
+        self.assertTrue(report['active_root_matches'])
+        self.assertEqual(report['page_events'][:2],[0x60000000,0x60000001])
+        self.assertIn(0x60000003,report['page_events'])
+        self.assertEqual(report['navigation_effects'],[6,7,6])
+        self.assertEqual(report['draw_returns'],[0,0])
+        self.assertTrue(report['guards_unchanged'])
+        self.assertTrue(report['stack_preserved'])
+        self.assertTrue(report['low_module_loaded'])
+
     def test_original_main_yuv_handoff_sets_valid_length_before_encode(self):
         module=self.implementation()
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')

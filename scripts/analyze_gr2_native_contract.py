@@ -764,7 +764,7 @@ def probe_osd_colors(code:bytes)->dict:
     return dict(colors=rows,helpers_intercepted=[],hardware_tested=False,
                 scope='Original palette lookup, fixed-point YUV to RGB and channel/alpha nibble packing. CPU format evidence, no display hardware or compositing proof.')
 
-def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False)->dict:
+def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False)->dict:
     """Original stock list/graphics/font bodies, with bounded ROM-file reads.
 
     All display planes, active geometry and property/kernel state are synthetic.
@@ -772,6 +772,7 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     generation, widget drawing, navigation, allocation or property mutation.
     """
     import hashlib
+    if overlay and not attach:raise ValueError('overlay evidence requires the original active root transition')
     official_profile(code,'gr2')
     if hashlib.sha256(disk).hexdigest()!='9e0d291f5b9b74f76a2dd269c4b23fe8f524b5db92b86bf82150d5dc3096abf8':
         raise ValueError('exact GR II official resource component identity required')
@@ -806,10 +807,11 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
         uc.mem_write(handle,b'BUFF'+struct.pack('>5I',address,size,0,0,size));uc.mem_write(word(0xA03938A4)+index*4,struct.pack('>I',handle))
     uc.mem_write(word(0xA0393D48)+0x24,struct.pack('>I',1))
     uc.mem_write(word(0xA039387C)+0x20,struct.pack('>I',(480<<16)|720))
-    palette_calls=[];read_names=[];font_engine_calls=0
+    palette_calls=[];read_names=[];font_engine_calls=0;page_events=[]
     def boundary(machine,address,size,context):
         nonlocal font_engine_calls
         if address==0xA03CE5F8:font_engine_calls+=1;return
+        if address==0xA03AD0C6:page_events.append(word(machine.reg_read(r.UC_ARM_REG_R1)));return
         value=0
         if address==0xA002CD2C:
             name=bytes(machine.mem_read(machine.reg_read(r.UC_ARM_REG_R0),100)).split(b'\0',1)[0].decode('ascii')
@@ -820,7 +822,7 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
             else:machine.mem_write(pointer,payload);value=len(payload)
         else:palette_calls.append(hex(address))
         machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA002CD2C,0xA00F5ED6,0xA00F5F92,0xA00F5FE2,0xA03CE5F8):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    for address in (0xA002CD2C,0xA00F5ED6,0xA00F5F92,0xA00F5FE2,0xA03CE5F8,0xA03AD0C6):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     # Boot-time service order matters: initialize all constructors and official
     # font services before the list computes its text measurements in INIT.
     for index in range(6):
@@ -830,25 +832,88 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     uc.mem_map(0x68300000,(arena_bytes+4095)&~4095);uc.mem_write(word(0xA039387C)+0x2c,struct.pack('>I',0x68300000))
     run(0xA039955A)
     uc.mem_write(root-16,b'\xa5'*16);uc.mem_write(root+0x600,b'\xa5'*16)
-    uc.mem_write(root,bytes(uc.mem_read(0xA0411A18,64)));uc.mem_write(word(0xA0398DC4),struct.pack('>I',root))
+    uc.mem_write(root,bytes(uc.mem_read(0xA0411A18,64)))
     page_returns=[]
-    for action in (0x60000000,0x60000001):
-        uc.mem_write(event,struct.pack('>3I',action,0,0));page_returns.append(run(0xA03AD0C6,root,event))
+    if attach:
+        # The complete draw loop also reaches original ARM code at low 2004.
+        # Map the deferred official record explicitly for this CPU fixture;
+        # this does not claim the physical ROM/deferred commit was established.
+        from scripts.analyze_unity_runtime import parse_executable_load_map
+        low=parse_executable_load_map(code)[15];uc.mem_map(0,0x10000)
+        uc.mem_write(low['address'],code[low['source_file_offset']:low['source_file_offset']+low['length']])
+        uc.mem_write(word(0xA0398DC4),bytes(4))
+        page_returns.append(run(0xA0398CD8,root,0))
+    else:
+        uc.mem_write(word(0xA0398DC4),struct.pack('>I',root))
+        for action in (0x60000000,0x60000001):
+            uc.mem_write(event,struct.pack('>3I',action,0,0));page_returns.append(run(0xA03AD0C6,root,event))
     uc.mem_write(word(0xA00695FC),struct.pack('>2I',0,1000));run(0xA039C56A)
     navigation=[];draw_returns=[]
     for action in (0x60000003,0x60002004,0x60002004,0x60002003,0x60000003):
-        uc.mem_write(event,struct.pack('>3I',action,1,0));value=run(0xA03BA7A6,root+0x84,event)
+        uc.mem_write(event,struct.pack('>3I',action,1,0))
+        value=run(0xA0398F20) if attach and action==0x60000003 else run(0xA03BA7A6,root+0x84,event)
         if action==0x60000003:draw_returns.append(value)
         else:navigation.append(word(0x5000D000+43*4))
+    overlay_report={}
+    if overlay:
+        pointer=0x50005000;overlay_events=[];destructor_calls=0
+        uc.mem_write(pointer,struct.pack('>9I',0x5001D001,0,0,0,0x5001D101,0,0,0,0))
+        def overlay_callback(machine,address,size,context):
+            nonlocal destructor_calls
+            if address==0x5001D000:overlay_events.append(word(machine.reg_read(r.UC_ARM_REG_R1)))
+            else:destructor_calls+=1
+            machine.reg_write(r.UC_ARM_REG_R0,1);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        for address in (0x5001D000,0x5001D100):uc.hook_add(UC_HOOK_CODE,overlay_callback,begin=address,end=address)
+        if native_runtime is not None:uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        def attach_overlay():
+            if native_runtime is not None:return run(native_runtime['symbols']['gr2_overlay_attach'],pointer,thumb=False)
+            uc.mem_write(stack,bytes(4));run(0xA0399094,pointer,0,0,1);return run(0xA0399182,pointer)
+        def detach_overlay():
+            if native_runtime is not None:return run(native_runtime['symbols']['gr2_overlay_detach'],pointer,thumb=False)
+            if not run(0xA0399182,pointer):return 0
+            run(0xA0398A5E,pointer,0);return int(not run(0xA0399182,pointer))
+        attached=attach_overlay();duplicate=attach_overlay() if native_runtime is not None else 0
+        run(0xA0398F20)
+        uc.mem_write(event,struct.pack('>3I',0x60002004,1,0));run(0xA0398E6C,event)
+        effects=[word(0x5000D000+43*4)];detached=detach_overlay();second_detach=detach_overlay()
+        run(0xA0398E6C,event);effects.append(word(0x5000D000+43*4))
+        full_rejected=False
+        if native_runtime is not None:
+            # Occupied slots are a synthetic capacity fixture; the wrapper
+            # must reject before touching them or invoking registration.
+            views=word(0xA0398DC4);saved=bytes(uc.mem_read(views+4,20))
+            uc.mem_write(views+4,struct.pack('>5I',*[pointer]*5))
+            fresh=pointer+0x80;uc.mem_write(fresh,struct.pack('>9I',0x5001D001,0,0,0,0x5001D101,0,0,0,0))
+            original=bytes(uc.mem_read(fresh,36));full_rejected=run(native_runtime['symbols']['gr2_overlay_attach'],fresh,thumb=False)==0 and bytes(uc.mem_read(fresh,36))==original
+            uc.mem_write(views+4,saved)
+        overlay_report=dict(overlay_attach_return=attached,overlay_duplicate_return=duplicate,overlay_detach_return=detached,
+            overlay_second_detach_return=second_detach,overlay_events=overlay_events,overlay_destructor_calls=destructor_calls,
+            overlay_underlying_effects=effects,overlay_full_rejected=full_rejected)
     native_text_return=None;native_text_changed_bytes=0;native_text_outside_bounds=0
     if native_runtime is not None:
         uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
         if native_font_missing:uc.mem_write(0xA077D70C+0x14,bytes(4))
         before=bytes(uc.mem_read(0x68000000,720*480))
-        uc.mem_write(0x50001200,'M10V\0'.encode('utf-16-be'));uc.mem_write(0x50001300,struct.pack('>4h',380,60,639,120))
-        native_text_return=run(native_runtime['symbols']['gr2_text_draw'],0x50001200,4,0x50001300,0x20001,thumb=False)
+        text_box=(600,60,719,120) if native_text_full else (380,60,639,120)
+        uc.mem_write(0x50001200,'M10V\0'.encode('utf-16-be'));uc.mem_write(0x50001300,struct.pack('>4h',*text_box))
+        native_text_return=run(native_runtime['symbols']['gr2_text_draw_full' if native_text_full else 'gr2_text_draw'],0x50001200,4,0x50001300,0x20001,thumb=False)
         after=bytes(uc.mem_read(0x68000000,720*480));native_text_changed_bytes=sum(a!=b for a,b in zip(before,after))
-        native_text_outside_bounds=sum(a!=b for i,(a,b) in enumerate(zip(before,after)) if not (380<=i%720<=639 and 60<=i//720<=120))
+        native_text_outside_bounds=sum(a!=b for i,(a,b) in enumerate(zip(before,after)) if not (text_box[0]<=i%720<=text_box[2] and text_box[1]<=i//720<=text_box[3]))
+    native_fill_report={}
+    if native_runtime is not None and native_fill:
+        returns=[];match=True;outside=0;samples=[]
+        uc.mem_write(0x50001300,struct.pack('>4h',10,20,14,25))
+        for index,address,bytes_per_pixel in ((0,0x68000000,1),(1,0x68200000,2)):
+            color=run(0xA03A4B34,index,0x20001)
+            before_fill=bytes(uc.mem_read(address,720*480*bytes_per_pixel))
+            returns.append(run(native_runtime['symbols']['gr2_fill_rect'],index,0x50001300,0x20001,thumb=False))
+            after_fill=bytes(uc.mem_read(address,720*480*bytes_per_pixel))
+            expected=bytes([color]) if index==0 else struct.pack('>H',color)
+            actual=b''.join(after_fill[((20+row)*720+10)*bytes_per_pixel:((20+row)*720+15)*bytes_per_pixel] for row in range(6))
+            samples.append(dict(index=index,actual=actual[:60].hex(),expected=expected.hex()))
+            match=match and actual==expected*30
+            outside+=sum(a!=b for i,(a,b) in enumerate(zip(before_fill,after_fill)) if not (10<=(i//bytes_per_pixel)%720<=14 and 20<=(i//bytes_per_pixel)//720<=25))
+        native_fill_report=dict(native_fill_samples=samples,native_fill_returns=returns,native_fill_matches_reference=match,native_fill_outside_bounds=outside)
     native_card_report={}
     if native_runtime is not None and native_card:
         def pool_free():return word(word(0x50007004)+12)*word(0x50007014)
@@ -874,12 +939,12 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
             native_card_pool_restored=pool_free()==available)
     frame=bytes(uc.mem_read(0x68000000,720*480))
     if frame_out is not None:Path(frame_out).write_bytes(frame)
-    return dict(**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
+    return dict(**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
                 page_returns=page_returns,navigation_effects=navigation,draw_returns=draw_returns,
                 display_nonzero_bytes=sum(value!=0 for value in frame),display_sha256=hashlib.sha256(frame).hexdigest(),
                 palette_backend_calls=palette_calls,guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,
-                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply'],hardware_tested=False,
-                scope='Six original graphics constructors and official Latin/monitor fonts initialized before detached stock effect page CREATE/INIT, then original list DRAW and property-mutating navigation. Synthetic display/active geometry, kernel and no-observer property fixtures; no real ROM filesystem, registered screen, display hardware or custom M10V page installation.')
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply']+(['private overlay event/destruction callbacks'] if overlay else []),hardware_tested=False,
+                scope='Six original graphics constructors and official Latin/monitor fonts initialized before detached stock effect page CREATE/INIT, then original list DRAW and property-mutating navigation. Synthetic display/active geometry, kernel and no-observer property fixtures; optional root transition starts with an empty active root and original draw dispatcher using an explicitly loaded low-address module; no real ROM filesystem, hardware state transition/display or custom M10V page installation.')
 
 def probe_effect_key_routes(code:bytes)->dict:
     """Execute original actions from the MONSETEFFECTMODE state event table.
@@ -1015,7 +1080,11 @@ def main():
                 jpeg_input=[probe_jpeg_input(code,4928,3264,format_kind=kind) for kind in (2,3,4)],
                 sd_io=[probe_sd_io(code,operation,b'M10V\x00config\xff') for operation in ('read','write')],
                 sd_modes=[probe_sd_open_mode(code,flags) for flags in (0,1,9,2,10,0x102)],can_build=False)
-    if args.resource_component:report['effect_font_draw']=probe_effect_view_draw(code,args.resource_component.read_bytes())
+    if args.resource_component:
+        disk=args.resource_component.read_bytes()
+        report['effect_font_draw']=probe_effect_view_draw(code,disk)
+        report['effect_root_lifecycle']=probe_effect_view_draw(code,disk,attach=True)
+        report['effect_modal_lifecycle']=probe_effect_view_draw(code,disk,attach=True,overlay=True)
     args.out.parent.mkdir(parents=True,exist_ok=True);args.out.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(dict(report=str(args.out),can_build=False)))
 
