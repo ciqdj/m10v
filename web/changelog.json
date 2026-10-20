@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.8",
+      "date": "2026-10-20",
+      "title": "收紧发布构建内存限制，保留系统运行余量",
+      "changes": [
+        "部署构建增加 600 MiB 提前回收阈值，将内存硬上限从 900 MiB 降为 700 MiB，并将受限交换空间从 64 MiB 调整为 384 MiB；保留三机型顺序构建、单核 CPU、十分钟超时、型号保护与失败回滚。",
+        "此前两次 GR III 构建期间服务器 SSH 失联，失联前全机可用内存约 73 MiB；尚无内核 OOM 证据，不能认定内存压力为唯一原因。本次优先为约 1.6 GiB 可用物理内存的主机保留余量。",
+        "包含上一条水印放大、切卷首张选择及四款胶卷改名的源码修复。此前发布未取得完整成功标记，未将其归档为已验证部署；相机刷入与首张效果仍待实机确认。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.7",
       "date": "2026-10-20",
       "title": "放大数码分段水印，修复切卷首张归属并统一胶卷名称",
@@ -11,9 +24,9 @@
         "胶卷库、网页和照片印字统一名称为 ProImage 100、Aerochrome、2460、5203；固定胶卷 ID 与调色数值不变。水印渲染合同更新，请重新生成并下载配套 SD 胶卷包。",
         "用户诊断日志确认旧实现有首张错槽；其中完整 CPU 后处理约 2–3ms，不代表全部保存耗时，蓝凤凰／UMax 400 持续 loading 仍不能认定已彻底解决。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c988e7a907d22fa68a8412a656f3c8b0bb40ff1a",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/c988e7a907d22fa68a8412a656f3c8b0bb40ff1a"
     },
     {
       "version": "2026.10.20.6",

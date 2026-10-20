@@ -62,7 +62,7 @@ class BaotaPublishTests(unittest.TestCase):
   r=self.run_script('--deploy',AFTER);self.assertEqual(r.returncode,0,r.stderr)
   trace=self.trace()
   self.assertEqual(trace.count('systemd-run '),3)
-  for control in ('MemoryMax=900M','MemorySwapMax=64M','CPUQuota=100%','TasksMax=64','RuntimeMaxSec=600','OOMPolicy=kill','KillMode=control-group'):
+  for control in ('MemoryHigh=600M','MemoryMax=700M','MemorySwapMax=384M','CPUQuota=100%','TasksMax=64','RuntimeMaxSec=600','OOMPolicy=kill','KillMode=control-group'):
    self.assertIn(control,trace)
   self.assertIn('FIRMWARE_BUILD_START model=gr3x',r.stdout)
   self.assertIn('FIRMWARE_BUILD_START model=gr4',r.stdout)
