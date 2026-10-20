@@ -9,6 +9,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import zlib
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.analyze_unity_update import official_profile
 ROOT=Path(__file__).resolve().parents[1]
@@ -50,9 +51,31 @@ def audit_elf(data:bytes)->dict:
     if not required<=symbols.keys():raise ValueError('required GR II ABI exports missing')
     return dict(base=address,code_bytes=filesize,memory_bytes=memsize,runtime_hex=data[offset:offset+filesize].hex(),symbols=symbols,undefined_symbols=undefined,endianness='big',be8=False)
 
+def configuration_state(configuration:dict)->tuple[dict,bytes,bytes]:
+    """Use the existing page normalizer; convert its LE wire value to BE32 ABI.
+
+    HDF is a separate producer/ISP contract, never a silently ignored field.
+    This emits research runtime data, not a downloadable firmware.
+    """
+    if not isinstance(configuration,dict):raise ValueError('five-slot configuration object required')
+    node=shutil.which('node')
+    if not node:raise RuntimeError('Node.js required for the shared page configuration contract')
+    script="import {readFileSync} from 'node:fs';import {defaultConfiguration,normalizeConfiguration} from './web/gr3/native-library-state.mjs';import {initialState} from './node/gr3-native-library.mjs';const value=JSON.parse(readFileSync(0,'utf8'));const configuration=normalizeConfiguration(Object.keys(value).length?value:defaultConfiguration());console.log(JSON.stringify({configuration,wire:initialState(configuration).toString('hex')}));"
+    result=subprocess.run([node,'--input-type=module','-e',script],input=json.dumps(configuration),cwd=ROOT,text=True,capture_output=True,timeout=15)
+    if result.returncode:
+        message=next((line[6:].strip() for line in result.stderr.splitlines() if line.startswith('Error:')),'shared normalizer rejected the configuration')
+        raise ValueError('invalid shared page configuration: '+message)
+    decoded=json.loads(result.stdout);normalized=decoded['configuration'];wire=bytes.fromhex(decoded['wire'])
+    if normalized['hdf']!=0:raise ValueError('GR II HDF configuration binding remains under reverse engineering')
+    if len(wire)!=104 or struct.unpack_from('<IHHI',wire)!=(0x5630314d,4,104,0) or zlib.crc32(wire[:100])!=struct.unpack_from('<I',wire,100)[0]:raise ValueError('shared state wire contract changed')
+    native=bytearray(wire);struct.pack_into('>IHHI',native,0,*struct.unpack_from('<IHHI',wire))
+    for index in range(5):struct.pack_into('>H',native,12+8*index,struct.unpack_from('<H',wire,12+8*index)[0])
+    struct.pack_into('>I',native,96,struct.unpack_from('<I',wire,96)[0]);struct.pack_into('>I',native,100,zlib.crc32(native[:100]))
+    return normalized,wire,bytes(native)
+
 def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     profile=official_profile(official,'gr2')
-    if configuration!={}:raise ValueError('feature configuration is not yet connected to this ABI foundation')
+    normalized,initial_wire,initial_native=configuration_state(configuration)
     clang=shutil.which('clang');linker=shutil.which('ld.lld')
     if not clang or not linker:raise RuntimeError('clang and ld.lld required for GR II BE32 build')
     from scripts.verify_gr3_5207_reference import verify
@@ -95,7 +118,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     render_objects=[str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
-        subprocess.run([clang,*FLAGS,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
+        initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
+        subprocess.run([clang,*FLAGS,*initial_flags,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())
@@ -130,13 +154,15 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
 
 
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
+                  configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
+                  configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),
                   limits=['Shared scalar renderer and ABI bridges; capture ownership/cache/mode lifecycle and menu/storage integration remain researching.','Reserved C-heap window needs original literal adjustment; no firmware patch or download is emitted.','ARMv4T soft-float subset avoids assuming a newer CPU or floating-point unit.'])
     (out_dir/'runtime-audit.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--component',required=True,type=Path);parser.add_argument('--out',required=True,type=Path);args=parser.parse_args()
-    report=build_gr2_runtime(args.component.read_bytes(),{},args.out)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--component',required=True,type=Path);parser.add_argument('--out',required=True,type=Path);parser.add_argument('--configuration',type=Path);args=parser.parse_args()
+    report=build_gr2_runtime(args.component.read_bytes(),json.loads(args.configuration.read_text()) if args.configuration else {},args.out)
     print(json.dumps({key:report[key] for key in ('code_bytes','memory_bytes','endianness','be8','can_package')}))
 if __name__=='__main__':main()

@@ -27,6 +27,39 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         self.assertEqual(u.reg_read(r.UC_ARM_REG_PC),0x5001f000)
         return u.reg_read(r.UC_ARM_REG_R0)
 
+    def test_page_configuration_rejects_invalid_values_and_does_not_silently_drop_unwired_hdf(self):
+        import copy
+        from scripts.build_gr2_runtime import configuration_state
+        normalized,wire,native=configuration_state({})
+        self.assertEqual(len(wire),104);self.assertEqual(len(native),104)
+        self.assertEqual(struct.unpack_from('>IHHI',native),(0x5630314d,4,104,0))
+        for field,value in (('grain',4),('film',79),('soft',True)):
+            bad=copy.deepcopy(normalized);bad['slots'][0][field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):configuration_state(bad)
+        bad=copy.deepcopy(normalized);bad['hdf']=1
+        with self.assertRaisesRegex(ValueError,'under reverse engineering'):configuration_state(bad)
+        bad=copy.deepcopy(normalized);bad['unknown']=0
+        with self.assertRaises(ValueError):configuration_state(bad)
+        for bad in ([],None,False):
+            with self.assertRaises(ValueError):configuration_state(bad)
+
+    def test_complete_page_configuration_compiles_to_be32_state_and_roundtrips_shared_wire_contract(self):
+        import json,subprocess
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        script="import {defaultConfiguration} from './web/gr3/native-library-state.mjs';const c=defaultConfiguration();[67,68,33,66,78].forEach((film,i)=>{c.slots[i].film=film;c.slots[i].grain=i%4;c.slots[i].soft=3;});c.slots[0].effects.filmExposure=1;c.slots[1].effects.filmExposure=2;c.stamp=2;c.format=3;c.corner=2;c.color=1;c.filmNameStamp=true;console.log(JSON.stringify(c));"
+        configuration=json.loads(subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT))
+        with tempfile.TemporaryDirectory() as folder:
+            report=build_gr2_runtime(component('gr2','b01firm8'),configuration,Path(folder))
+        expected=subprocess.check_output(['node','--input-type=module','-e',"import {readFileSync} from 'node:fs';import {initialState} from './node/gr3-native-library.mjs';process.stdout.write(initialState(JSON.parse(readFileSync(0,'utf8'))));"],input=json.dumps(configuration).encode(),cwd=ROOT)
+        u=self.machine(report);state=0x50001000;wire=0x50002000
+        self.call(u,report['symbols']['m10v_library_init'],[state])
+        self.assertEqual(self.call(u,report['symbols']['m10v_library_valid'],[state]),1)
+        self.assertEqual(bytes(u.mem_read(state,104)).hex(),report['initial_state_native_hex'])
+        self.assertEqual(self.call(u,report['symbols']['gr2_state_encode'],[state,wire]),1)
+        self.assertEqual(bytes(u.mem_read(wire,104)),expected)
+        self.assertEqual(report['initial_state_wire_hex'],expected.hex());self.assertFalse(report['can_package'])
+        self.assertEqual(report['configuration']['slots'][0]['soft'],0)
+
     def test_compiled_text_bridge_draws_through_stock_font_services_and_rejects_invalid_bounds(self):
         from scripts.analyze_gr2_native_contract import probe_effect_view_draw
         report=self.build();self.assertTrue('gr2_text_draw' in report['symbols'])
