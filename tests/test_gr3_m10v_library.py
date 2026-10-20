@@ -46,10 +46,13 @@ class NativeFilmLibraryTests(unittest.TestCase):
         cls.lib.m10v_library_init.argtypes = [C.POINTER(State)]
         cls.lib.m10v_library_valid.argtypes = [C.POINTER(State)]
         cls.lib.m10v_library_select.argtypes = [C.POINTER(State), C.c_uint32, C.c_uint32, STORE, C.c_void_p]
+        cls.lib.m10v_library_select_custom.argtypes = [C.POINTER(State), C.c_uint32, C.c_uint32, C.c_uint32, STORE, C.c_void_p]
         cls.lib.m10v_library_texture.argtypes = [C.POINTER(State), C.c_uint32, C.c_uint32, C.c_uint32, STORE, C.c_void_p]
         cls.lib.m10v_library_stamp.argtypes = [C.POINTER(State), C.c_uint32, C.c_uint32, C.c_uint32, C.c_uint32, STORE, C.c_void_p]
+        cls.lib.m10v_library_film_name_stamp.argtypes = [C.POINTER(State),C.c_uint32,STORE,C.c_void_p]
         cls.lib.m10v_library_render.argtypes = [C.POINTER(Image), C.POINTER(State), C.c_uint32,
                                              C.POINTER(Date), C.c_uint32, C.POINTER(C.c_uint8), C.c_uint32]
+        cls.lib.m10v_library_render_custom.argtypes = [C.POINTER(Image),C.POINTER(State),C.c_uint32,C.POINTER(Date),C.c_uint32,C.POINTER(C.c_uint8),C.c_uint32,C.c_uint32,C.POINTER(C.c_uint8),C.c_char_p]
         cls.lib.m10v_library_halation.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
         cls.lib.m10v_library_tables.argtypes=[C.c_uint32,C.POINTER(C.c_int16),C.POINTER(C.c_int16),C.POINTER(C.c_uint16),C.POINTER(C.c_uint16)]
         cls.lib.m10v_library_name.argtypes = [C.c_uint32]; cls.lib.m10v_library_name.restype = C.c_char_p
@@ -61,6 +64,48 @@ class NativeFilmLibraryTests(unittest.TestCase):
         before=(bytes(y),bytes(uv))
         self.assertLess(self.render(image,state,scratch),0)
         self.assertEqual((bytes(y),bytes(uv)),before)
+
+    def test_custom_slot_bank_commits_only_with_state_and_clears_on_builtin(self):
+        state=self.state();before=bytes(state);bad=STORE(lambda ctx,next:-1);ok=STORE(lambda ctx,next:0)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,73,1,bad,None),-2)
+        self.assertEqual(bytes(state),before)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,73,1,ok,None),0)
+        self.assertEqual(state.slots[0].film,73);self.assertEqual(state.effects[0][6],2)
+        self.assertEqual(self.lib.m10v_library_valid(C.byref(state)),1)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,33,ok,None),0)
+        self.assertEqual(state.effects[0][6],0)
+
+    def test_custom_lut_changes_saved_rgb_without_sd_and_missing_table_is_rejected(self):
+        state=self.state();ok=STORE(lambda ctx,next:0)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,73,0,ok,None),0)
+        image,y,uv,scratch=self.image();uv[0]=80;uv[1]=200;before=(bytes(y),bytes(uv))
+        self.assertLess(self.render(image,state,scratch),0)
+        self.assertEqual((bytes(y),bytes(uv)),before)
+        lut=(C.c_uint8*6591)();i=0
+        for b in range(13):
+            for g in range(13):
+                for r in range(13):
+                    lut[i:i+3]=(round(b*255/12),round(g*255/12),round(r*255/12));i+=3
+        self.assertEqual(self.lib.m10v_library_render_custom(C.byref(image),C.byref(state),0,None,1,scratch,len(scratch)-32,0,lut,b'Custom'),0)
+        self.assertNotEqual(bytes(uv),before[1])
+
+    def test_film_name_stamp_is_independent_of_date_and_uses_stamp_style(self):
+        state=self.state();ok=STORE(lambda ctx,next:0)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,1,ok,None),0)
+        self.assertEqual(self.lib.m10v_library_film_name_stamp(C.byref(state),1,ok,None),0)
+        self.assertEqual(state.reserved,1);self.assertEqual(self.lib.m10v_library_valid(C.byref(state)),1)
+        image,y,uv,scratch=self.image(320,240);before=bytes(y)
+        self.assertEqual(self.render(image,state,scratch,Date(2026,2,30,0,0)),0)
+        changed={i//image.stride for i in range(image.y_bytes) if y[i]!=before[i]}
+        self.assertTrue(changed);self.assertLess(max(changed),30)
+        self.assertEqual(bytes(y)[image.y_bytes:],bytes([173]*32))
+        self.assertEqual(self.lib.m10v_library_stamp(C.byref(state),1,0,0,1,ok,None),0)
+        image,y,uv,scratch=self.image(320,240);before=bytes(y)
+        self.assertEqual(self.render(image,state,scratch,Date(2026,10,14,23,59)),0)
+        changed={i//image.stride for i in range(image.y_bytes) if y[i]!=before[i]}
+        self.assertTrue(any(row<12 for row in changed));self.assertTrue(any(row>=12 for row in changed))
+        self.assertEqual(self.lib.m10v_library_film_name_stamp(C.byref(state),0,ok,None),0)
+        self.assertEqual(state.reserved,0)
 
     def test_existing_matrices_curves_and_knots_decode_losslessly(self):
         import json

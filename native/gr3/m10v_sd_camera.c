@@ -87,13 +87,59 @@ static int persist(const uint8_t *record,uint32_t id){
  typedef int (*write_fn)(uint32_t,const char *,uint32_t,const void *);
  return ((write_fn)0x53825fa8u)(fs,name,M10V_SD_RECORD_BYTES,record)&&snapshot_read(fs,primary,record);
 }
+static void custom_names(uint32_t slot,uint32_t bank,char *name,char *full){
+ const char base[]="M10VC00.bin",path[]="F:\\M10VC00.bin";
+ for(uint32_t i=0;i<12;i++)name[i]=base[i];for(uint32_t i=0;i<15;i++)full[i]=path[i];
+ name[5]=full[8]=(char)('0'+slot);name[6]=full[9]=(char)('0'+bank);
+}
+static int persist_custom(const uint8_t *record,uint32_t slot,uint32_t bank){
+ uint32_t manager=((get_fn)0x53828014u)();if(!ram(manager,12))return 0;
+ uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
+ uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
+ char name[12],full[15];custom_names(slot,bank,name,full);
+ if(snapshot_read(fs,full,record))return 1;
+ typedef int (*write_fn)(uint32_t,const char *,uint32_t,const void *);
+ return ((write_fn)0x53825fa8u)(fs,name,M10V_SD_RECORD_BYTES,record)&&snapshot_read(fs,full,record);
+}
+int m10v_sd_camera_custom_record(const m10v_library_state *state,uint32_t slot,uint8_t *out,uint32_t bytes){
+ if(!state||slot>=5||!ram((uint32_t)(uintptr_t)out,bytes)||bytes<M10V_SD_RECORD_BYTES)return 0;
+ uint32_t id=state->slots[slot].film,which=state->effects[slot].reserved[0];if(id<73||id>288||which<1||which>2)return 0;
+ uint32_t manager=((get_fn)0x53828014u)();if(!ram(manager,12))return 0;
+ uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
+ uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
+ char name[12],full[15];custom_names(slot,which-1,name,full);
+ typedef uint32_t (*stat_fn)(uint32_t,const char *,void *);typedef int (*read_fn)(uint32_t,const char *,uint32_t,void *);
+ uint32_t file_manager=*(const uint32_t *)(uintptr_t)fs;
+ if(((stat_fn)0x5362e160u)(file_manager,full,0)!=M10V_SD_RECORD_BYTES+8)return 0;
+ return ((read_fn)0x53825648u)(fs,name,M10V_SD_RECORD_BYTES,out)&&m10v_sd_record(out,M10V_SD_RECORD_BYTES,id)==id;
+}
+static int record_name(const uint8_t *record,char *out,uint32_t capacity){
+ if(!out||capacity<24)return 0;
+ uint32_t n=0;while(n<23&&record[16+n]){out[n]=(char)record[16+n];n++;}
+ out[n]=0;return n>0;
+}
+int m10v_sd_camera_custom_name(const m10v_library_state *state,uint32_t slot,char *out,uint32_t capacity){
+ uint8_t *memory=allocate();if(!memory)return 0;
+ int ok=m10v_sd_camera_custom_record(state,slot,memory+4096,M10V_SD_RECORD_BYTES)&&record_name(memory+4096,out,capacity);
+ ((free_fn)0x536af2e4u)(memory);return ok;
+}
+int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,uint32_t capacity){
+ if(index>=256||expected_id<73||expected_id>288)return 0;
+ uint8_t *memory=allocate();if(!memory)return 0;
+ int ok=fetch(index/8,index%8,memory,1)==expected_id&&record_name(memory+4096,out,capacity);
+ ((free_fn)0x536af2e4u)(memory);return ok;
+}
 int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if(page>=32||row>=8||expected_id<33||expected_id>M10V_FILM_COUNT||slot>=5)return -1;
+ if(page>=32||row>=8||expected_id<33||expected_id>M10V_CUSTOM_MAX_ID||slot>=5)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){
   m10v_library_state state;
-  if(m10v_camera_library_load(&state)>=0&&persist(memory+4096,id))result=m10v_camera_library_select(&state,slot,id);
+  if(m10v_camera_library_load(&state)>=0){
+   if(id<=M10V_FILM_COUNT){if(persist(memory+4096,id))result=m10v_camera_library_select(&state,slot,id);}
+   else {uint32_t current=state.effects[slot].reserved[0],bank=current?2-current:0;
+    if(persist_custom(memory+4096,slot,bank))result=m10v_camera_library_select_custom(&state,slot,id,bank);}
+  }
  }
  ((free_fn)0x536af2e4u)(memory);return result;
 }

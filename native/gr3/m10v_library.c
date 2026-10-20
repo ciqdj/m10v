@@ -87,14 +87,15 @@ void m10v_library_init(m10v_library_state *state) {
 }
 int m10v_library_valid(const m10v_library_state *state) {
     if (!state || state->magic != 0x5630314du || state->version != 4 ||
-        state->size != sizeof(*state) || state->reserved != 0 || state->stamp > 2 ||
+        state->size != sizeof(*state) || (state->reserved & ~1u) || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
-        if (!state->slots[i].film || state->slots[i].film > M10V_FILM_COUNT ||
+        if (!state->slots[i].film || state->slots[i].film > M10V_CUSTOM_MAX_ID ||
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
             state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
     for(uint32_t i=0;i<5;i++){const m10v_film_effects *e=&state->effects[i];
-        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->film_exposure>2||(state->slots[i].film!=68&&e->film_exposure)||e->reserved[0]||e->reserved[1])return 0;}
+        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->film_exposure>2||(state->slots[i].film!=68&&e->film_exposure)||e->reserved[1]||
+           (state->slots[i].film<=M10V_FILM_COUNT?e->reserved[0]!=0:(e->reserved[0]<1||e->reserved[0]>2)))return 0;}
     return 1;
 }
 const char *m10v_library_name(uint32_t id) {
@@ -119,6 +120,7 @@ int m10v_library_reset(m10v_library_state *state,uint32_t slot,m10v_library_stor
         m10v_film_effects e={id==67||id==69||id==70||id==72?0:1,0,0,4,0,0,{0,0}};defaults.effects[slot]=e;
     }
     next.slots[slot]=defaults.slots[slot];next.effects[slot]=defaults.effects[slot];
+    if(id>M10V_FILM_COUNT)next.effects[slot].reserved[0]=state->effects[slot].reserved[0];
     return commit(state,&next,store,context);
 }
 int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
@@ -126,6 +128,7 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
     if (!m10v_library_valid(state) || slot >= M10V_SLOT_COUNT || !id || id > M10V_FILM_COUNT)
         return M10V_LIBRARY_INVALID;
     m10v_library_state next; copy_state(&next, state); next.slots[slot].film = (uint16_t)id;
+    next.effects[slot].reserved[0]=0;
     if(id==66&&state->slots[slot].film!=66){next.slots[slot].grain=1;next.slots[slot].soft=0;next.slots[slot].halo_gain=0;next.slots[slot].halo_spread=3;next.slots[slot].halo_threshold=5;next.slots[slot].halo_profile=1;
         m10v_film_effects e={1,0,0,4,0,0,{0,0}};next.effects[slot]=e;}
     if((id==67||id==68||id>=69)&&state->slots[slot].film!=id){
@@ -134,6 +137,13 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
     }
     if(id!=68)next.effects[slot].film_exposure=0;
     return commit(state, &next, store, context);
+}
+int m10v_library_select_custom(m10v_library_state *state,uint32_t slot,uint32_t id,uint32_t bank,m10v_library_store store,void *context){
+ if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||id<=M10V_FILM_COUNT||id>M10V_CUSTOM_MAX_ID||bank>1)return M10V_LIBRARY_INVALID;
+ m10v_library_state next;copy_state(&next,state);next.slots[slot].film=(uint16_t)id;
+ next.slots[slot].grain=next.slots[slot].soft=next.slots[slot].halo_gain=0;
+ next.effects[slot].film_exposure=0;next.effects[slot].reserved[0]=(uint8_t)(bank+1);
+ return commit(state,&next,store,context);
 }
 int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grain, uint32_t soft,
                          m10v_library_store store, void *context) {
@@ -165,6 +175,11 @@ int m10v_library_stamp(m10v_library_state *state, uint32_t enabled, uint32_t for
     next.stamp = (uint8_t)enabled; next.format = (uint8_t)format;
     next.corner = (uint8_t)corner; next.color = (uint8_t)color;
     return commit(state, &next, store, context);
+}
+int m10v_library_film_name_stamp(m10v_library_state *state,uint32_t enabled,m10v_library_store store,void *context){
+    if(!m10v_library_valid(state)||enabled>1)return M10V_LIBRARY_INVALID;
+    m10v_library_state next;copy_state(&next,state);next.reserved=enabled;
+    return commit(state,&next,store,context);
 }
 int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store store,void *ctx){
     static const uint8_t limits[5]={2,8,5,8,1};
@@ -213,21 +228,34 @@ static const uint8_t glyphs[10][7] = {
     {14,17,17,15,1,1,14}
 };
 static uint32_t glyph(char c, uint32_t row) {
+    static const uint8_t letters[26][7]={
+      {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
+      {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
+      {14,17,16,23,17,17,14},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
+      {7,2,2,2,18,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
+      {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
+      {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
+      {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
+      {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
+      {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
+    };
     if (c >= '0' && c <= '9') return glyphs[c - '0'][row];
+    if(c>='a'&&c<='z')c=(char)(c-'a'+'A');
+    if(c>='A'&&c<='Z')return letters[c-'A'][row];
     if (c == '.') return row == 6 ? 4u : 0u;
     if (c == '-') return row == 3 ? 14u : 0u;
     if (c == ':') return row == 2 || row == 4 ? 4u : 0u;
-    return 0;
+    if(c==' ')return 0;
+    if(c=='_')return row==6?31u:0u;
+    if(c=='/')return 1u<<(row<5?row:4);
+    if(c=='+')return row==3?31u:row==2||row==4?4u:0u;
+    if(c=='&'){static const uint8_t amp[7]={12,18,20,8,21,18,13};return amp[row];}
+    if(c=='\'')return row<3?4u:0u;
+    if(c=='(')return row==0||row==6?2u:4u;
+    if(c==')')return row==0||row==6?8u:4u;
+    static const uint8_t question[7]={14,17,1,2,4,0,4};return question[row];
 }
-static void stamp(m10v_library_image *image, const m10v_library_state *state,
-                   const m10v_library_date *date) {
-    char text[24]; uint32_t count = date_text(text, date, state->format, state->stamp);
-    uint32_t scale = image->width / 1200u; if (!scale) scale = 1;
-    uint32_t tw = count * 6 * scale, th = 8 * scale;
-    uint32_t margin = image->width / 100 + 2;
-    if (tw + margin * 2 >= image->width || th + margin * 2 >= image->height) return;
-    uint32_t left = (state->corner & 1) ? image->width - margin - tw : margin;
-    uint32_t top = (state->corner & 2) ? image->height - margin - th : margin;
+static void stamp_line(m10v_library_image *image,const m10v_library_state *state,const char *text,uint32_t count,uint32_t left,uint32_t top,uint32_t scale){
     static const uint8_t colors[4][3] = {{235,128,128},{180,80,185},{82,90,240},{210,16,146}};
     for (uint32_t pass = 0; pass < 2; ++pass)
         for (uint32_t i = 0; i < count; ++i)
@@ -243,6 +271,26 @@ static void stamp(m10v_library_image *image, const m10v_library_state *state,
                         image->chroma[at + 1] = pass ? colors[state->color][2] : 128;
                     }
                 }
+}
+static void stamp(m10v_library_image *image, const m10v_library_state *state,
+                  const m10v_library_date *date,const char *name) {
+    char text[24];uint32_t count=state->stamp&&date_valid(date)?date_text(text,date,state->format,state->stamp):0;
+    uint32_t name_count=0;
+    if((state->reserved&1u)&&name){
+        while(name_count<24&&name[name_count]>=' '&&name[name_count]<='~')name_count++;
+        if(!name_count||name_count>23||name[name_count])name_count=0;
+    }
+    if(!count&&!name_count)return;
+    uint32_t scale = image->width / 1200u; if (!scale) scale = 1;
+    uint32_t lines=(count?1u:0u)+(name_count?1u:0u);
+    uint32_t max_count=count>name_count?count:name_count;
+    uint32_t tw = (max_count * 6 + 1) * scale, th = (lines * 9 + 1) * scale;
+    uint32_t margin = image->width / 100 + 2;
+    if (tw + margin * 2 >= image->width || th + margin * 2 >= image->height) return;
+    uint32_t left = (state->corner & 1) ? image->width - margin - tw : margin;
+    uint32_t top = (state->corner & 2) ? image->height - margin - th : margin;
+    if(count)stamp_line(image,state,text,count,left,top,scale);
+    if(name_count)stamp_line(image,state,name,name_count,left,top+(count?9*scale:0),scale);
 }
 /* Existing tables are decoded exactly; RGB evaluation is an explicitly new
  * saved-JPEG path, not a claim that it reproduces the stock ISP pixel-for-pixel. */
@@ -310,6 +358,34 @@ static int legacy_color(m10v_library_image *image,uint32_t id,void *memory){
     memory=m10v_color_cache_prepare(memory,image);
     return memory?legacy_color_loop(image,id,memory,1):legacy_color_loop(image,id,0,0);
 }
+static uint8_t custom_sample(const uint8_t *lut,uint32_t r,uint32_t g,uint32_t b,uint32_t channel){
+ uint32_t x=r*12u*256u/255u,y=g*12u*256u/255u,z=b*12u*256u/255u;
+ uint32_t xi=x>>8,yi=y>>8,zi=z>>8,fx=x&255u,fy=y&255u,fz=z&255u;
+ uint32_t xx=xi<12?xi+1:xi,yy=yi<12?yi+1:yi,zz=zi<12?zi+1:zi;
+ #define AT(a,c,d) lut[(((d)*13u+(c))*13u+(a))*3u+channel]
+ uint32_t a=(AT(xi,yi,zi)*(256-fx)+AT(xx,yi,zi)*fx+128)>>8;
+ uint32_t c=(AT(xi,yy,zi)*(256-fx)+AT(xx,yy,zi)*fx+128)>>8;
+ uint32_t d=(AT(xi,yi,zz)*(256-fx)+AT(xx,yi,zz)*fx+128)>>8;
+ uint32_t e=(AT(xi,yy,zz)*(256-fx)+AT(xx,yy,zz)*fx+128)>>8;
+ #undef AT
+ uint32_t low=(a*(256-fy)+c*fy+128)>>8,high=(d*(256-fy)+e*fy+128)>>8;
+ return (uint8_t)((low*(256-fz)+high*fz+128)>>8);
+}
+static void custom_color(m10v_library_image *image,const uint8_t *lut){
+ for(uint32_t row=0;row<image->height;++row)for(uint32_t x=0;x<image->width;x+=2){
+  uint32_t at=row*image->stride+x;int a[3],b[3];
+  int cb=(int)image->chroma[at]-128,cr=(int)image->chroma[at+1]-128;
+  for(uint32_t k=0;k<2;k++){
+   int y=image->y[at+k],r=clamp(y+rounded(91881*cr,16)),g=clamp(y-rounded(22554*cb+46802*cr,16)),blue=clamp(y+rounded(116130*cb,16));
+   int *out=k?b:a;for(uint32_t c=0;c<3;c++)out[c]=custom_sample(lut,(uint32_t)r,(uint32_t)g,(uint32_t)blue,c);
+  }
+  image->y[at]=clamp(rounded(19595*a[0]+38470*a[1]+7471*a[2],16));
+  image->y[at+1]=clamp(rounded(19595*b[0]+38470*b[1]+7471*b[2],16));
+  int rs=a[0]+b[0],gs=a[1]+b[1],bs=a[2]+b[2];
+  image->chroma[at]=clamp(128+rounded(-11059*rs-21709*gs+32768*bs,17));
+  image->chroma[at+1]=clamp(128+rounded(32768*rs-27439*gs-5329*bs,17));
+ }
+}
 
 /* Assumed Phoenix II orange/red scatter, weaker than the 800T grade. Build
  * the source from ORIGINAL luminance, then composite after colour rendering.
@@ -368,7 +444,7 @@ static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,c
 }
 static int render_stages(m10v_library_image *image,const m10v_library_state *state,
                         uint32_t slot,const m10v_library_date *date,uint32_t seed,
-                        uint8_t *scratch,uint32_t scratch_bytes,uint32_t completed
+                        uint8_t *scratch,uint32_t scratch_bytes,uint32_t completed,const uint8_t *custom_lut,const char *custom_name
 #if M10V_CAPTURE_PROFILE
                         ,m10v_capture_profile *profile
 #endif
@@ -385,9 +461,11 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
         overlap(image->y, bytes, image->chroma, bytes) ||
         overlap(image->y, bytes, state, sizeof(*state)) || overlap(image->chroma, bytes, state, sizeof(*state)) ||
         overlap(image->y, bytes, image, sizeof(*image)) || overlap(image->chroma, bytes, image, sizeof(*image)) ||
-        (state->stamp && (!date_valid(date) || overlap(image->y, bytes, date, sizeof(*date)) ||
+        (state->stamp && !date_valid(date) && !(state->reserved&1u)) ||
+        (state->stamp && date && (overlap(image->y, bytes, date, sizeof(*date)) ||
           overlap(image->chroma, bytes, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
     const m10v_slot *choice = &state->slots[slot];
+    if(choice->film>M10V_FILM_COUNT&&!custom_lut)return M10V_LIBRARY_INVALID;
     uint32_t shift = 0, gw = image->width, gh = image->height;
     /* Power-of-two sampling must not depend on an ARM division runtime. */
     while (gw > 384 || gh > 256) {
@@ -447,7 +525,11 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
 #if M10V_CAPTURE_PROFILE
     uint32_t texture_work[3];texture_stats=texture_work;
 #endif
-    if(completed&M10V_NATIVE_COLOR){
+    if(choice->film>M10V_FILM_COUNT){
+        custom_color(image,custom_lut);
+        if(grain||effects.leak_gain)m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,0,0,texture_stats);
+    }
+    else if(completed&M10V_NATIVE_COLOR){
         uint32_t amount=grain<<8;
         if(choice->film==68){uint32_t exposure=effects.film_exposure;amount=grain*(exposure==1?218:exposure==2?307:256);}
         if(choice->film>=66)m10v_5207_texture_cached_stats_q8(image,&effects,amount,seed,0,0,texture_stats);
@@ -483,27 +565,35 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     if(choice->film==67&&use_halo)phoenix_halation_compose(image,choice,scratch,gw,gh,shift);
     if(choice->film<66)m10v_5207_texture(image,&effects,grain,seed,0);
     M10V_PROFILE(9);
-    if (state->stamp) stamp(image, state, date);
+    if (state->stamp||(state->reserved&1u))stamp(image,state,date,choice->film>M10V_FILM_COUNT?custom_name:m10v_library_name(choice->film));
     M10V_PROFILE(10);
     return M10V_LIBRARY_OK;
 }
 
 
 int m10v_library_render_native(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed){
-    return render_stages(image,state,slot,date,seed,scratch,bytes,completed
+    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,0,0
 #if M10V_CAPTURE_PROFILE
       ,0
 #endif
     );
+}
+int m10v_library_render_custom(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed,const uint8_t *lut,const char *name){
+ if(!lut||!state||slot>=M10V_SLOT_COUNT||state->slots[slot].film<=M10V_FILM_COUNT)return M10V_LIBRARY_INVALID;
+ return render_stages(image,state,slot,date,seed,scratch,bytes,completed,lut,name
+#if M10V_CAPTURE_PROFILE
+ ,0
+#endif
+ );
 }
 int m10v_library_render(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes){
     return m10v_library_render_native(image,state,slot,date,seed,scratch,bytes,0);
 }
 #if M10V_CAPTURE_PROFILE
 int m10v_library_render_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,m10v_capture_profile *profile){
-    return render_stages(image,state,slot,date,seed,scratch,bytes,0,profile);
+    return render_stages(image,state,slot,date,seed,scratch,bytes,0,0,0,profile);
 }
 int m10v_library_render_native_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed,m10v_capture_profile *profile){
-    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,profile);
+    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,0,0,profile);
 }
 #endif

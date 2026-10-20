@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #define M10V_FILM_COUNT 72u
+#define M10V_CUSTOM_MAX_ID 288u
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0
 #define M10V_LIBRARY_INVALID -1
@@ -35,6 +36,7 @@ int m10v_library_valid(const m10v_library_state *);
 const char *m10v_library_name(uint32_t film);
 int m10v_library_select(m10v_library_state *, uint32_t slot, uint32_t film,
                         m10v_library_store, void *);
+int m10v_library_select_custom(m10v_library_state *,uint32_t slot,uint32_t film,uint32_t bank,m10v_library_store,void *);
 int m10v_library_texture(m10v_library_state *, uint32_t slot, uint32_t grain, uint32_t soft,
                          m10v_library_store, void *);
 int m10v_library_halation(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t profile, m10v_library_store, void *);
@@ -42,6 +44,7 @@ int m10v_library_detail(m10v_library_state *, uint32_t slot, uint32_t gain, uint
 int m10v_library_tables(uint32_t film, int16_t *, int16_t *, uint16_t *, uint16_t *);
 int m10v_library_stamp(m10v_library_state *, uint32_t enabled, uint32_t format,
                        uint32_t corner, uint32_t color, m10v_library_store, void *);
+int m10v_library_film_name_stamp(m10v_library_state *,uint32_t enabled,m10v_library_store,void *);
 /* Upstream completion is per recipe; callers must validate generation and
  * frame identity before supplying this mask. These bits never disable an
  * effect that the native owner has not actually executed. */
@@ -53,15 +56,17 @@ enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
 #define M10V_CPU_STAMP 32u
 static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,uint32_t slot,uint32_t completed){
     const m10v_slot *v=&state->slots[slot];
-    uint32_t stages=(completed&M10V_NATIVE_COLOR)?0:M10V_NATIVE_COLOR;
+    uint32_t stages=(v->film>M10V_FILM_COUNT||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
     if(v->grain&&!(completed&M10V_NATIVE_GRAIN))stages|=M10V_NATIVE_GRAIN;
     if((v->film==33||v->film==67)&&v->halo_gain&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
     if(state->effects[slot].leak_gain&&!(completed&M10V_NATIVE_LEAK))stages|=M10V_NATIVE_LEAK;
-    if(state->stamp)stages|=M10V_CPU_STAMP;
+    if(state->stamp||(state->reserved&1u))stages|=M10V_CPU_STAMP;
     return stages;
 }
 int m10v_library_render_native(m10v_library_image *,const m10v_library_state *,uint32_t,
         const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t completed);
+int m10v_library_render_custom(m10v_library_image *,const m10v_library_state *,uint32_t,
+        const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t completed,const uint8_t *lut,const char *name);
 int m10v_library_render(m10v_library_image *, const m10v_library_state *, uint32_t slot,
                         const m10v_library_date *, uint32_t seed, uint8_t *scratch,
                         uint32_t scratch_bytes);
@@ -72,9 +77,11 @@ void m10v_camera_library_preview_init(uint32_t);
 void m10v_camera_library_preview_clear(uint32_t);
 int m10v_camera_library_load(m10v_library_state *);
 int m10v_camera_library_select(m10v_library_state *, uint32_t slot, uint32_t film);
+int m10v_camera_library_select_custom(m10v_library_state *,uint32_t slot,uint32_t film,uint32_t bank);
 int m10v_camera_library_texture(m10v_library_state *, uint32_t slot, uint32_t grain, uint32_t soft);
 int m10v_camera_library_halation(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t profile);
 int m10v_camera_library_detail(m10v_library_state *, uint32_t slot, uint32_t gain, uint32_t spread, uint32_t threshold, uint32_t grain, uint32_t soft);
 int m10v_camera_library_stamp(m10v_library_state *, uint32_t enabled, uint32_t format,
                              uint32_t corner, uint32_t color);
+int m10v_camera_library_film_name_stamp(m10v_library_state *,uint32_t enabled);
 #endif

@@ -44,8 +44,6 @@ function render(){
  $('#reset-texture').disabled=busy;
  const halo=configuration.slots[active].halo;
  for(const k of ['gain','spread','threshold']){$('#halo-'+k).value=String(halo[k]);$('#halo-'+k+'-value').textContent=halo[k]+'/8';$('#halo-'+k).disabled=busy;}
- segment('#stamp',['关闭','日期','日期 + 时间'],configuration.stamp,v=>configuration.stamp=v);
- for(const k of ['format','corner','color']){$('#'+k).value=String(configuration[k]);$('#'+k).disabled=busy||!configuration.stamp;}
  $('#native-debug-mode').disabled=busy;
  const unlockValid=renderVersionUnlock();
  renderFilms();$('#build').disabled=busy||!project||!unlockValid;$('#local-source').disabled=busy||!$('#local-source').dataset.available;$('#official-file').disabled=busy;$('#search').disabled=busy;
@@ -59,7 +57,6 @@ async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(da
 function post(url,value,signal){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(value),signal});}
 function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
 async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
-for(const k of ['format','corner','color'])$('#'+k).onchange=()=>{configuration[k]=Number($('#'+k).value);invalidate();render();};
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
 for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};

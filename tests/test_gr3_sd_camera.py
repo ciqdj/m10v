@@ -73,6 +73,25 @@ class SdCameraTests(unittest.TestCase):
   self.card=b'';self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   state=bytes(self.u.mem_read(0x5500a000,104));self.assertEqual(struct.unpack_from('<H',state,28)[0],65)
   self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_custom_lut_installs_into_slot_bank_and_failed_replacement_keeps_active_bank(self):
+  cube='LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n'
+  script="import {parseCustomCube} from './node/gr3-custom-lut.mjs';import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';let c=parseCustomCube(Buffer.from("+repr(cube).replace("'",'"')+"),'i.cube','My Film');process.stdout.write(buildSdFilmPack([],[c]));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  self.assertEqual(self.call('m10v_sd_camera_item',0,0),73)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',0,73,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'My Film')
+  self.assertEqual(self.call('m10v_sd_camera_install',0,0,73,0),0)
+  self.assertIn('M10VC00.bin',self.files)
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+  before=bytes(self.u.mem_read(0x5500a000,104));self.assertEqual(struct.unpack_from('<H',before,12)[0],73);self.assertEqual(before[62],1)
+  self.card=b''
+  self.assertEqual(self.call('m10v_sd_camera_custom_name',0x5500a000,0,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'My Film')
+  self.card=self.pack
+  self.fail_state=True
+  self.assertNotEqual(self.call('m10v_sd_camera_install',0,0,73,0),0)
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+  self.assertEqual(bytes(self.u.mem_read(0x5500a000,104)),before)
  def test_new_films_keep_effects_and_timestamp_in_v5_journal(self):
   state=0x5500a000
   self.assertGreaterEqual(self.call('m10v_camera_library_load',state),0)
@@ -157,6 +176,15 @@ class SdCameraTests(unittest.TestCase):
    self.assertEqual(self.call('m10v_capture_library',context),0)
    outputs.append(bytes(u.mem_read(0x55060000,2048))+bytes(u.mem_read(0x55062000,2048)))
   self.assertNotEqual(outputs[0],outputs[1]);self.assertEqual((self.opened,self.allocated),(0,0))
+  cube='LUT_3D_SIZE 2\n1 0 0\n1 0 0\n1 0 0\n1 0 0\n1 0 0\n1 0 0\n1 0 0\n1 0 0\n'
+  script="import {parseCustomCube} from './node/gr3-custom-lut.mjs';import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';let c=parseCustomCube(Buffer.from("+repr(cube).replace("'",'"')+"),'red.cube','Red LUT');process.stdout.write(buildSdFilmPack([],[c]));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  self.assertEqual(self.call('m10v_sd_camera_install',0,0,73,1),0)
+  self.card=b'';u.mem_write(0x55060000,bytes([64])*2048);u.mem_write(0x55062000,bytes([128])*2048)
+  self.assertEqual(self.call('m10v_capture_library',context),0)
+  custom=bytes(u.mem_read(0x55060000,2048))+bytes(u.mem_read(0x55062000,2048))
+  self.assertNotIn(custom,outputs)
+  self.assertEqual((self.opened,self.allocated),(0,0))
 
  def test_original_size_wrapper_receives_open_handle_not_path(self):
   # Execute both original size and metadata dispatch. Only the metadata

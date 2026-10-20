@@ -31,7 +31,12 @@ static int stamp(void *ctx,uint32_t enabled,uint32_t format,uint32_t corner,uint
  if(m10v_camera_library_load(&fresh)<0)return -1;
  return m10v_camera_library_stamp(&fresh,enabled,format,corner,color);
 }
-static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;}
+static int film_name_stamp(void *ctx,uint32_t enabled){
+ (void)ctx;m10v_library_state fresh;
+ if(m10v_camera_library_load(&fresh)<0)return -1;
+ return m10v_camera_library_film_name_stamp(&fresh,enabled);
+}
+static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }

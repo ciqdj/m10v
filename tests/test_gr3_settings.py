@@ -14,8 +14,9 @@ static int install(void *ctx,unsigned index,unsigned id,unsigned slot){(void)ctx
  if(fail||index>=M10V_FILM_COUNT-32||ids[index]!=id)return -1; saved.slots[slot].film=id;writes++;return 0;}
 static int stamp(void *ctx,unsigned mode,unsigned format,unsigned corner,unsigned color){(void)ctx;
  if(fail)return -1;saved.stamp=mode;saved.format=format;saved.corner=corner;saved.color=color;writes++;return 0;}
+static int name_stamp(void *ctx,unsigned enabled){(void)ctx;if(fail)return -1;saved.reserved=enabled;writes++;return 0;}
 int main(void){
- m10v_settings p; m10v_settings_ops ops={0,load,item,install,stamp};
+ m10v_settings p; m10v_settings_ops ops={0,load,item,install,stamp,name_stamp};
  memset(&saved,0,sizeof(saved));memset(saved.effects,7,sizeof(saved.effects));for(unsigned i=0;i<5;i++)saved.slots[i].film=33+i;
  for(unsigned i=0;i<M10V_FILM_COUNT-32;i++)ids[i]=33+i;
  assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
@@ -47,6 +48,12 @@ int main(void){
  m10v_settings_key(&p,&ops,M10V_KEY_BACK);assert(writes==before);
  m10v_settings_key(&p,&ops,M10V_KEY_OK);m10v_settings_key(&p,&ops,M10V_KEY_LEFT);fail=1;
  m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(writes==before&&p.screen==M10V_SETTINGS_VALUE&&p.error==M10V_SETTINGS_SAVE_FAILED);
+ fail=0;m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);m10v_settings_key(&p,&ops,M10V_KEY_OK);
+ assert(saved.reserved==1&&p.screen==M10V_SETTINGS_STAMP&&writes==before+1);
+ ids[0]=73;assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
+ m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(p.screen==M10V_SETTINGS_CATALOG&&p.expected==73);
+ m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(saved.slots[0].film==73&&p.screen==M10V_SETTINGS_FILMS);
+ assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
  assert(m10v_settings_open(&p,&ops,99)<0);
  return 0;
 }

@@ -29,7 +29,7 @@ class SettingsViewTests(unittest.TestCase):
    card=Path(d)/'card.o'
    subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(card)],check=True,capture_output=True)
    cls.card,entries=link_object(card.read_bytes(),BASE+0x4000,prefix='m10v_film_card_')
-   cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,**entries},prefix='m10v_settings_view_')
+   cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,**entries},prefix='m10v_settings_view_')
  def machine(self,fail_object=0,fail_cards=False,native_accessor=False):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   for addr,size in [(0x53000000,0x2000000),(0x55000000,0x1000000),(0x10000000,0x200000)]:u.mem_map(addr,size)
@@ -58,6 +58,7 @@ class SettingsViewTests(unittest.TestCase):
    elif a==0x540b0000:uc.reg_write(UC_ARM_REG_R0,0x10000800)
    elif a==0x540b0010:
     index=uc.reg_read(UC_ARM_REG_R1);uc.reg_write(UC_ARM_REG_R0,33+index if index<7 else 0)
+   elif a in (0x540b0020,0x540b0030):uc.reg_write(UC_ARM_REG_R0,0)
    elif a in (0x536b93d0,0x53820074):self.fail('original assertion '+hex(a))
    else:return
    uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
@@ -156,6 +157,10 @@ class SettingsViewTests(unittest.TestCase):
    self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[int(i==focus) for i in range(4)])
    self.assertEqual([u.mem_read(w[21+i]+0xea,1)[0] for i in range(4)],[6]*4)
    self.assertEqual([u.mem_read(w[6+i]+0x9e,1)[0] for i in range(5)],[0]*5)
+  self.state(u,3,4);self.call(u,'draw',0x10001000,0x10002000,0)
+  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0]*4)
+  p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(p,34)),'> Film Name: OFF\0'.encode('utf-16le'))
   self.state(u,1,4);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0]*4)
   self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(5)],[1,1,1,1,6])

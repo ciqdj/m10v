@@ -6,6 +6,9 @@
 #include "m10v_debug.h"
 #include "m10v_capture_profile.h"
 #include "m10v_color_cache.h"
+#if M10V_SD_LIBRARY
+#include "m10v_sd_library.h"
+#endif
 #if M10V_RAW_LIFETIME
 #include "m10v_save_trace.h"
 #endif
@@ -256,7 +259,14 @@ int m10v_capture_library(uint32_t context) {
     if(use_halo)
         required=(((state.slots[slot].film==33||state.slots[slot].film==67)?6:2)*cells+3)&~3u;
     scratch_bytes=required;
-    if((cpu_stages&M10V_NATIVE_COLOR)&&state.slots[slot].film>33){
+    if(state.slots[slot].film>M10V_FILM_COUNT){
+#if M10V_SD_LIBRARY
+        required=M10V_SD_RECORD_BYTES;
+        scratch_bytes=required;
+#else
+        REJECT(-5,19,state.slots[slot].film,0);
+#endif
+    }else if((cpu_stages&M10V_NATIVE_COLOR)&&state.slots[slot].film>33){
         /* Phoenix's source occupies 4*cells; the old 6*cells allocation
          * already leaves room at full size. Other spatial passes finish
          * before color or run afterward, so reuse their storage. */
@@ -281,6 +291,13 @@ int m10v_capture_library(uint32_t context) {
             ((free_fn)0x536af2e4u)(scratch); REJECT(-6,18,address,scratch_bytes);
         }
     }
+#if M10V_SD_LIBRARY
+    if(state.slots[slot].film>M10V_FILM_COUNT &&
+       (!scratch||!m10v_sd_camera_custom_record(&state,slot,scratch,scratch_bytes))){
+        if(scratch)((free_fn)0x536af2e4u)(scratch);
+        REJECT(-5,19,state.slots[slot].film,slot);
+    }
+#endif
     M10V_PROFILE(4);
     m10v_library_image image = {(uint8_t *)(uintptr_t)planes[0], (uint8_t *)(uintptr_t)planes[1],
                                 bytes, bytes, width, height, stride};
@@ -299,11 +316,18 @@ int m10v_capture_library(uint32_t context) {
 #if M10V_DEBUG_MODE && !M10V_CAPTURE_PROFILE
     trace_flush(trace);
 #endif
+    int result;
+#if M10V_SD_LIBRARY
+    if(state.slots[slot].film>M10V_FILM_COUNT)
+        result=m10v_library_render_custom(&image,&state,slot,(const m10v_library_date *)time,
+                                           seed,0,0,completed,scratch+64,(const char *)(scratch+16));
+    else
+#endif
 #if M10V_CAPTURE_PROFILE
-    int result=m10v_library_render_native_profiled(&image,&state,slot,(const m10v_library_date *)time,seed,scratch,scratch_bytes,completed,profile);
+        result=m10v_library_render_native_profiled(&image,&state,slot,(const m10v_library_date *)time,seed,scratch,scratch_bytes,completed,profile);
 #else
-    int result = m10v_library_render_native(&image, &state, slot, (const m10v_library_date *)time,
-                                     seed, scratch, scratch_bytes,completed);
+        result=m10v_library_render_native(&image,&state,slot,(const m10v_library_date *)time,
+                                           seed,scratch,scratch_bytes,completed);
 #endif
     CAPTURE_LOG(111,context,(uint32_t)result,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].halo_profile<<12),scratch_bytes);
     if (!result) {

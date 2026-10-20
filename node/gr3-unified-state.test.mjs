@@ -14,6 +14,14 @@ test('four halo controls and grain/soft are packed in each version4 slot',()=>{
  assert.deepEqual([...bytes.subarray(48,52)],[8,1,7,3]);
  assert.throws(()=>normalizeConfiguration({...cfg,slots:cfg.slots.map((s,i)=>i===4?{...s,halo:{...s.halo,gain:9}}:s)}));
 });
+test('film name stamp migrates off and packs independently from date',()=>{
+ const old=defaultConfiguration();delete old.filmNameStamp;
+ assert.equal(normalizeConfiguration(old).filmNameStamp,false);
+ const selected=normalizeConfiguration({...old,stamp:0,filmNameStamp:true});
+ assert.equal(initialState(selected).readUInt32LE(96),1);
+ assert.equal(initialState(selected).readUInt8(52),0);
+ assert.equal(selected.slots[0].film,old.slots[0].film);
+});
 
 test('legacy simulation draft migrates into the same slots and flags unknown LUTs',async()=>{
  const {films}=await nativeCatalog();const migrated=migrateSimulationSelection(['ektar100','gold200','lut-private','portra400','vision3-250d'],{ektar100:{grain:2,hdf:1}},films);

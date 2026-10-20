@@ -29,6 +29,18 @@ test('HDF strength is covered by the export hash and readback plan',async()=>{
  assert.equal(strong.configuration.hdf,3);assert.ok(strong.features.includes('digitalHdf'));
  assert.ok(!strong.features.includes('soft'));
 });
+test('GR III with HDF enabled at off strength still installs the camera menu',{timeout:120000},async()=>{
+ const source=await readNativeOfficial(),configuration=defaultConfiguration();
+ configuration.filmNameStamp=true;
+ const plan=prepareNative(source,configuration,{hdf_enabled:true});
+ const result=await generateNative(source,configuration,plan.configuration_sha256,{hdf_enabled:true});
+ assert.equal(result.manifest.hdf_enabled,true);
+ assert.equal(result.manifest.hdf_default,0);
+ assert.equal(result.manifest.hdf_menu.route,0x0200f102);
+ assert.deepEqual(result.manifest.hdf_menu.resource_ids,[970,971,972,973,974,975,976,977]);
+ assert.equal(result.receipt.configuration.hdf,0);
+ assert.equal(result.receipt.configuration.filmNameStamp,true);
+});
 
 test('HDF alone preserves original film entry points and has an independent menu',{timeout:120000},async()=>{
  const source=await readNativeOfficial(),c=defaultConfiguration();c.hdf=2;

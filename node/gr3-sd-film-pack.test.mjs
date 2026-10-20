@@ -53,6 +53,19 @@ test('packs carrying the preceding renderer contract are rejected even with repa
  b.writeUInt32LE(sdCrc(b.subarray(0,4092)),4092);assert.throws(()=>auditSdFilmPack(b),/配方版本不兼容/);
 });
 
+test('v1 built-in pack from the preceding release remains readable',()=>{
+ const oldRenderer=Buffer.from('52c0e9f5e8bc84b0430702ecd187c0a9dc816822f20ec8d5de670b9e97276d59','hex');
+ const pack=buildSdFilmPack([33,66,34]);
+ for(let i=0;i<3;i++){
+  const record=pack.subarray(4096+i*SD_RECORD_BYTES,4096+(i+1)*SD_RECORD_BYTES);
+  oldRenderer.copy(record,8448);
+  record.writeUInt32LE(sdCrc(record.subarray(0,-4)),SD_RECORD_BYTES-4);
+  pack.writeUInt32LE(record.readUInt32LE(SD_RECORD_BYTES-4),68+i*12);
+ }
+ pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);
+ assert.deepEqual(auditSdFilmPack(pack).ids,[33,66,34]);
+});
+
 test('mixed pack carries a named portable LUT while preserving built-in records',()=>{
  const cube=Buffer.from('LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n');
  const custom=parseCustomCube(cube,'identity.cube','My Film');

@@ -197,6 +197,10 @@ int m10v_camera_library_select(m10v_library_state *state, uint32_t slot, uint32_
     uint32_t fs = filesystem();
     return fs ? m10v_library_select(state, slot, film, store, (void *)(uintptr_t)fs) : M10V_LIBRARY_STORE_FAILED;
 }
+int m10v_camera_library_select_custom(m10v_library_state *state,uint32_t slot,uint32_t film,uint32_t bank){
+ if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+ uint32_t fs=filesystem();return fs?m10v_library_select_custom(state,slot,film,bank,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
+}
 int m10v_camera_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grain, uint32_t soft) {
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     uint32_t fs = filesystem();
@@ -216,6 +220,11 @@ int m10v_camera_library_stamp(m10v_library_state *state, uint32_t enabled, uint3
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     uint32_t fs = filesystem();
     return fs ? m10v_library_stamp(state, enabled, format, corner, color, store, (void *)(uintptr_t)fs) : M10V_LIBRARY_STORE_FAILED;
+}
+int m10v_camera_library_film_name_stamp(m10v_library_state *state,uint32_t enabled){
+    if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();
+    return fs?m10v_library_film_name_stamp(state,enabled,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
 }
 
 int m10v_camera_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value){

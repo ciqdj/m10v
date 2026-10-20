@@ -6,6 +6,7 @@
  */
 #include "m10v_settings_view.h"
 #include "m10v_film_card.h"
+#include "m10v_sd_library.h"
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -45,7 +46,7 @@ int m10v_settings_view_create(m10v_settings_view *v){
  if(!v||v->count)return -1;
  for(uint32_t i=0;i<M10V_VIEW_CAPACITY;i++)v->widgets[i]=0;
  if(make(v,1,0,0,720,480)||make(v,11,0,0,720,480)||
-    make(v,17,20,12,680,42)||make(v,0,24,348,672,44)||
+    make(v,17,20,12,680,42)||make(v,0,24,380,672,44)||
     make(v,17,20,430,680,40)||make(v,17,20,375,680,40))goto fail;
  for(uint32_t i=0;i<5;i++)if(make(v,11,24+i*136,102,128,204))goto fail;
  for(uint32_t i=0;i<5;i++)if(make(v,11,26+i*136,104,124,200))goto fail;
@@ -75,7 +76,7 @@ static uint32_t film(const m10v_settings *s,const m10v_settings_ops *o,uint32_t 
   id=index<256&&o&&o->item?o->item(o->context,index):0;
   if(id<33)id=0;
  }else id=s->saved.slots[i].film;
- return id&&id<=M10V_FILM_COUNT?id:0;
+ return id&&id<=M10V_CUSTOM_MAX_ID?id:0;
 }
 static uint32_t valueres(uint32_t row,uint32_t value){
  static const uint16_t first[4]={M10V_VIEW_OFF,M10V_VIEW_YMD,M10V_VIEW_TOP_LEFT,M10V_VIEW_WHITE};
@@ -89,7 +90,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  caption(v->widgets[FOOTER],s->screen==M10V_SETTINGS_CATALOG?M10V_VIEW_CATALOG_HELP:
    s->screen==M10V_SETTINGS_FILMS?M10V_VIEW_FILM_HELP:
    s->screen==M10V_SETTINGS_VALUE?M10V_VIEW_VALUE_HELP:M10V_VIEW_STAMP_HELP);
- visible(v->widgets[NAME],films);
+ visible(v->widgets[NAME],films||s->screen==M10V_SETTINGS_STAMP||s->screen==M10V_SETTINGS_VALUE);
  visible(v->widgets[ERROR_TEXT],s->error>=1&&s->error<=3);
  if(s->error>=1&&s->error<=3)caption(v->widgets[ERROR_TEXT],M10V_VIEW_EMPTY+s->error-1);
  if(films&&!v->widgets[39])v->widgets[39]=((fn1)0x536af2a8u)(5*M10V_CARD_PIXELS*4+64);
@@ -103,7 +104,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
    uint32_t icon=670+id;
    if(v->widgets[39]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
-    m10v_film_card_render(pixels,id,i,i==focus);
+    m10v_film_card_render(pixels,id>M10V_FILM_COUNT?33:id,i,i==focus);
     uint32_t *all=card_descriptors(v),*d=all+i*2;
     d[0]=M10V_CARD_WIDTH|(M10V_CARD_HEIGHT<<16);d[1]=ptr(pixels)/4;
     all[10+i]=ptr(d);
@@ -114,7 +115,13 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  }
  if(films){
   uint32_t id=focus<5?film(s,o,focus):0;
-  const char *name=id?m10v_library_name(id):0;
+  const char *name=id?m10v_library_name(id):0;char custom_name[24];
+  if(id>M10V_FILM_COUNT){
+   int ok=s->screen==M10V_SETTINGS_CATALOG?
+     m10v_sd_camera_catalog_name(s->index,id,custom_name,sizeof(custom_name)):
+     m10v_sd_camera_custom_name(&s->saved,focus,custom_name,sizeof(custom_name));
+   if(ok)name=custom_name;
+  }
   /* Bounded ASCII copy; the stock setter owns its UTF-16 copy afterwards. */
   char label[96];uint32_t n=0,number=s->screen==M10V_SETTINGS_CATALOG?s->index+1:focus+1;
   if(number>=100)label[n++]=(char)('0'+number/100);
@@ -124,6 +131,11 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   label[n++]=' ';label[n++]=' ';
   if(name)for(uint32_t j=0;name[j]&&n<sizeof(label)-1;j++)label[n++]=name[j];
   label[n]=0;
+  ((fn2)0x53390ef8u)(v->widgets[NAME],ptr(label));
+ }else{
+  uint32_t enabled=s->screen==M10V_SETTINGS_VALUE&&s->focus==4?s->value:s->saved.reserved&1u;
+  const char *label=s->focus==4?(enabled?"> Film Name: ON":"> Film Name: OFF"):
+                                 (enabled?"Film Name: ON":"Film Name: OFF");
   ((fn2)0x53390ef8u)(v->widgets[NAME],ptr(label));
  }
  uint32_t values[4]={s->saved.stamp,s->saved.format,s->saved.corner,s->saved.color};
@@ -139,7 +151,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   ((fn2)0x5339658cu)(w,selected&&s->screen!=M10V_SETTINGS_VALUE?10:31);
   ((fn2)0x5339658cu)(value,selected?10:31);
  }
- if(!films&&s->focus<4)caption(v->widgets[TITLE],s->screen==M10V_SETTINGS_VALUE?
-   M10V_VIEW_EDIT_MODE+s->focus:M10V_VIEW_STAMP);
+ if(!films&&s->focus<5)caption(v->widgets[TITLE],s->screen==M10V_SETTINGS_VALUE?
+   (s->focus==4?M10V_VIEW_EDIT_NAME:M10V_VIEW_EDIT_MODE+s->focus):M10V_VIEW_STAMP);
  ((fn1)0x533ad308u)(v->widgets[ROOT]);
 }

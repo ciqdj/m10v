@@ -15,6 +15,7 @@ export function validateGr4Source(source){if(!Buffer.isBuffer(source)||hash(sour
 export function normalizeGr4Request(value={}){
  const configuration=normalizeConfiguration(value.configuration),extensions=normalizeExtensions(value.extensions);
  if(configuration.hdf)throw Error('数字 HDF 模拟当前仅支持普通 GR III');
+ if(configuration.filmNameStamp)throw Error('胶卷名称水印当前仅支持 GR III / GR IIIx');
  const debug_mode=value.debug_mode??false;if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');
  const version_unlock=value.version_unlock??{enabled:false};if(version_unlock?.enabled!==false||Object.keys(version_unlock).some(k=>k!=='enabled'))throw Error('GR IV 版本适配尚未验证');
  return {configuration,extensions,debug_mode,version_unlock:{enabled:false}};

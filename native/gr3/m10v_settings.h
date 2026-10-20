@@ -16,6 +16,7 @@ typedef struct {
  uint32_t (*item)(void *, uint32_t index);
  int (*install)(void *, uint32_t index,uint32_t expected,uint32_t slot);
  int (*stamp)(void *,uint32_t mode,uint32_t format,uint32_t corner,uint32_t color);
+ int (*film_name_stamp)(void *,uint32_t enabled);
 } m10v_settings_ops;
 typedef struct {
  m10v_library_state saved;

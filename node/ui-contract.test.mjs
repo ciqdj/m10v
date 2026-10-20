@@ -89,7 +89,10 @@ test('native 800T uses the same capture chain as texture and timestamp',async()=
  const core=await readFile(new URL('../native/gr3/m10v_library.c',import.meta.url),'utf8');
  // Pixel behavior is exercised by test_gr3_800t_energy and the ARM capture tests.
  const ui=await readFile(new URL('../web/gr3/native-library-controls.html',import.meta.url),'utf8');
- for(const id of ['slots','grain','stamp'])assert.match(ui,new RegExp(`id="${id}"`));
+ for(const id of ['slots','grain'])assert.match(ui,new RegExp(`id="${id}"`));
+ assert.doesNotMatch(ui,/id="stamp"|id="format"|id="corner"|id="color"/);
+ const imaging=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
+ assert.match(imaging,/native-stamp-fields/);assert.match(imaging,/filmNameStamp/);
  assert.doesNotMatch(ui,/id="soft"/);
 });
 

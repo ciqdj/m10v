@@ -14,4 +14,7 @@ uint32_t m10v_sd_crc(const uint8_t *p,uint32_t bytes);
 /* Camera operations return a stable film ID or zero; no SD calls from capture. */
 uint32_t m10v_sd_camera_item(uint32_t page,uint32_t row);
 int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot);
+int m10v_sd_camera_custom_record(const m10v_library_state *state,uint32_t slot,uint8_t *out,uint32_t bytes);
+int m10v_sd_camera_custom_name(const m10v_library_state *state,uint32_t slot,char *out,uint32_t capacity);
+int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,uint32_t capacity);
 #endif

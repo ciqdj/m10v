@@ -34,7 +34,7 @@ const slots = [
 ];
 const definitions = [
   ['digitalHdf', 'HDF 模拟', '普通 GR III 的独立数字柔焦。机内入口：MENU → 设置 → HDF 模拟；可单独使用。', '普通 GR III · 独立机内菜单'],
-  ['timestamp', '时间戳', '在 JPEG 中写入拍摄日期与时间，样式在胶卷设置中调整。', '拍摄时间'],
+  ['timestamp', '时间戳', '在 JPEG 中写入拍摄日期、时间和胶卷名称，机内也可调整。', '拍摄时间'],
   ['aspect', '画幅比例', '增加 4:3、65:24 画幅与宽幅取景蒙版。', '4:3 / 65:24'],
   ['negativeGrain', '原厂负片颗粒', '开放原厂负片颗粒菜单，档位在机内调整。', '机内调整'],
   ['rawNr', 'RAW 降噪', '设置写入 DNG 前的降噪策略。', '独立设置'],
@@ -229,7 +229,7 @@ function renderFeatures() {
     const heading = document.createElement('div');
     heading.className = 'feature-title';
     heading.append(textNode('span', String(index + 1).padStart(2, '0'), 'feature-num'), textNode('h3', name));
-    copy.append(heading, textNode('p', description), textNode('span', tag, 'feature-tag'));
+    copy.append(heading, textNode('p',gr4Workbench&&id==='timestamp'?'在 JPEG 中写入拍摄日期与时间，样式可在机内调整。':description), textNode('span', tag, 'feature-tag'));
     const button = textNode('button', active ? '关闭' : '开启', 'feature-toggle' + (active ? ' selected' : ''));
     button.type = 'button';
     button.setAttribute('aria-pressed',String(active));
@@ -240,7 +240,7 @@ function renderFeatures() {
       if(id==='digitalHdf'&&active&&!state.features.has('film')){notice('可将档位设为关闭以保留独立菜单；或先启用胶卷库。');return;}
       active?state.features.delete(id):state.features.add(id);
       if(id==='digitalHdf')nativeEditor.setHdf(active?0:(state.nativeConfig.hdf||1));
-      if(id==='timestamp')nativeEditor.setConfiguration({...state.nativeConfig,stamp:active?0:(state.nativeConfig.stamp||1)});
+      if(id==='timestamp')nativeEditor.setConfiguration({...state.nativeConfig,stamp:active?0:(state.nativeConfig.stamp||1),filmNameStamp:active?false:state.nativeConfig.filmNameStamp});
 
       invalidate();
       renderFeatures();
@@ -260,10 +260,17 @@ function renderFeatures() {
       else if (id === 'negativeGrain') detail.append(textNode('p','档位由原厂菜单保存。'));
       else if (id === 'rawNr') renderRawNrDetail(detail);
       else if (id === 'timestamp') {
-        if(state.profile==='native'){detail.append(textNode('p','格式、位置与颜色在胶卷设置或机内时间水印菜单调整。'));}
+        if(state.profile==='native'){
+          const c=state.nativeConfig;
+          const fields=document.createElement('div');fields.className='native-stamp-fields';
+          const select=(label,key,items)=>{const wrap=document.createElement('label');wrap.textContent=label;const input=document.createElement('select');input.setAttribute('aria-label',label);items.forEach((name,value)=>{const option=textNode('option',name);option.value=String(value);input.append(option);});input.value=String(c[key]);input.onchange=()=>nativeEditor.setConfiguration({...state.nativeConfig,[key]:Number(input.value)});wrap.append(input);return wrap;};
+          fields.append(select('日期时间','stamp',['关闭','日期','日期 + 时间']),select('日期格式','format',['YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD']),select('位置','corner',['左上','右上','左下','右下']),select('颜色','color',['白色','橙色','红色','黄色']));
+          if(!gr4Workbench){const name=document.createElement('label');const check=document.createElement('input');check.type='checkbox';check.checked=c.filmNameStamp;check.onchange=()=>nativeEditor.setConfiguration({...state.nativeConfig,filmNameStamp:check.checked});name.append(check,' 胶卷名称');fields.append(name);}
+          detail.append(fields,textNode('p',gr4Workbench?'机内菜单 → 设置 → 时间水印也可调整。':'机内菜单 → 设置 → 时间水印也可调整。胶卷名称可单独开启。'));
+        }
         else detail.append(textNode('p', '默认 ON · YYYY.MM.DD · 右下 · 中 · 橙。日期格式、位置、字号和颜色可在相机菜单中调整，关机后保留。'));
         const points = document.createElement('div'); points.className = 'feature-points';
-        for (const value of (state.profile==='native'?['开 / 关','四种颜色','四种日期格式','四角位置']:['ON / OFF', '五色字体', '四种日期格式', '四角位置', '3:2 / 4:3 / 1:1 / 65:24'])) points.append(textNode('span', value));
+        for (const value of (state.profile==='native'?(gr4Workbench?['开 / 关','四种颜色','四种日期格式','四角位置']:['开 / 关','胶卷名称','四种颜色','四种日期格式','四角位置']):['ON / OFF', '五色字体', '四种日期格式', '四角位置', '3:2 / 4:3 / 1:1 / 65:24'])) points.append(textNode('span', value));
         detail.append(points);
       } else if (id === 'aspect') {
         const points = document.createElement('div'); points.className = 'feature-points';
@@ -690,9 +697,9 @@ try {
   state.token = status.session_token; state.runtime = gr4Workbench || status.gr3_custom_runtime === true;
   state.nativeCatalog=nativeCatalog.films;
   $('native-editor').innerHTML=gr4Workbench?nativeMarkup.replaceAll('GR III STREET · 2.10','GR IV · 1.11').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replaceAll('fwdc239b.bin','fwdc248b.bin'):nativeMarkup;
-  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';if(!meta.globalHdf)state.features.add('film');if(configuration.hdf)state.features.add('digitalHdf');configuration.stamp?state.features.add('timestamp'):state.features.delete('timestamp');if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
+  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';if(!meta.globalHdf)state.features.add('film');if(configuration.hdf)state.features.add('digitalHdf');if(configuration.stamp||configuration.filmNameStamp)state.features.add('timestamp');if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
   state.nativeConfig=nativeEditor.getConfiguration();
-  if(state.nativeConfig.stamp)state.features.add('timestamp');
+  if(state.nativeConfig.stamp||state.nativeConfig.filmNameStamp)state.features.add('timestamp');
   if(state.nativeConfig.hdf)state.features.add('digitalHdf');
   state.films = film.looks; state.community = community;
   restoreDraft();showSettingsTab('library');
