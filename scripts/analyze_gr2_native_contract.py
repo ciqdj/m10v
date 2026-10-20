@@ -638,15 +638,16 @@ def probe_ui_undo(code:bytes,*,commit:bool)->dict:
                 helpers_intercepted=[],hardware_tested=False,
                 scope='Original pool creation, UI undo allocation/begin, property preview setter, restore-or-commit and free. Synthetic one-pool/property bank; no page ownership, GUI rendering, property listeners or hardware effect preview claim.')
 
-def probe_effect_view_init(code:bytes,*,native_runtime:dict|None=None,activate:bool=False,settle_animation:bool=False)->dict:
+def probe_effect_view_init(code:bytes,*,native_runtime:dict|None=None,activate:bool=False,settle_animation:bool=False,navigate:bool=False)->dict:
     """Execute stock page creation/INIT, optionally graphics and animation.
 
     Only palette device upload/apply is substituted in the graphics variant.
     """
     if settle_animation and not activate:raise ValueError('animation settling requires INIT')
+    if navigate and not settle_animation:raise ValueError('navigation requires initialized graphics and settled animation')
     from unicorn import UC_HOOK_MEM_WRITE,UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
-    uc=runtime_machine(code);root=0x50004000;event=0x50001000;stop=0x5001f000;highest=0;external=set()
+    uc=runtime_machine(code);root=0x50004000;event=0x50001000;stop=0x5001f000;highest=0;external=set();display_writes=0;navigation=[];graphics_contexts=0
     uc.mem_write(root-16,b'\xa5'*16);uc.mem_write(root+0x600,b'\xa5'*16)
     entry=0xA03AD0C7;argument=event
     if native_runtime is None:uc.mem_write(root,bytes(uc.mem_read(0xA0411A18,64)))
@@ -654,7 +655,9 @@ def probe_effect_view_init(code:bytes,*,native_runtime:dict|None=None,activate:b
         uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']));entry=native_runtime['symbols']['gr2_effect_view_init'];argument=0x600
     uc.mem_write(event,struct.pack('>3I',0x60000000,0,0))
     def write(machine,access,address,size,value,ctx):
-        nonlocal highest
+        nonlocal highest,display_writes
+        if navigate and 0x68000000<=address<0x68300000:
+            display_writes+=1;return
         if root<=address<root+0x600:highest=max(highest,address+size-root)
         elif not 0x50010000<=address<0x50018000:external.add(address)
     if activate:
@@ -682,29 +685,58 @@ def probe_effect_view_init(code:bytes,*,native_runtime:dict|None=None,activate:b
     if settle_animation:
         buffer_table=struct.unpack('>I',uc.mem_read(0xA03938A4,4))[0]
         palette_control=struct.unpack('>I',uc.mem_read(0xA0393D48,4))[0]
-        for index,address in ((4,0x68000000),(5,0x68100000)):
-            uc.mem_map(address,0x55000);handle=0x5000B000+index*0x20
-            uc.mem_write(handle,b'BUFF'+struct.pack('>5I',address,720*480,0,0,720*480))
+        for index,address in ((4,0x68000000),(5,0x68100000),*(((6,0x68200000),) if navigate else ())):
+            uc.mem_map(address,0xb0000 if navigate else 0x55000);handle=0x5000B000+index*0x20
+            uc.mem_write(handle,b'BUFF'+struct.pack('>5I',address,720*480*(2 if index==6 else 1),0,0,720*480*(2 if index==6 else 1)))
             uc.mem_write(buffer_table+index*4,struct.pack('>I',handle))
         uc.mem_write(palette_control+0x24,struct.pack('>I',1))
         def palette(machine,address,size,ctx):
             palette_calls.append(address);machine.reg_write(UC_ARM_REG_R0,0)
             machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
-        for address in (0xA00F5ED6,0xA00F5F92):uc.hook_add(UC_HOOK_CODE,palette,begin=address,end=address)
+        for address in (0xA00F5ED6,0xA00F5F92,*((0xA00F5FE2,) if navigate else ())):uc.hook_add(UC_HOOK_CODE,palette,begin=address,end=address)
         for register,value in ((UC_ARM_REG_R0,context_address),(UC_ARM_REG_SP,0x50018000),(UC_ARM_REG_LR,stop|1)):
             uc.reg_write(register,value)
         uc.emu_start(0xA03BC94D,stop,count=100000)
         if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('original graphics context initialization budget exceeded')
+        graphics_contexts=1
+        if navigate:
+            # Synthetic active display geometry comes from the same 720x480
+            # fixture as the actual BUFFs; all six constructor bodies are stock.
+            display_control=struct.unpack('>I',uc.mem_read(0xA039387C,4))[0]
+            uc.mem_write(display_control+0x20,struct.pack('>I',(480<<16)|720))
+            for index in (0,1,3,4,5):
+                for register,value in ((UC_ARM_REG_R0,index),(UC_ARM_REG_SP,0x50018000),(UC_ARM_REG_LR,stop|1)):uc.reg_write(register,value)
+                uc.emu_start(0xA039DA57,stop,count=100000)
+                if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('graphics context lookup budget exceeded')
+                pointer=uc.reg_read(UC_ARM_REG_R0);constructor=struct.unpack('>I',uc.mem_read(pointer+0x20,4))[0]
+                for register,value in ((UC_ARM_REG_R0,pointer),(UC_ARM_REG_SP,0x50018000),(UC_ARM_REG_LR,stop|1)):uc.reg_write(register,value)
+                uc.emu_start(constructor,stop,count=100000)
+                if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('graphics context constructor budget exceeded')
+                graphics_contexts+=1
+
     if settle_animation:
         clock=struct.unpack('>I',uc.mem_read(0xA00695FC,4))[0]
         uc.mem_write(clock,struct.pack('>2I',0,1000))
         uc.reg_write(UC_ARM_REG_SP,0x50018000);uc.reg_write(UC_ARM_REG_LR,stop|1)
         uc.emu_start(0xA039C56B,stop,count=100000)
         if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('original UI animation execution budget exceeded')
+    if navigate:
+        # Initialized no-alias/no-subscriber property registry, not setter stubs.
+        uc.mem_map(0x51000000,0x10000)
+        uc.mem_write(0x51000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383)
+        uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+        uc.mem_write(0xA0129C3C,struct.pack('>I',0x51000000));uc.mem_write(0x50003004,struct.pack('>I',0x51006000))
+        active_root=struct.unpack('>I',uc.mem_read(0xA0398DC4,4))[0];uc.mem_write(active_root,struct.pack('>I',root))
+        for action in (0x60002004,0x60002004,0x60002003):
+            uc.mem_write(event,struct.pack('>3I',action,1,0))
+            for register,value in ((UC_ARM_REG_R0,root+0x84),(UC_ARM_REG_R1,event),(UC_ARM_REG_SP,0x50018000),(UC_ARM_REG_LR,stop|1)):uc.reg_write(register,value)
+            uc.emu_start(0xA03BA7A7,stop,count=30000000)
+            if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('effect widget navigation budget exceeded')
+            navigation.append(dict(event=action,index=struct.unpack('>H',uc.mem_read(root+0x84+0x60,2))[0],effect=struct.unpack('>I',uc.mem_read(0x5000D000+43*4,4))[0]))
     word=lambda pointer:struct.unpack('>I',uc.mem_read(pointer,4))[0]
     count=struct.unpack('>H',uc.mem_read(root+0x18,2))[0]
     if count>32:raise ValueError('effect embedded widget count exceeds probe bound')
-    return dict(entry='0xa03ad0c6',returned=returned,widget_offsets=[word(word(root+0x14)+4*i)-root for i in range(count)],
+    return dict(navigation=navigation,graphics_contexts=graphics_contexts,display_writes=display_writes,entry='0xa03ad0c6',returned=returned,widget_offsets=[word(word(root+0x14)+4*i)-root for i in range(count)],
                 focus=uc.mem_read(root+0x514,1)[0],event_handler=hex(word(root+0x518)),highest_written_offset=highest,
                 list_count=struct.unpack('>H',uc.mem_read(root+0x84+0x56,2))[0],list_cursor=struct.unpack('>H',uc.mem_read(root+0x84+0x64,2))[0],
                 animation_state=uc.mem_read(root+0x84+0xfc,1)[0],effect_property=word(0x5000D000+43*4) if activate else None,
@@ -713,7 +745,141 @@ def probe_effect_view_init(code:bytes,*,native_runtime:dict|None=None,activate:b
                 logical_size=list(struct.unpack('>2H',uc.mem_read(context_address+8,4))),palette_backend_calls=len(palette_calls),
                 external_writes=[hex(value) for value in sorted(external)],guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,
                 stack_preserved=uc.reg_read(UC_ARM_REG_SP)==0x50018000,helpers_intercepted=['palette backend upload/apply'] if settle_animation else [],hardware_tested=False,
-                scope='Stock 64-byte effect-page configuration and embedded widget initialization in synthetic zeroed 0x600-byte storage. Optional INIT uses a synthetic property bank and already-awake deferred UI worker. For the isolated animation phase the original graphics context is initialized after detached view setup, using synthetic BUFF display planes and kernel clock; palette device operations are boundaries. No screen registration, actual font rendering or hardware display proof.')
+                scope='Stock 64-byte effect-page configuration and embedded widget initialization in synthetic zeroed 0x600-byte storage. Optional INIT uses a synthetic property bank and already-awake deferred UI worker. For the isolated animation phase the original graphics context is initialized after detached view setup, using synthetic BUFF display planes and kernel clock; palette device operations are boundaries. Optional widget navigation uses six stock graphics constructors, a synthetic active display geometry, and a no-alias/no-subscriber bank; widget handlers and property setters execute unchanged to return. No screen registration, full font rendering or hardware display proof.')
+
+def probe_osd_colors(code:bytes)->dict:
+    """Execute stock indexed/16-bit symbolic color conversion, no helper stubs."""
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);rows=[];stop=0x5001f000
+    for index in range(256):
+        results=[]
+        for mode in (0,1):
+            for register,value in ((r.UC_ARM_REG_R0,mode),(r.UC_ARM_REG_R1,0x20000+index),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,stop|1)):uc.reg_write(register,value)
+            uc.emu_start(0xA03A4B35,stop,count=10000)
+            if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=0x50018000:raise RuntimeError('original OSD color conversion budget/stack failure')
+            results.append(uc.reg_read(r.UC_ARM_REG_R0))
+        packed=struct.unpack('>I',uc.mem_read(0xA04EA83C+results[0]*4,4))[0]
+        alpha=(uc.mem_read(0xA04EAC42+((packed>>24)&7),1)[0]*241)>>12
+        rows.append(dict(symbol=0x20000+index,index=results[0],palette=packed,rgb4444=results[1],alpha=alpha))
+    return dict(colors=rows,helpers_intercepted=[],hardware_tested=False,
+                scope='Original palette lookup, fixed-point YUV to RGB and channel/alpha nibble packing. CPU format evidence, no display hardware or compositing proof.')
+
+def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False)->dict:
+    """Original stock list/graphics/font bodies, with bounded ROM-file reads.
+
+    All display planes, active geometry and property/kernel state are synthetic.
+    The resource read and palette device are explicit boundaries, never glyph
+    generation, widget drawing, navigation, allocation or property mutation.
+    """
+    import hashlib
+    official_profile(code,'gr2')
+    if hashlib.sha256(disk).hexdigest()!='9e0d291f5b9b74f76a2dd269c4b23fe8f524b5db92b86bf82150d5dc3096abf8':
+        raise ValueError('exact GR II official resource component identity required')
+    resources={}
+    for index in range(121):
+        at=0x786000+index*64;name=disk[at:at+32].split(b'\0',1)[0].decode('ascii')
+        offset,size=struct.unpack_from('>2I',disk,at+32)
+        if name.startswith('A:/font/'):resources[name]=disk[512+offset:512+offset+size]
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);root=0x50004000;event=0x50001000;stop=0x5001f000;stack=0x50018000
+    word=lambda pointer:struct.unpack('>I',uc.mem_read(pointer,4))[0]
+    def run(entry,*args,thumb=True):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1)
+        uc.emu_start(entry|1 if thumb else entry,stop,count=30000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('original UI/font operation did not return within budget with its stack intact')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    # One no-lock/no-alias/no-subscriber property bank and an awake UI worker.
+    uc.mem_map(0x51000000,0x10000)
+    uc.mem_write(0x51000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x51000000,0x50003000,0x383))
+    uc.mem_write(0x50003000,struct.pack('>6I',0,0x51006000,0x383,0x5000D000,0,0))
+    for property_id,value in ((43,5),(0x1e4,1)):uc.mem_write(0x5000D000+property_id*4,struct.pack('>I',value))
+    control=word(0xA039CF20)
+    uc.mem_write(control+0x1c,struct.pack('>I',0x5000C000));uc.mem_write(0x5000C000,struct.pack('>I',32));uc.mem_write(control+0x10,struct.pack('>I',1))
+    uc.mem_write(0xA00B5BFE,struct.pack('>H',1));uc.mem_write(0xA00B5BE0,struct.pack('>I',0x50007000));uc.mem_write(0x50007000,struct.pack('>h',-2))
+    run(0xA0024BCA)
+    for index,address in ((4,0x68000000),(5,0x68100000),(6,0x68200000)):
+        uc.mem_map(address,0xb0000);handle=0x5000B000+index*32;size=720*480*(2 if index==6 else 1)
+        uc.mem_write(handle,b'BUFF'+struct.pack('>5I',address,size,0,0,size));uc.mem_write(word(0xA03938A4)+index*4,struct.pack('>I',handle))
+    uc.mem_write(word(0xA0393D48)+0x24,struct.pack('>I',1))
+    uc.mem_write(word(0xA039387C)+0x20,struct.pack('>I',(480<<16)|720))
+    palette_calls=[];read_names=[];font_engine_calls=0
+    def boundary(machine,address,size,context):
+        nonlocal font_engine_calls
+        if address==0xA03CE5F8:font_engine_calls+=1;return
+        value=0
+        if address==0xA002CD2C:
+            name=bytes(machine.mem_read(machine.reg_read(r.UC_ARM_REG_R0),100)).split(b'\0',1)[0].decode('ascii')
+            pointer=machine.reg_read(r.UC_ARM_REG_R1);limit=machine.reg_read(r.UC_ARM_REG_R2)
+            payload=resources.get(name);read_names.append(name)
+            if payload is None:value=0xffffffff
+            elif len(payload)>limit:raise RuntimeError('original font resource exceeds requested capacity')
+            else:machine.mem_write(pointer,payload);value=len(payload)
+        else:palette_calls.append(hex(address))
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA002CD2C,0xA00F5ED6,0xA00F5F92,0xA00F5FE2,0xA03CE5F8):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    # Boot-time service order matters: initialize all constructors and official
+    # font services before the list computes its text measurements in INIT.
+    for index in range(6):
+        pointer=run(0xA039DA56,index);run(word(pointer+0x20),pointer)
+    arena_bytes=word(0xA03938B8)
+    if arena_bytes!=2246020:raise RuntimeError('original font work arena size identity mismatch')
+    uc.mem_map(0x68300000,(arena_bytes+4095)&~4095);uc.mem_write(word(0xA039387C)+0x2c,struct.pack('>I',0x68300000))
+    run(0xA039955A)
+    uc.mem_write(root-16,b'\xa5'*16);uc.mem_write(root+0x600,b'\xa5'*16)
+    uc.mem_write(root,bytes(uc.mem_read(0xA0411A18,64)));uc.mem_write(word(0xA0398DC4),struct.pack('>I',root))
+    page_returns=[]
+    for action in (0x60000000,0x60000001):
+        uc.mem_write(event,struct.pack('>3I',action,0,0));page_returns.append(run(0xA03AD0C6,root,event))
+    uc.mem_write(word(0xA00695FC),struct.pack('>2I',0,1000));run(0xA039C56A)
+    navigation=[];draw_returns=[]
+    for action in (0x60000003,0x60002004,0x60002004,0x60002003,0x60000003):
+        uc.mem_write(event,struct.pack('>3I',action,1,0));value=run(0xA03BA7A6,root+0x84,event)
+        if action==0x60000003:draw_returns.append(value)
+        else:navigation.append(word(0x5000D000+43*4))
+    native_text_return=None;native_text_changed_bytes=0;native_text_outside_bounds=0
+    if native_runtime is not None:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        if native_font_missing:uc.mem_write(0xA077D70C+0x14,bytes(4))
+        before=bytes(uc.mem_read(0x68000000,720*480))
+        uc.mem_write(0x50001200,'M10V\0'.encode('utf-16-be'));uc.mem_write(0x50001300,struct.pack('>4h',380,60,639,120))
+        native_text_return=run(native_runtime['symbols']['gr2_text_draw'],0x50001200,4,0x50001300,0x20001,thumb=False)
+        after=bytes(uc.mem_read(0x68000000,720*480));native_text_changed_bytes=sum(a!=b for a,b in zip(before,after))
+        native_text_outside_bounds=sum(a!=b for i,(a,b) in enumerate(zip(before,after)) if not (380<=i%720<=639 and 60<=i//720<=120))
+    native_card_report={}
+    if native_runtime is not None and native_card:
+        def pool_free():return word(word(0x50007004)+12)*word(0x50007014)
+        if native_card_allocation_failure:
+            run(native_runtime['symbols']['gr2_allocate'],pool_free(),thumb=False)
+        available=pool_free();before_card=bytes(uc.mem_read(0x68200000,720*480*2))
+        result=run(native_runtime['symbols']['gr2_card_draw'],33,2,1,(106<<16)|300,thumb=False)
+        after_card=bytes(uc.mem_read(0x68200000,720*480*2))
+        uc.mem_map(0x68600000,0x20000)
+        # Independent decoded reference uses the already host-verified shared
+        # RGBA bridge; set the fifth argument before entering its ARM function.
+        for register,value in ((r.UC_ARM_REG_R0,0x68600000),(r.UC_ARM_REG_R1,120*196*4),(r.UC_ARM_REG_R2,33),(r.UC_ARM_REG_R3,2),(r.UC_ARM_REG_SP,stack),(r.UC_ARM_REG_LR,stop)):uc.reg_write(register,value)
+        uc.mem_write(stack,struct.pack('>I',1));uc.emu_start(native_runtime['symbols']['gr2_film_card_rgba'],stop,count=30000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_R0)!=1:raise RuntimeError('card reference did not return')
+        rgba=bytes(uc.mem_read(0x68600000,120*196*4));reference=bytearray()
+        for at in range(0,len(rgba),4):
+            channels=[(value+8)//17 for value in rgba[at:at+4]]
+            reference.extend(struct.pack('>H',(channels[0]<<12)|(channels[1]<<8)|(channels[2]<<4)|channels[3]))
+        actual=b''.join(after_card[((106+row)*720+300)*2:((106+row)*720+420)*2] for row in range(196))
+        native_card_report=dict(native_card_return=result,native_card_changed_bytes=sum(a!=b for a,b in zip(before_card,after_card)),
+            native_card_outside_bounds=sum(a!=b for i,(a,b) in enumerate(zip(before_card,after_card)) if not (300<=(i//2)%720<420 and 106<=(i//2)//720<302)),
+            native_card_matches_reference=actual==bytes(len(reference)) if native_card_allocation_failure else actual==reference,
+            native_card_pool_restored=pool_free()==available)
+    frame=bytes(uc.mem_read(0x68000000,720*480))
+    if frame_out is not None:Path(frame_out).write_bytes(frame)
+    return dict(**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
+                page_returns=page_returns,navigation_effects=navigation,draw_returns=draw_returns,
+                display_nonzero_bytes=sum(value!=0 for value in frame),display_sha256=hashlib.sha256(frame).hexdigest(),
+                palette_backend_calls=palette_calls,guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply'],hardware_tested=False,
+                scope='Six original graphics constructors and official Latin/monitor fonts initialized before detached stock effect page CREATE/INIT, then original list DRAW and property-mutating navigation. Synthetic display/active geometry, kernel and no-observer property fixtures; no real ROM filesystem, registered screen, display hardware or custom M10V page installation.')
 
 def probe_effect_key_routes(code:bytes)->dict:
     """Execute original actions from the MONSETEFFECTMODE state event table.
@@ -825,16 +991,17 @@ def probe_effect_menu(code:bytes)->dict:
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--component',required=True,type=Path);parser.add_argument('--out',required=True,type=Path)
+    parser.add_argument('--resource-component',type=Path,help='Optional exact official b01firm6 for full stock font/DRAW evidence')
     args=parser.parse_args()
-    if args.component.resolve()==args.out.resolve():raise ValueError('output must not overwrite official input')
+    if args.component.resolve()==args.out.resolve() or (args.resource_component and args.resource_component.resolve()==args.out.resolve()):raise ValueError('output must not overwrite official input')
     code=args.component.read_bytes();profile=official_profile(code,'gr2')
     report=dict(schema='m10v-gr2-native-contract/v1',component_sha256=profile['sha'],
                 rtc=probe_rtc_get_time(code,(2026,10,20,18,30,45)),
                 memory_policy=[probe_memory_policy(code,boot_mode=mode) for mode in (0,1,3,4)],
                 raw_for_dng=[probe_raw_for_dng(code,present=present) for present in (False,True)],
                 ui_undo=[probe_ui_undo(code,commit=commit) for commit in (False,True)],
-                effect_menu=probe_effect_menu(code),effect_key_routes=probe_effect_key_routes(code),effect_view_init=probe_effect_view_init(code),effect_view_activate=probe_effect_view_init(code,activate=True),
-                effect_view_animation=probe_effect_view_init(code,activate=True,settle_animation=True),task_context=probe_task_context(code),
+                osd_colors=probe_osd_colors(code),effect_menu=probe_effect_menu(code),effect_key_routes=probe_effect_key_routes(code),effect_view_init=probe_effect_view_init(code),effect_view_activate=probe_effect_view_init(code,activate=True),
+                effect_view_animation=probe_effect_view_init(code,activate=True,settle_animation=True),effect_widget_navigation=probe_effect_view_init(code,activate=True,settle_animation=True,navigate=True),task_context=probe_task_context(code),
                 ui_text=[probe_ui_text(code,106,language) for language in range(21)],
                 sd_file_lifecycle=probe_sd_file_lifecycle(code),
                 sd_tell=[probe_sd_tell(code,position) for position in (0,104,0x100000001)],
@@ -848,6 +1015,7 @@ def main():
                 jpeg_input=[probe_jpeg_input(code,4928,3264,format_kind=kind) for kind in (2,3,4)],
                 sd_io=[probe_sd_io(code,operation,b'M10V\x00config\xff') for operation in ('read','write')],
                 sd_modes=[probe_sd_open_mode(code,flags) for flags in (0,1,9,2,10,0x102)],can_build=False)
+    if args.resource_component:report['effect_font_draw']=probe_effect_view_draw(code,args.resource_component.read_bytes())
     args.out.parent.mkdir(parents=True,exist_ok=True);args.out.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(dict(report=str(args.out),can_build=False)))
 

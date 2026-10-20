@@ -131,6 +131,46 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertEqual(report['returned'],0)
         self.assertTrue(report['stack_preserved'])
 
+    def test_original_effect_widget_navigation_runs_all_graphics_contexts_and_property_setters(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=module.probe_effect_view_init(component('gr2','b01firm8'),activate=True,settle_animation=True,navigate=True)
+        self.assertEqual(report['navigation'],[{'event':0x60002004,'index':2,'effect':6},{'event':0x60002004,'index':3,'effect':7},{'event':0x60002003,'index':2,'effect':6}])
+        self.assertEqual(report['graphics_contexts'],6)
+        self.assertGreater(report['display_writes'],0)
+        self.assertTrue(report['guards_unchanged'])
+        self.assertTrue(report['stack_preserved'])
+        self.assertEqual(report['helpers_intercepted'],['palette backend upload/apply'])
+
+    def test_original_effect_list_draws_official_font_resources_before_and_after_navigation(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        code=component('gr2','b01firm8');disk=component('gr2','b01firm6')
+        report=module.probe_effect_view_draw(code,disk)
+        self.assertEqual(report['font_resources'],['A:/font/RT_Latin.pac','A:/font/LE_Latin.bin','A:/font/RT_Moni.pac','A:/font/LE_JP.bin'])
+        self.assertEqual(report['navigation_effects'],[6,7,6])
+        self.assertEqual(report['draw_returns'],[1,1])
+        self.assertGreater(report['font_engine_calls'],0)
+        self.assertGreater(report['display_nonzero_bytes'],10000)
+        self.assertTrue(report['guards_unchanged'])
+        self.assertTrue(report['stack_preserved'])
+        self.assertFalse(report['hardware_tested'])
+        with self.assertRaises(ValueError):module.probe_effect_view_draw(code,disk[:-1]+bytes([disk[-1]^1]))
+
+    def test_original_osd_color_converter_proves_rgb_and_alpha_nibble_order(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=module.probe_osd_colors(component('gr2','b01firm8'))
+        self.assertEqual(len(report['colors']),256)
+        def q(value):return (min(255,max(0,value//1000))+8)//17
+        for row in report['colors']:
+            packed=row['palette'];y=(packed>>16)&255;u=((packed>>8)&255)-128;v=(packed&255)-128
+            expected=q(1164*y+1596*v)<<12|q(1164*y-391*u-813*v)<<8|q(1164*y+2018*u)<<4|row['alpha']
+            self.assertEqual(row['rgb4444'],expected)
+        self.assertEqual(report['colors'][1]['rgb4444'],0xffff)
+        self.assertEqual(report['colors'][4]['rgb4444'],0x000f)
+        self.assertEqual(report['helpers_intercepted'],[])
+
     def test_original_main_yuv_handoff_sets_valid_length_before_encode(self):
         module=self.implementation()
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')

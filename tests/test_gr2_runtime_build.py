@@ -27,6 +27,36 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         self.assertEqual(u.reg_read(r.UC_ARM_REG_PC),0x5001f000)
         return u.reg_read(r.UC_ARM_REG_R0)
 
+    def test_compiled_text_bridge_draws_through_stock_font_services_and_rejects_invalid_bounds(self):
+        from scripts.analyze_gr2_native_contract import probe_effect_view_draw
+        report=self.build();self.assertTrue('gr2_text_draw' in report['symbols'])
+        code=component('gr2','b01firm8');disk=component('gr2','b01firm6')
+        drawn=probe_effect_view_draw(code,disk,native_runtime=report)
+        self.assertEqual(drawn['native_text_return'],1)
+        self.assertGreater(drawn['native_text_changed_bytes'],100)
+        self.assertEqual(drawn['native_text_outside_bounds'],0)
+        missing=probe_effect_view_draw(code,disk,native_runtime=report,native_font_missing=True)
+        self.assertEqual(missing['native_text_return'],0)
+        self.assertEqual(missing['native_text_changed_bytes'],0)
+        u=self.machine(report);text=0x50001000;rect=0x50002000
+        u.mem_write(text,'M10V\0'.encode('utf-16-be'));u.mem_write(rect,struct.pack('>4h',380,60,639,120))
+        for count,color,bounds in ((0,0x20001,(380,60,639,120)),(4,0x20001,(-1,60,639,120)),(4,0x20001,(380,60,640,120)),(4,0x20001,(380,121,639,120)),(4,0x123456,(380,60,639,120)),(3,0x20001,(380,60,639,120))):
+            u.mem_write(rect,struct.pack('>4h',*bounds))
+            self.assertEqual(self.call(u,report['symbols']['gr2_text_draw'],[text,count,rect,color]),0)
+
+    def test_compiled_film_card_uses_stock_16_bit_blitter_and_releases_pool_storage(self):
+        from scripts.analyze_gr2_native_contract import probe_effect_view_draw
+        report=self.build();self.assertTrue('gr2_card_draw' in report['symbols'])
+        code=component('gr2','b01firm8');disk=component('gr2','b01firm6')
+        for fail in (False,True):
+            with self.subTest(allocation_failure=fail):
+                drawn=probe_effect_view_draw(code,disk,native_runtime=report,native_card=True,native_card_allocation_failure=fail)
+                self.assertEqual(drawn['native_card_return'],0 if fail else 1)
+                self.assertEqual(drawn['native_card_changed_bytes'],0 if fail else 47040)
+                self.assertEqual(drawn['native_card_outside_bounds'],0)
+                self.assertTrue(drawn['native_card_matches_reference'])
+                self.assertTrue(drawn['native_card_pool_restored'])
+
     def test_be32_runtime_preserves_original_post_load_result_and_audits_all_sections(self):
         report=self.build();self.assertEqual(report['endianness'],'big');self.assertFalse(report['be8'])
         self.assertFalse(report['can_package']);self.assertLess(report['memory_bytes'],0x68000)
