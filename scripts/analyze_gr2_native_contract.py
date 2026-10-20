@@ -126,7 +126,71 @@ def probe_memory_regions(code:bytes,sizes:list[int])->dict:
                 private_gap_proved=False,hardware_tested=False,helpers_intercepted=['RTOS pool creation'],
                 scope='Original region base getter, initial 2MiB pool reservation and bump alignment/metadata; no ownership claim for lower RAM gap.')
 
-def probe_capture_owner(code:bytes,kind:int)->dict:
+def probe_task_context(code:bytes)->dict:
+    """Execute the original ARM task-frame constructor, without scheduler stubs."""
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);base=0x50004000;stop=0x5001f000
+    uc.mem_write(base-4,b'\xa5'*88)
+    for register,value in ((UC_ARM_REG_R0,0xA02AE5C1),(UC_ARM_REG_R1,0x50008000),(UC_ARM_REG_R2,base),(UC_ARM_REG_LR,stop)):
+        uc.reg_write(register,value)
+    uc.emu_start(0xA00AF7A8,stop,count=1000)
+    if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('task frame construction budget exceeded')
+    words=struct.unpack('>20I',uc.mem_read(base,80))
+    return dict(entry='0xa00af7a8',scheduler_cpsr=words[0],initial_task_cpsr=words[1],frame=list(words),
+                guards_unchanged=bytes(uc.mem_read(base-4,4))==b'\xa5'*4 and bytes(uc.mem_read(base+80,4))==b'\xa5'*4,
+                helpers_intercepted=[],hardware_tested=False,
+                scope='Original initial task-frame construction. Actual capture task identity and live exception-vector installation still need validation.')
+
+def probe_memory_policy(code:bytes,*,boot_mode:int=0)->dict:
+    """Observe original MPU/cache register programming, not a hardware cache simulation."""
+    official_profile(code,'gr2')
+    if type(boot_mode) is not int or not 0<=boot_mode<=4:raise ValueError('bounded boot mode required')
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);registers={};writes=[];stop=0x5001f000
+    def observe(machine,address,size,ctx):
+        if address==0xA0040D5E:
+            machine.reg_write(UC_ARM_REG_R0,boot_mode);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR));return
+        word=struct.unpack('>I',machine.mem_read(address,4))[0]
+        if word&0x0f000f10!=0x0e000f10:return
+        if (word>>12)&15:raise ValueError('unexpected original CP15 transfer register')
+        key=((word>>21)&7,(word>>16)&15,word&15,(word>>5)&7)
+        if word&(1<<20):machine.reg_write(UC_ARM_REG_R0,registers.get(key,0))
+        else:
+            value=machine.reg_read(UC_ARM_REG_R0);registers[key]=value;writes.append(dict(pc=hex(address),register=list(key),value=value))
+        machine.reg_write(UC_ARM_REG_PC,address+4)
+    uc.hook_add(UC_HOOK_CODE,observe,begin=0xA00AF200,end=0xA00AF3C0)
+    uc.hook_add(UC_HOOK_CODE,observe,begin=0xA0040D5E,end=0xA0040D5E)
+    uc.reg_write(UC_ARM_REG_SP,0x50018000);uc.reg_write(UC_ARM_REG_LR,stop)
+    uc.emu_start(0xA00AF200,stop,count=10000)
+    if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('original memory policy execution budget exceeded')
+    return dict(entry='0xa00af200',boot_mode=boot_mode,regions=[registers[(0,6,i,0)] for i in range(8)],
+                instruction_cache_mask=registers[(0,2,0,1)],data_cache_mask=registers[(0,2,0,0)],
+                write_buffer_mask=registers[(0,3,0,0)],control=registers[(0,1,0,0)],writes=writes,
+                hardware_cache_emulated=False,helpers_intercepted=['boot mode getter','CP15 read/write register boundaries'],
+                scope='Original register-value arithmetic and branches, synthetic CP15 initial values. No cache contents, physical address aliases or DMA coherence simulation.')
+
+def probe_raw_for_dng(code:bytes,*,present:bool)->dict:
+    """Run original named imgProp RAW-for-DNG assertion against synthetic property RAM."""
+    official_profile(code,'gr2')
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_PC,UC_ARM_REG_LR
+    uc=runtime_machine(code);stack=0x50010000;context=0x50004000;asserted=False;continued=False;messages=[]
+    uc.mem_write(stack+0x18,struct.pack('>I',context));uc.mem_write(context+0x1e4,struct.pack('>I',0x50008000 if present else 0))
+    def observe(machine,address,size,ctx):
+        nonlocal asserted,continued
+        if address==0xA0162C9E:continued=True;machine.emu_stop();return
+        if address==0xA003A01A:asserted=True;machine.emu_stop();return
+        pointer=machine.reg_read(UC_ARM_REG_R0)
+        messages.append(bytes(machine.mem_read(pointer,128)).split(b'\0',1)[0].decode('ascii'))
+        machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
+    for address in (0xA0162C9E,0xA0039F9C,0xA003A01A):uc.hook_add(UC_HOOK_CODE,observe,begin=address,end=address)
+    uc.reg_write(UC_ARM_REG_SP,stack);uc.emu_start(0xA0162C7D,0,count=1000)
+    return dict(entry='0xa0162c7c',handle_offset=0x1e4,asserted=asserted,reached_continuation=continued,
+                assertion_text=' '.join(messages),helpers_intercepted=['diagnostic log','panic stop'],hardware_tested=False,
+                scope='Original named imgProp->bufferInfo.hRawForDng null assertion; property address and handle are synthetic.')
+
+def probe_capture_owner(code:bytes,kind:int,*,complete:bool=False)->dict:
     """Original per-image encode owner constructs the real wrapper descriptor.
 
     Uses synthetic reference-counted image/JPEG handles. Getters and descriptor
@@ -143,32 +207,46 @@ def probe_capture_owner(code:bytes,kind:int)->dict:
     # Read the original handle magic literal, not an invented object tag.
     magic=bytes(uc.mem_read(0xA00E08C8,4))
     for handle,address,size in ((source_handle,source,image_bytes),(output_handle,output,0x1000000)):
-        uc.mem_write(handle,magic+struct.pack('>5I',address,size,0,0,0))
+        uc.mem_write(handle,magic+struct.pack('>5I',address,size,0,0,size))
     uc.mem_write(context+source_offset,struct.pack('>I',source_handle));uc.mem_write(context+output_offset,struct.pack('>I',output_handle))
     uc.mem_write(context+0x3e0+kind*4,struct.pack('>I',(height<<16)|width));uc.mem_write(context+0x400,b'\x02')
-    captured=None;getter_calls=0
+    captured=None;getter_calls=0;lifetime=[]
+    if complete:
+        if kind not in (1,3):raise ValueError('outer lifetime callers currently proved for image kinds 1 and 3')
+        uc.mem_map(output,0x1000)
     def boundary(machine,address,size,ctx):
         nonlocal captured,getter_calls
         if address==0xA00E0714:getter_calls+=1;return # observe original handle checks/getter
         if address==0xA01324BA:
-            captured=bytes(machine.mem_read(machine.reg_read(UC_ARM_REG_R0),48));machine.emu_stop();return
+            captured=bytes(machine.mem_read(machine.reg_read(UC_ARM_REG_R0),48))
+            if not complete:machine.emu_stop();return
+            lifetime.append('encoder_enter');machine.mem_write(machine.reg_read(UC_ARM_REG_R0)+0x28,struct.pack('>I',512));lifetime.append('encoder_return')
+            machine.reg_write(UC_ARM_REG_R0,0);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR));return
+        if address==0xA029AA1A:
+            pointer=machine.reg_read(UC_ARM_REG_R0)
+            if pointer!=context+source_offset:raise RuntimeError('unexpected source release slot')
+            lifetime.append('source_release');machine.mem_write(pointer,bytes(4))
+            machine.reg_write(UC_ARM_REG_R0,0);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR));return
         if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original capture handle assertion')
         result=0x2b if address==0xA02ADB7C else 0x100000
         machine.reg_write(UC_ARM_REG_R0,result);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
-    for address in (0xA00E0714,0xA01324BA,0xA02ADB7C,0xA029AB3C,0xA0039F9C,0xA003A01A):
+    for address in (0xA00E0714,0xA01324BA,0xA02ADB7C,0xA029AB3C,0xA0039F9C,0xA003A01A,*((0xA029AA1A,) if complete else ())):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     uc.reg_write(UC_ARM_REG_R0,context);uc.reg_write(UC_ARM_REG_R1,kind)
     uc.reg_write(UC_ARM_REG_SP,0x50018000);uc.reg_write(UC_ARM_REG_LR,0x5001f001)
-    uc.emu_start(0xA02ADC15,0x5001f000,count=10000)
+    uc.emu_start(({1:0xA02AE5C1,3:0xA02AE611}[kind] if complete else 0xA02ADC15),0x5001f000,count=10000)
+    if complete and uc.reg_read(UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('capture lifetime execution budget exceeded')
     if captured is None:raise RuntimeError('original capture owner did not reach JPEG wrapper')
     dims=struct.unpack_from('>I',captured,8)[0]
     return dict(entry='0xa02adc14',kind=kind,source_handle_offset=source_offset,output_handle_offset=output_offset,
                 source=struct.unpack_from('>I',captured,0)[0],output=struct.unpack_from('>I',captured,4)[0],
                 width=dims&65535,height=dims>>16,source_handle_data=source,source_handle_bytes=image_bytes,
                 minimum_planar_bytes=width*height*2,output_handle_data=output,original_handle_getters=getter_calls,
-                descriptor_hex=captured.hex(),hardware_tested=False,
-                helpers_intercepted=['quality selection','JPEG target-size setting'],
-                scope='Original image-kind dispatch, source/destination handles, crop-disabled descriptor construction and original handle validation. Producer/RAW/cache lifecycle remains to prove.')
+                descriptor_hex=captured.hex(),hardware_tested=False,lifetime_events=lifetime,
+                source_cleared_after_encode=bytes(uc.mem_read(context+source_offset,4))==bytes(4),
+                stack_preserved=uc.reg_read(UC_ARM_REG_SP)==0x50018000,
+                helpers_intercepted=['quality selection','JPEG target-size setting']+(['JPEG encoder completion','source release effect'] if complete else []),
+                scope='Original image-kind dispatch and handle validation. Optional original outer caller executes through synthetic synchronous encoder completion and release effect. This proves call order, not producer readiness, kernel concurrency or DMA completion.')
 
 def probe_jpeg_input(code:bytes,width:int,height:int,*,format_kind:int=2,overrides:tuple[int,int,int,int]|None=None)->dict:
     """Run stock still-JPEG wrapper and config builder up to encoder submission.
@@ -304,6 +382,65 @@ def probe_sd_io(code:bytes,operation:str,payload:bytes,*,read_count:int|None=Non
                 hardware_tested=False,helpers_intercepted=['filesystem readiness','file backend transfer','file status','errno'],
                 scope='Original handle-magic/path dispatch and full-transfer wrapper semantics only; synthetic open handle, no SD I/O.')
 
+def probe_sd_file_lifecycle(code:bytes,*,native_runtime:dict|None=None,fail_write:bool=False,fail_close:bool=False)->dict:
+    """Execute normal open/read/write/close with synthetic stdio, media and metadata pool boundaries."""
+    official_profile(code,'gr2')
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);stop=0x5001f000;control=0xA00C2C6C;pool=0x5000c000
+    uc.mem_write(control+0x1c,struct.pack('>I',pool))
+    if native_runtime is not None:uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    path=0x50001000;source=0x50002000;target=0x50003000
+    payload=bytes((i*23+19)&255 for i in range(104));uc.mem_write(path,b'H:/M10V5A.bin\0');uc.mem_write(source,payload)
+    file=bytearray();position=0;file_token=0x5000b000;handles=[];closed=[];freed=[];cleared=True
+    def string(pointer):return bytes(uc.mem_read(pointer,32)).split(b'\0',1)[0].decode('ascii')
+    def boundary(machine,address,size,ctx):
+        nonlocal file,position,cleared
+        a,b,c,d=[machine.reg_read(r) for r in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3)]
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError(f'original filesystem assertion at {address:x}')
+        if address==0xA0065324:
+            if string(a)!='H:/M10V5A.bin' or string(b) not in ('r','w'):raise ValueError('private file open arguments differ')
+            if string(b)=='w':file=bytearray()
+            position=0;result=file_token
+        elif address==0xA0024C3C:
+            if (a,b)!=(pool,0x38):raise ValueError('file metadata pool allocation differs')
+            result=0x50009000+len(handles)*0x100;handles.append(result)
+        elif address==0xA0024D76:
+            if a!=pool or b not in handles:raise ValueError('file metadata free ownership differs')
+            cleared=cleared and bytes(machine.mem_read(b,4))==bytes(4);freed.append(b);result=0
+        elif address==0xA0065428:
+            if (b,c,d)!=(104,1,file_token):raise ValueError('file write backend items differ')
+            data=bytes(machine.mem_read(a,b));file.extend(data[:29] if fail_write else data);position=len(file);result=0 if fail_write else 1
+        elif address==0xA0065386:
+            if (b,d)!=(1,file_token):raise ValueError('file read backend items differ')
+            data=bytes(file[position:position+c]);machine.mem_write(a,data);position+=len(data);result=len(data)
+        elif address==0xA00652F0:result=int(position>=len(file))
+        elif address==0xA00652E2:
+            if a!=file_token:raise ValueError('file close token differs')
+            closed.append(a);result=0xffffffff if fail_close else 0
+        elif address==0xA00652CE:result=31
+        elif address==0xA00267BA:result=1
+        else:result=0
+        machine.reg_write(UC_ARM_REG_R0,result);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
+    for address in (0xA002B0EE,0xA0027360,0xA00273A4,0xA00A2058,0xA0065324,0xA0024C3C,0xA0024D76,
+                    0xA0065428,0xA0065386,0xA00652F0,0xA00652E2,0xA00652CE,0xA00267BA,0xA0039DE4,0xA0039F9C,0xA003A01A):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def run(entry,args):
+        for register,value in zip((UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(UC_ARM_REG_SP,0x50018000);uc.reg_write(UC_ARM_REG_LR,stop|1)
+        uc.emu_start(entry,stop,count=100000)
+        if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('file lifecycle execution budget exceeded')
+        return uc.reg_read(UC_ARM_REG_R0)
+    if native_runtime is None:
+        handle=run(0xA002C70F,[path,1]);written=run(0xA002CC4B,[handle,source,len(payload)]);run(0xA002C905,[handle])
+        handle=run(0xA002C70F,[path,0]);read=run(0xA002CA99,[handle,target,105]);run(0xA002C905,[handle])
+    else:
+        symbols=native_runtime['symbols'];written=run(symbols['gr2_file_write'],[path,source,len(payload)]);read=run(symbols['gr2_file_read'],[path,target,105])
+    return dict(write_returned=written,read_returned=read,payload_matches=bytes(uc.mem_read(target,len(payload)))==payload,
+                backend_close_calls=len(closed),metadata_free_calls=len(freed),magic_cleared_before_free=cleared,
+                hardware_tested=False,helpers_intercepted=['stdio backend','media readiness/locks','metadata pool allocate/free','errno/thread id','diagnostic log'],
+                scope='Original normal-file wrappers and optional compiled private bridge; synthetic media and stdio bytes, no disk I/O.')
+
 def probe_sd_open_mode(code:bytes,flags:int)->dict:
     """Execute original H: open-mode selection up to fopen, without opening a file."""
     official_profile(code,'gr2')
@@ -335,6 +472,69 @@ def probe_sd_open_mode(code:bytes,flags:int)->dict:
                 helpers_intercepted=['filesystem readiness','media status','lock','unlock','fopen stop boundary'],
                 scope='Original H: mode-selection instructions and string comparison; no file creation or handle allocation.')
 
+def probe_ui_text(code:bytes,text_id:int,language:int,*,native_runtime:dict|None=None)->dict:
+    """Execute the original UI localized text lookup without helper substitution."""
+    if type(text_id) is not int or not 0<=text_id<=0xffffffff or type(language) is not int or not 0<=language<(0x100000000 if native_runtime is not None else 21):
+        raise ValueError('u32 text id and original language index 0..20 required')
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);stop=0x5001f000;entry=0xA03A4AD1
+    if native_runtime is not None:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']));entry=native_runtime['symbols']['gr2_original_text']
+    for register,value in ((UC_ARM_REG_R0,text_id),(UC_ARM_REG_R1,language),(UC_ARM_REG_SP,0x50018000),(UC_ARM_REG_LR,stop|1)):
+        uc.reg_write(register,value)
+    uc.emu_start(entry,stop,count=1000)
+    if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('original text lookup execution budget exceeded')
+    pointer=uc.reg_read(UC_ARM_REG_R0);wire=bytearray()
+    if not pointer:return dict(pointer=0,text='',wire_hex='',helpers_intercepted=[],hardware_tested=False)
+    for index in range(256):
+        pair=bytes(uc.mem_read(pointer+index*2,2));wire.extend(pair)
+        if pair==bytes(2):break
+    else:raise ValueError('original text exceeds bounded probe string length')
+    return dict(entry='0xa03a4ad0',text_id=text_id,language=language,pointer=pointer,text=bytes(wire[:-2]).decode('utf-16-be'),
+                wire_hex=wire.hex(),helpers_intercepted=[],hardware_tested=False,
+                scope='Original loaded locale pointer table and bounded UTF-16BE string; no font rendering or screen display.')
+
+def probe_effect_menu(code:bytes)->dict:
+    """Execute the original effect menu's display/property conversion both ways.
+
+    Property-bank reads, property change dispatch and screen refresh are explicit
+    boundaries. Definitions, permutation, transform and menu callbacks are stock.
+    """
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);stop=0x5001f000;current=[0];changes=[];reads=[]
+    # Synthetic initialized property registry: stock config and empty callbacks.
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x50002000,0x50001000,0x383))
+    def boundary(machine,address,size,ctx):
+        r0=machine.reg_read(UC_ARM_REG_R0);r1=machine.reg_read(UC_ARM_REG_R1);result=0
+        if address==0xA0037566:
+            if r0!=0x50001000 or r1!=43:raise RuntimeError('unexpected effect property bank access')
+            reads.append(r1);result=current[0]
+        elif address==0xA039FFA8:
+            if r0!=43:raise RuntimeError('effect menu changed another property')
+            changes.append([r0,r1]);current[0]=r1
+        machine.reg_write(UC_ARM_REG_R0,result)
+        machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
+    for address in (0xA0037516,0xA0037566,0xA0037540,0xA039FFA8,0xA0398CC8,0xA039FCBE):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def run(entry,*args):
+        for register,value in zip((UC_ARM_REG_R0,UC_ARM_REG_R1),args):uc.reg_write(register,value)
+        uc.reg_write(UC_ARM_REG_SP,0x50018000);uc.reg_write(UC_ARM_REG_LR,stop|1)
+        uc.emu_start(entry|1,stop,count=10000)
+        if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('effect menu execution budget exceeded')
+        return uc.reg_read(UC_ARM_REG_R0)
+    definition=run(0xA0396900,102);property_id=struct.unpack('>I',uc.mem_read(definition+4,4))[0]
+    count=struct.unpack('>H',uc.mem_read(definition+12,2))[0]
+    rows=[]
+    for index in range(count):
+        run(0xA03C0AD0,102,index);value=current[0]
+        displayed=run(0xA03C0A50,102)
+        rows.append(dict(display_index=index,property_value=value,roundtrip=displayed==index))
+    return dict(item_id=102,property_id=property_id,definition=hex(definition),choices=rows,
+                invalid_definition=run(0xA0396900,0x148),property_reads=len(reads),property_changes=changes,
+                helpers_intercepted=['property bank lock/read/unlock','property change dispatch','screen refresh/status'],
+                hardware_tested=False,scope='Stock 18-choice effect menu conversion, not a custom menu installation or live camera selection.')
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--component',required=True,type=Path);parser.add_argument('--out',required=True,type=Path)
@@ -343,9 +543,15 @@ def main():
     code=args.component.read_bytes();profile=official_profile(code,'gr2')
     report=dict(schema='m10v-gr2-native-contract/v1',component_sha256=profile['sha'],
                 rtc=probe_rtc_get_time(code,(2026,10,20,18,30,45)),
+                memory_policy=[probe_memory_policy(code,boot_mode=mode) for mode in (0,1,3,4)],
+                raw_for_dng=[probe_raw_for_dng(code,present=present) for present in (False,True)],
+                effect_menu=probe_effect_menu(code),task_context=probe_task_context(code),
+                ui_text=[probe_ui_text(code,106,language) for language in range(21)],
+                sd_file_lifecycle=probe_sd_file_lifecycle(code),
                 c_heap=probe_c_heap_startup(code),reserved_c_heap=probe_c_heap_startup(code,reserved_end=0xa0800000),
                 memory_regions=probe_memory_regions(code,[1,17,1024]),rtos_pool=probe_rtos_pool(code),
                 capture_owner=[probe_capture_owner(code,kind) for kind in (1,2,3)],
+                capture_lifetime=[probe_capture_owner(code,kind,complete=True) for kind in (1,3)],
                 jpeg_input=[probe_jpeg_input(code,4928,3264,format_kind=kind) for kind in (2,3,4)],
                 sd_io=[probe_sd_io(code,operation,b'M10V\x00config\xff') for operation in ('read','write')],
                 sd_modes=[probe_sd_open_mode(code,flags) for flags in (0,1,9,2,10,0x102)],can_build=False)

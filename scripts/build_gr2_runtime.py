@@ -74,13 +74,23 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_storage.c'),'-o',str(storage)],check=True,capture_output=True)
     services=out_dir/'services.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_services.c'),'-o',str(services)],check=True,capture_output=True)
-    render_objects=[str(planar),str(capture),str(storage),str(services)]
+    cache=out_dir/'cache.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_cache.S'),'-o',str(cache)],check=True,capture_output=True)
+    files=out_dir/'files.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_files.c'),'-o',str(files)],check=True,capture_output=True)
+    ui=out_dir/'ui.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_ui.c'),'-o',str(ui)],check=True,capture_output=True)
+    render_objects=[str(planar),str(capture),str(storage),str(services),str(cache),str(files),str(ui)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library'):
         target=out_dir/(name+'.o')
         subprocess.run([clang,*FLAGS,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())
+    if official[0xA0044F4C-0xA0020200:0xA0044F50-0xA0020200]!=bytes.fromhex('e12fff1e'):raise ValueError('original SVC callback identity mismatch')
+    displacement=report['symbols']['gr2_cache_gateway']-0xA0044F54
+    if displacement%4 or not -(1<<25)<=displacement<(1<<25):raise ValueError('cache callback ARM branch range invalid')
+    report['cache_gateway_patch_hex']=struct.pack('>I',0xea000000|((displacement>>2)&0xffffff)).hex()
     report['startup_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_startup_chain'])).hex()
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),

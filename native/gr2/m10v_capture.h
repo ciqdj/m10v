@@ -5,4 +5,8 @@
 /* Synchronous software adapter only. Camera lifecycle admission is separate. */
 int gr2_render_planar(const m10v_gr2_image *,const m10v_library_state *,uint32_t,
                       const m10v_library_date *,uint32_t,uint8_t *,uint32_t);
+/* The real camera hook must also establish event completion and cache aliases. */
+int gr2_capture_admit(const uint8_t *,uint32_t,const uint8_t *,m10v_gr2_image *);
+
+int gr2_capture_process(const uint8_t *,uint32_t,const uint8_t *,const m10v_library_state *,uint32_t);
 #endif

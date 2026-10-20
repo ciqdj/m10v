@@ -14,4 +14,6 @@ int gr2_chroma_shuffle(uint8_t *,uint32_t samples,int inverse);
 void *gr2_allocate(uint32_t);
 int32_t gr2_release(void *);
 int gr2_read_clock(uint16_t output[6]);
+int gr2_cache_before(void);
+int gr2_cache_after(void);
 #endif

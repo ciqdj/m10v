@@ -31,3 +31,23 @@ int gr2_state_decode(const uint8_t *wire,m10v_library_state *state){
     if(!m10v_library_valid(&next))return 0;
     copy((uint8_t *)state,(const uint8_t *)&next,104);return 1;
 }
+static const char journals[2][16]={"H:/M10V5A.bin","H:/M10V5B.bin"};
+int gr2_journal_load(const gr2_storage_io *io,m10v_library_state *out){
+    if(!io||!io->read||!out)return 0;
+    uint8_t raw[105];m10v_library_state candidates[2];uint32_t good[2]={0,0};
+    for(uint32_t i=0;i<2;i++){
+        if(io->read(journals[i],raw,sizeof(raw))==104)good[i]=(uint32_t)gr2_state_decode(raw,&candidates[i]);
+    }
+    if(!good[0]&&!good[1])return 0;
+    uint32_t index=!good[0]||(good[1]&&(int32_t)(candidates[1].sequence-candidates[0].sequence)>0);
+    copy((uint8_t *)out,(const uint8_t *)&candidates[index],104);return 1;
+}
+int gr2_journal_store(const gr2_storage_io *io,const m10v_library_state *next){
+    if(!io||!io->read||!io->write||!next)return 0;
+    uint8_t wire[104],readback[105];m10v_library_state validated;
+    if(!gr2_state_encode(next,wire))return 0;
+    const char *path=journals[next->sequence&1u];
+    if(io->write(path,wire,104)!=104||io->read(path,readback,sizeof(readback))!=104||!gr2_state_decode(readback,&validated))return 0;
+    for(uint32_t i=0;i<104;i++)if(readback[i]!=wire[i])return 0;
+    return 1;
+}

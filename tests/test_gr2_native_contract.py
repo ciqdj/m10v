@@ -143,3 +143,78 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertEqual(report['exhausted_returned'],0xffffffce)
         self.assertEqual(report['reallocated_pointer'],report['allocated_pointer'])
         self.assertEqual(report['helpers_intercepted'],[])
+
+    def test_official_named_raw_for_dng_field_is_the_capture_property_offset_1e4(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        code=component('gr2','b01firm8')
+        present=module.probe_raw_for_dng(code,present=True)
+        self.assertEqual(present['handle_offset'],0x1e4)
+        self.assertFalse(present['asserted'])
+        self.assertTrue(present['reached_continuation'])
+        absent=module.probe_raw_for_dng(code,present=False)
+        self.assertTrue(absent['asserted'])
+        self.assertIn('hRawForDng',absent['assertion_text'])
+
+    def test_original_memory_policy_programs_only_region_five_as_cacheable(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        for mode in (0,1,3,4):
+            with self.subTest(mode=mode):
+                report=module.probe_memory_policy(component('gr2','b01firm8'),boot_mode=mode)
+                self.assertEqual(report['instruction_cache_mask'],0x20)
+                self.assertEqual(report['data_cache_mask'],0x20)
+                self.assertEqual(report['write_buffer_mask'],0)
+                self.assertEqual(report['regions'][5],0xa0000039)
+                self.assertEqual(report['control']&0x1005,0x1005)
+                self.assertFalse(report['hardware_cache_emulated'])
+
+    def test_original_file_lifecycle_closes_backend_and_invalidates_metadata_before_free(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=module.probe_sd_file_lifecycle(component('gr2','b01firm8'))
+        self.assertEqual(report['write_returned'],104)
+        self.assertEqual(report['read_returned'],104)
+        self.assertTrue(report['payload_matches'])
+        self.assertEqual(report['backend_close_calls'],2)
+        self.assertEqual(report['metadata_free_calls'],2)
+        self.assertTrue(report['magic_cleared_before_free'])
+
+    def test_original_effect_menu_roundtrips_every_display_choice_through_property_43(self):
+        module=self.implementation()
+        code=component('gr2','b01firm8')
+        report=module.probe_effect_menu(code)
+        self.assertEqual(report['item_id'],102)
+        self.assertEqual(report['property_id'],43)
+        self.assertEqual(len(report['choices']),18)
+        self.assertEqual(sorted(row['display_index'] for row in report['choices']),list(range(18)))
+        self.assertTrue(all(row['roundtrip'] for row in report['choices']))
+        self.assertEqual(report['invalid_definition'],0)
+        self.assertFalse(report['hardware_tested'])
+
+    def test_capture_callers_keep_source_until_encoder_returns_then_release_it(self):
+        module=self.implementation();code=component('gr2','b01firm8')
+        for kind in (1,3):
+            with self.subTest(kind=kind):
+                report=module.probe_capture_owner(code,kind,complete=True)
+                self.assertEqual(report['lifetime_events'],['encoder_enter','encoder_return','source_release'])
+                self.assertTrue(report['source_cleared_after_encode'])
+                self.assertTrue(report['stack_preserved'])
+
+    def test_original_task_context_constructor_starts_tasks_in_user_mode(self):
+        module=self.implementation();report=module.probe_task_context(component('gr2','b01firm8'))
+        self.assertEqual(report['initial_task_cpsr'],0x10)
+        self.assertEqual(report['scheduler_cpsr'],0xd2)
+        self.assertTrue(report['guards_unchanged'])
+        self.assertEqual(report['helpers_intercepted'],[])
+
+    def test_original_localized_text_lookup_returns_big_endian_utf16_and_bounded_fallback(self):
+        module=self.implementation();code=component('gr2','b01firm8')
+        for language,expected in ((0,'白黒'),(1,'Black & White'),(4,'黑白'),(5,'黑白')):
+            with self.subTest(language=language):
+                report=module.probe_ui_text(code,106,language)
+                self.assertEqual(report['text'],expected)
+                self.assertEqual(report['wire_hex'],(expected+'\0').encode('utf-16-be').hex())
+                self.assertEqual(report['helpers_intercepted'],[])
+        self.assertEqual(module.probe_ui_text(code,0,1)['pointer'],module.probe_ui_text(code,0x350,1)['pointer'])
+        with self.assertRaises(ValueError):module.probe_ui_text(code,106,21)

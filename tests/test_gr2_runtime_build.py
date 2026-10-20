@@ -114,3 +114,63 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
             self.assertEqual(result['returned'],1);self.assertEqual(result['fields'],list(fields))
         invalid=probe_rtc_get_time(component('gr2','b01firm8'),(2100,2,29,0,0,0),native_runtime=report)
         self.assertEqual(invalid['returned'],0);self.assertEqual(invalid['output_hex'],'a5'*12)
+
+    def test_cache_bridge_rejects_user_irq_modes_and_emits_bounded_privileged_operations(self):
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        report=self.build();self.assertIn('gr2_cache_before',report['symbols'])
+        for name,expected in (('gr2_cache_before',(7,6,0)),('gr2_cache_after',(7,10,4))):
+            for mode in (0x13,0x1f,0x10,0x12):
+                u=self.machine(report);u.mem_map(0xA0044000,0x1000);observed=[]
+                u.reg_write(r.UC_ARM_REG_CPSR,(u.reg_read(r.UC_ARM_REG_CPSR)&~31)|mode)
+                def cp15(uc,address,size,context):
+                    word=struct.unpack('>I',uc.mem_read(address,4))[0]
+                    if word&0x0f100f10==0x0e000f10:
+                        observed.append(((word>>16)&15,word&15,(word>>5)&7));uc.reg_write(r.UC_ARM_REG_PC,address+4)
+                entry=report['symbols'][name];u.hook_add(UC_HOOK_CODE,cp15,begin=entry,end=report['symbols']['gr2_cache_gateway']-4)
+                with self.subTest(name=name,mode=mode):
+                    self.assertEqual(self.call(u,entry,[]),int(mode in (0x13,0x1f)))
+                    self.assertEqual(observed,[expected] if mode in (0x13,0x1f) else [])
+
+    def test_user_cache_bridge_runs_original_svc_dispatch_and_restores_user_context(self):
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        from unicorn import UC_HOOK_INTR,UC_HOOK_CODE,arm_const as r
+        report=self.build();self.assertTrue('cache_gateway_patch_hex' in report)
+        u=runtime_machine(component('gr2','b01firm8'));u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']))
+        u.mem_write(0xA0044F4C,bytes.fromhex(report['cache_gateway_patch_hex']))
+        from scripts.analyze_unity_runtime import parse_executable_load_map
+        code=component('gr2','b01firm8');row=parse_executable_load_map(code)[15]
+        u.mem_map(0,0x10000);u.mem_write(row['address'],code[row['source_file_offset']:row['source_file_offset']+row['length']])
+        for name,expected in (('gr2_cache_before',(7,6,0)),('gr2_cache_after',(7,10,4))):
+            operations=[];dispatch=[]
+            def interrupt(uc,number,context):
+                self.assertEqual(number,2)
+                old=uc.reg_read(r.UC_ARM_REG_CPSR);resume=uc.reg_read(r.UC_ARM_REG_PC)
+                uc.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|0x13)
+                uc.reg_write(r.UC_ARM_REG_SP,0x50017000);uc.reg_write(r.UC_ARM_REG_SPSR,old)
+                uc.reg_write(r.UC_ARM_REG_LR,resume);uc.reg_write(r.UC_ARM_REG_PC,0x844)
+            def observe(uc,address,size,context):
+                if address==0xA00AF858:dispatch.append(address)
+                word=struct.unpack('>I',uc.mem_read(address,4))[0]
+                if word&0x0f000f10==0x0e000f10:
+                    self.assertEqual(uc.reg_read(r.UC_ARM_REG_CPSR)&31,19)
+                    operations.append(((word>>16)&15,word&15,(word>>5)&7));uc.reg_write(r.UC_ARM_REG_PC,address+4)
+            intr=u.hook_add(UC_HOOK_INTR,interrupt);obs=u.hook_add(UC_HOOK_CODE,observe)
+            u.reg_write(r.UC_ARM_REG_CPSR,0x60000210)
+            u.reg_write(r.UC_ARM_REG_R4,0x12345678)
+            self.assertEqual(self.call(u,report['symbols'][name],[]),1)
+            self.assertEqual(operations,[expected]);self.assertEqual(dispatch,[0xA00AF858])
+            self.assertEqual(u.reg_read(r.UC_ARM_REG_CPSR)&31,16)
+            self.assertEqual(u.reg_read(r.UC_ARM_REG_R4),0x12345678)
+            self.assertEqual(u.reg_read(r.UC_ARM_REG_SP),0x50018000)
+            u.hook_del(intr);u.hook_del(obs)
+
+    def test_compiled_ui_text_bridge_preserves_original_utf16_and_rejects_invalid_language(self):
+        from scripts.analyze_gr2_native_contract import probe_ui_text
+        report=self.build();self.assertTrue('gr2_original_text' in report['symbols'])
+        code=component('gr2','b01firm8')
+        for language in range(21):
+            expected=probe_ui_text(code,106,language)
+            actual=probe_ui_text(code,106,language,native_runtime=report)
+            self.assertEqual(actual['wire_hex'],expected['wire_hex'])
+            self.assertEqual(actual['pointer'],expected['pointer'])
+        self.assertEqual(probe_ui_text(code,106,21,native_runtime=report)['pointer'],0)

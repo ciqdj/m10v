@@ -22,3 +22,67 @@ int gr2_render_planar(const m10v_gr2_image *im,const m10v_library_state *state,u
     gr2_chroma_shuffle(im->u,cn,1);
     return result;
 }
+static uint32_t be32(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
+static int span(uint32_t handle,uint32_t *address,uint32_t *bytes,int used){
+    if(!handle||(handle&3))return 0;
+    const uint8_t *p=(const uint8_t *)(uintptr_t)handle;
+    if(be32(p)!=0x42554646u)return 0;
+    *address=be32(p+4);uint32_t capacity=be32(p+0x14);
+    *bytes=used?be32(p+8):capacity;
+    return valid(*address,capacity)&&*bytes<=capacity&&*bytes;
+}
+static int contains(uint32_t base,uint32_t bytes,uint32_t address,uint32_t length){
+    return valid(address,length)&&address>=base&&length<=bytes&&address-base<=bytes-length;
+}
+int gr2_capture_admit(const uint8_t *context,uint32_t kind,const uint8_t *request,m10v_gr2_image *out){
+    if(!context||!request||!out||kind<1||kind>3)return 0;
+    static const uint16_t sources[3]={0x1f4,0x1fc,0x200};
+    uint32_t source=0,source_bytes=0,output=0,output_bytes=0;
+    if(!span(be32(context+sources[kind-1]),&source,&source_bytes,1)||
+       !span(be32(context+0x200+4*kind),&output,&output_bytes,0)||be32(request+4)!=output||
+       be32(request+8)!=be32(context+0x3e0+4*kind))return 0;
+    m10v_gr2_image image;
+    if(!gr2_capture_decode(request,&image))return 0;
+    uint32_t addresses[3]={(uint32_t)(uintptr_t)image.y,(uint32_t)(uintptr_t)image.u,(uint32_t)(uintptr_t)image.v};
+    uint32_t sizes[3]={image.y_bytes,image.u_bytes,image.v_bytes};
+    uint32_t raw_handle=be32(context+0x1e4),raw=0,raw_bytes=0;
+    if(raw_handle&&!span(raw_handle,&raw,&raw_bytes,0))return 0;
+    for(uint32_t i=0;i<3;i++){
+        if(!contains(source,source_bytes,addresses[i],sizes[i])||overlaps(addresses[i],sizes[i],output,output_bytes)||
+           (raw_handle&&overlaps(addresses[i],sizes[i],raw,raw_bytes)))return 0;
+    }
+    /* Reject a caller trying to place the result in any protected buffer. */
+    uint32_t destination=(uint32_t)(uintptr_t)out;
+    if(!valid(destination,sizeof(*out))||overlaps(destination,sizeof(*out),(uint32_t)(uintptr_t)request,48)||
+       overlaps(destination,sizeof(*out),(uint32_t)(uintptr_t)context,0x400)||overlaps(destination,sizeof(*out),source,source_bytes)||
+       overlaps(destination,sizeof(*out),output,output_bytes)||(raw_handle&&overlaps(destination,sizeof(*out),raw,raw_bytes)))return 0;
+    uint8_t *dst=(uint8_t *)out;const uint8_t *src=(const uint8_t *)&image;
+    for(uint32_t i=0;i<sizeof(image);i++)dst[i]=src[i];
+    return 1;
+}
+#include "../gr3/m10v_sd_library.h"
+int gr2_capture_process(const uint8_t *context,uint32_t kind,const uint8_t *request,
+                        const m10v_library_state *source_state,uint32_t slot){
+    if(!source_state||slot>=5)return -1;
+    if(!gr2_cache_before())return -3;
+    m10v_gr2_image image;
+    if(!gr2_capture_admit(context,kind,request,&image)||image.format!=0x422)return -1;
+    m10v_library_state state;
+    for(uint32_t i=0;i<sizeof(state);i++)((uint8_t *)&state)[i]=((const uint8_t *)source_state)[i];
+    if(!m10v_library_valid(&state))return -1;
+    uint32_t gw=image.width,gh=image.height,shift=0;
+    while(gw>384||gh>256){shift++;uint32_t mask=(1u<<shift)-1;gw=(image.width+mask)>>shift;gh=(image.height+mask)>>shift;}
+    uint32_t film=state.slots[slot].film;
+    uint32_t required=((film==33||film==67)&&state.slots[slot].halo_gain)?6*gw*gh:0;
+    uint32_t bytes=required+65536u;uint8_t *scratch=gr2_allocate(bytes);
+    if(!scratch){bytes=required;if(required)scratch=gr2_allocate(required);}
+    if(required&&!scratch)return -2;
+    m10v_library_date date;uint16_t fields[6];const m10v_library_date *stamp=0;
+    if(state.stamp){
+        if(gr2_read_clock(fields)){date.year=fields[0];date.month=(uint8_t)fields[1];date.day=(uint8_t)fields[2];date.hour=(uint8_t)fields[3];date.minute=(uint8_t)fields[4];stamp=&date;}
+        else {state.stamp=0;state.crc=m10v_sd_crc((const uint8_t *)&state,100);}
+    }
+    int result=gr2_render_planar(&image,&state,slot,stamp,state.sequence^(uint32_t)(uintptr_t)image.y, scratch,bytes);
+    if(!gr2_cache_after())result=-3;
+    gr2_release(scratch);return result;
+}
