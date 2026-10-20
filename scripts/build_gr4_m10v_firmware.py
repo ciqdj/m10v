@@ -22,8 +22,10 @@ RTOS_SHA='a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1'
 def sha(b):return hashlib.sha256(b).hexdigest()
 
 def initial_state(configuration):
-    if not isinstance(configuration,dict) or set(configuration) not in ({'slots','stamp','format','corner','color'},{'slots','stamp','format','corner','color','hdf'}):raise ValueError('complete five-slot configuration required')
+    required={'slots','stamp','format','corner','color'}
+    if not isinstance(configuration,dict) or not required<=set(configuration) or set(configuration)-required-{'hdf','filmNameStamp'}:raise ValueError('complete five-slot configuration required')
     if configuration.get('hdf',0)!=0:raise ValueError('digital HDF is only supported on GR III')
+    if type(configuration.get('filmNameStamp',False)) is not bool or configuration.get('filmNameStamp',False):raise ValueError('film name stamp is only supported on GR III / GR IIIx')
     slots=configuration['slots']
     if not isinstance(slots,list) or len(slots)!=5:raise ValueError('five slots required')
     b=bytearray(default_state())

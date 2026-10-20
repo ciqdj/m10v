@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.4",
+      "date": "2026-10-20",
+      "title": "修复 GR IV 发布兼容并上线自定义胶卷",
+      "changes": [
+        "GR III／GR IIIx 影像方案统一时间水印，支持机内设置，并可独立将胶卷名称写入静态 JPEG。",
+        "SD 胶卷库可命名导入 sRGB 3D .cube，导出后在 GR III／GR IIIx 机内装入；兼容上一版内置胶卷包。",
+        "修复 GR IV 构建器对共享配置中关闭的胶卷名称字段及 GR III 专用接口的误拒绝，保留 GR IV 原有型号保护和独立固件回读。",
+        "HDF 菜单已做 GR III 离线组合回归，网友缺菜单反馈尚无实机记录可复现；新增功能仍待真机验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.3",
       "date": "2026-10-20",
       "title": "统一时间水印并支持自定义 LUT 胶卷",
@@ -11,9 +25,9 @@
         "修复开启胶卷名称水印时初始配置被固件构建器拒绝的问题；补充 HDF 菜单离线回归，启用 HDF 且档位为关闭时仍应保留机内菜单。",
         "GR III 的 HDF 缺菜单反馈尚无固件记录或机内照片，当前离线构建未复现；自定义 LUT、名称水印及 HDF 组合仍待真机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "9847672609c2e6b05dc987b46d434343e884fcbc",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/9847672609c2e6b05dc987b46d434343e884fcbc"
     },
     {
       "version": "2026.10.20.2",

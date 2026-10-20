@@ -66,9 +66,14 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
             at=(base+len(image)+15)&~15;image.extend(bytes(at-base-len(image)));image.extend(code);return at
         def module(relative,prefix,extra=()):
             obj=compile_source(relative,extra);at=(base+len(image)+15)&~15
+            omitted={
+                'm10v_camera_library_':('m10v_camera_library_preview','m10v_camera_library_preview_init',
+                    'm10v_camera_library_preview_clear','m10v_camera_library_select_custom','m10v_camera_library_film_name_stamp'),
+                'm10v_sd_camera_':('m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name'),
+            }
             blob,entries=link_object(obj,at,symbols,prefix,
                 additional_exports=('m10v_menu_rows',) if prefix=='m10v_menu_' else (),
-                omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear') if prefix=='m10v_camera_library_' else ())
+                omitted_exports=omitted.get(prefix,()))
             append(blob);symbols.update(entries)
         module('native/gr3/film_curated.c','m10v_curated_')
         module('native/gr3/film_harman.c','m10v_harman_')
