@@ -46,5 +46,7 @@ test('platform inspection HTTP requires authorization and accepts exact GR II up
     assert.equal((await fetch(base+'/gr2/')).status,200);
     const catalog=await(await fetch(base+'/api/platform/adapters')).json();
     assert.equal(catalog.adapters.find(r=>r.id==='gr2').capabilities.inspect.can_read,true);
+    assert.equal(catalog.adapters.find(r=>r.id==='gr2').capabilities.update_checksum.status,'verified_offline');
+    assert.equal(catalog.adapters.find(r=>r.id==='gr2').capabilities.native_film_library.status,'researching');
   }finally{await new Promise(r=>server.close(r));}
 });

@@ -14,11 +14,11 @@ async function inspect(local=false){
     if(result.model!=='GR II')throw new Error(`已识别 ${result.model}，请使用对应机型工作台；当前工作台仅支持 GR II。`);
     $('identity').textContent=`${result.model} · ${result.public_version}`;
     $('hash').textContent=`SHA-256 ${result.sha256}`;
-    $('proof').textContent=result.proof.byte_exact_roundtrip?'官方身份与原样往返检查通过。离线检查不代表实机验收。':'官方固件身份检查通过。';
+    $('proof').textContent=(result.proof.byte_exact_roundtrip?'官方身份与原样往返检查通过。':'官方固件身份检查通过。')+(result.proof.modified_update_checksum?'更新校验通过（已与原厂 CPU 对照）。':'')+'离线检查不代表实机验收。';
     $('components').replaceChildren(...(result.components||result.sections||[]).map(v=>row([v.name,v.size||v.payload_bytes,v.sha256])));
     $('resources').replaceChildren(...(result.resources||[]).map(v=>row([v.name,'0x'+v.payload_offset.toString(16),v.size])));
     $('resource-count').textContent=`${(result.resources||[]).length} 项资源`;
-    $('report').hidden=false;$('notice').textContent=result.model==='GR II'?'GR II 解析完成。修改校验与原生功能接入尚未完成。':`已识别 ${result.model}，可从顶部导航进入对应工作台。`;
+    $('report').hidden=false;$('notice').textContent='GR II 解析完成。加载链、菜单与成像等原生功能继续逆向中。';
   }catch(error){$('notice').textContent=error.message;}
   finally{busy=false;$('local').disabled=false;$('firmware').disabled=false;}
 }

@@ -24,7 +24,7 @@ function mountDesk() {
   const desk = document.createElement('main');desk.className = 'studio model-studio';
   const descriptions = ['官方文件 · 身份核验', gr4 ? '影像 · 裁切 · 关机画面' : '组件 · 资源 · 能力状态', '构建 · 回读 · 下载'];
   const labels = ['导入固件', '设置方案', '保存固件'];
-  desk.innerHTML = `<aside class="steps" aria-label="工作台导航"><p class="section-kicker">工作流程</p>${['source','features','build'].map((step,i)=>`<button class="step" data-step="${step}"><b>0${i+1}</b><span>${labels[i]}<small>${descriptions[i]}</small></span></button>`).join('')}<div class="steps-foot"><strong>你的影像方案</strong><p>随时切换区域，右侧方案清单持续显示当前状态。</p></div></aside><div class="stage"></div><aside class="plan-rail" aria-label="当前方案清单"><p class="section-kicker">方案摘要</p><h2>当前工作台</h2><div class="plan-ledger"><div><span>机型</span><strong>${name}</strong></div><div><span>固件来源</span><strong id="desk-source-status">等待导入固件</strong></div><div><span>当前方案</span><strong id="desk-plan-status">${gr4 ? '原厂影像控制编辑' : '只读固件检查'}</strong></div></div><button class="primary rail-action" id="open-build-desk">继续保存固件 ↗</button><p class="rail-note">${gr4 ? '原生 65 卷胶卷库仍在移植；生成结果需要实机验证。' : '修改校验算法尚未确认，当前不提供修改固件导出。'}</p></aside>`;
+  desk.innerHTML = `<aside class="steps" aria-label="工作台导航"><p class="section-kicker">工作流程</p>${['source','features','build'].map((step,i)=>`<button class="step" data-step="${step}"><b>0${i+1}</b><span>${labels[i]}<small>${descriptions[i]}</small></span></button>`).join('')}<div class="steps-foot"><strong>你的影像方案</strong><p>随时切换区域，右侧方案清单持续显示当前状态。</p></div></aside><div class="stage"></div><aside class="plan-rail" aria-label="当前方案清单"><p class="section-kicker">方案摘要</p><h2>当前工作台</h2><div class="plan-ledger"><div><span>机型</span><strong>${name}</strong></div><div><span>固件来源</span><strong id="desk-source-status">等待导入固件</strong></div><div><span>当前方案</span><strong id="desk-plan-status">${gr4 ? '原厂影像控制编辑' : '只读固件检查'}</strong></div></div><button class="primary rail-action" id="open-build-desk">继续保存固件 ↗</button><p class="rail-note">${gr4 ? '原生 65 卷胶卷库仍在移植；生成结果需要实机验证。' : '更新校验已验证；加载链与原生功能继续逆向，当前不提供修改固件导出。'}</p></aside>`;
   hero.after(desk);
   const stage = desk.querySelector('.stage'), pages = {};
   const heads = [ ['固件来源','导入官方固件',`导入对应机型的官方 ${gr4 ? 'BIN' : 'FRM'}，系统核验机型和版本。`], ['设置','设置功能',gr4 ? '影像控制、裁切与关机画面共享官方来源和保存出口。' : '已验证的组件与资源在此查看；影像编辑尚未开放。'], ['保存','核对并保存固件',gr4 ? '保存前自动核验来源与方案，完成后下载对应机型的 BIN。' : '当前支持读取官方固件；修改与保存功能尚未开放。'] ];
@@ -52,7 +52,7 @@ function mountDesk() {
   if(build)pages.build.append(build);
   else {
     const pending=document.createElement('div');pending.className='feature-row';
-    pending.innerHTML='<h3>固件保存尚未开放</h3><p>GR II 的修改后校验与原生胶卷功能仍在验证。当前方案为只读检查。</p><button class="primary wide" id="build-firmware" disabled>保存固件 · 尚未开放</button>';
+    pending.innerHTML='<h3>固件保存尚未开放</h3><p>GR II 的更新载荷校验已验证；加载链与原生胶卷功能继续逆向。当前方案为只读检查。</p><button class="primary wide" id="build-firmware" disabled>保存固件 · 尚未开放</button>';
     pages.build.append(pending);
   }
   const history=gr4 ? document.querySelector('.history-summary') : null;
