@@ -88,3 +88,15 @@ gr2_ui_event_chain:
 6:  .word 0xA0394959
 8:  .word 0xA03949D3
 .size gr2_ui_event_chain,.-gr2_ui_event_chain
+
+/* The aligned A02AD48C site follows stock PUSH {r4-r7,lr}. Undo only that
+ * prelude, then tail-enter the active C adapter with original SP/LR/r0/r1.
+ * Its original-body trampoline bypasses this hook and preserves the return. */
+.arm
+.balign 4
+.global gr2_producer_chain
+.type gr2_producer_chain,%function
+gr2_producer_chain:
+    ldmia sp!,{r4-r7,lr}
+    b gr2_producer_active
+.size gr2_producer_chain,.-gr2_producer_chain

@@ -60,6 +60,10 @@ class Gr2CaptureTests(unittest.TestCase):
             word=struct.unpack('>I',uc.mem_read(address,4))[0]
             if word&0x0f100f10==0x0e000f10:uc.reg_write(r.UC_ARM_REG_PC,address+4)
         u.hook_add(UC_HOOK_CODE,cp15,begin=runtime['symbols']['gr2_cache_before'],end=runtime['symbols']['gr2_cache_gateway']+80)
+        u.mem_write(context+0x408,b'\x07')
+        self.assertEqual(self.call(u,runtime['symbols']['gr2_capture_frozen'],[context,1,0x50001000]),0xffffffff)
+        self.assertEqual(bytes(u.mem_read(0x60000000,256)),planar)
+        u.mem_write(context+0x408,b'\0')
         self.assertEqual(self.call(u,runtime['symbols']['gr2_capture_frozen'],[context,1,0x50001000]),0)
         rendered=bytes(u.mem_read(0x60000000,256));self.assertNotEqual(rendered,planar)
         import ctypes as C,shutil,tempfile

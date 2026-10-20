@@ -132,7 +132,7 @@ def probe_rtos_mutex(code:bytes)->dict:
     return dict(create_returned=created,returns=returns,owners=owners,stack_preserved=True,helpers_intercepted=[],hardware_tested=False,
                 scope='Original kernel mutex create, polling lock, owner chain and unlock on synthetic task records; no preemption, wait queues or camera thread timing proof.')
 
-def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False)->dict:
+def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False,active_configuration:bool=False)->dict:
     """Original IQ library constructor/parser and full capture producer body.
 
     Only ISP engine completion is substituted. The complete official IQ and
@@ -141,6 +141,7 @@ def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone
     import hashlib
     if hashlib.sha256(disk).hexdigest()!='9e0d291f5b9b74f76a2dd269c4b23fe8f524b5db92b86bf82150d5dc3096abf8':raise ValueError('exact GR II official resource component identity required')
     if type(tone) is not int or not 0<=tone<=20:raise ValueError('stock frame color mode required')
+    if active_configuration and (native_runtime is None or deep):raise ValueError('active configuration fixture requires native runtime and unmixed mutex evidence')
     resources={}
     for index in range(121):
         at=0x786000+index*64;name=disk[at:at+32].split(b'\0',1)[0].decode('ascii');offset,size=struct.unpack_from('>2I',disk,at+32)
@@ -191,7 +192,16 @@ def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone
         uc.mem_write(0xA00B5BFC,struct.pack('>H',1));uc.mem_write(0xA00B5BDC,struct.pack('>I',0x50008000))
         uc.mem_write(0x50008000,struct.pack('>6I',0xffffffff,0x51000000,0,60*block,block,0x51000000))
         run(native_runtime['symbols']['m10v_library_init'],0x50006000,thumb=False)
-        result=run(native_runtime['symbols']['gr2_producer_run'],context,0,0x50006000,1234,thumb=False)
+        if active_configuration:
+            uc.mem_write(0xA00B5BFE,struct.pack('>H',1));uc.mem_write(0xA00B5BE0,struct.pack('>I',0x50007000));uc.mem_write(0x50007000,struct.pack('>h',-2));run(0xA0024BCA)
+            uc.mem_write(0xA00B5BF8,struct.pack('>h',2));uc.mem_write(0xA00B5BD4,struct.pack('>I',0x50009000))
+            for index in range(2):uc.mem_write(0x50009000+14*index,struct.pack('>h',-2))
+            uc.mem_write(0xA06B6DE0,b'\x01');uc.mem_write(0xA06B6DE3,b'\x01');uc.mem_write(0xA00C22C0,struct.pack('>h',1))
+            task=0xA05F5C28+68;uc.mem_write(task+8,struct.pack('>2h',-1,-1));uc.mem_write(task+24,struct.pack('>3h',20,0,20))
+            if run(native_runtime['symbols']['gr2_configuration_publish'],0x50006000,0x50006200,thumb=False)!=1:raise RuntimeError('native initial configuration publication failed')
+            uc.mem_write(0xA02AD48C,bytes.fromhex(native_runtime['producer_hook_patch_hex']))
+            result=run(0xA02AD48A,context,0)
+        else:result=run(native_runtime['symbols']['gr2_producer_run'],context,0,0x50006000,1234,thumb=False)
         snapshot_valid=run(native_runtime['symbols']['gr2_frame_read'],context,0x50006080,thumb=False)
     else:result=run(0xA02AD48A,context,0)
     if len(captured)!=1 or len(responses)!=1 or (deep and len(hardware)!=1):raise RuntimeError('original producer engine request/response count differs')

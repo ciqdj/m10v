@@ -57,12 +57,18 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(struct.unpack('>H',u.mem_read(0x5000100c,2))[0],79);self.assertEqual(bytes(u.mem_read(0x5000103e,1)),b'\x01')
         self.assertEqual(self.call(u,report['symbols']['gr2_sd_custom_record'],[0x50001000,0,0x53000000,12288]),1)
         self.assertEqual(bytes(u.mem_read(0x53000000,12288)),pack[4096:]);self.assertEqual(tokens,{})
+        u.mem_write(0xa00b5bf8,struct.pack('>h',2));u.mem_write(0xa00b5bd4,struct.pack('>I',0x50006c00))
+        for i in range(2):u.mem_write(0x50006c00+14*i,struct.pack('>h',-2))
+        u.mem_write(0xa06b6de0,b'\1');u.mem_write(0xa06b6de3,b'\1');u.mem_write(0xa00c22c0,struct.pack('>h',1))
+        task=0xa05f5c28+68;u.mem_write(task+8,struct.pack('>2h',-1,-1));u.mem_write(task+24,struct.pack('>3h',20,0,20))
         self.assertIn('gr2_settings_backend_bind',report['symbols'])
         u.mem_map(0x54000000,0x2000);ops=0x50004000;page=0x50003000
         self.assertEqual(self.call(u,report['symbols']['gr2_settings_backend_bind'],[0x54000000,ops]),1)
         self.assertEqual(self.call(u,report['symbols']['m10v_settings_open'],[page,ops,1]),0)
         self.call(u,report['symbols']['m10v_settings_key'],[page,ops,4])
         self.assertEqual(word(page+104),2);self.assertEqual(word(page+120),79)
+        self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
+        self.assertEqual(bytes(u.mem_read(0x50005000,104)),bytes(u.mem_read(page,104)))
         self.call(u,report['symbols']['m10v_settings_key'],[page,ops,5])
         self.assertEqual(word(page+104),1)
         self.assertEqual(self.call(u,report['symbols']['m10v_settings_open'],[page,ops,3]),0)
@@ -74,6 +80,13 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(self.call(u,report['symbols']['gr2_load_state'],[0x50001000]),1);self.assertEqual(bytes(u.mem_read(0x50001034,1)),b'\x01')
         for key in (3,3,3,3,4,1,4):self.call(u,report['symbols']['m10v_settings_key'],[page,ops,key])
         self.assertEqual(self.call(u,report['symbols']['gr2_load_state'],[0x50001000]),1);self.assertEqual(word(0x50001060),1)
+        self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
+        committed=bytes(u.mem_read(0x50001000,104));self.assertEqual(bytes(u.mem_read(0x50005000,104)),committed)
+        files['H:/M10VC00.bin']=b'bad snapshot'
+        self.assertEqual(self.call(u,report['symbols']['gr2_configuration_reload'],[]),0)
+        self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
+        self.assertEqual(bytes(u.mem_read(0x50005000,104)),committed)
+        self.assertEqual(self.call(u,report['symbols']['gr2_configuration_clear'],[]),1)
         self.assertEqual(len(metadata),len(closed));self.assertEqual(len(metadata),len(freed));self.assertEqual(free(),before)
 
     def test_frozen_custom_install_commits_journal_only_after_verified_inactive_snapshot(self):

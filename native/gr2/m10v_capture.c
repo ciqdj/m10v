@@ -208,6 +208,7 @@ static int process(const uint8_t *context,uint32_t kind,const uint8_t *request,
     if(frozen){
         m10v_gr2_frame frame;
         if(!gr2_frame_read(context,&frame))return -1;
+        if(context[0x408]&&context[0x408]!=carriers[frame.slot])return -1;
         if(frame.processed&(1u<<(kind-1)))return 0;
         copy_bytes(&state,&frame.state,sizeof(state));slot=frame.slot;seed=frame.seed;
     }else{

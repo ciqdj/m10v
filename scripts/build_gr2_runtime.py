@@ -84,13 +84,15 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_ui.c'),'-o',str(ui)],check=True,capture_output=True)
     sd=out_dir/'sd.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_sd.c'),'-o',str(sd)],check=True,capture_output=True)
+    configuration_object=out_dir/'configuration.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_configuration.c'),'-o',str(configuration_object)],check=True,capture_output=True)
     settings_backend=out_dir/'settings_backend.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_settings_backend.c'),'-o',str(settings_backend)],check=True,capture_output=True)
     settings_page=out_dir/'settings_page.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_settings_page.c'),'-o',str(settings_page)],check=True,capture_output=True)
     artwork=out_dir/'artwork.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_artwork.c'),'-o',str(artwork)],check=True,capture_output=True)
-    render_objects=[str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(settings_backend),str(settings_page),str(artwork)]
+    render_objects=[str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         subprocess.run([clang,*FLAGS,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
@@ -117,6 +119,14 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     if official[source:source+8]!=bytes.fromhex('0006000d24002900'):raise ValueError('original UI hook instructions differ')
     report['ui_event_hook_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_ui_event_chain'])).hex()
     report['ui_event_hook_source_offset']=source
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA02AD48C and 0xA02AD494<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA02AD48C-row['address'];break
+    else:raise ValueError('original producer hook outside executable load ranges')
+    if official[source:source+8]!=bytes.fromhex('0004000db0ad2198'):raise ValueError('original producer hook instructions differ')
+    report['producer_hook_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_producer_chain'])).hex()
+    report['producer_hook_source_offset']=source
+
 
 
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
