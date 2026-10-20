@@ -99,7 +99,7 @@ int m10v_library_valid(const m10v_library_state *state) {
     return 1;
 }
 const char *m10v_library_name(uint32_t id) {
-    static const char appended_names[13][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200","CCD Classic","Fuji C200","Kodak ProImage 100","T-Max 100","Aerochrome III 1443","Aerocolor IV 2460","VISION3 50D 5203"};
+    static const char appended_names[13][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200","CCD Classic","Fuji C200","ProImage 100","T-Max 100","Aerochrome","2460","5203"};
     return !id || id>M10V_FILM_COUNT ? (const char *)0 : id>=66 ? appended_names[id-66] : id<=33 ? films[id-1].name : legacy_records[id-34].name;
 }
 static int commit(m10v_library_state *state, m10v_library_state *next,
@@ -220,77 +220,102 @@ static uint32_t date_text(char *text, const m10v_library_date *date, uint32_t fo
         text[n++] = ':'; digits(text + n, date->minute, 2); n += 2; }
     return n;
 }
-/* Original five-by-seven bitmap glyphs for decimal date/time notation. */
-static const uint8_t glyphs[10][7] = {
-    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
-    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
-    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
-    {14,17,17,15,1,1,14}
+/* Compact beveled segment outlines in a 55 x 108 design space. The same
+ * slanted strokes serve dates and film names; no font atlas or frame allocation. */
+static const uint8_t stamp_segments[13][13] = {
+    {6,9,0,47,0,53,6,47,12,9,12,3,6},
+    {6,49,14,55,8,55,43,49,49,43,43,43,20},
+    {6,49,53,55,59,55,94,49,100,43,94,43,59},
+    {6,9,96,47,96,53,102,47,108,9,108,3,102},
+    {6,0,59,6,53,12,59,12,94,6,100,0,94},
+    {6,0,8,6,14,12,20,12,43,6,49,0,43},
+    {6,9,48,47,48,53,54,47,60,9,60,3,54},
+    {5,14,17,21,19,30,42,26,47,21,43},
+    {5,35,43,30,47,26,42,35,19,40,17},
+    {5,21,65,26,61,30,66,21,89,14,91},
+    {5,40,91,35,89,26,66,30,61,35,65},
+    {6,24,15,30,15,32,19,32,42,27,47,22,42},
+    {6,27,61,32,66,32,90,28,94,22,90,22,66},
 };
-static uint32_t glyph(char c, uint32_t row) {
-    static const uint8_t letters[26][7]={
-      {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
-      {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
-      {14,17,16,23,17,17,14},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
-      {7,2,2,2,18,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
-      {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
-      {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
-      {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
-      {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
-      {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
-    };
-    if (c >= '0' && c <= '9') return glyphs[c - '0'][row];
+static uint32_t stamp_mask(char c) {
+    static const uint16_t numbers[10] = {63,6,91,79,102,109,125,7,127,111};
+    static const uint16_t letters[26] = {119,127,57,63,121,113,125,118,6153,30,1328,56,438,1206,63,115,1087,1139,109,6145,62,816,1590,1920,4480,777};
+    if(c>='0'&&c<='9')return numbers[c-'0'];
     if(c>='a'&&c<='z')c=(char)(c-'a'+'A');
-    if(c>='A'&&c<='Z')return letters[c-'A'][row];
-    if (c == '.') return row == 6 ? 4u : 0u;
-    if (c == '-') return row == 3 ? 14u : 0u;
-    if (c == ':') return row == 2 || row == 4 ? 4u : 0u;
+    if(c>='A'&&c<='Z')return letters[c-'A'];
     if(c==' ')return 0;
-    if(c=='_')return row==6?31u:0u;
-    if(c=='/')return 1u<<(row<5?row:4);
-    if(c=='+')return row==3?31u:row==2||row==4?4u:0u;
-    if(c=='&'){static const uint8_t amp[7]={12,18,20,8,21,18,13};return amp[row];}
-    if(c=='\'')return row<3?4u:0u;
-    if(c=='(')return row==0||row==6?2u:4u;
-    if(c==')')return row==0||row==6?8u:4u;
-    static const uint8_t question[7]={14,17,1,2,4,0,4};return question[row];
+    if(c=='-'||c=='_')return 1u<<(c=='-'?6:3);
+    if(c=='/')return (1u<<8)|(1u<<9);
+    if(c=='+')return (1u<<6)|(1u<<11)|(1u<<12);
+    if(c=='(')return (1u<<5)|(1u<<4);
+    if(c==')')return (1u<<1)|(1u<<2);
+    if(c=='&')return 0x1ed9u;
+    return (1u<<0)|(1u<<1)|(1u<<6)|(1u<<12);
 }
-static void stamp_line(m10v_library_image *image,const m10v_library_state *state,const char *text,uint32_t count,uint32_t left,uint32_t top,uint32_t scale){
-    static const uint8_t colors[4][3] = {{235,128,128},{180,80,185},{82,90,240},{210,16,146}};
-    for (uint32_t pass = 0; pass < 2; ++pass)
-        for (uint32_t i = 0; i < count; ++i)
-            for (uint32_t row = 0; row < 7; ++row)
-                for (uint32_t col = 0; col < 5; ++col) {
-                    if (!(glyph(text[i], row) & (1u << (4 - col)))) continue;
-                    for (uint32_t dy = 0; dy < scale; ++dy) for (uint32_t dx = 0; dx < scale; ++dx) {
-                        uint32_t x = left + (i * 6 + col) * scale + dx + (pass ? 0 : scale);
-                        uint32_t y = top + row * scale + dy + (pass ? 0 : scale);
-                        image->y[y * image->stride + x] = pass ? colors[state->color][0] : 16;
-                        uint32_t at = y * image->stride + (x & ~1u);
-                        image->chroma[at] = pass ? colors[state->color][1] : 128;
-                        image->chroma[at + 1] = pass ? colors[state->color][2] : 128;
-                    }
-                }
+static void stamp_pixel(m10v_library_image *image,const m10v_library_state *state,uint32_t x,uint32_t y,uint32_t pass){
+    static const uint8_t colors[4][3]={{235,128,128},{180,80,185},{82,90,240},{210,16,146}};
+    if(x>=image->width||y>=image->height)return;
+    image->y[y*image->stride+x]=pass?colors[state->color][0]:16;
+    uint32_t at=y*image->stride+(x&~1u);
+    image->chroma[at]=pass?colors[state->color][1]:128;
+    image->chroma[at+1]=pass?colors[state->color][2]:128;
 }
-static void stamp(m10v_library_image *image, const m10v_library_state *state,
-                  const m10v_library_date *date,const char *name) {
+static void stamp_line(m10v_library_image *image,const m10v_library_state *state,const char *text,uint32_t count,uint32_t left,uint32_t top,uint32_t height){
+    uint32_t advance=(height*76+107)/108,shadow=height/36+1;
+    for(uint32_t pass=0;pass<2;++pass)for(uint32_t i=0;i<count;++i){
+        char c=text[i];uint32_t mask=stamp_mask(c),offset=pass?0:shadow;
+        if(c=='.'||c==':'||c=='\''){
+            uint32_t size=height/12+1;
+            for(uint32_t dot=0;dot<(c==':'?2u:1u);++dot){
+                uint32_t yy=c=='\''?0:c==':'?(dot?height*2/3:height/3):height-size;
+                for(uint32_t y=0;y<size;++y)for(uint32_t x=0;x<size;++x)
+                    stamp_pixel(image,state,left+i*advance+height/4+x+offset,top+yy+y+offset,pass);
+            }
+            continue;
+        }
+        for(uint32_t segment=0;segment<13;++segment){
+            if(!(mask&(1u<<segment)))continue;
+            const uint8_t *p=stamp_segments[segment];int32_t vx[6],vy[6];
+            int32_t minx=100000,miny=100000,maxx=0,maxy=0;
+            for(uint32_t n=0;n<p[0];++n){
+                /* Rightward shear, strongest at the top, with beveled ends. */
+                vx[n]=(int32_t)((p[1+n*2]*8u+108u-p[2+n*2])*height/864u);
+                vy[n]=(int32_t)(p[2+n*2]*height/108u);
+                if(vx[n]<minx)minx=vx[n];if(vx[n]>maxx)maxx=vx[n];
+                if(vy[n]<miny)miny=vy[n];if(vy[n]>maxy)maxy=vy[n];
+            }
+            for(int32_t y=miny;y<maxy;++y)for(int32_t x=minx;x<maxx;++x){
+                uint32_t inside=1;
+                for(uint32_t n=0;n<p[0];++n){uint32_t next=n+1==p[0]?0:n+1;
+                    if((vx[next]-vx[n])*(2*y+1-2*vy[n])-(vy[next]-vy[n])*(2*x+1-2*vx[n])<0){inside=0;break;}}
+                if(inside)stamp_pixel(image,state,left+i*advance+(uint32_t)x+offset,top+(uint32_t)y+offset,pass);
+            }
+        }
+    }
+}
+static uint32_t stamp_width(uint32_t count,uint32_t height){return count*((height*76+107)/108)+height/36+1;}
+static void stamp(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name){
     char text[24];uint32_t count=state->stamp&&date_valid(date)?date_text(text,date,state->format,state->stamp):0;
     uint32_t name_count=0;
-    if((state->reserved&1u)&&name){
-        while(name_count<24&&name[name_count]>=' '&&name[name_count]<='~')name_count++;
-        if(!name_count||name_count>23||name[name_count])name_count=0;
-    }
+    if((state->reserved&1u)&&name){while(name_count<24&&name[name_count]>=' '&&name[name_count]<='~')name_count++;
+        if(!name_count||name_count>23||name[name_count])name_count=0;}
     if(!count&&!name_count)return;
-    uint32_t scale = image->width / 1200u; if (!scale) scale = 1;
-    uint32_t lines=(count?1u:0u)+(name_count?1u:0u);
-    uint32_t max_count=count>name_count?count:name_count;
-    uint32_t tw = (max_count * 6 + 1) * scale, th = (lines * 9 + 1) * scale;
-    uint32_t margin = image->width / 100 + 2;
-    if (tw + margin * 2 >= image->width || th + margin * 2 >= image->height) return;
-    uint32_t left = (state->corner & 1) ? image->width - margin - tw : margin;
-    uint32_t top = (state->corner & 2) ? image->height - margin - th : margin;
-    if(count)stamp_line(image,state,text,count,left,top,scale);
-    if(name_count)stamp_line(image,state,name,name_count,left,top+(count?9*scale:0),scale);
+    uint32_t edge=image->width<image->height?image->width:image->height;
+    uint32_t dh=edge*27/1000,nh=edge*24/1000,margin=edge/64+2;
+    if(dh<7)dh=7;if(nh<7)nh=7;
+    uint32_t tw,th,gap;
+    for(;;){
+        uint32_t dw=count?stamp_width(count,dh):0,nw=name_count?stamp_width(name_count,nh):0;
+        tw=dw>nw?dw:nw;gap=(count&&name_count)?dh/5+2:0;
+        th=(count?dh+dh/36+1:0)+(name_count?nh+nh/36+1:0)+gap;
+        if(tw+2*margin<image->width&&th+2*margin<image->height)break;
+        if(dh<=3&&nh<=3)return;
+        if(dh>3)--dh;if(nh>3)--nh;
+    }
+    uint32_t left=(state->corner&1)?image->width-margin-tw:margin;
+    uint32_t top=(state->corner&2)?image->height-margin-th:margin;
+    if(count)stamp_line(image,state,text,count,left+((state->corner&1)?tw-stamp_width(count,dh):0),top,dh);
+    if(name_count)stamp_line(image,state,name,name_count,left+((state->corner&1)?tw-stamp_width(name_count,nh):0),top+(count?dh+dh/36+1+gap:0),nh);
 }
 /* Existing tables are decoded exactly; RGB evaluation is an explicitly new
  * saved-JPEG path, not a claim that it reproduces the stock ISP pixel-for-pixel. */

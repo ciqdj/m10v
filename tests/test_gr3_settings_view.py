@@ -185,6 +185,6 @@ class SettingsViewTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as folder:
    m=build(Path(folder),sd_library=True)
    texts=m['resources']['texts']
-   self.assertEqual(texts[978-786:988-786],['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','Kodak ProImage 100','T-Max 100','Aerochrome III 1443','Aerocolor IV 2460','VISION3 50D 5203'])
+   self.assertEqual(texts[978-786:988-786],['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203'])
 
 if __name__=='__main__':unittest.main()

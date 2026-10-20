@@ -27,7 +27,7 @@ const legacyHashes=JSON.parse(read('node/gr3-sd-v1-legacy-hashes.json'));
 needLegacyHashes();
 function needLegacyHashes(){if(legacyHashes.length!==40||legacyHashes.some(h=>!/^[a-f0-9]{64}$/.test(h)))throw Error('旧版 SD 配方摘要无效');}
 export const SD_FILM_IDS=Object.freeze(Array.from({length:46},(_,i)=>33+i));
-const appendedNames=['5207','Phoenix II','HARMAN RED','Portra 160','Fuji Industrial 100','Lucky C200','CCD Classic','Fuji C200','Kodak ProImage 100','T-Max 100','Aerochrome III 1443','Aerocolor IV 2460','VISION3 50D 5203'];
+const appendedNames=['5207','Phoenix II','HARMAN RED','Portra 160','Fuji Industrial 100','Lucky C200','CCD Classic','Fuji C200','ProImage 100','T-Max 100','Aerochrome','2460','5203'];
 const engineRecipeContracts=[
  createHash('sha256').update(read('native/gr3/film_5207_data.h')).digest(),
  ...[0,1].map(variant=>createHash('sha256').update(read('native/gr3/film_harman_data.h')).update(Buffer.from([variant])).digest()),

@@ -658,7 +658,7 @@
   },
   {
     "id": 74,
-    "name": "Kodak ProImage 100",
+    "name": "ProImage 100",
     "title": "PROIM",
     "code": "100",
     "color": "#c7a357",
@@ -676,7 +676,7 @@
   },
   {
     "id": 76,
-    "name": "Aerochrome III 1443",
+    "name": "Aerochrome",
     "title": "AERO",
     "code": "1443",
     "color": "#ca527d",
@@ -685,7 +685,7 @@
   },
   {
     "id": 77,
-    "name": "Aerocolor IV 2460",
+    "name": "2460",
     "title": "AERO",
     "code": "2460",
     "color": "#58a3a8",
@@ -694,7 +694,7 @@
   },
   {
     "id": 78,
-    "name": "VISION3 50D 5203",
+    "name": "5203",
     "title": "5203",
     "code": "50D",
     "color": "#bfaa4c",

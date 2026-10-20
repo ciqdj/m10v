@@ -38,11 +38,13 @@ class NativeFilmLibraryTests(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory(); cls.addClassCleanup(cls.tmp.cleanup)
         out = Path(cls.tmp.name) / 'films.dylib'
         wrapper = Path(cls.tmp.name) / 'date_probe.c'
-        wrapper.write_text('#include "' + str(ROOT / 'native/gr3/m10v_library.c') + '"\nuint32_t m10v_test_date(char *out,const m10v_library_date *date,uint32_t format,uint32_t mode){return date_text(out,date,format,mode);}')
+        wrapper.write_text('#include "' + str(ROOT / 'native/gr3/m10v_library.c') + '"\nuint32_t m10v_test_date(char *out,const m10v_library_date *date,uint32_t format,uint32_t mode){return date_text(out,date,format,mode); }\nvoid m10v_test_stamp(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name){stamp(image,state,date,name); }\nvoid m10v_test_line(m10v_library_image *image,const m10v_library_state *state,const char *text){stamp_line(image,state,text,1,0,0,108);}')
         subprocess.run([shutil.which('clang') or 'clang', '-O2', '-Wall', '-Wextra', '-Werror',
                         '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'), '-o', str(out)],
                        check=True, capture_output=True)
         cls.lib = C.CDLL(str(out))
+        cls.lib.m10v_test_line.argtypes = [C.POINTER(Image), C.POINTER(State), C.c_char_p]
+        cls.lib.m10v_test_stamp.argtypes = [C.POINTER(Image), C.POINTER(State), C.POINTER(Date), C.c_char_p]
         cls.lib.m10v_library_init.argtypes = [C.POINTER(State)]
         cls.lib.m10v_library_valid.argtypes = [C.POINTER(State)]
         cls.lib.m10v_library_select.argtypes = [C.POINTER(State), C.c_uint32, C.c_uint32, STORE, C.c_void_p]
@@ -56,6 +58,15 @@ class NativeFilmLibraryTests(unittest.TestCase):
         cls.lib.m10v_library_halation.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
         cls.lib.m10v_library_tables.argtypes=[C.c_uint32,C.POINTER(C.c_int16),C.POINTER(C.c_int16),C.POINTER(C.c_uint16),C.POINTER(C.c_uint16)]
         cls.lib.m10v_library_name.argtypes = [C.c_uint32]; cls.lib.m10v_library_name.restype = C.c_char_p
+
+    def test_short_display_names_are_shared_with_lut_metadata(self):
+        import json
+        expected={74:'ProImage 100',76:'Aerochrome',77:'2460',78:'5203'}
+        stocks={stock['id']:stock for stock in json.loads((ROOT/'web/gr3/newstocks-luts.json').read_text())['stocks']}
+        for film,name in expected.items():
+            self.assertEqual(self.lib.m10v_library_name(film).decode(),name)
+            self.assertEqual(stocks[film]['name'],name)
+            self.assertEqual(stocks[film]['ascii_name'],name)
 
     def test_800t_invalid_halo_stride_leaves_pixels_unchanged(self):
         state=self.state();store=STORE(lambda context,value:0)
@@ -212,6 +223,69 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual(self.render(image, state, scratch), 0)
         self.assertEqual(y[at + 2], 64); self.assertEqual(y[at], 255)
         self.assertEqual(bytes(uv), before_uv); self.assertEqual(bytes(scratch)[-32:], bytes([91] * 32))
+
+    def stamp_pixels(self, width=6000, height=4000, corner=0, name=None, mode=1, planes=False):
+        import numpy as np
+        stride=width+16
+        y=np.full((height+1,stride),73,dtype=np.uint8)
+        uv=np.full_like(y,129)
+        image=Image(y.ctypes.data_as(C.POINTER(C.c_uint8)),uv.ctypes.data_as(C.POINTER(C.c_uint8)),height*stride,height*stride,width,height,stride)
+        state=self.state();state.stamp=mode;state.color=2;state.corner=corner;state.reserved=bool(name)
+        date=Date(2026,10,20,23,59)
+        self.lib.m10v_test_stamp(C.byref(image),C.byref(state),C.byref(date),name)
+        self.assertTrue((y[:,width:]==73).all());self.assertTrue((uv[:,width:]==129).all())
+        self.assertTrue((y[height]==73).all());self.assertTrue((uv[height]==129).all())
+        return (y[:height,:width],uv[:height,:width]) if planes else y[:height,:width]
+
+    def test_segmented_stamp_24mp_date_and_name_sizes(self):
+        import numpy as np
+        y=self.stamp_pixels()
+        rows=np.flatnonzero((y==82).any(axis=1))
+        self.assertGreaterEqual(rows[-1]-rows[0]+1,105)
+        self.assertLessEqual(rows[-1]-rows[0]+1,108)
+        y=self.stamp_pixels(name=b'Kodak 5207',mode=0)
+        rows=np.flatnonzero((y==82).any(axis=1))
+        self.assertGreaterEqual(rows[-1]-rows[0]+1,90)
+        self.assertLessEqual(rows[-1]-rows[0]+1,100)
+
+    def test_date_and_alphabet_share_hollow_beveled_italic_segments(self):
+        import numpy as np
+        for char in [b'8',b'A',b'a',b'B',b'D']:
+            y=np.full((120,128),73,dtype=np.uint8);uv=np.full_like(y,129)
+            image=Image(y.ctypes.data_as(C.POINTER(C.c_uint8)),uv.ctypes.data_as(C.POINTER(C.c_uint8)),y.size,uv.size,128,120,128)
+            state=self.state();state.color=2
+            self.lib.m10v_test_line(C.byref(image),C.byref(state),char)
+            self.assertEqual(y[25,30],73)  # counters remain open, unlike solid blocks
+            top=np.flatnonzero(y[0]==82);middle=np.flatnonzero(y[6]==82)
+            self.assertGreater(len(middle),len(top))  # bevel opens after the tip
+            if char==b'8':
+                bottom=np.flatnonzero(y[107]==82)
+                self.assertGreater(top.min(),bottom.min()+7)  # italic shear
+            if char in [b'B',b'D']:self.assertEqual(y[30,15],82)
+            if char==b'A':upper=y.copy()
+            if char==b'a':self.assertTrue((upper==y).all())
+
+    def test_short_film_name_aligns_with_date_at_right_corners(self):
+        import numpy as np
+        for corner in [1,3]:
+            y=self.stamp_pixels(corner=corner,name=b'8')
+            rows=np.flatnonzero((y==82).any(axis=1))
+            split=np.flatnonzero(np.diff(rows)>10)[0]
+            date_right=np.where(y[rows[:split+1]]==82)[1].max()
+            name_right=np.where(y[rows[split+1:]]==82)[1].max()
+            self.assertLess(abs(date_right-name_right),25)
+
+    def test_stamp_fits_corners_small_aspects_long_ascii_and_two_lines(self):
+        import numpy as np
+        for w,h in [(320,240),(240,320),(96,64),(6000,4000),(4000,6000)]:
+            for corner in range(4):
+                y=self.stamp_pixels(w,h,corner,b"CUSTOM ABCDEFGHIJKLMNOP",2)
+                rows,cols=np.where(y==82)
+                self.assertGreater(len(rows),0)
+                self.assertEqual(bool(rows.mean()>h/2),bool(corner&2))
+                self.assertEqual(bool(cols.mean()>w/2),bool(corner&1))
+                runs=np.flatnonzero(np.diff(np.unique(rows))>1)
+                self.assertGreater(len(runs),0)
 
     def test_timestamp_draws_valid_date_in_all_corners_and_rejects_bad_date_before_mutation(self):
         @STORE

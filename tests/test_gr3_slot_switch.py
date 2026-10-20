@@ -37,12 +37,12 @@ class SlotSwitchTests(unittest.TestCase):
   e=StockISP(self.candidate);recipe=e.alloc(0x50f0);e.w32(recipe,0x53d0fc90);e.w32(recipe+0x4778,0x31545653)
   obj=e.cursor;e.make(12,1);frame=obj+0x1400;si=struct.unpack('<I',e.u.mem_read(frame+0x82d0,4))[0]
   context=recipe+0x96c;e.w32(context+0x30,recipe+0x1a8);e.w32(context+0x34,si)
-  current=self.backend(e,18);load=self.manifest['symbols']['m10v_camera_library_load']
+  current=self.backend(e,12);ui=self.ui_selection(e,18);load=self.manifest['symbols']['m10v_camera_library_load']
   def fs(u,at,size,data):
    if at==load:u.mem_write(u.reg_read(A.UC_ARM_REG_R0),state(FILMS));u.reg_write(A.UC_ARM_REG_R0,0);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
   hook=e.u.hook_add(UC_HOOK_CODE,fs)
   exports=self.snapshot['exports'];e.call(exports['m10v_isp_frame_recipe_producer'],recipe);e.u.hook_del(hook)
-  base=bytes(e.u.mem_read(frame,0x9000));e.u.mem_write(current+0x77c,bytes([21]))
+  base=bytes(e.u.mem_read(frame,0x9000));e.u.mem_write(current+0x77c,bytes([21]));e.u.mem_write(ui+0x1c2,bytes([21]))
   e.call(exports['m10v_isp_frame_recipe_producer'],recipe) # Re-entry cannot retarget an already queued shot.
   e.call(exports['m10v_isp_frame_recipe_begin'],context,obj,frame);e.call(0x536dd8f0,obj,frame);e.call(exports['m10v_isp_frame_recipe_finish'],context)
   st=e.alloc(104);e.u.mem_write(st,state(FILMS))
@@ -69,3 +69,58 @@ class SlotSwitchTests(unittest.TestCase):
    self.assertTrue(any(event[0]==110 and event[2]==1 and event[3]==66 for event in h.capture_events))
    results.append((bytes(u.mem_read(0x55010000,len(y))),bytes(u.mem_read(0x55020000,len(uv)))))
   self.assertEqual(*results)
+
+ def ui_selection(self,e,tone,bank=0):
+  data=e.alloc(0xb28)
+  e.w32(0x55063ed0,1);e.w32(0x55063f34,data)
+  e.u.mem_write(data+0x1c0,bytes([bank]))
+  e.u.mem_write(data+0x1c2+bank*2,bytes([tone]))
+  return data
+ def test_first_shot_uses_ui_commit_when_backend_is_one_film_behind(self):
+  for previous,current in ((19,20),(20,21),(12,18),(21,12)):
+   for bank in (0,1,2):
+    with self.subTest(previous=previous,current=current,bank=bank):
+     e=StockISP(self.candidate);self.cache(e,33);self.distinct(e)
+     recipe=e.alloc(0x50f0);e.w32(recipe,0x53d0fc90);e.w32(recipe+0x4778,0x31545653)
+     self.backend(e,previous);data=self.ui_selection(e,current,bank)
+     exports=self.snapshot['exports'];e.call(exports['m10v_isp_frame_recipe_producer'],recipe)
+     self.assertEqual(struct.unpack('<H',e.u.mem_read(recipe+0x4a08+22,2))[0],current)
+     e.u.mem_write(data+0x1c2+bank*2,bytes([previous]))
+     e.call(exports['m10v_isp_frame_recipe_producer'],recipe)
+     self.assertEqual(struct.unpack('<H',e.u.mem_read(recipe+0x4a08+22,2))[0],current)
+ def test_live_color_uses_ui_selection_when_backend_lags_the_frame(self):
+  for previous,current in ((19,20),(20,21)):
+   e=StockISP(self.candidate);self.cache(e,33);self.distinct(e)
+   e.make(current,1,True,actual_live=True);self.backend(e,previous);self.ui_selection(e,current)
+   obj,frame=0x60000000,0x60001400;e.call(self.entry,obj,frame)
+   ref=StockISP(self.candidate);self.cache(ref,33);self.distinct(ref)
+   ref.make(current,1,True,actual_live=True);self.backend(ref,current);ref.call(self.entry,obj,frame)
+   self.assertEqual(self.banks(e,frame),self.banks(ref,frame))
+
+ def test_real_stock_setter_is_visible_before_backend_snapshot_catches_up(self):
+  for bank in (0,1,2):
+   e=StockISP(self.candidate);self.cache(e,33);self.distinct(e)
+   recipe=e.alloc(0x50f0);e.w32(recipe,0x53d0fc90);e.w32(recipe+0x4778,0x31545653)
+   self.backend(e,19);data=self.ui_selection(e,19,bank)
+   e.u.mem_write(0x55068200,bytes(32))
+   def boundary(u,at,size,unused):
+    if at==0x5320ad88:u.reg_write(A.UC_ARM_REG_R0,0x55068224)
+    elif at==0x532750f8:u.reg_write(A.UC_ARM_REG_R0,1)
+    else:return
+    u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+   hook=e.u.hook_add(UC_HOOK_CODE,boundary)
+   e.call(0x532c26c0,0x55068200,20);e.u.hook_del(hook)
+   self.assertEqual(e.u.mem_read(data+0x1c2+bank*2,1),b'\x14')
+   e.call(self.snapshot['exports']['m10v_isp_frame_recipe_producer'],recipe)
+   self.assertEqual(struct.unpack('<H',e.u.mem_read(recipe+0x4a08+22,2))[0],20)
+ def test_unavailable_or_invalid_ui_property_retains_guarded_backend_fallback(self):
+  for invalid in ('guard','pointer','bank','tone'):
+   e=StockISP(self.candidate);self.cache(e,33);self.distinct(e)
+   recipe=e.alloc(0x50f0);e.w32(recipe,0x53d0fc90);e.w32(recipe+0x4778,0x31545653)
+   self.backend(e,19);data=self.ui_selection(e,20)
+   if invalid=='guard':e.w32(0x55063ed0,0)
+   if invalid=='pointer':e.w32(0x55063f34,0x90000000)
+   if invalid=='bank':e.u.mem_write(data+0x1c0,b'\x03')
+   if invalid=='tone':e.u.mem_write(data+0x1c2,b'\xff')
+   e.call(self.snapshot['exports']['m10v_isp_frame_recipe_producer'],recipe)
+   self.assertEqual(struct.unpack('<H',e.u.mem_read(recipe+0x4a08+22,2))[0],19)

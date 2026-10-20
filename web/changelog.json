@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.7",
+      "date": "2026-10-20",
+      "title": "放大数码分段水印，修复切卷首张归属并统一胶卷名称",
+      "changes": [
+        "GR III／GR IIIx／GR IV 共享水印改为斜体数码分段字形，6000×4000 照片日期高约 108px、胶卷名称约 96px；保留日期格式、颜色和四角位置，小尺寸与长名称自动适配。",
+        "GR III／GR IIIx 修正影像控制换卷后首张使用旧效果的选择来源：优先读取原厂前端当前拍摄 bank，并在捕获入口冻结，避免后端配置副本滞后一张；原厂 setter、排队冻结及回退均已离线回归，仍待机身复拍确认。",
+        "胶卷库、网页和照片印字统一名称为 ProImage 100、Aerochrome、2460、5203；固定胶卷 ID 与调色数值不变。水印渲染合同更新，请重新生成并下载配套 SD 胶卷包。",
+        "用户诊断日志确认旧实现有首张错槽；其中完整 CPU 后处理约 2–3ms，不代表全部保存耗时，蓝凤凰／UMax 400 持续 loading 仍不能认定已彻底解决。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.6",
       "date": "2026-10-20",
       "title": "修复胶卷激活与名称显示，独立胶卷名称水印菜单",
@@ -11,9 +25,9 @@
         "GR III 拍摄参数快照优先使用已校验且保存回读后发布的配置缓存，避免每次曝光重复读取两份持久化配置；缓存不可用时保留原有读取路径。",
         "补充五槽切换、名称资源、独立菜单、46 卷原生快速路径与最终固件回读验证。GR III 蓝凤凰／UMax 400 关闭附加效果仍持续 loading 的用户反馈尚未实机复现，不能认定已彻底修复；已提供诊断候选及日志步骤。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "af4caf0d45d1745f97abaaeb389c648ae8f65fc4",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39417624064"
     },
     {
       "version": "2026.10.20.5",

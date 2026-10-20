@@ -187,7 +187,7 @@
   ],
   "files": {
     "docs/research/newstocks-sources/proimage-100-digitized.json": "0fb9669b7689ecd80e9200e6c18c8908ed4ad4ef7952407bd0c99edaecc160d3",
-    "scripts/build_gr3_newstocks_reference.py": "ac0899c93b402496ec8cd7497b8b686c9bb8e173a38129dae680a79b314b7a23",
+    "scripts/build_gr3_newstocks_reference.py": "ba9c6006399fddf009266c3c06c13d4737ce8acd7e83c333abb1e0ecc9a39550",
     "third_party/curated-film-luts/kodak_t-max_100.cube": "f1a5366f5f48d33669f5e71fcd85a4ca364925df6e092051481421940435c08c",
     "third_party/curated-film-luts/LICENSE": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",
     "third_party/spectral-film-lut/LICENSE": "3cdc90b3e7727be6e5930102fadeaf35cf3d3bd7c492b90d6d16fb9ad8c3a1bd",

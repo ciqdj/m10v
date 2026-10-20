@@ -30,5 +30,5 @@ def catalog_texts(sd_library=True):
         texts=[translations.get(t,t) for t in texts]
     if sd_library:
         texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
-    texts += ['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','Kodak ProImage 100','T-Max 100','Aerochrome III 1443','Aerocolor IV 2460','VISION3 50D 5203']
+    texts += ['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
     return texts

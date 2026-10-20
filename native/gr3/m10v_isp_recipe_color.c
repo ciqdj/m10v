@@ -19,14 +19,35 @@ extern void m10v_hdf_done(uint32_t,uint32_t,uint32_t);
 _Static_assert(sizeof(m10v_isp_recipe_color)==M10V_SAVE_COLOR_BYTES,"recipe color extent");
 #if M10V_ISP_RECIPE_COLOR_PRODUCER || M10V_ISP_LIVE_COLOR
 static int config_ram(uintptr_t p,uint32_t bytes){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-bytes;}
+/* Original UI Property singleton: 5320b31c returns 55063f30 only after
+ * guard55063ed0. Shooting setters5327b394/b3b4/b3d4 write data+1c2/4/6
+ * synchronously; getter53244284 selects the bank via data+1c0. This UI
+ * commit precedes the backend copy used by53549ee8, which camera logs show
+ * can still describe the previous film on the first exposure. Borrow scalar
+ * bytes only: no singleton initialization, mutex, allocation or retained data. */
+static uint32_t ui_shooting_tone(void){
+    if(!(*(const volatile uint32_t *)0x55063ed0u&1u))return 0;
+    uintptr_t data=__atomic_load_n((const uint32_t *)0x55063f34u,__ATOMIC_ACQUIRE);
+    if(!config_ram(data,0x1c8))return 0;
+    const volatile uint8_t *p=(const volatile uint8_t *)data;
+    uint32_t bank=p[0x1c0];if(bank>2)return 0;
+    uint32_t tone=p[0x1c2+bank*2];
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+    if(data!=__atomic_load_n((const uint32_t *)0x55063f34u,__ATOMIC_RELAXED)||
+       bank!=p[0x1c0]||tone!=p[0x1c2+bank*2]||
+       !(*(const volatile uint32_t *)0x55063ed0u&1u))return 0;
+    return tone>=11&&tone<=22?tone:0;
+}
 /* Original active-tone getter 532bd6b4 -> 53549ee8 -> 5355155c.
  * Singleton53525d5c owns guard553458ac and backend553458b0; ctor53543198
  * installs vptr53d1a528 and config+518. Config[0] is committed after5355198c.
  * Its retained singleton owns the two configuration buffers; we borrow them
  * only during this read and never initialize or retain a backend pointer.
- * Read the committed configuration without taking its mutex in ISP callbacks;
+ * Only a fallback when the UI Property is unavailable. Never assume this
+ * backend is newer than the front-end selection. Read without its mutex;
  * reject a concurrent buffer swap and preserve the frame's own tone on failure. */
 static uint32_t committed_tone(uint32_t fallback){
+    uint32_t ui=ui_shooting_tone();if(ui)return ui;
     if(!(*(const volatile uint32_t *)0x553458acu&1u))return fallback;
     uintptr_t backend=*(const volatile uint32_t *)0x553458b0u;
     if(!config_ram(backend,0x51c)||*(const volatile uint32_t *)backend!=0x53d1a528u)return fallback;
