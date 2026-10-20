@@ -23,11 +23,14 @@ class Gr2CaptureTests(unittest.TestCase):
         # A freshly allocated JPEG output has zero used bytes and a nonzero capacity.
         u.mem_write(output+8,struct.pack('>I',0))
         self.assertEqual(self.call(u,entry,[context,1,0x50001000,0x50002000]),1)
-        for mutation in ('short_source','raw_overlap','wrong_output','wrong_dimensions','bad_magic'):
+        for mutation in ('short_source','raw_overlap','producer_raw_overlap','wrong_output','wrong_dimensions','bad_magic'):
             handle(source,0x60000000,640*480*2);handle(output,0x64000000,0x200000);handle(raw,0x68000000,0x2000000)
+            u.mem_write(context+0x1e0,bytes(4))
             changed=bytearray(request)
             if mutation=='short_source':handle(source,0x60000000,640*480)
             elif mutation=='raw_overlap':handle(raw,0x60000040,0x10000)
+            elif mutation=='producer_raw_overlap':
+                handle(0x5000a300,0x60000040,0x10000);u.mem_write(context+0x1e0,struct.pack('>I',0x5000a300))
             elif mutation=='wrong_output':struct.pack_into('>I',changed,4,0x64000004)
             elif mutation=='wrong_dimensions':struct.pack_into('>I',changed,8,(400<<16)|640)
             else:u.mem_write(source,b'BAD!')

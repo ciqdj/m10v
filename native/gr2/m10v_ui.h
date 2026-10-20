@@ -5,4 +5,5 @@
 const uint16_t *gr2_original_text(uint32_t text_id,uint32_t language);
 /* Fresh detached storage only; this is not menu open/registration. */
 int gr2_effect_view_init(void *storage,uint32_t capacity);
+int gr2_film_card_rgba(uint8_t *,uint32_t capacity,uint32_t film,uint32_t slot,uint32_t selected);
 #endif

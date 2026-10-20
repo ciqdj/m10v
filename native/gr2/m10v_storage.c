@@ -44,10 +44,12 @@ int gr2_journal_load(const gr2_storage_io *io,m10v_library_state *out){
 }
 int gr2_journal_store(const gr2_storage_io *io,const m10v_library_state *next){
     if(!io||!io->read||!io->write||!next)return 0;
-    uint8_t wire[104],readback[105];m10v_library_state validated;
+    uint8_t wire[104],readback[105];m10v_library_state validated,active;
     if(!gr2_state_encode(next,wire))return 0;
-    const char *path=journals[next->sequence&1u];
+    const char *path=journals[m10v_sd_u32(wire+8)&1u];
     if(io->write(path,wire,104)!=104||io->read(path,readback,sizeof(readback))!=104||!gr2_state_decode(readback,&validated))return 0;
     for(uint32_t i=0;i<104;i++)if(readback[i]!=wire[i])return 0;
+    if(!gr2_journal_load(io,&active))return 0;
+    for(uint32_t i=0;i<104;i++)if(((const uint8_t *)&active)[i]!=((const uint8_t *)&validated)[i])return 0;
     return 1;
 }

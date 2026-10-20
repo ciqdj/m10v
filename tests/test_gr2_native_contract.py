@@ -119,6 +119,31 @@ class Gr2NativeContractTests(unittest.TestCase):
         report=module.probe_jpeg_input(code,640,480,overrides=(0x61000000,0x62000000,672,352))
         self.assertEqual((report['u'],report['v'],report['y_stride'],report['chroma_stride']),(0x61000000,0x62000000,672,352))
 
+    def test_original_isp_completion_wait_uses_event_13_and_clears_observed_bits(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=module.probe_isp_completion_wait(component('gr2','b01firm8'))
+        self.assertEqual(report['event_id'],13)
+        self.assertEqual(report['requested_bits'],0x11)
+        self.assertEqual(report['wait_mode'],1)
+        self.assertEqual(report['clear_mask'],0xffffffee)
+        self.assertEqual(report['observed_bits'],0x11)
+        self.assertEqual(report['returned'],0)
+        self.assertTrue(report['stack_preserved'])
+
+    def test_original_main_yuv_handoff_sets_valid_length_before_encode(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=module.probe_main_yuv_handoff(component('gr2','b01firm8'))
+        self.assertEqual(report['source_offset'],0x1f0)
+        self.assertEqual(report['destination_offset'],0x1f4)
+        self.assertTrue(report['source_cleared'])
+        self.assertTrue(report['same_handle'])
+        self.assertEqual(report['used_before'],0)
+        self.assertEqual(report['used_after'],4928*3264*2)
+        self.assertEqual(report['queried_buffer_kinds'],[0x17])
+        self.assertTrue(report['stack_preserved'])
+
     def test_original_capture_owner_selects_distinct_image_kind_handles_and_dimensions(self):
         module=self.implementation()
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')

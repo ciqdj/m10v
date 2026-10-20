@@ -197,6 +197,59 @@ def probe_raw_for_dng(code:bytes,*,present:bool)->dict:
                 assertion_text=' '.join(messages),helpers_intercepted=['diagnostic log','panic stop'],hardware_tested=False,
                 scope='Original named imgProp->bufferInfo.hRawForDng null assertion; property address and handle are synthetic.')
 
+def probe_isp_completion_wait(code:bytes)->dict:
+    """Stock ISP wait adapter with explicit synthetic RTOS event boundaries."""
+    official_profile(code,'gr2')
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);stack=0x50018000;stop=0x5001f000;output=0x50004000;calls={}
+    def boundary(machine,address,size,ctx):
+        if address==0xA00686C4:
+            calls.update(event_id=machine.reg_read(UC_ARM_REG_R0),requested_bits=machine.reg_read(UC_ARM_REG_R1),wait_mode=machine.reg_read(UC_ARM_REG_R2))
+            machine.mem_write(machine.reg_read(UC_ARM_REG_R3),struct.pack('>I',0x91))
+        else:
+            calls.update(clear_event_id=machine.reg_read(UC_ARM_REG_R0),clear_mask=machine.reg_read(UC_ARM_REG_R1))
+        machine.reg_write(UC_ARM_REG_R0,0);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
+    for address in (0xA00686C4,0xA0067F8C):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    for reg,value in ((UC_ARM_REG_R0,output),(UC_ARM_REG_R1,0x11),(UC_ARM_REG_R2,0xffffffff),(UC_ARM_REG_SP,stack),(UC_ARM_REG_LR,stop|1)):uc.reg_write(reg,value)
+    uc.emu_start(0xA010C465,stop,count=10000)
+    if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('ISP wait execution budget exceeded')
+    return dict(**calls,observed_bits=struct.unpack('>I',uc.mem_read(output,4))[0],returned=uc.reg_read(UC_ARM_REG_R0),
+                stack_preserved=uc.reg_read(UC_ARM_REG_SP)==stack,hardware_tested=False,
+                helpers_intercepted=['RTOS wait-event result','RTOS clear-event result'],
+                scope='Original ISP completion adapter masks unrelated event bits before clearing and publishing; no real interrupt or DMA execution.')
+
+def probe_main_yuv_handoff(code:bytes)->dict:
+    """Execute the stock equal-dimension producer-to-main-JPEG handoff.
+
+    Only the buffer-kind capacity service is synthetic. This is not proof of
+    ISP completion: the upstream producer is deliberately outside this probe.
+    """
+    official_profile(code,'gr2')
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);context=0x50004000;handle=0x50008000
+    width,height=4928,3264;length=width*height*2;stop=0x5001f000;stack=0x50018000
+    uc.mem_write(handle,b'BUFF'+struct.pack('>5I',0x60000000,0,0,0,length))
+    uc.mem_write(context+0x1f0,struct.pack('>I',handle))
+    for offset in (0x258,0x3e4):uc.mem_write(context+offset,struct.pack('>I',(height<<16)|width))
+    kinds=[]
+    def boundary(machine,address,size,ctx):
+        kinds.append(machine.reg_read(UC_ARM_REG_R0))
+        machine.reg_write(UC_ARM_REG_R0,length)
+        machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
+    uc.hook_add(UC_HOOK_CODE,boundary,begin=0xA029AB3C,end=0xA029AB3C)
+    uc.reg_write(UC_ARM_REG_R0,context);uc.reg_write(UC_ARM_REG_SP,stack);uc.reg_write(UC_ARM_REG_LR,stop|1)
+    uc.emu_start(0xA02AE0AF,stop,count=10000)
+    if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('YUV handoff execution budget exceeded')
+    return dict(entry='0xa02ae0ae',source_offset=0x1f0,destination_offset=0x1f4,
+                source_cleared=bytes(uc.mem_read(context+0x1f0,4))==bytes(4),
+                same_handle=struct.unpack('>I',uc.mem_read(context+0x1f4,4))[0]==handle,
+                used_before=0,used_after=struct.unpack('>I',uc.mem_read(handle+8,4))[0],
+                queried_buffer_kinds=kinds,stack_preserved=uc.reg_read(UC_ARM_REG_SP)==stack,
+                helpers_intercepted=['buffer-kind capacity lookup'],hardware_tested=False,
+                scope='Original equal-dimension handle move and BUFF valid-length setter; synthetic capacity, no ISP/DMA execution.')
+
 def probe_capture_owner(code:bytes,kind:int,*,complete:bool=False)->dict:
     """Original per-image encode owner constructs the real wrapper descriptor.
 
@@ -788,6 +841,8 @@ def main():
                 sd_seek=[probe_sd_seek(code,offset,origin) for offset,origin in ((0,0),(4096,0),(-1,1),(-4096,2))],
                 c_heap=probe_c_heap_startup(code),reserved_c_heap=probe_c_heap_startup(code,reserved_end=0xa0800000),
                 memory_regions=probe_memory_regions(code,[1,17,1024]),rtos_pool=probe_rtos_pool(code),
+                isp_completion_wait=probe_isp_completion_wait(code),
+                main_yuv_handoff=probe_main_yuv_handoff(code),
                 capture_owner=[probe_capture_owner(code,kind) for kind in (1,2,3)],
                 capture_lifetime=[probe_capture_owner(code,kind,complete=True) for kind in (1,3)],
                 jpeg_input=[probe_jpeg_input(code,4928,3264,format_kind=kind) for kind in (2,3,4)],

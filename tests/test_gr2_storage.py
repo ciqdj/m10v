@@ -81,6 +81,11 @@ class Gr2StorageTests(unittest.TestCase):
         behavior['bad_readback']=True
         self.assertEqual(self.call(u,report['symbols']['gr2_journal_store'],[0x50000000,0x50003000]),0)
         behavior['bad_readback']=False
+        # A candidate that loses journal arbitration was not committed.
+        files[b]=wire(100)
+        self.assertEqual(self.call(u,report['symbols']['gr2_journal_store'],[0x50000000,0x50003000]),0)
+        self.assertEqual(self.call(u,report['symbols']['gr2_journal_load'],[0x50000000,0x50004000]),1)
+        self.assertEqual(struct.unpack('>I',u.mem_read(0x50004008,4))[0],100)
         files[a]=wire(0);files[b]=wire(0xffffffff)
         self.assertEqual(self.call(u,report['symbols']['gr2_journal_load'],[0x50000000,0x50004000]),1)
         self.assertEqual(struct.unpack('>I',u.mem_read(0x50004008,4))[0],0)
@@ -155,3 +160,34 @@ class Gr2StorageTests(unittest.TestCase):
             source['bytes']=invalid
             self.assertEqual(fetch(0,33,1),0)
         self.assertTrue(all(count in (4096,12288) for _,count in requests))
+
+    def test_catalog_manifest_rejects_changed_custom_content_even_when_numeric_id_is_unchanged(self):
+        import subprocess
+        from tests.test_unity_update import ROOT
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        report=self.build();self.assertTrue('gr2_pack_manifest_load' in report['symbols']);u=self.machine(report)
+        program="import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';import {parseCustomCube} from './node/gr3-custom-lut.mjs';const cube='LUT_3D_SIZE 2\\n0 0 0\\n1 0 0\\n0 1 0\\n1 1 0\\n0 0 1\\n1 0 1\\n0 1 1\\n1 1 1\\n';for(const name of ['FIRST','SECOND'])process.stdout.write(buildSdFilmPack([],[parseCustomCube(Buffer.from(cube),'identity.cube',name)]));"
+        packs=subprocess.check_output(['node','--input-type=module','-e',program],cwd=ROOT);first,second=packs[:16384],packs[16384:]
+        self.assertEqual(len(second),16384);self.assertEqual(struct.unpack_from('<I',first,64)[0],79);self.assertEqual(struct.unpack_from('<I',second,64)[0],79)
+        source={'bytes':first};size_fn=0x5001d000;read_fn=0x5001d004;u.mem_write(0x50000000,struct.pack('>2I',size_fn,read_fn))
+        def io(uc,address,size,context):
+            data=source['bytes']
+            if address==size_fn:uc.mem_write(uc.reg_read(r.UC_ARM_REG_R1),struct.pack('>I',len(data)));value=1
+            else:
+                offset=uc.reg_read(r.UC_ARM_REG_R1);target=uc.reg_read(r.UC_ARM_REG_R2);count=uc.reg_read(r.UC_ARM_REG_R3)
+                payload=data[offset:offset+count];uc.mem_write(target,payload);value=len(payload)
+            uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE,io,begin=size_fn,end=read_fn)
+        manifest=0x50008000;work=0x50004000
+        self.assertEqual(self.call(u,report['symbols']['gr2_pack_manifest_load'],[0x50000000,manifest,work]),1)
+        saved=bytes(u.mem_read(manifest,4108))
+        def fetch():
+            u.mem_write(0x50018000,struct.pack('>I',work))
+            return self.call(u,report['symbols']['gr2_pack_fetch_frozen'],[0x50000000,manifest,0,79])
+        self.assertEqual(fetch(),79)
+        source['bytes']=second
+        self.assertEqual(fetch(),0xfffffffe)
+        self.assertEqual(bytes(u.mem_read(manifest,4108)),saved)
+        source['bytes']=first+b'!';self.assertEqual(fetch(),0xfffffffe)
+        self.assertEqual(self.call(u,report['symbols']['gr2_pack_manifest_load'],[0x50000000,manifest,manifest]),0)
+        self.assertEqual(bytes(u.mem_read(manifest,4108)),saved)

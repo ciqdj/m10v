@@ -45,17 +45,23 @@ int gr2_capture_admit(const uint8_t *context,uint32_t kind,const uint8_t *reques
     if(!gr2_capture_decode(request,&image))return 0;
     uint32_t addresses[3]={(uint32_t)(uintptr_t)image.y,(uint32_t)(uintptr_t)image.u,(uint32_t)(uintptr_t)image.v};
     uint32_t sizes[3]={image.y_bytes,image.u_bytes,image.v_bytes};
-    uint32_t raw_handle=be32(context+0x1e4),raw=0,raw_bytes=0;
-    if(raw_handle&&!span(raw_handle,&raw,&raw_bytes,0))return 0;
+    /* The producer input (1E0) and RAW-for-DNG (1E4) have distinct lifetimes.
+     * Protect either handle while the stock context still retains it. */
+    uint32_t raw[2]={0,0},raw_bytes[2]={0,0};
+    for(uint32_t i=0;i<2;i++){
+        uint32_t handle=be32(context+0x1e0+4*i);
+        if(handle&&!span(handle,&raw[i],&raw_bytes[i],0))return 0;
+    }
     for(uint32_t i=0;i<3;i++){
-        if(!contains(source,source_bytes,addresses[i],sizes[i])||overlaps(addresses[i],sizes[i],output,output_bytes)||
-           (raw_handle&&overlaps(addresses[i],sizes[i],raw,raw_bytes)))return 0;
+        if(!contains(source,source_bytes,addresses[i],sizes[i])||overlaps(addresses[i],sizes[i],output,output_bytes))return 0;
+        for(uint32_t j=0;j<2;j++)if(raw_bytes[j]&&overlaps(addresses[i],sizes[i],raw[j],raw_bytes[j]))return 0;
     }
     /* Reject a caller trying to place the result in any protected buffer. */
     uint32_t destination=(uint32_t)(uintptr_t)out;
     if(!valid(destination,sizeof(*out))||overlaps(destination,sizeof(*out),(uint32_t)(uintptr_t)request,48)||
        overlaps(destination,sizeof(*out),(uint32_t)(uintptr_t)context,0x400)||overlaps(destination,sizeof(*out),source,source_bytes)||
-       overlaps(destination,sizeof(*out),output,output_bytes)||(raw_handle&&overlaps(destination,sizeof(*out),raw,raw_bytes)))return 0;
+       overlaps(destination,sizeof(*out),output,output_bytes))return 0;
+    for(uint32_t i=0;i<2;i++)if(raw_bytes[i]&&overlaps(destination,sizeof(*out),raw[i],raw_bytes[i]))return 0;
     uint8_t *dst=(uint8_t *)out;const uint8_t *src=(const uint8_t *)&image;
     for(uint32_t i=0;i<sizeof(image);i++)dst[i]=src[i];
     return 1;
