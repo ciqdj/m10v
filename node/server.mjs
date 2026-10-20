@@ -204,7 +204,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       (request.headers.origin && request.headers.origin !== origin))
       return send(response, 403, { error: 'authorization failed' });
     try {
-      const body = await readBody(request, ['/api/gr3/sd-library/export','/api/gr3/film-bay/pack'].includes(pathname) ? 2048 :
+      const body = await readBody(request, pathname==='/api/gr3/sd-library/export' ? 24 * 1024 * 1024 : pathname==='/api/gr3/film-bay/pack' ? 2048 :
         pathname === '/api/platform/inspect-official' ? 4096 :
         pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
         bridgeMatch || nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :

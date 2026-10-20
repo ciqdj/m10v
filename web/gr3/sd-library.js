@@ -1,19 +1,38 @@
 const model=location.pathname.startsWith('/gr4')?'gr4':'gr3';
 const $=id=>document.getElementById(id);
-const selected=new Set();let films=[],token='',busy=false;
+if(model==='gr4')document.querySelector('.sd-custom')?.setAttribute('hidden','');
+const selected=new Set(),custom=[];let films=[],token='',busy=false;
 function status(text,error=false){$('sd-status').textContent=text;$('sd-status').dataset.error=String(error);}
 function update(){
- $('sd-count').textContent=`已选 ${selected.size} / ${films.length} 款 · ${(4096+selected.size*12288)/1024} KiB`;
- $('sd-download').disabled=busy||!selected.size;
+ $('sd-count').textContent=`已选 ${selected.size+custom.length} / ${films.length+custom.length} 款 · ${(4096+(selected.size+custom.length)*12288)/1024} KiB`;
+ $('sd-download').disabled=busy||!(selected.size+custom.length);
  for(const input of document.querySelectorAll('#sd-films input')){input.checked=selected.has(Number(input.value));input.disabled=busy;}
  $('sd-all').disabled=busy||!films.length;$('sd-none').disabled=busy||!films.length;
+ $('custom-add').disabled=busy;
 }
+function customStatus(message,error=false){$('custom-status').textContent=message;$('custom-status').dataset.error=String(error);}
+function renderCustom(){
+ const host=$('custom-films');host.replaceChildren();
+ for(const entry of custom){const card=document.createElement('div'),name=document.createElement('strong'),button=document.createElement('button');
+  card.className='sd-film';name.textContent=entry.name;button.type='button';button.textContent='移除';button.disabled=busy;
+  button.onclick=()=>{custom.splice(custom.indexOf(entry),1);renderCustom();update();};card.append(name,button);host.append(card);
+ }
+}
+const fileBase64=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('读取 LUT 文件失败'));reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(file);});
+$('custom-add').onclick=async()=>{
+ const name=$('custom-name').value.trim(),file=$('custom-file').files?.[0];
+ if(!/^[\x20-\x7e]{1,23}$/.test(name)){customStatus('胶卷名称需为 1–23 个英文字符。',true);return;}
+ if(!file||!file.name.toLowerCase().endsWith('.cube')||!file.size||file.size>8*1024*1024){customStatus('请选择不超过 8 MiB 的 .cube 文件。',true);return;}
+ if(custom.some(v=>v.name.toLowerCase()===name.toLowerCase())){customStatus('胶卷名称重复。',true);return;}
+ try{busy=true;update();const base64=await fileBase64(file);custom.push({name,filename:file.name,base64});$('custom-name').value='';$('custom-file').value='';customStatus(`已添加 ${name}；下载时会校验 LUT 内容。`);renderCustom();}
+ catch(e){customStatus(e.message,true);}finally{busy=false;update();}
+};
 $('sd-all').onclick=()=>{films.forEach(f=>selected.add(f.id));update();};
 $('sd-none').onclick=()=>{selected.clear();update();};
 $('sd-download').onclick=async()=>{
  busy=true;update();status('正在打包并校验胶卷…');
  try{
-  const response=await fetch(model==='gr4'?'/api/gr4/native-library/sd-export':'/api/gr3/sd-library/export',{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify({model,ids:films.filter(f=>selected.has(f.id)).map(f=>f.id)})});
+  const response=await fetch(model==='gr4'?'/api/gr4/native-library/sd-export':'/api/gr3/sd-library/export',{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify({model,ids:films.filter(f=>selected.has(f.id)).map(f=>f.id),...(model==='gr3'?{customFilms:custom}: {})})});
   if(!response.ok)throw Error((await response.json()).error||'下载失败');
   const url=URL.createObjectURL(await response.blob()),a=document.createElement('a');a.href=url;a.download='M10V-SD-films.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
   status('已生成下载文件。请按下方说明复制到 SD 卡。');
