@@ -2,9 +2,14 @@
 typedef uint32_t (*open_fn)(const char *,uint32_t);
 typedef int32_t (*transfer_fn)(uint32_t,void *,uint32_t);
 static int same(const char *a,const char *b){while(*a&&*a==*b){a++;b++;}return *a==*b;}
+static int custom_snapshot(const char *path){
+    const char prefix[]="H:/M10VC";
+    for(uint32_t i=0;i<8;i++)if(path[i]!=prefix[i])return 0;
+    return path[8]>='0'&&path[8]<='4'&&path[9]>='0'&&path[9]<='1'&&same(path+10,".bin");
+}
 static int owned(const char *path,int writing){
     if(!path)return 0;
-    if(same(path,"H:/M10V5A.bin")||same(path,"H:/M10V5B.bin"))return 1;
+    if(same(path,"H:/M10V5A.bin")||same(path,"H:/M10V5B.bin")||custom_snapshot(path))return 1;
     return !writing&&same(path,"H:/M10V/FILMS.M10");
 }
 static int close_owned(uint32_t handle){

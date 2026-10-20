@@ -220,7 +220,7 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
-def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None)->dict:
+def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None,custom_record:bytes|None=None)->dict:
     """Original fixed-block image pool/factory/clone/retirement CPU evidence.
 
     Extra bytes change only the size table in synthetic RAM. Mutex operations
@@ -228,6 +228,7 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     helpers, property setters, zeroing/copying and releases execute unchanged.
     """
     if type(extra) is not int or not 0<=extra<=16384 or extra&3:raise ValueError('bounded aligned synthetic inline extension required')
+    if custom_record is not None and (not native_runtime or extra!=128+12288 or len(custom_record)!=12288):raise ValueError('native runtime and complete inline custom record required')
     from unicorn import UC_HOOK_CODE
     from unicorn import arm_const as r
     uc=runtime_machine(code);uc.mem_map(0xA1000000,0x400000);stop=0x5001f000;stack=0x50018000
@@ -237,6 +238,7 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
         for index in range(count):uc.mem_write(table+index*stride,struct.pack('>h',-2))
     def run(entry,*args,thumb=True):
         for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        for index,value in enumerate(args[4:]):uc.mem_write(stack+4*index,struct.pack('>I',value))
         uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1 if thumb else stop)
         uc.emu_start(entry|1 if thumb else entry,stop,count=3000000)
         if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('original fixed-pool/factory budget or stack failure')
@@ -262,17 +264,24 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     constructor_zeroed=bytes(uc.mem_read(source,payload_bytes))==b'\x01'+bytes(payload_bytes-1)
     count_after=word(0x5000D000+0x347*4)
     frame_clone={}
-    if owner_entry and extra==128:
+    if owner_entry and extra in (128,128+12288):
         run(native_runtime['symbols']['m10v_library_init'],0x50002000,thumb=False)
-        frame_clone['freeze']=run(native_runtime['symbols']['gr2_frame_freeze'],source,0x50002000,2,0x12345678,thumb=False)
+        if custom_record is not None:
+            import zlib
+            uc.mem_map(0x56000000,0x4000);uc.mem_write(0x56000000,custom_record)
+            state=bytearray(uc.mem_read(0x50002000,104));struct.pack_into('>H',state,28,struct.unpack_from('<I',custom_record,8)[0]);state[78]=1;struct.pack_into('>I',state,100,zlib.crc32(state[:100]));uc.mem_write(0x50002000,bytes(state))
+            frame_clone['freeze']=run(native_runtime['symbols']['gr2_frame_freeze_custom'],source,0x50002000,2,0x12345678,0x56000000,thumb=False)
+        else:frame_clone['freeze']=run(native_runtime['symbols']['gr2_frame_freeze'],source,0x50002000,2,0x12345678,thumb=False)
     elif extra:uc.mem_write(source+0xfb0c,b'\xa5'*extra)
     original=bytes(uc.mem_read(source,payload_bytes));clone=run(0xA029B57C if owner_entry else 0xA00E1E9E,source)
     clone_matches=bytes(uc.mem_read(clone,payload_bytes))==original
     inline_cloned=not extra or bytes(uc.mem_read(clone+0xfb0c,extra))==original[0xfb0c:]
     if frame_clone:
         uc.mem_write(0x50002000,b'\xa5'*104)
+        if custom_record is not None:uc.mem_write(0x56000000,b'\xa5'*12288)
         frame_clone['read']=run(native_runtime['symbols']['gr2_frame_read'],clone,0x50003080,thumb=False)
-        frame_clone['matches']=bytes(uc.mem_read(0x50003080,128))==original[0xfb0c:]
+        frame_clone['matches']=bytes(uc.mem_read(0x50003080,128))==original[0xfb0c:0xfb8c]
+        if custom_record is not None:frame_clone['custom_record_matches']=bytes(uc.mem_read(clone+0xfb8c,12288))==custom_record
     owner_live=[];owner_rejected=[];owner_retired=[]
     if owner_entry:
         owner_live=[run(owner_entry,pointer,thumb=False) for pointer in (source,clone)]

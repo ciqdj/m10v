@@ -20,6 +20,69 @@ class Gr2CaptureTests(unittest.TestCase):
         u.mem_write(0xa00b5bfc,struct.pack('>H',1));u.mem_write(0xa00b5bdc,struct.pack('>I',0x50008000))
         u.mem_write(0x50008000,struct.pack('>6I',0xffffffff,base,0,60*block,block,base))
 
+    def test_custom_lut_record_is_frozen_inline_and_corruption_never_overwrites_stock_owner(self):
+        import subprocess
+        from tests.test_unity_update import ROOT
+        runtime=self.build();self.assertIn('gr2_frame_freeze_custom',runtime['symbols'])
+        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Frozen LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
+        from scripts.analyze_gr2_native_contract import probe_image_object_pools
+        from tests.test_unity_update import component
+        cloned=probe_image_object_pools(component('gr2','b01firm8'),extra=128+12288,native_runtime=runtime,custom_record=record)
+        self.assertEqual(cloned['native_owner_live'],[0x12b8c]*2)
+        self.assertEqual(cloned['native_frame_clone'],dict(freeze=1,read=1,matches=True,custom_record_matches=True))
+        self.assertTrue(cloned['all_blocks_released']);self.assertEqual(cloned['counter_after_retirement'],0)
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        u=runtime_machine(component('gr2','b01firm8'));u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']))
+        u.mem_write(0xa00b5bfe,struct.pack('>H',1));u.mem_write(0xa00b5be0,struct.pack('>I',0x50007000));u.mem_write(0x50007000,struct.pack('>h',-2));self.call(u,0xa0024bcb,[])
+        u.mem_map(0x51000000,0x20000);u.mem_map(0x52000000,0x4000)
+        context=0x51000008;state=0x50002000;out=0x50003000;tail=context+0xfb0c
+        u.mem_write(context-8,b'IMG '+bytes(4));self.owner_pool(u,extra=128+12288)
+        self.call(u,runtime['symbols']['m10v_library_init'],[state]);wire=bytearray(u.mem_read(state,104));struct.pack_into('>H',wire,12,79);wire[62]=1;struct.pack_into('>I',wire,100,zlib.crc32(wire[:100]));u.mem_write(state,bytes(wire))
+        self.assertEqual(self.call(u,runtime['symbols']['m10v_library_valid'],[state]),1)
+        u.mem_write(0x52000000,record);before=bytes(u.mem_read(context,0xfb0c))
+        self.assertEqual(self.call(u,runtime['symbols']['gr2_frame_freeze'],[context,state,0,1234]),0)
+        u.mem_write(0x50018000,struct.pack('>I',0x52000000))
+        self.assertEqual(self.call(u,runtime['symbols']['gr2_frame_freeze_custom'],[context,state,0,1234]),1)
+        self.assertEqual(bytes(u.mem_read(context+0xfb8c,12288)),record)
+        self.assertEqual(bytes(u.mem_read(context,0xfb0c)),before)
+        u.mem_write(0x52000000,b'\xa5'*12288)
+        self.assertEqual(self.call(u,runtime['symbols']['gr2_frame_read'],[context,out]),1)
+        self.assertEqual(bytes(u.mem_read(context+0xfb8c,12288)),record)
+        # Render only the owned record; the external record has been overwritten.
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        for address in (0x60000000,0x64000000):u.mem_map(address,4096)
+        y=bytes((i*31+9)%256 for i in range(128));uv=bytes((i*7+83)%256 for i in range(128))
+        planar=y+uv[::2]+uv[1::2];u.mem_write(0x60000000,planar)
+        for offset,handle,address,used,capacity in ((0x1f4,0x5000a000,0x60000000,256,256),(0x204,0x5000a100,0x64000000,0,4096)):
+            u.mem_write(context+offset,struct.pack('>I',handle));u.mem_write(handle,b'BUFF'+struct.pack('>5I',address,used,0,0,capacity))
+        u.mem_write(context+0x3e4,struct.pack('>I',(4<<16)|32));request=bytearray(48);struct.pack_into('>3I',request,0,0x60000000,0x64000000,(4<<16)|32);request[13]=2;u.mem_write(0x50001000,bytes(request))
+        def cp15(uc,address,size,unused):
+            word=struct.unpack('>I',uc.mem_read(address,4))[0]
+            if word&0x0f100f10==0x0e000f10:uc.reg_write(r.UC_ARM_REG_PC,address+4)
+        u.hook_add(UC_HOOK_CODE,cp15,begin=runtime['symbols']['gr2_cache_before'],end=runtime['symbols']['gr2_cache_gateway']+80)
+        self.assertEqual(self.call(u,runtime['symbols']['gr2_capture_frozen'],[context,1,0x50001000]),0)
+        rendered=bytes(u.mem_read(0x60000000,256));self.assertNotEqual(rendered,planar)
+        import ctypes as C,shutil,tempfile
+        from pathlib import Path
+        from tests.test_gr3_m10v_library import State,Image
+        with tempfile.TemporaryDirectory() as folder:
+            library=Path(folder)/'custom.dylib';sources=['m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks']
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',*[str(ROOT/f'native/gr3/{name}.c') for name in sources],'-o',str(library)],check=True,capture_output=True)
+            host=C.CDLL(str(library));host.m10v_library_render_custom.argtypes=[C.POINTER(Image),C.POINTER(State),C.c_uint32,C.c_void_p,C.c_uint32,C.c_void_p,C.c_uint32,C.c_uint32,C.c_void_p,C.c_char_p]
+            expected_state=State();host.m10v_library_init(C.byref(expected_state));expected_state.slots[0].film=79;expected_state.effects[0][6]=1;expected_state.crc=zlib.crc32(bytes(expected_state)[:100])
+            expected_y=(C.c_uint8*128).from_buffer_copy(y);expected_uv=(C.c_uint8*128).from_buffer_copy(uv);lut=(C.c_uint8*6591).from_buffer_copy(record[64:6655]);image=Image(expected_y,expected_uv,128,128,32,4,32)
+            self.assertEqual(host.m10v_library_render_custom(C.byref(image),C.byref(expected_state),0,None,1234,None,0,0,lut,b'Frozen LUT'),0)
+            self.assertEqual(rendered,bytes(expected_y)+bytes(expected_uv)[::2]+bytes(expected_uv)[1::2])
+        self.assertEqual(bytes(u.mem_read(context+0xfb8c,12288)),record)
+        u.mem_write(context+0xfb8c+64,bytes([record[64]^1]));u.mem_write(out,b'\xa5'*128)
+        self.assertEqual(self.call(u,runtime['symbols']['gr2_frame_read'],[context,out]),0)
+        self.assertEqual(bytes(u.mem_read(out,128)),b'\xa5'*128)
+        for extra,valid_record in ((128,True),(128+12288,False)):
+            self.owner_pool(u,extra=extra);u.mem_write(tail,bytes(128+12288));u.mem_write(0x52000000,record if valid_record else b'\xa5'*12288)
+            u.mem_write(0x50018000,struct.pack('>I',0x52000000))
+            self.assertEqual(self.call(u,runtime['symbols']['gr2_frame_freeze_custom'],[context,state,0,1234]),0)
+            self.assertEqual(bytes(u.mem_read(tail,128+12288)),bytes(128+12288))
+
     def test_native_producer_wrapper_runs_original_iq_lookup_before_engine_and_restores_color_mode(self):
         from scripts.analyze_gr2_native_contract import probe_producer_iq
         from tests.test_unity_update import component
@@ -208,7 +271,7 @@ class Gr2CaptureTests(unittest.TestCase):
                 self.assertEqual(bytes(u.mem_read(0x50002000,44)),b'\xa5'*44)
 
     def test_admission_preserves_image_owner_and_buff_metadata(self):
-        report=self.build();u=self.machine(report);u.mem_map(0x51000000,0x10000)
+        report=self.build();u=self.machine(report);u.mem_map(0x51000000,0x20000)
         context=0x51000008;source=0x5000a000;output=0x5000a100;request=0x50001000
         u.mem_write(context-8,b'IMG '+bytes(4));self.owner_pool(u)
         def setup(data=0x60000000):
@@ -225,7 +288,8 @@ class Gr2CaptureTests(unittest.TestCase):
         u.mem_write(context+0x800,b'\xa5'*44)
         self.assertEqual(self.call(u,entry,[context,1,request,context+0x800]),0)
         self.assertEqual(bytes(u.mem_read(context+0x800,44)),b'\xa5'*44)
-        for data in (context+0x100,source+4):
+        self.owner_pool(u,extra=128+12288)
+        for data in (context+0x100,source+4,context+0xfb8c):
             setup(data);u.mem_write(0x50002000,b'\xa5'*44)
             self.assertEqual(self.call(u,entry,[context,1,request,0x50002000]),0)
             self.assertEqual(bytes(u.mem_read(0x50002000,44)),b'\xa5'*44)

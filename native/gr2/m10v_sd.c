@@ -96,3 +96,37 @@ uint32_t gr2_sd_frozen_record(const gr2_pack_manifest *manifest,uint32_t index,u
     if(gr2_release(work))return 0;
     return result>0?(uint32_t)result:0;
 }
+
+static int store_state(void *context,const m10v_library_state *state){
+    return gr2_journal_store((const gr2_storage_io *)context,state)?0:-1;
+}
+int gr2_pack_install(const gr2_pack_io *pack_io,const gr2_storage_io *storage,const gr2_pack_manifest *manifest,
+                     uint32_t index,uint32_t expected,uint32_t slot,uint8_t *work){
+    const uint32_t bytes=4096+2*M10V_SD_RECORD_BYTES+1;
+    if(!pack_io||!storage||!manifest||!work||slot>=5||
+       !disjoint(work,bytes,manifest,sizeof(*manifest))||!disjoint(work,bytes,pack_io,sizeof(*pack_io))||
+       !disjoint(work,bytes,storage,sizeof(*storage)))return M10V_LIBRARY_INVALID;
+    int32_t id=gr2_pack_fetch_frozen(pack_io,manifest,index,expected,work);
+    if(id<0)return id;
+    m10v_library_state state;
+    if(!gr2_journal_load(storage,&state)||state.sequence==UINT32_MAX)return M10V_LIBRARY_INVALID;
+    if((uint32_t)id<=M10V_FILM_COUNT)return m10v_library_select(&state,slot,(uint32_t)id,store_state,(void *)storage);
+    uint32_t bank=0;
+    if(!gr2_custom_snapshot_store(storage,&state,slot,work+4096,work+4096+M10V_SD_RECORD_BYTES,&bank))return M10V_LIBRARY_STORE_FAILED;
+    return m10v_library_select_custom(&state,slot,(uint32_t)id,bank,store_state,(void *)storage);
+}
+static const gr2_storage_io snapshot_io={gr2_file_read,gr2_file_write};
+int gr2_sd_install(const gr2_pack_manifest *manifest,uint32_t index,uint32_t expected,uint32_t slot){
+    if(!manifest||slot>=5||index>=M10V_SD_MAX_FILMS||expected<33||expected>M10V_CUSTOM_MAX_ID)return M10V_LIBRARY_INVALID;
+    uint8_t *work=gr2_allocate(4096+2*M10V_SD_RECORD_BYTES+1);if(!work)return M10V_LIBRARY_STORE_FAILED;
+    int result=gr2_pack_install(&io,&snapshot_io,manifest,index,expected,slot,work);
+    if(gr2_release(work))return M10V_LIBRARY_STORE_FAILED;
+    return result;
+}
+int gr2_sd_custom_record(const m10v_library_state *state,uint32_t slot,uint8_t *out,uint32_t capacity){
+    if(!state||!out||slot>=5||capacity<M10V_SD_RECORD_BYTES||!disjoint(state,sizeof(*state),out,M10V_SD_RECORD_BYTES))return 0;
+    uint8_t *work=gr2_allocate(M10V_SD_RECORD_BYTES+1);if(!work)return 0;
+    int result=gr2_custom_snapshot_read(&snapshot_io,state,slot,out,work);
+    if(gr2_release(work))return 0;
+    return result;
+}

@@ -72,6 +72,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_capture.c'),'-o',str(capture)],check=True,capture_output=True)
     storage=out_dir/'storage.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_storage.c'),'-o',str(storage)],check=True,capture_output=True)
+    snapshot=out_dir/'snapshot.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_snapshot.c'),'-o',str(snapshot)],check=True,capture_output=True)
     services=out_dir/'services.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_services.c'),'-o',str(services)],check=True,capture_output=True)
     cache=out_dir/'cache.o'
@@ -84,7 +86,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_sd.c'),'-o',str(sd)],check=True,capture_output=True)
     artwork=out_dir/'artwork.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_artwork.c'),'-o',str(artwork)],check=True,capture_output=True)
-    render_objects=[str(planar),str(capture),str(storage),str(services),str(cache),str(files),str(ui),str(sd),str(artwork)]
+    render_objects=[str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         subprocess.run([clang,*FLAGS,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)

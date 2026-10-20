@@ -8,6 +8,60 @@ class Gr2StorageTests(unittest.TestCase):
     build=runtime_tests.Gr2RuntimeBuildTests.build
     machine=runtime_tests.Gr2RuntimeBuildTests.machine
     call=runtime_tests.Gr2RuntimeBuildTests.call
+    def test_native_file_bridge_admits_only_ten_owned_custom_snapshot_names(self):
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        from tests.test_unity_update import component
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        report=self.build();u=runtime_machine(component('gr2','b01firm8'));u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']));opened=[]
+        def open_failure(uc,address,size,unused):
+            opened.append(bytes(uc.mem_read(uc.reg_read(r.UC_ARM_REG_R0),32)).split(b'\0',1)[0].decode())
+            self.assertEqual(uc.reg_read(r.UC_ARM_REG_R1),1);uc.reg_write(r.UC_ARM_REG_R0,0);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE,open_failure,begin=0xa002c70e,end=0xa002c70e)
+        allowed=[f'H:/M10VC{slot}{bank}.bin' for slot in range(5) for bank in range(2)]
+        denied=['H:/M10VC50.bin','H:/M10VC02.bin','H:/M10VC00.bin.extra','H:/M10VC00.bin/../other','H:/M10V/FILMS.M10','A:/M10VC00.bin','H:/M10VC0.bin','H:/M10VC000.bin']
+        for path in allowed+denied:
+            with self.subTest(path=path):
+                opened.clear();u.mem_write(0x50001000,path.encode()+b'\0')
+                self.assertEqual(self.call(u,report['symbols']['gr2_file_write'],[0x50001000,0x50002000,16]),0xffffffff)
+                self.assertEqual(opened,[path] if path in allowed else [])
+
+    def test_custom_snapshot_writes_inactive_bank_verifies_exact_readback_and_keeps_active_copy(self):
+        import subprocess
+        from tests.test_unity_update import ROOT
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        report=self.build();self.assertIn('gr2_custom_snapshot_store',report['symbols']);self.assertIn('gr2_custom_snapshot_read',report['symbols'])
+        raw=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';for(const id of [79,80])process.stdout.write(customFilmRecord({name:'LUT '+id,rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i+id)%256))},id));"],cwd=ROOT)
+        records=[raw[:12288],raw[12288:]];u=self.machine(report);u.mem_map(0x52000000,0x4000);u.mem_map(0x53000000,0x4000)
+        io=0x50000000;state=0x50001000;bank=0x50002000;work=0x53000000;record=0x52000000
+        u.mem_write(io,struct.pack('>2I',0x5001d000,0x5001d004));files={};writes=[];behavior={'short':False,'trailing':False}
+        def boundary(uc,address,size,unused):
+            path=bytes(uc.mem_read(uc.reg_read(r.UC_ARM_REG_R0),20)).split(b'\0',1)[0].decode();buffer=uc.reg_read(r.UC_ARM_REG_R1);count=uc.reg_read(r.UC_ARM_REG_R2)
+            self.assertIn(path,('H:/M10VC00.bin','H:/M10VC01.bin'))
+            if address==0x5001d000:
+                data=files.get(path,b'')+(b'!' if behavior['trailing'] and path.endswith('01.bin') else b'');data=data[:count];uc.mem_write(buffer,data);value=len(data)
+            else:
+                data=bytes(uc.mem_read(buffer,count));value=23 if behavior['short'] else count;files[path]=data[:value];writes.append(path)
+            uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE,boundary,begin=0x5001d000,end=0x5001d004)
+        self.call(u,report['symbols']['m10v_library_init'],[state]);u.mem_write(record,records[0])
+        def store():
+            u.mem_write(bank,struct.pack('>I',0xa5a5a5a5));u.mem_write(0x50018000,struct.pack('>2I',work,bank))
+            return self.call(u,report['symbols']['gr2_custom_snapshot_store'],[io,state,0,record])
+        self.assertEqual(store(),1);self.assertEqual(struct.unpack('>I',u.mem_read(bank,4))[0],0)
+        self.assertEqual(files['H:/M10VC00.bin'],records[0])
+        wire=bytearray(u.mem_read(state,104));struct.pack_into('>H',wire,12,79);wire[62]=1;struct.pack_into('>I',wire,100,zlib.crc32(wire[:100]));u.mem_write(state,bytes(wire));u.mem_write(record,records[1])
+        before=bytes(u.mem_read(state,104));behavior['short']=True
+        self.assertEqual(store(),0);self.assertEqual(struct.unpack('>I',u.mem_read(bank,4))[0],0xa5a5a5a5)
+        self.assertEqual(files['H:/M10VC00.bin'],records[0]);self.assertEqual(bytes(u.mem_read(state,104)),before)
+        behavior['short']=False;behavior['trailing']=True;self.assertEqual(store(),0)
+        behavior['trailing']=False;self.assertEqual(store(),1);self.assertEqual(struct.unpack('>I',u.mem_read(bank,4))[0],1)
+        self.assertEqual(files['H:/M10VC00.bin'],records[0]);self.assertEqual(files['H:/M10VC01.bin'],records[1])
+        u.mem_write(0x50018000,struct.pack('>I',work));self.assertEqual(self.call(u,report['symbols']['gr2_custom_snapshot_read'],[io,state,0,record]),1)
+        self.assertEqual(bytes(u.mem_read(record,12288)),records[0])
+        files['H:/M10VC00.bin']=records[0]+b'!';u.mem_write(record,b'\xa5'*12288);u.mem_write(0x50018000,struct.pack('>I',work))
+        self.assertEqual(self.call(u,report['symbols']['gr2_custom_snapshot_read'],[io,state,0,record]),0)
+        self.assertEqual(bytes(u.mem_read(record,12288)),b'\xa5'*12288)
+
     def test_state_codec_crosses_native_endian_and_refuses_corrupt_payload_atomically(self):
         report=self.build();self.assertIn('gr2_state_encode',report['symbols']);u=self.machine(report)
         self.call(u,report['symbols']['m10v_library_init'],[0x50001000])

@@ -6,8 +6,8 @@ static int overlaps(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn
 static int hits(uint32_t p,uint32_t n,uint32_t y,uint32_t yn,uint32_t c,uint32_t cn){
     return !valid(p,n)||overlaps(p,n,y,yn)||overlaps(p,n,c,cn);
 }
-int gr2_render_planar(const m10v_gr2_image *im,const m10v_library_state *state,uint32_t slot,
-                      const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t scratch_bytes){
+static int render_planar(const m10v_gr2_image *im,const m10v_library_state *state,uint32_t slot,
+                      const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t scratch_bytes,const uint8_t *record){
     if(!im||!m10v_library_valid(state)||slot>=5||im->format!=0x422||im->width<2||im->width>4928||
        im->height<2||im->height>3264||(im->width&1)||(im->height&1)||im->y_stride<im->width||
        im->y_stride>16384||im->chroma_stride>8192||im->chroma_stride*2!=im->y_stride)return -1;
@@ -18,11 +18,19 @@ int gr2_render_planar(const m10v_gr2_image *im,const m10v_library_state *state,u
        hits((uint32_t)(uintptr_t)state,sizeof(*state),y,yn,u,2*cn)||
        (date&&hits((uint32_t)(uintptr_t)date,sizeof(*date),y,yn,u,2*cn))||
        (scratch_bytes&&hits((uint32_t)(uintptr_t)scratch,scratch_bytes,y,yn,u,2*cn)))return -1;
+    uint32_t film=state->slots[slot].film;
+    if((film>M10V_FILM_COUNT)!=!!record)return -1;
+    if(record&&(hits((uint32_t)(uintptr_t)record,M10V_SD_RECORD_BYTES,y,yn,u,2*cn)||m10v_sd_record(record,M10V_SD_RECORD_BYTES,film)!=film))return -1;
     m10v_library_image paired={im->y,im->u,yn,2*cn,im->width,im->height,im->y_stride};
     if(!gr2_chroma_shuffle(im->u,cn,0))return -1;
-    int result=m10v_library_render(&paired,state,slot,date,seed,scratch,scratch_bytes);
+    int result=record?m10v_library_render_custom(&paired,state,slot,date,seed,scratch,scratch_bytes,0,record+64,(const char *)(record+16)):
+                      m10v_library_render(&paired,state,slot,date,seed,scratch,scratch_bytes);
     gr2_chroma_shuffle(im->u,cn,1);
     return result;
+}
+int gr2_render_planar(const m10v_gr2_image *image,const m10v_library_state *state,uint32_t slot,
+                      const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes){
+    return render_planar(image,state,slot,date,seed,scratch,bytes,0);
 }
 static uint32_t be32(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
 /* Caller retains the image reference throughout this synchronous check. This
@@ -34,7 +42,7 @@ uint32_t gr2_image_owner_bytes(const uint8_t *context){
     if(be32((const uint8_t *)(uintptr_t)0xa0129c54u)!=(uint32_t)(uintptr_t)pool||
        be32(pool)!=0x4d504c20u)return 0;
     uint32_t body=be32((const uint8_t *)(uintptr_t)0xa01137ecu),block=be32(pool+8);
-    if(body<0xfb0cu||body>0x1000u+0xfb0cu||(body&3)||block!=body+8||be32(pool+12)!=60*block)return 0;
+    if((body!=0xfb0cu&&body!=0xfb8cu&&body!=0x12b8cu)||block!=body+8||be32(pool+12)!=60*block)return 0;
     uint32_t id=((uint32_t)pool[20]<<8)|pool[21];
     const uint8_t *maximum=(const uint8_t *)(uintptr_t)0xa00b5bfcu;
     if(!id||id>(((uint32_t)maximum[0]<<8)|maximum[1]))return 0;
@@ -53,26 +61,54 @@ uint32_t gr2_image_owner_bytes(const uint8_t *context){
 static void copy_bytes(void *destination,const void *source,uint32_t bytes){
     for(uint32_t i=0;i<bytes;i++)((uint8_t *)destination)[i]=((const uint8_t *)source)[i];
 }
-int gr2_frame_freeze(uint8_t *context,const m10v_library_state *source,uint32_t slot,uint32_t seed){
-    if(slot>=5||!source||gr2_image_owner_bytes(context)!=0xfb8cu)return 0;
+static int frame_prepare(uint8_t *context,const m10v_library_state *source,uint32_t slot,uint32_t seed,m10v_gr2_frame *frame){
+    if(slot>=5||!source)return 0;
+    uint32_t body=gr2_image_owner_bytes(context);
+    if(body!=0xfb8cu&&body!=0x12b8cu)return 0;
     uint32_t address=(uint32_t)(uintptr_t)source,owner=(uint32_t)(uintptr_t)context-8;
-    if(!valid(address,sizeof(*source))||overlaps(address,sizeof(*source),owner,0xfb94u))return 0;
-    m10v_gr2_frame frame;frame.processed=0;frame.magic=0x47324652u;frame.version=2;frame.slot=slot;frame.seed=seed;
-    copy_bytes(&frame.state,source,sizeof(frame.state));
-    if(!m10v_library_valid(&frame.state))return 0;
+    if(!valid(address,sizeof(*source))||overlaps(address,sizeof(*source),owner,body+8))return 0;
+    frame->processed=0;frame->magic=0x47324652u;frame->version=2;frame->slot=slot;frame->seed=seed;
+    copy_bytes(&frame->state,source,sizeof(frame->state));
+    if(!m10v_library_valid(&frame->state))return 0;
+    const uint8_t *tail=context+0xfb0c;
+    for(uint32_t i=0;i<sizeof(*frame);i++)if(tail[i])return 0;
+    frame->crc=m10v_sd_crc((const uint8_t *)frame,124);return 1;
+}
+static void frame_publish(uint8_t *context,const m10v_gr2_frame *frame){
     uint8_t *tail=context+0xfb0c;
-    for(uint32_t i=0;i<sizeof(frame);i++)if(tail[i])return 0;
-    frame.crc=m10v_sd_crc((const uint8_t *)&frame,124);
-    copy_bytes(tail+4,(const uint8_t *)&frame+4,sizeof(frame)-4);
-    copy_bytes(tail,&frame,4);return 1;
+    copy_bytes(tail+4,(const uint8_t *)frame+4,sizeof(*frame)-4);copy_bytes(tail,frame,4);
+}
+int gr2_frame_freeze(uint8_t *context,const m10v_library_state *source,uint32_t slot,uint32_t seed){
+    m10v_gr2_frame frame;
+    if(!frame_prepare(context,source,slot,seed,&frame)||frame.state.slots[slot].film>M10V_FILM_COUNT)return 0;
+    frame_publish(context,&frame);return 1;
+}
+int gr2_frame_freeze_custom(uint8_t *context,const m10v_library_state *source,uint32_t slot,uint32_t seed,const uint8_t *record){
+    m10v_gr2_frame frame;
+    if(gr2_image_owner_bytes(context)!=0x12b8cu||!frame_prepare(context,source,slot,seed,&frame))return 0;
+    uint32_t id=frame.state.slots[slot].film,address=(uint32_t)(uintptr_t)record,owner=(uint32_t)(uintptr_t)context-8;
+    if(id<=M10V_FILM_COUNT||!valid(address,M10V_SD_RECORD_BYTES)||overlaps(address,M10V_SD_RECORD_BYTES,owner,0x12b94u)||
+       m10v_sd_record(record,M10V_SD_RECORD_BYTES,id)!=id)return 0;
+    uint8_t *snapshot=context+0xfb8c;
+    for(uint32_t i=0;i<M10V_SD_RECORD_BYTES;i++)if(snapshot[i])return 0;
+    copy_bytes(snapshot,record,M10V_SD_RECORD_BYTES);
+    if(m10v_sd_record(snapshot,M10V_SD_RECORD_BYTES,id)!=id){
+        for(uint32_t i=0;i<M10V_SD_RECORD_BYTES;i++)snapshot[i]=0;
+        return 0;
+    }
+    frame_publish(context,&frame);return 1;
 }
 int gr2_frame_read(const uint8_t *context,m10v_gr2_frame *out){
-    if(!out||gr2_image_owner_bytes(context)!=0xfb8cu)return 0;
+    if(!out)return 0;
+    uint32_t body=gr2_image_owner_bytes(context);
+    if(body!=0xfb8cu&&body!=0x12b8cu)return 0;
     uint32_t address=(uint32_t)(uintptr_t)out,owner=(uint32_t)(uintptr_t)context-8;
-    if(!valid(address,sizeof(*out))||overlaps(address,sizeof(*out),owner,0xfb94u))return 0;
+    if(!valid(address,sizeof(*out))||overlaps(address,sizeof(*out),owner,body+8))return 0;
     m10v_gr2_frame frame;copy_bytes(&frame,context+0xfb0c,sizeof(frame));
     if(frame.magic!=0x47324652u||frame.version!=2||frame.slot>=5||(frame.processed&~7u)||
        frame.crc!=m10v_sd_crc((const uint8_t *)&frame,124)||!m10v_library_valid(&frame.state))return 0;
+    uint32_t id=frame.state.slots[frame.slot].film;
+    if(id>M10V_FILM_COUNT&&(body!=0x12b8cu||m10v_sd_record(context+0xfb8c,M10V_SD_RECORD_BYTES,id)!=id))return 0;
     copy_bytes(out,&frame,sizeof(frame));return 1;
 }
 static void frame_store(uint8_t *context,m10v_gr2_frame *frame){
@@ -95,7 +131,7 @@ int gr2_producer_ingress(uint8_t *context,const m10v_library_state *state,uint32
     uint32_t body=gr2_image_owner_bytes(context);
     if(!body)return -1;
     uint32_t mode=context[0x408];m10v_gr2_frame frame;
-    if(body==0xfb8cu&&gr2_frame_read(context,&frame)){
+    if((body==0xfb8cu||body==0x12b8cu)&&gr2_frame_read(context,&frame)){
         if(mode&&mode!=carriers[frame.slot])return -1;
         if(frame.processed){frame.processed=0;frame_store(context,&frame);}
         context[0x408]=0;return 1;
@@ -190,7 +226,8 @@ static int process(const uint8_t *context,uint32_t kind,const uint8_t *request,
         if(gr2_read_clock(fields)){date.year=fields[0];date.month=(uint8_t)fields[1];date.day=(uint8_t)fields[2];date.hour=(uint8_t)fields[3];date.minute=(uint8_t)fields[4];stamp=&date;}
         else {state.stamp=0;state.crc=m10v_sd_crc((const uint8_t *)&state,100);}
     }
-    int result=gr2_render_planar(&image,&state,slot,stamp,seed,scratch,bytes);
+    const uint8_t *record=frozen&&film>M10V_FILM_COUNT?context+0xfb8c:0;
+    int result=render_planar(&image,&state,slot,stamp,seed,scratch,bytes,record);
     if(frozen&&!result&&!frame_mark((uint8_t *)context,kind))result=-1;
     if(!gr2_cache_after())result=-3;
     gr2_release(scratch);return result;
