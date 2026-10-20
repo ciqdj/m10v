@@ -39,12 +39,12 @@ class Gr2CaptureTests(unittest.TestCase):
     def test_synchronous_capture_process_uses_real_pool_and_preserves_raw_or_rejected_pixels(self):
         from scripts.analyze_gr2_native_contract import runtime_machine
         from tests.test_unity_update import component
-        from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_READ,arm_const as r
+        from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_READ,UC_HOOK_INTR,arm_const as r
         import zlib
         report=self.build();self.assertIn('gr2_capture_process',report['symbols'])
-        for failure in ('none','raw_overlap','allocation'):
-            with self.subTest(failure=failure):
-                u=runtime_machine(component('gr2','b01firm8'));u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']))
+        for failure,mode in (('none',0x13),('raw_overlap',0x13),('allocation',0x13),('none',0x10)):
+            with self.subTest(failure=failure,mode=mode):
+                u=runtime_machine(component('gr2','b01firm8'),cpu_model=r.UC_CPU_ARM_946);u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']))
                 table=0x50007000;u.mem_write(0xa00b5bfe,struct.pack('>H',1));u.mem_write(0xa00b5be0,struct.pack('>I',table));u.mem_write(table,struct.pack('>h',-2))
                 self.call(u,0xa0024bcb,[])
                 for address in (0x60000000,0x64000000,0x68000000):u.mem_map(address,4096)
@@ -64,9 +64,33 @@ class Gr2CaptureTests(unittest.TestCase):
                 def cp15(uc,address,size,context):
                     word=struct.unpack('>I',uc.mem_read(address,4))[0]
                     if word&0x0f100f10==0x0e000f10:cache.append(address);timeline.append("cache");uc.reg_write(r.UC_ARM_REG_PC,address+4)
-                u.hook_add(UC_HOOK_CODE,cp15,begin=report['symbols']['gr2_cache_before'],end=report['symbols']['gr2_cache_gateway']-4)
+                u.hook_add(UC_HOOK_CODE,cp15,begin=report['symbols']['gr2_cache_before'],end=report['symbols']['gr2_cache_gateway']+80)
+                if mode==0x10:
+                    from scripts.analyze_unity_runtime import parse_executable_load_map
+                    code=component('gr2','b01firm8');low=parse_executable_load_map(code)[15]
+                    u.mem_map(0,0x10000);u.mem_write(low['address'],code[low['source_file_offset']:low['source_file_offset']+low['length']])
+                    u.mem_write(0xA0044F4C,bytes.fromhex(report['cache_gateway_patch_hex']))
+                    syscalls=[]
+                    def interrupt(uc,number,context):
+                        self.assertEqual(number,2)
+                        old=uc.reg_read(r.UC_ARM_REG_CPSR);resume=uc.reg_read(r.UC_ARM_REG_PC)
+                        syscalls.append(struct.unpack('>I',uc.mem_read(resume-4,4))[0]&0xffffff)
+                        uc.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|0x13)
+                        uc.reg_write(r.UC_ARM_REG_SP,0x50017000);uc.reg_write(r.UC_ARM_REG_SPSR,old)
+                        uc.reg_write(r.UC_ARM_REG_LR,resume);uc.reg_write(r.UC_ARM_REG_PC,0x844)
+                    u.hook_add(UC_HOOK_INTR,interrupt)
+                    # One running task, no pending switch. Exercise the stock
+                    # scheduler return after pool free, not a synthetic bypass.
+                    u.mem_write(0xA00C22C0,struct.pack('>H',1));u.mem_write(0xA05FA969,b'\x01')
+                    old=u.reg_read(r.UC_ARM_REG_CPSR)
+                    u.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|0x12);u.reg_write(r.UC_ARM_REG_SP,0x50016000)
+                    u.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|mode)
                 u.mem_write(0x50018000,struct.pack('>I',0))
                 result=self.call(u,report['symbols']['gr2_capture_process'],[context,1,0x50001000,0x50002000])
+                if mode==0x10:
+                    self.assertEqual(syscalls,[5,4,3,5,4,3,0])
+                    self.assertEqual(u.reg_read(r.UC_ARM_REG_CPSR)&31,16)
+                    self.assertEqual(u.reg_read(r.UC_ARM_REG_SP),0x50018000)
                 self.assertEqual(result,0 if failure=='none' else 0xfffffffe if failure=='allocation' else 0xffffffff)
                 self.assertEqual(bytes(u.mem_read(0x68000000,4096)),b'\xa5'*4096)
                 if failure!='none':self.assertEqual(bytes(u.mem_read(0x60000000,256)),y+chroma)

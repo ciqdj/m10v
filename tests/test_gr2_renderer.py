@@ -50,3 +50,19 @@ class Gr2RendererTests(unittest.TestCase):
                     self.assertEqual(call('gr2_render_planar',[0x50006000,0x50001000,0,0,123,0x50004000,4096]),0)
                     self.assertEqual(bytes(u.mem_read(0x50002000,n)),bytes(y))
                     self.assertEqual(bytes(u.mem_read(0x50003000,n)),bytes(uv)[::2]+bytes(uv)[1::2])
+
+    def test_constant_scratch_shuffle_matches_independent_reference_at_full_sensor_size(self):
+        with tempfile.TemporaryDirectory() as folder:
+            library=Path(folder)/'planar.dylib'
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',str(ROOT/'native/gr2/m10v_planar.c'),'-o',str(library)],check=True,capture_output=True)
+            host=C.CDLL(str(library));host.gr2_chroma_shuffle.argtypes=[C.POINTER(C.c_uint8),C.c_uint32,C.c_int]
+            for n in (*range(1,513),4928*3264//2):
+                with self.subTest(samples=n):
+                    original=bytes(range(251))*(2*n//251)+bytes(range(2*n%251))
+                    pixels=(C.c_uint8*(2*n+8)).from_buffer_copy(b'\xa5'*4+original+b'\xa5'*4)
+                    pointer=C.cast(C.byref(pixels,4),C.POINTER(C.c_uint8))
+                    self.assertEqual(host.gr2_chroma_shuffle(pointer,n,0),1)
+                    expected=bytearray(2*n);expected[::2]=original[:n];expected[1::2]=original[n:]
+                    self.assertEqual(bytes(pixels)[4:-4],bytes(expected))
+                    self.assertEqual(host.gr2_chroma_shuffle(pointer,n,1),1)
+                    self.assertEqual(bytes(pixels),b'\xa5'*4+original+b'\xa5'*4)

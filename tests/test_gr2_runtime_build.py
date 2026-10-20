@@ -78,7 +78,7 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
 
     def test_planar_chroma_conversion_is_reversible_for_odd_plane_lengths_and_preserves_guards(self):
         report=self.build();self.assertIn('gr2_chroma_shuffle',report['symbols']);u=self.machine(report)
-        for n in (1,2,3,7,16,17,31,320,1025):
+        for n in (*range(1,129),320,363,364,365,1025,1092,1093,1094,3279,3280,3281):
             a=bytes(i%251 for i in range(n));b=bytes((i*7+93)%251 for i in range(n));address=0x50001004
             u.mem_write(address-4,b'\xa5'*4+a+b+b'\xa5'*4)
             with self.subTest(n=n):
@@ -174,3 +174,19 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
             self.assertEqual(actual['wire_hex'],expected['wire_hex'])
             self.assertEqual(actual['pointer'],expected['pointer'])
         self.assertEqual(probe_ui_text(code,106,21,native_runtime=report)['pointer'],0)
+
+    def test_planar_conversion_has_linear_bounded_pixel_traffic_without_frame_scratch(self):
+        from unicorn import UC_HOOK_MEM_READ,UC_HOOK_MEM_WRITE,UC_MEM_READ
+        report=self.build();u=self.machine(report);n=8192;address=0x50001004
+        original=bytes((i*17+23)%251 for i in range(2*n));u.mem_write(address-4,b'\xa5'*4+original+b'\xa5'*4)
+        traffic=[0,0]
+        def count(uc,access,pointer,size,value,context):traffic[0 if access==UC_MEM_READ else 1]+=size
+        hook=u.hook_add(UC_HOOK_MEM_READ|UC_HOOK_MEM_WRITE,count,begin=address,end=address+2*n-1)
+        for inverse in (0,1):
+            traffic[:]=[0,0]
+            self.assertEqual(self.call(u,report['symbols']['gr2_chroma_shuffle'],[address,n,inverse]),1)
+            self.assertLess(max(traffic),16*n)
+            expected=original if inverse else bytes(x for pair in zip(original[:n],original[n:]) for x in pair)
+            self.assertEqual(bytes(u.mem_read(address,2*n)),expected)
+        u.hook_del(hook)
+        self.assertEqual(bytes(u.mem_read(address-4,2*n+8)),b'\xa5'*4+original+b'\xa5'*4)

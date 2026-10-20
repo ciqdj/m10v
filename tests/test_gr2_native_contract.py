@@ -218,3 +218,18 @@ class Gr2NativeContractTests(unittest.TestCase):
                 self.assertEqual(report['helpers_intercepted'],[])
         self.assertEqual(module.probe_ui_text(code,0,1)['pointer'],module.probe_ui_text(code,0x350,1)['pointer'])
         with self.assertRaises(ValueError):module.probe_ui_text(code,106,21)
+
+    def test_effect_screen_key_actions_preserve_payload_and_distinct_guarded_routes(self):
+        module=self.implementation();report=module.probe_effect_key_routes(component('gr2','b01firm8'))
+        routes=report['routes'];self.assertEqual(len(routes),17)
+        for source,target in ((0x60001006,0x60002003),(0x60001007,0x60002004),(0x6000100a,0x60002005)):
+            route=next(row for row in routes if row['source_event']==source)
+            self.assertEqual(route['queued_event'],target)
+        left=[row for row in routes if row['source_event']==0x60001008]
+        self.assertEqual(len(left),2);self.assertTrue(all(row['predicate'] for row in left))
+        self.assertEqual({row['queued_event'] for row in left},{0x60002002,0x6000200f})
+        self.assertEqual(next(row['accepted_focus'] for row in left if row['queued_event']==0x60002002),[0,6])
+        self.assertEqual(next(row['accepted_focus'] for row in left if row['queued_event']==0x6000200f),[1])
+        self.assertTrue(all(row['payload']==[0x12345678,0x23456789] for row in routes))
+        self.assertTrue(all(row['returned']==1 for row in routes))
+        self.assertEqual(next(row['source_name'] for row in routes if row['source_event']==0x60001017),'APP_EVENT_SYS_JOG_LEFT')

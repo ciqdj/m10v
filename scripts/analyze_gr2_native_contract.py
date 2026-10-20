@@ -9,12 +9,19 @@ import sys
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.analyze_unity_update import official_profile,_machine,FILE_BASE
 
-def runtime_machine(code:bytes):
-    """Map official high-RAM segments at their declared destinations, never flat."""
+def runtime_machine(code:bytes,*,cpu_model:int|None=None):
+    """Map stock segments using an ARMv5 BE32/MPU instruction model.
+
+    ARM946 is an emulator execution model, not a claim of camera CPU identity.
+    Unicorn defaults to ARM1176, whose endian state across kernel exceptions
+    differs from the older BE32 instructions used by this firmware.
+    """
     official_profile(code,'gr2')
     from scripts.analyze_unity_runtime import parse_executable_load_map
     from unicorn import Uc,UC_ARCH_ARM,UC_MODE_THUMB,UC_MODE_BIG_ENDIAN
     uc=Uc(UC_ARCH_ARM,UC_MODE_THUMB|UC_MODE_BIG_ENDIAN)
+    from unicorn.arm_const import UC_CPU_ARM_946
+    uc.ctl_set_cpu_model(UC_CPU_ARM_946 if cpu_model is None else cpu_model)
     uc.mem_map(0xA0000000,0x1000000);uc.mem_map(0x50000000,0x20000)
     for row in parse_executable_load_map(code)[:15]:
         start=row['source_file_offset'];uc.mem_write(row['address'],code[start:start+row['length']])
@@ -472,6 +479,50 @@ def probe_sd_open_mode(code:bytes,flags:int)->dict:
                 helpers_intercepted=['filesystem readiness','media status','lock','unlock','fopen stop boundary'],
                 scope='Original H: mode-selection instructions and string comparison; no file creation or handle allocation.')
 
+def probe_effect_key_routes(code:bytes)->dict:
+    """Execute original actions from the MONSETEFFECTMODE state event table.
+
+    Predicate addresses and their accepted focus bytes are executed against a
+    synthetic original root. The queue service is an explicit boundary.
+    """
+    from unicorn import UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
+    uc=runtime_machine(code);stop=0x5001f000;event=0x50004000;queued=[];routes=[]
+    word=lambda pointer:struct.unpack('>I',uc.mem_read(pointer,4))[0]
+    state=word(0xA040177C+49*4);events=word(state+0x14)
+    root=0x50008000;uc.mem_write(word(0xA0398DC4),struct.pack('>I',root))
+    names={}
+    for index in range(38):
+        identity,pointer=struct.unpack('>2I',uc.mem_read(0xA040A620+index*8,8))
+        names[identity]=bytes(uc.mem_read(pointer,80)).split(b'\0',1)[0].decode('ascii')
+    def queue(machine,address,size,ctx):
+        queued.append([machine.reg_read(register) for register in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2)])
+        machine.reg_write(UC_ARM_REG_R0,0);machine.reg_write(UC_ARM_REG_PC,machine.reg_read(UC_ARM_REG_LR))
+    uc.hook_add(UC_HOOK_CODE,queue,begin=0xA03948F6,end=0xA03948F6)
+    for index in range(64):
+        descriptor=word(events+index*4)
+        if not descriptor:break
+        data=word(descriptor);action=word(descriptor+8)
+        if not data or not action:continue
+        source=word(data);predicate=word(data+24)
+        uc.mem_write(event,struct.pack('>3I',source,0x12345678,0x23456789));queued.clear()
+        for register,value in ((UC_ARM_REG_R0,0x50008000),(UC_ARM_REG_R1,0),(UC_ARM_REG_R2,event),(UC_ARM_REG_SP,0x50018000),(UC_ARM_REG_LR,stop|1)):
+            uc.reg_write(register,value)
+        uc.emu_start(action,stop,count=1000)
+        if uc.reg_read(UC_ARM_REG_PC)!=stop or len(queued)!=1:raise RuntimeError('effect key action failed bounded queue contract')
+        target,*payload=queued[0];returned=uc.reg_read(UC_ARM_REG_R0);accepted=[]
+        for focus in range(7):
+            if not predicate:accepted.append(focus);continue
+            uc.mem_write(root+0x514,bytes([focus]));uc.reg_write(UC_ARM_REG_SP,0x50018000);uc.reg_write(UC_ARM_REG_LR,stop|1)
+            uc.emu_start(predicate,stop,count=1000)
+            if uc.reg_read(UC_ARM_REG_PC)!=stop:raise RuntimeError('effect focus predicate execution budget exceeded')
+            if uc.reg_read(UC_ARM_REG_R0)==1:accepted.append(focus)
+        routes.append(dict(source_event=source,source_name=names.get(source,'not in base key table'),action=hex(action),
+                           predicate=predicate,accepted_focus=accepted,queued_event=target,payload=payload,returned=returned))
+    else:raise ValueError('effect event list exceeds bounded probe count')
+    return dict(state_id=word(state+32),state_record=hex(state),routes=routes,helpers_intercepted=['UI event queue'],hardware_tested=False,
+                scope='Original effect-screen key actions, names and focus predicates 0..6. Focus transition ownership, actual queue, screen lifecycle and display remain under research.')
+
 def probe_ui_text(code:bytes,text_id:int,language:int,*,native_runtime:dict|None=None)->dict:
     """Execute the original UI localized text lookup without helper substitution."""
     if type(text_id) is not int or not 0<=text_id<=0xffffffff or type(language) is not int or not 0<=language<(0x100000000 if native_runtime is not None else 21):
@@ -545,7 +596,7 @@ def main():
                 rtc=probe_rtc_get_time(code,(2026,10,20,18,30,45)),
                 memory_policy=[probe_memory_policy(code,boot_mode=mode) for mode in (0,1,3,4)],
                 raw_for_dng=[probe_raw_for_dng(code,present=present) for present in (False,True)],
-                effect_menu=probe_effect_menu(code),task_context=probe_task_context(code),
+                effect_menu=probe_effect_menu(code),effect_key_routes=probe_effect_key_routes(code),task_context=probe_task_context(code),
                 ui_text=[probe_ui_text(code,106,language) for language in range(21)],
                 sd_file_lifecycle=probe_sd_file_lifecycle(code),
                 c_heap=probe_c_heap_startup(code),reserved_c_heap=probe_c_heap_startup(code,reserved_end=0xa0800000),
