@@ -1,0 +1,1082 @@
+{
+  "schema": "m10v-unity-parity/v1",
+  "baseline": {
+    "commit": "a3773e4",
+    "required_ids": [
+      "firmware.inventory",
+      "firmware.header",
+      "firmware.update-checksum",
+      "firmware.version-policy",
+      "film.catalog",
+      "film.slots",
+      "film.lut-import",
+      "film.color-rendering",
+      "film.exposure",
+      "film.grain",
+      "film.grain-size",
+      "film.soft",
+      "film.halation",
+      "film.light-leak",
+      "camera.menu",
+      "camera.icons",
+      "camera.persistence",
+      "camera.capture-lifecycle",
+      "sd.export",
+      "sd.camera-load",
+      "stamp.datetime",
+      "stamp.film-name",
+      "tools.recipes",
+      "tools.names-icons",
+      "tools.negative-grain",
+      "tools.raw-nr",
+      "tools.ratios",
+      "tools.level",
+      "images.startup",
+      "images.shutdown",
+      "web.import",
+      "web.catalog",
+      "web.preview",
+      "web.state",
+      "web.config",
+      "web.build",
+      "web.navigation",
+      "web.debug"
+    ],
+    "selectable_films": 46,
+    "active_slots": 5
+  },
+  "features": [
+    {
+      "id": "firmware.inventory",
+      "label": "官方固件识别、组件和资源读取",
+      "baseline_files": [
+        "node/model-firmware.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "verified_offline",
+          "implementation_files": [
+            "node/gr2-firmware.mjs"
+          ],
+          "evidence_files": [
+            "docs/research/gr1-gr2-official-evidence-2026-10-20.md"
+          ],
+          "automated_checks": [
+            "node scripts/analyze_gr2_firmware.mjs bin/rg2_v003.frm --out data/research/gr2"
+          ],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "firmware.header",
+      "label": "原厂头识别",
+      "baseline_files": [
+        "scripts/analyze_gr2_update.py"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "firmware.update-checksum",
+      "label": "修改后的完整性校验",
+      "baseline_files": [
+        "node/gr2-firmware.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "firmware.version-policy",
+      "label": "版本适配与原厂恢复",
+      "baseline_files": [
+        "node/gr3-version-unlock.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.catalog",
+      "label": "46款胶卷与稳定历史ID",
+      "baseline_files": [
+        "node/gr3-native-library.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.slots",
+      "label": "五槽配置与静态Standard基底",
+      "baseline_files": [
+        "native/gr3/m10v_library.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.lut-import",
+      "label": "自定义LUT导入及命名",
+      "baseline_files": [
+        "web/gr3/sd-library.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.color-rendering",
+      "label": "JPEG色彩与各胶卷管线",
+      "baseline_files": [
+        "native/gr3/m10v_library.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.exposure",
+      "label": "蓝凤凰和RED曝光变体",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.grain",
+      "label": "每槽颗粒强度",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.grain-size",
+      "label": "颗粒尺寸",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.soft",
+      "label": "每槽柔光",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.halation",
+      "label": "800T及蓝凤凰光晕全部参数",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "film.light-leak",
+      "label": "漏光强度位置扩散与变化",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "camera.menu",
+      "label": "原生入口焦点按键退出与原厂回退",
+      "baseline_files": [
+        "native/gr3/m10v_library_camera.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "camera.icons",
+      "label": "目录图标文字及中文字体",
+      "baseline_files": [
+        "scripts/generate_m10v_icons.py"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "camera.persistence",
+      "label": "参数保存与重启恢复",
+      "baseline_files": [
+        "native/gr3/m10v_library_camera.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "camera.capture-lifecycle",
+      "label": "JPEG/RAW保护缓存模式与取消",
+      "baseline_files": [
+        "native/gr3/m10v_library_capture.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "sd.export",
+      "label": "胶卷包选择与ZIP导出",
+      "baseline_files": [
+        "web/gr3/sd-library.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "sd.camera-load",
+      "label": "机内换卷保存及损坏包处理",
+      "baseline_files": [
+        "native/gr3/m10v_library_camera.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "stamp.datetime",
+      "label": "相机时钟日期时间格式位置颜色",
+      "baseline_files": [
+        "native/gr3/m10v_library.c"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "stamp.film-name",
+      "label": "胶卷名称印记",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "tools.recipes",
+      "label": "配方位置参数默认值和重置",
+      "baseline_files": [
+        "node/gr3-customization.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "tools.names-icons",
+      "label": "原厂名称原图标社区与自定义图标",
+      "baseline_files": [
+        "node/gr3-customization.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "tools.negative-grain",
+      "label": "负片颗粒",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "tools.raw-nr",
+      "label": "RAW降噪原厂关闭ISO阈值",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "tools.ratios",
+      "label": "画幅及65:24",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "tools.level",
+      "label": "水平仪方向位置颜色与恢复",
+      "baseline_files": [
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "images.startup",
+      "label": "开机图上传裁切预览与恢复",
+      "baseline_files": [
+        "web/gr3/power-images.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "images.shutdown",
+      "label": "关机图上传裁切预览与恢复",
+      "baseline_files": [
+        "web/gr3/power-images.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.import",
+      "label": "上传拖放官方来源内容识别与备份",
+      "baseline_files": [
+        "web/gr3/studio.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.catalog",
+      "label": "胶卷搜索分类与五槽同步",
+      "baseline_files": [
+        "web/gr3/native-library.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.preview",
+      "label": "胶卷照片与质感预览",
+      "baseline_files": [
+        "web/gr3/preview-controller.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.state",
+      "label": "草稿来源隔离撤销重做模式切换",
+      "baseline_files": [
+        "web/gr3/workbench-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.config",
+      "label": "配置导入导出与校验",
+      "baseline_files": [
+        "web/gr3/native-library.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.build",
+      "label": "预检保存确认构建取消及下载",
+      "baseline_files": [
+        "web/gr3/firmware-save-gate.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.navigation",
+      "label": "机型导航SD页面说明与日志",
+      "baseline_files": [
+        "web/shared/navigation.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    },
+    {
+      "id": "web.debug",
+      "label": "调试模式与SD日志",
+      "baseline_files": [
+        "web/gr3/studio.js"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        }
+      }
+    }
+  ]
+}
