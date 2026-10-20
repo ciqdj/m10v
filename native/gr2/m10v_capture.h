@@ -5,8 +5,19 @@
 /* Synchronous software adapter only. Camera lifecycle admission is separate. */
 int gr2_render_planar(const m10v_gr2_image *,const m10v_library_state *,uint32_t,
                       const m10v_library_date *,uint32_t,uint8_t *,uint32_t);
+/* Inline value-only payload; stock clone copies it without new references.
+ * This bridge does not itself resize a pool or install a capture hook. */
+typedef struct {
+    uint32_t magic,version,slot,seed;
+    m10v_library_state state;
+    uint32_t crc,reserved;
+} m10v_gr2_frame;
+int gr2_frame_freeze(uint8_t *,const m10v_library_state *,uint32_t,uint32_t);
+int gr2_frame_read(const uint8_t *,m10v_gr2_frame *);
+uint32_t gr2_image_owner_bytes(const uint8_t *);
 /* The real camera hook must also establish event completion and cache aliases. */
 int gr2_capture_admit(const uint8_t *,uint32_t,const uint8_t *,m10v_gr2_image *);
 
+int gr2_capture_frozen(const uint8_t *,uint32_t,const uint8_t *);
 int gr2_capture_process(const uint8_t *,uint32_t,const uint8_t *,const m10v_library_state *,uint32_t);
 #endif

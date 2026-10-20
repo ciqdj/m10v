@@ -102,6 +102,94 @@ def probe_rtos_pool(code:bytes,*,native_runtime:dict|None=None)->dict:
                 oversized_returned=oversized,allocation_returns=allocation_returns,free_returned=released,reallocate_returned=allocated_again,reallocated_pointer=again,helpers_intercepted=[],
                 hardware_tested=False,scope='Original RTOS pool arithmetic and lifecycle; synthetic one-pool kernel table and single-thread SVC CPU context. Scheduler/concurrency not emulated.')
 
+def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None)->dict:
+    """Original fixed-block image pool/factory/clone/retirement CPU evidence.
+
+    Extra bytes change only the size table in synthetic RAM. Mutex operations
+    are explicit single-thread boundaries; MPF arithmetic and object ownership
+    helpers, property setters, zeroing/copying and releases execute unchanged.
+    """
+    if type(extra) is not int or not 0<=extra<=4096 or extra&3:raise ValueError('bounded aligned synthetic inline extension required')
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_map(0xA1000000,0x200000);stop=0x5001f000;stack=0x50018000
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    for maximum,pointer,table,count,stride in ((0xA00B5BFE,0xA00B5BE0,0x50007000,1,28),(0xA00B5BFC,0xA00B5BDC,0x50008000,2,24)):
+        uc.mem_write(maximum,struct.pack('>H',count));uc.mem_write(pointer,struct.pack('>I',table))
+        for index in range(count):uc.mem_write(table+index*stride,struct.pack('>h',-2))
+    def run(entry,*args,thumb=True):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1 if thumb else stop)
+        uc.emu_start(entry|1 if thumb else entry,stop,count=3000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('original fixed-pool/factory budget or stack failure')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    run(0xA0024BCA);pool_creates=[];mutex_calls=[]
+    def boundary(machine,address,size,context):
+        if address==0xA0024E16:
+            pool_creates.append([machine.reg_read(register) for register in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]);return
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original fixed-pool/factory assertion')
+        mutex_calls.append(hex(address));machine.reg_write(r.UC_ARM_REG_R0,0x50009000 if address==0xA0027270 else 0)
+        machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0024E16,0xA0027270,0xA0027360,0xA00273A4,0xA0039F9C,0xA003A01A):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    if extra:uc.mem_write(0xA01137EC,struct.pack('>I',0xfb0c+extra))
+    run(0xA00E1DF0)
+    uc.mem_map(0x51000000,0x10000)
+    uc.mem_write(0x51000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x51000000,0x50003000,0x383))
+    uc.mem_write(0x50003000,struct.pack('>6I',0,0x51006000,0x383,0x5000D000,0,0))
+    source=run(0xA029B4E0,0);header=bytes(uc.mem_read(source-8,8));payload_bytes=0xfb0c+extra
+    if native_runtime:uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    owner_entry=native_runtime['symbols']['gr2_image_owner_bytes'] if native_runtime else None
+    constructor_zeroed=bytes(uc.mem_read(source,payload_bytes))==b'\x01'+bytes(payload_bytes-1)
+    count_after=word(0x5000D000+0x347*4)
+    frame_clone={}
+    if owner_entry and extra==128:
+        run(native_runtime['symbols']['m10v_library_init'],0x50002000,thumb=False)
+        frame_clone['freeze']=run(native_runtime['symbols']['gr2_frame_freeze'],source,0x50002000,2,0x12345678,thumb=False)
+    elif extra:uc.mem_write(source+0xfb0c,b'\xa5'*extra)
+    original=bytes(uc.mem_read(source,payload_bytes));clone=run(0xA029B57C if owner_entry else 0xA00E1E9E,source)
+    clone_matches=bytes(uc.mem_read(clone,payload_bytes))==original
+    inline_cloned=not extra or bytes(uc.mem_read(clone+0xfb0c,extra))==original[0xfb0c:]
+    if frame_clone:
+        uc.mem_write(0x50002000,b'\xa5'*104)
+        frame_clone['read']=run(native_runtime['symbols']['gr2_frame_read'],clone,0x50003080,thumb=False)
+        frame_clone['matches']=bytes(uc.mem_read(0x50003080,128))==original[0xfb0c:]
+    owner_live=[];owner_rejected=[];owner_retired=[]
+    if owner_entry:
+        owner_live=[run(owner_entry,pointer,thumb=False) for pointer in (source,clone)]
+        uc.mem_write(0x50005000,b'IMG '+bytes(4))
+        owner_rejected=[run(owner_entry,pointer,thumb=False) for pointer in (source+4,clone+4,0x50005008,source+60*(payload_bytes+8))]
+        uc.mem_write(0xA01137EC,struct.pack('>I',payload_bytes+4));owner_rejected.append(run(owner_entry,source,thumb=False));uc.mem_write(0xA01137EC,struct.pack('>I',payload_bytes))
+        uc.mem_write(0x50008010,struct.pack('>I',payload_bytes+12));owner_rejected.append(run(owner_entry,source,thumb=False));uc.mem_write(0x50008010,struct.pack('>I',payload_bytes+8))
+    if owner_entry:
+        uc.mem_write(0x50004004,struct.pack('>I',clone));run(0xA029B522,0x50004004)
+    else:run(0xA00E2020,clone)
+    uc.mem_write(0x50004000,struct.pack('>I',source));run(0xA029B522,0x50004000)
+    retired_slot_cleared=word(0x50004000)==0;count_retired=word(0x5000D000+0x347*4)
+    if owner_entry:owner_retired=[run(owner_entry,pointer,thumb=False) for pointer in (source,clone)]
+    # MPF links overwrite the poison word after the generic free marks 'void'.
+    # Assert the actual released header is no longer live, not a retained tag.
+    invalid=bytes(uc.mem_read(source-8,4))!=b'IMG ' and bytes(uc.mem_read(clone-8,4))!=b'IMG '
+    allocated=[];allocation_results=[]
+    for index in range(61):
+        value=run(0xA00674B0,1,0x50001000,thumb=False);allocation_results.append(value)
+        if value&0x80000000:break
+        allocated.append(word(0x50001000))
+    else:raise RuntimeError('original fixed pool exceeded its declared count')
+    released=[run(0xA0067640,1,pointer,thumb=False) for pointer in allocated]
+    again=run(0xA00674B0,1,0x50001000,thumb=False);again_pointer=word(0x50001000)
+    final_release=run(0xA0067640,1,again_pointer,thumb=False) if again==0 else 0xffffffff
+    return dict(native_frame_clone=frame_clone,native_owner_live=owner_live,native_owner_rejected=owner_rejected,native_owner_retired=owner_retired,pool_counts=[row[1] for row in pool_creates],pool_block_bytes=[row[2] for row in pool_creates],
+                pool_data=[hex(row[0]) for row in pool_creates],inline_extra=extra,constructor_zeroed=constructor_zeroed,
+                header_magic=header[:4].decode('ascii'),object_kind=struct.unpack_from('>I',header,4)[0],
+                source=hex(source),clone=hex(clone),counter_after_construct=count_after,clone_matches=clone_matches,
+                inline_extension_cloned=inline_cloned,freed_magic_invalid=invalid,counter_after_retirement=count_retired,
+                retired_slot_cleared=retired_slot_cleared,exhausted_return=allocation_results[-1],unique_blocks=len(set(allocated)),
+                all_blocks_released=len(allocated)==60 and released==[0]*60 and again==0 and final_release==0,
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,mutex_calls=len(mutex_calls),helpers_intercepted=['mutex create/lock/unlock'],hardware_tested=False,
+                scope='Original image fixed-pool initialization, MPF create/allocate/free, type0 factory/property count, zeroing, clone and slot retirement. Synthetic kernel tables, no-observer property bank, mutex boundaries and optional RAM-only size-table extension; no firmware patch, capture concurrency or peak-memory proof.')
+
 def probe_memory_regions(code:bytes,sizes:list[int])->dict:
     """Original region initialization and bump allocator; only RTOS pool creation is synthetic."""
     official_profile(code,'gr2')
@@ -1072,7 +1160,7 @@ def main():
                 sd_tell=[probe_sd_tell(code,position) for position in (0,104,0x100000001)],
                 sd_seek=[probe_sd_seek(code,offset,origin) for offset,origin in ((0,0),(4096,0),(-1,1),(-4096,2))],
                 c_heap=probe_c_heap_startup(code),reserved_c_heap=probe_c_heap_startup(code,reserved_end=0xa0800000),
-                memory_regions=probe_memory_regions(code,[1,17,1024]),rtos_pool=probe_rtos_pool(code),
+                memory_regions=probe_memory_regions(code,[1,17,1024]),rtos_pool=probe_rtos_pool(code),image_object_pools=[probe_image_object_pools(code,extra=extra) for extra in (0,128)],
                 isp_completion_wait=probe_isp_completion_wait(code),
                 main_yuv_handoff=probe_main_yuv_handoff(code),
                 capture_owner=[probe_capture_owner(code,kind) for kind in (1,2,3)],

@@ -184,6 +184,28 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertTrue(report['stack_preserved'])
         self.assertTrue(report['low_module_loaded'])
 
+    def test_original_image_object_fixed_pools_own_construct_clone_and_retirement(self):
+        module=self.implementation()
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        for extra in (0,128):
+            with self.subTest(inline_extension=extra):
+                report=module.probe_image_object_pools(component('gr2','b01firm8'),extra=extra)
+                self.assertEqual(report['pool_counts'],[60,91])
+                self.assertEqual(report['pool_block_bytes'],[0xfb14+extra,0x7f00])
+                self.assertTrue(report['constructor_zeroed'])
+                self.assertEqual(report['header_magic'],'IMG ')
+                self.assertEqual(report['counter_after_construct'],1)
+                self.assertTrue(report['clone_matches'])
+                self.assertTrue(report['inline_extension_cloned'])
+                self.assertTrue(report['freed_magic_invalid'])
+                self.assertEqual(report['counter_after_retirement'],0)
+                self.assertTrue(report['retired_slot_cleared'])
+                self.assertEqual(report['exhausted_return'],0xffffffce)
+                self.assertEqual(report['unique_blocks'],60)
+                self.assertTrue(report['all_blocks_released'])
+                self.assertTrue(report['stack_preserved'])
+                self.assertEqual(report['helpers_intercepted'],['mutex create/lock/unlock'])
+
     def test_original_main_yuv_handoff_sets_valid_length_before_encode(self):
         module=self.implementation()
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
