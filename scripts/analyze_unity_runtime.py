@@ -60,31 +60,71 @@ def probe_gr2_rom_capacity(code:bytes,image_kind:int,requested_bytes:int)->dict:
                 policy_entry=hex(fields[6]&~1),helpers_intercepted=['NAND_driver_ready','driver_unlock'],
                 scope='Original constant descriptor, 256-sector NAND block calculation and inclusive size comparison; no flash access.')
 
-def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None)->dict:
+def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None)->dict:
     """Run original startup orchestration; subsystem bodies are external boundaries."""
     official_profile(code,'gr2');phase_results=phase_results or {}
     if any(type(k) is not int or type(v) is not int or not 0<=k<16 or not 0<=v<=0xffffffff for k,v in phase_results.items()):
         raise ValueError('invalid synthetic startup phase results')
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
-    machine=_machine(code);modules=[];events=[]
-    calls=(0xA002270C,0xA0022E28,0xA0023234,0xA002323A,0xA002323C,0xA002323E,
+    machine=_machine(code);modules=[];events=[];post_load_return=None
+    native_result={};native_stream=b'';context=0x50003000;header_address=0x50004000
+    if native_runtime is not None:
+        runtime=bytes.fromhex(native_runtime['runtime_hex']);base=native_runtime['base'];memory=native_runtime['memory_bytes']
+        if base!=0xa0798000 or memory<len(runtime) or memory>0x68000 or len(runtime)%4:
+            raise ValueError('bounded aligned native runtime required')
+        if hashlib.sha256(runtime).hexdigest()!=native_runtime['runtime_sha256'] or native_runtime['endianness']!='big' or native_runtime['be8']:
+            raise ValueError('audited BE32 runtime required')
+        patch=bytes.fromhex(native_runtime['startup_patch_hex'])
+        if len(patch)!=8 or patch[:4]!=bytes.fromhex('4b004718'):raise ValueError('native startup veneer differs')
+        machine.mem_map(base,0x68000);machine.mem_write(base,b'\xa5'*memory)
+        machine.mem_write(0xA0020AB4,patch)
+        header=bytearray(code[:512]);struct.pack_into('>5I',header,0x20+14*20,0,base,len(runtime),base+len(runtime),memory-len(runtime))
+        machine.mem_write(header_address,bytes(header));machine.mem_write(_context_pointer(code,'gr2'),struct.pack('>I',context))
+        native_stream=runtime+bytes((-len(runtime))%512);machine.mem_map(0x54000000,4096)
+    calls=(0xA002270C,0xA0022E28,0xA002323A,0xA002323C,0xA002323E,
            0xA0023240,0xA00AFD9C,0xA00C63A6,0xA015D458,0xA0296804,0xA039130A)
     def boundary(uc,address,size,ctx):
+        nonlocal post_load_return
+        if address==0xA0020ABC:
+            post_load_return=uc.reg_read(UC_ARM_REG_R0);return
         if address==0xA0020AB4:
-            events.append(['post_load',0]);return
+            events.append(['post_load',0])
+            if native_runtime is not None:
+                native_result['native_loaded_by_original_indexed_loader']=(machine.mem_read(context+0x108+14,1)==b'\x01' and bytes(machine.mem_read(base,len(runtime)))==runtime)
+                native_result['native_bss_zero_before_init']=bytes(machine.mem_read(base+len(runtime),memory-len(runtime)))==bytes(memory-len(runtime))
+            return
         first=uc.reg_read(UC_ARM_REG_R0)
+        if native_runtime is not None and address in (0xA00566BC,0xA005658E,0x54000000):
+            from unicorn.arm_const import UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3
+            second,count,fourth=[uc.reg_read(r) for r in (UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3)]
+            if address==0xA00566BC:result=header_address
+            elif address==0xA005658E:
+                uc.mem_write(second,bytes(60));uc.mem_write(second+0x2c,struct.pack('>I',0x54000001));result=0
+            else:
+                if (second+count)*512>len(native_stream):raise ValueError('native module read exceeds synthetic storage')
+                uc.mem_write(first,native_stream[second*512:(second+count)*512]);result=0
+            uc.reg_write(UC_ARM_REG_R0,result);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR));return
         if address==0xA0022E28:
-            modules.append(first);events.append(['module',first]);result=0
-        elif address==0xA00C63A6:result=phase_results.get(first,0)
+            if first==0xffffffff:events.append(['finalize',first])
+            else:modules.append(first);events.append(['module',first])
+            if native_runtime is not None and first==14:
+                from unicorn.arm_const import UC_ARM_REG_R1
+                uc.reg_write(UC_ARM_REG_R1,0);uc.reg_write(UC_ARM_REG_PC,0xA0056723);return
+            result=0
+        elif address==0xA00C63A6:
+            events.append(['phase',first]);result=phase_results.get(first,0)
         else:result=0
         uc.reg_write(UC_ARM_REG_R0,result);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
-    for address in (*calls,0xA0020AB4):machine.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    extra=(0xA00566BC,0xA005658E,0x54000000) if native_runtime is not None else ()
+    for address in (*calls,0xA0020AB4,0xA0020ABC,*extra):machine.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     machine.reg_write(UC_ARM_REG_SP,0x50018000);machine.reg_write(UC_ARM_REG_LR,0x5001f001)
     machine.emu_start(0xA0020945,0x5001f000,count=10000)
     if machine.reg_read(UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('startup orchestration exceeded execution budget')
-    return dict(entry='0xa0020944',module_indices=modules,events=events,returned=machine.reg_read(UC_ARM_REG_R0),
-                post_load_call='0xa0020ab4',post_load_original_target='0xa0023234',
+    if native_runtime is not None:
+        native_result['native_boot_count']=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_boot_count'],4))[0]
+    return dict(**native_result,entry='0xa0020944',module_indices=modules,events=events,returned=machine.reg_read(UC_ARM_REG_R0),
+                post_load_call='0xa0020ab4',post_load_original_target='0xa0023234',post_load_return=post_load_return,
                 post_load_original_bytes=code[0xA0020AB4-FILE_BASE:0xA0020AB8-FILE_BASE].hex(),
                 helpers_intercepted=[hex(a) for a in calls],
                 scope='Original startup branch/call order only; subsystem initialization and module reads are synthetic boundaries.')
@@ -288,7 +328,7 @@ def analyze_runtime(component:bytes,model:str)->dict:
             row['boundary_checks']=dict(at_capacity_returned=maximum['returned'],over_capacity_returned=overflow['returned'])
         if not all(indexed[k] for k in ('payload_matches','aux_zeroed','guards_unchanged','loaded')) or indexed['returned']!=0:
             raise ValueError('original indexed loader contract proof failed')
-        if startup['module_indices'][-1]!=14 or startup['events'][-2:]!=[['module',14],['post_load',0]]:
+        if startup['module_indices'][-1]!=14 or startup['events'][-5:]!=[['module',14],['post_load',0],['phase',0],['phase',0xffffffff],['finalize',0xffffffff]]:
             raise ValueError('original startup ordering proof failed')
         startup_evidence=dict(indexed_loader_cpu=indexed,startup_cpu=startup,rom_capacity_cpu=capacity)
     return dict(schema='m10v-unity-loader-proof/v2',model=model,component_sha256=hashlib.sha256(component).hexdigest(),

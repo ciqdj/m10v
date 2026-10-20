@@ -1,0 +1,52 @@
+"""GR II big-endian scalar rendering must match the shared host algorithms."""
+import ctypes as C
+from pathlib import Path
+import shutil
+import struct
+import subprocess
+import tempfile
+import unittest
+import zlib
+from tests.test_unity_update import ROOT,component
+
+class Gr2RendererTests(unittest.TestCase):
+    def test_big_endian_catalog_render_matches_host_reference_pixels(self):
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        from tests.test_gr3_m10v_library import State,Image
+        from unicorn import Uc,UC_ARCH_ARM,UC_MODE_ARM,UC_MODE_BIG_ENDIAN,arm_const as r
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)
+            report=build_gr2_runtime(component('gr2','b01firm8'),{},path)
+            self.assertIn('m10v_library_render',report['symbols'],'GR II runtime lacks the shared scalar renderer')
+            library=path/'host.dylib';sources=['m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks']
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',*[str(ROOT/f'native/gr3/{name}.c') for name in sources],'-o',str(library)],check=True,capture_output=True)
+            host=C.CDLL(str(library));host.m10v_library_init.argtypes=[C.POINTER(State)]
+            host.m10v_library_render.argtypes=[C.POINTER(Image),C.POINTER(State),C.c_uint32,C.c_void_p,C.c_uint32,C.c_void_p,C.c_uint32]
+            u=Uc(UC_ARCH_ARM,UC_MODE_ARM|UC_MODE_BIG_ENDIAN);u.mem_map(report['base'],0x68000);u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']));u.mem_map(0x50000000,0x20000)
+            def call(name,args):
+                for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):u.reg_write(reg,value)
+                for i,value in enumerate(args[4:]):u.mem_write(0x50018000+4*i,struct.pack('>I',value))
+                u.reg_write(r.UC_ARM_REG_SP,0x50018000);u.reg_write(r.UC_ARM_REG_LR,0x5001f000)
+                u.emu_start(report['symbols'][name],0x5001f000,count=10000000)
+                self.assertEqual(u.reg_read(r.UC_ARM_REG_PC),0x5001f000)
+                return u.reg_read(r.UC_ARM_REG_R0)
+            width,height=8,4;n=width*height
+            initial_y=bytes((i*37+13)%256 for i in range(n));initial_uv=bytes((i*11+93)%256 for i in range(n))
+            for film,grain,leak,exposure in [(film,0,0,0) for film in range(1,79)]+[(66,2,0,0),(67,3,4,1),(68,2,0,2),(70,1,8,0)]:
+                with self.subTest(film=film,grain=grain,leak=leak,exposure=exposure):
+                    state=State();host.m10v_library_init(C.byref(state));state.slots[0].film=film;state.slots[0].grain=grain;state.effects[0][1]=leak;state.effects[0][5]=exposure
+                    state.crc=zlib.crc32(bytes(state)[:100])
+                    y=(C.c_uint8*n).from_buffer_copy(initial_y);uv=(C.c_uint8*n).from_buffer_copy(initial_uv);scratch=(C.c_uint8*4096)()
+                    image=Image(y,uv,n,n,width,height,width)
+                    self.assertEqual(host.m10v_library_render(C.byref(image),C.byref(state),0,None,123,scratch,4096),0)
+                    call('m10v_library_init',[0x50001000]);be=bytearray(u.mem_read(0x50001000,104));struct.pack_into('>H',be,12,film);be[14]=grain;be[57]=leak;be[61]=exposure;struct.pack_into('>I',be,100,zlib.crc32(be[:100]));u.mem_write(0x50001000,bytes(be))
+                    u.mem_write(0x50002000,initial_y);u.mem_write(0x50003000,initial_uv);u.mem_write(0x50004000,bytes(4096))
+                    u.mem_write(0x50005000,struct.pack('>7I',0x50002000,0x50003000,n,n,width,height,width))
+                    self.assertEqual(call('m10v_library_render',[0x50005000,0x50001000,0,0,123,0x50004000,4096]),0)
+                    self.assertEqual(bytes(u.mem_read(0x50002000,n)),bytes(y));self.assertEqual(bytes(u.mem_read(0x50003000,n)),bytes(uv))
+                    self.assertIn('gr2_render_planar',report['symbols'])
+                    u.mem_write(0x50002000,initial_y);u.mem_write(0x50003000,initial_uv[::2]+initial_uv[1::2])
+                    u.mem_write(0x50006000,struct.pack('>11I',0x50002000,0x50003000,0x50003000+n//2,n,n//2,n//2,width,height,width,width//2,0x422))
+                    self.assertEqual(call('gr2_render_planar',[0x50006000,0x50001000,0,0,123,0x50004000,4096]),0)
+                    self.assertEqual(bytes(u.mem_read(0x50002000,n)),bytes(y))
+                    self.assertEqual(bytes(u.mem_read(0x50003000,n)),bytes(uv)[::2]+bytes(uv)[1::2])

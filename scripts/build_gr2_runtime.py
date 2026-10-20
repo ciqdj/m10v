@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Build/audit the GR II BE32 ABI foundation. Does not package camera firmware."""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import struct
+import subprocess
+import sys
+if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from scripts.analyze_unity_update import official_profile
+ROOT=Path(__file__).resolve().parents[1]
+BASE=0xA0798000
+LIMIT=0xA0800000
+FLAGS=['--target=armeb-none-eabi','-march=armv4t','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-vectorize','-fno-slp-vectorize','-Wall','-Wextra','-Werror']
+
+def audit_elf(data:bytes)->dict:
+    if data[:7]!=b'\x7fELF\x01\x02\x01' or struct.unpack_from('>HH',data,16)!=(2,40):raise ValueError('big-endian ARM ELF32 executable required')
+    flags=struct.unpack_from('>I',data,36)[0]
+    if flags&0x800000:raise ValueError('BE8 instructions cannot execute as original BE32')
+    phoff,shoff=struct.unpack_from('>II',data,28)
+    phsize,phcount,shsize,shcount,shnames=struct.unpack_from('>5H',data,42)
+    if phsize!=32 or shsize!=40 or phoff+phcount*32>len(data) or shoff+shcount*40>len(data):raise ValueError('ELF directory bounds invalid')
+    loads=[]
+    for i in range(phcount):
+        row=struct.unpack_from('>8I',data,phoff+i*32)
+        if row[0]!=1:continue
+        _,offset,address,physical,filesize,memsize,permissions,alignment=row
+        if offset+filesize>len(data) or filesize>memsize or address!=BASE or memsize>LIMIT-BASE:raise ValueError('runtime load range exceeds reserved window')
+        loads.append((offset,address,filesize,memsize))
+    if len(loads)!=1:raise ValueError('one bounded runtime load segment required')
+    offset,address,filesize,memsize=loads[0]
+    sections=[struct.unpack_from('>10I',data,shoff+i*40) for i in range(shcount)]
+    symbols={};undefined=[]
+    for row in sections:
+        if row[1]!=2:continue
+        if row[9]!=16 or row[6]>=shcount or row[4]+row[5]>len(data):raise ValueError('ELF symbol table invalid')
+        st=sections[row[6]];strings=data[st[4]:st[4]+st[5]]
+        for at in range(row[4],row[4]+row[5],16):
+            name,value,size,info,other,index=struct.unpack_from('>IIIBBH',data,at)
+            label=strings[name:].split(b'\0',1)[0].decode('ascii')
+            if label and not index:undefined.append(label)
+            if label.startswith(('gr2_','m10v_library_','m10v_sd_')) and info>>4:
+                if not BASE<=value<BASE+memsize:raise ValueError('export outside runtime')
+                symbols[label]=value
+    if undefined:raise ValueError('unresolved runtime helpers: '+','.join(undefined))
+    required={'gr2_post_load','gr2_boot_count','gr2_capture_decode','gr2_date_valid','gr2_startup_chain'}
+    if not required<=symbols.keys():raise ValueError('required GR II ABI exports missing')
+    return dict(base=address,code_bytes=filesize,memory_bytes=memsize,runtime_hex=data[offset:offset+filesize].hex(),symbols=symbols,undefined_symbols=undefined,endianness='big',be8=False)
+
+def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
+    profile=official_profile(official,'gr2')
+    if configuration!={}:raise ValueError('feature configuration is not yet connected to this ABI foundation')
+    clang=shutil.which('clang');linker=shutil.which('ld.lld')
+    if not clang or not linker:raise RuntimeError('clang and ld.lld required for GR II BE32 build')
+    from scripts.verify_gr3_5207_reference import verify
+    from scripts.verify_gr3_harman_reference import verify as verify_harman
+    from scripts.verify_gr3_curated_reference import verify as verify_curated
+    from scripts.verify_gr3_newstocks_reference import verify as verify_newstocks
+    for check in (verify,verify_harman,verify_curated,verify_newstocks):check(ROOT)
+    out_dir=Path(out_dir);out_dir.mkdir(parents=True,exist_ok=True)
+    obj=out_dir/'model.o';elf=out_dir/'model.elf';script=out_dir/'model.ld'
+    script.write_text('ENTRY(gr2_post_load)\nPHDRS { image PT_LOAD FLAGS(7); }\nSECTIONS { . = 0xA0798000; .text : { *(.text*) } :image .rodata : { *(.rodata*) } :image .data : { *(.data*) . = ALIGN(4); } :image .bss (NOLOAD) : { *(.bss*) *(COMMON) } :image /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) } }\n')
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_model.c'),'-o',str(obj)],check=True,capture_output=True)
+    startup=out_dir/'startup.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_startup.S'),'-o',str(startup)],check=True,capture_output=True)
+    planar=out_dir/'planar.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_planar.c'),'-o',str(planar)],check=True,capture_output=True)
+    capture=out_dir/'capture.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_capture.c'),'-o',str(capture)],check=True,capture_output=True)
+    storage=out_dir/'storage.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_storage.c'),'-o',str(storage)],check=True,capture_output=True)
+    services=out_dir/'services.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_services.c'),'-o',str(services)],check=True,capture_output=True)
+    render_objects=[str(planar),str(capture),str(storage),str(services)]
+    for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library'):
+        target=out_dir/(name+'.o')
+        subprocess.run([clang,*FLAGS,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
+        render_objects.append(str(target))
+    subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
+    report=audit_elf(elf.read_bytes())
+    report['startup_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_startup_chain'])).hex()
+    report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
+                  runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),
+                  limits=['Shared scalar renderer and ABI bridges; capture ownership/cache/mode lifecycle and menu/storage integration remain researching.','Reserved C-heap window needs original literal adjustment; no firmware patch or download is emitted.','ARMv4T soft-float subset avoids assuming a newer CPU or floating-point unit.'])
+    (out_dir/'runtime-audit.json').write_text(json.dumps(report,indent=2)+'\n')
+    return report
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--component',required=True,type=Path);parser.add_argument('--out',required=True,type=Path);args=parser.parse_args()
+    report=build_gr2_runtime(args.component.read_bytes(),{},args.out)
+    print(json.dumps({key:report[key] for key in ('code_bytes','memory_bytes','endianness','be8','can_package')}))
+if __name__=='__main__':main()

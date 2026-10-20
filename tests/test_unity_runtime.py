@@ -96,7 +96,7 @@ class UnityRuntimeTests(unittest.TestCase):
         report=implementation().probe_gr2_startup_order(component('gr2','b01firm8'))
         self.assertEqual(report['module_indices'],[0,1,4,2,3,5,10,11,8,9,6,12,13,14])
         self.assertEqual(report['post_load_call'],'0xa0020ab4')
-        self.assertEqual(report['events'][-2:],[['module',14],['post_load',0]])
+        self.assertEqual(report['events'][-5:-3],[['module',14],['post_load',0]])
         self.assertEqual(report['returned'],0)
 
     def test_gr2_early_startup_branches_still_load_record_14(self):
@@ -108,7 +108,7 @@ class UnityRuntimeTests(unittest.TestCase):
             with self.subTest(outcomes=outcomes):
                 report=module.probe_gr2_startup_order(code,phase_results=outcomes)
                 self.assertEqual(report['module_indices'][-1],14)
-                self.assertEqual(report['events'][-2:],[['module',14],['post_load',0]])
+                self.assertEqual(report['events'][-5:-3],[['module',14],['post_load',0]])
 
     def test_gr2_original_rom_size_policy_keeps_exact_capacity_boundaries(self):
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
@@ -121,4 +121,10 @@ class UnityRuntimeTests(unittest.TestCase):
                 invalid=module.probe_gr2_rom_capacity(code,kind,capacity+1)
                 self.assertEqual(invalid['returned'],0xffffffff)
 
-if __name__=='__main__':unittest.main()
+
+    def test_gr2_original_post_load_stub_preserves_final_initialization_callbacks(self):
+        if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
+        report=implementation().probe_gr2_startup_order(component('gr2','b01firm8'))
+        self.assertEqual(report['post_load_return'],0xffffffff)
+        self.assertEqual(report['events'][-4:],[['post_load',0],['phase',0],['phase',0xffffffff],['finalize',0xffffffff]])
+        self.assertNotIn('0xa0023234',report['helpers_intercepted'])
