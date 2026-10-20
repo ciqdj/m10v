@@ -57,12 +57,12 @@ int gr2_frame_freeze(uint8_t *context,const m10v_library_state *source,uint32_t 
     if(slot>=5||!source||gr2_image_owner_bytes(context)!=0xfb8cu)return 0;
     uint32_t address=(uint32_t)(uintptr_t)source,owner=(uint32_t)(uintptr_t)context-8;
     if(!valid(address,sizeof(*source))||overlaps(address,sizeof(*source),owner,0xfb94u))return 0;
-    m10v_gr2_frame frame;frame.reserved=0;frame.magic=0x47324652u;frame.version=1;frame.slot=slot;frame.seed=seed;
+    m10v_gr2_frame frame;frame.processed=0;frame.magic=0x47324652u;frame.version=2;frame.slot=slot;frame.seed=seed;
     copy_bytes(&frame.state,source,sizeof(frame.state));
     if(!m10v_library_valid(&frame.state))return 0;
     uint8_t *tail=context+0xfb0c;
     for(uint32_t i=0;i<sizeof(frame);i++)if(tail[i])return 0;
-    frame.crc=m10v_sd_crc((const uint8_t *)&frame,120);
+    frame.crc=m10v_sd_crc((const uint8_t *)&frame,124);
     copy_bytes(tail+4,(const uint8_t *)&frame+4,sizeof(frame)-4);
     copy_bytes(tail,&frame,4);return 1;
 }
@@ -71,9 +71,47 @@ int gr2_frame_read(const uint8_t *context,m10v_gr2_frame *out){
     uint32_t address=(uint32_t)(uintptr_t)out,owner=(uint32_t)(uintptr_t)context-8;
     if(!valid(address,sizeof(*out))||overlaps(address,sizeof(*out),owner,0xfb94u))return 0;
     m10v_gr2_frame frame;copy_bytes(&frame,context+0xfb0c,sizeof(frame));
-    if(frame.magic!=0x47324652u||frame.version!=1||frame.slot>=5||frame.reserved||
-       frame.crc!=m10v_sd_crc((const uint8_t *)&frame,120)||!m10v_library_valid(&frame.state))return 0;
+    if(frame.magic!=0x47324652u||frame.version!=2||frame.slot>=5||(frame.processed&~7u)||
+       frame.crc!=m10v_sd_crc((const uint8_t *)&frame,124)||!m10v_library_valid(&frame.state))return 0;
     copy_bytes(out,&frame,sizeof(frame));return 1;
+}
+static void frame_store(uint8_t *context,m10v_gr2_frame *frame){
+    frame->crc=m10v_sd_crc((const uint8_t *)frame,124);
+    uint8_t *tail=context+0xfb0c;
+    for(uint32_t i=0;i<4;i++)tail[i]=0;
+    copy_bytes(tail+4,(const uint8_t *)frame+4,sizeof(*frame)-4);copy_bytes(tail,frame,4);
+}
+static int frame_mark(uint8_t *context,uint32_t kind){
+    m10v_gr2_frame frame;
+    if(!gr2_frame_read(context,&frame))return 0;
+    frame.processed|=1u<<(kind-1);frame_store(context,&frame);return 1;
+}
+/* Identity-specific, single-frame effect carriers. HDR/miniature do not
+ * become film slots: their producer paths have additional geometry/merge work.
+ * Slot order preserves positive/bleach/retro, with vibrant as the fourth slot
+ * and cross-process as the fifth; numeric GR III tones are never reused. */
+static const uint8_t carriers[5]={9,10,11,18,8};
+int gr2_producer_ingress(uint8_t *context,const m10v_library_state *state,uint32_t seed){
+    uint32_t body=gr2_image_owner_bytes(context);
+    if(!body)return -1;
+    uint32_t mode=context[0x408];m10v_gr2_frame frame;
+    if(body==0xfb8cu&&gr2_frame_read(context,&frame)){
+        if(mode&&mode!=carriers[frame.slot])return -1;
+        if(frame.processed){frame.processed=0;frame_store(context,&frame);}
+        context[0x408]=0;return 1;
+    }
+    uint32_t slot=0;
+    while(slot<5&&carriers[slot]!=mode)slot++;
+    if(slot==5)return 0;
+    if(!gr2_frame_freeze(context,state,slot,seed))return -1;
+    context[0x408]=0;return 1;
+}
+int gr2_producer_leave(uint8_t *context){
+    m10v_gr2_frame frame;
+    if(!gr2_frame_read(context,&frame))return 0;
+    uint32_t mode=context[0x408],original=carriers[frame.slot];
+    if(mode&&mode!=original)return 0;
+    context[0x408]=(uint8_t)original;return 1;
 }
 static int span(uint32_t handle,uint32_t *address,uint32_t *bytes,int used){
     if((handle&3)||!valid(handle,24))return 0;
@@ -134,6 +172,7 @@ static int process(const uint8_t *context,uint32_t kind,const uint8_t *request,
     if(frozen){
         m10v_gr2_frame frame;
         if(!gr2_frame_read(context,&frame))return -1;
+        if(frame.processed&(1u<<(kind-1)))return 0;
         copy_bytes(&state,&frame.state,sizeof(state));slot=frame.slot;seed=frame.seed;
     }else{
         copy_bytes(&state,source_state,sizeof(state));seed=state.sequence^(uint32_t)(uintptr_t)image.y;
@@ -152,6 +191,7 @@ static int process(const uint8_t *context,uint32_t kind,const uint8_t *request,
         else {state.stamp=0;state.crc=m10v_sd_crc((const uint8_t *)&state,100);}
     }
     int result=gr2_render_planar(&image,&state,slot,stamp,seed,scratch,bytes);
+    if(frozen&&!result&&!frame_mark((uint8_t *)context,kind))result=-1;
     if(!gr2_cache_after())result=-3;
     gr2_release(scratch);return result;
 }

@@ -102,6 +102,52 @@ def probe_rtos_pool(code:bytes,*,native_runtime:dict|None=None)->dict:
                 oversized_returned=oversized,allocation_returns=allocation_returns,free_returned=released,reallocate_returned=allocated_again,reallocated_pointer=again,helpers_intercepted=[],
                 hardware_tested=False,scope='Original RTOS pool arithmetic and lifecycle; synthetic one-pool kernel table and single-thread SVC CPU context. Scheduler/concurrency not emulated.')
 
+def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)->dict:
+    """Original frame->ISP color descriptor, including software-float helpers.
+
+    No function interception. A no-observer global property bank supplies the
+    initialized service dependency; synthetic image metadata is not DMA input.
+    """
+    if type(tone) is not int or not 0<=tone<=20:raise ValueError('stock frame color mode required')
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_map(0x51000000,0x10000);uc.mem_map(0x52000000,0x10000)
+    uc.mem_write(0x52000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0x52006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x52000000,0x50005000,0x383))
+    uc.mem_write(0x50005000,struct.pack('>6I',0,0x52006000,0x383,0x5000D000,0,0))
+    context=0x51000008;output=0x50002008;aux=0x50004000;stack=0x50018000;stop=0x5001f000
+    def run_native(name,*args):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop)
+        uc.emu_start(native_runtime['symbols'][name],stop,count=100000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('native producer preparation stack/budget failure')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    uc.mem_write(context+0x408,bytes([tone]));native_prepare=None;native_restore=None
+    if native_runtime:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        block=0xfb94
+        uc.mem_write(context-8,b'IMG '+bytes(4));uc.mem_write(0xA0129C54,struct.pack('>I',0xA05FB0E8));uc.mem_write(0xA01137EC,struct.pack('>I',block-8))
+        uc.mem_write(0xA05FB0E8,b'MPL '+struct.pack('>4I',0x01000000,block,60*block,0)+struct.pack('>2H',1,0))
+        uc.mem_write(0xA00B5BFC,struct.pack('>H',1));uc.mem_write(0xA00B5BDC,struct.pack('>I',0x50008000))
+        uc.mem_write(0x50008000,struct.pack('>6I',0xffffffff,0x51000000,0,60*block,block,0x51000000))
+        run_native('m10v_library_init',0x50006000)
+        native_prepare=run_native('gr2_producer_ingress',context,0x50006000,1234)
+    before=bytes(uc.mem_read(context,0xfb0c))
+    uc.mem_write(output-8,b'\xa5'*80);uc.mem_write(aux-8,b'\xa5'*28)
+    def assertion(*args):raise RuntimeError('original ISP color recipe assertion')
+    uc.hook_add(UC_HOOK_CODE,assertion,begin=0xA0039F9C,end=0xA0039F9C)
+    for register,value in ((r.UC_ARM_REG_R0,context),(r.UC_ARM_REG_R1,output),(r.UC_ARM_REG_R2,aux),(r.UC_ARM_REG_R3,0),(r.UC_ARM_REG_SP,stack),(r.UC_ARM_REG_LR,stop|1)):uc.reg_write(register,value)
+    uc.emu_start(0xA0141E69,stop,count=100000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=stop:raise RuntimeError('original ISP color descriptor execution budget exceeded')
+    descriptor=bytes(uc.mem_read(output,64));unchanged=bytes(uc.mem_read(context,0xfb0c))==before
+    if native_runtime:native_restore=run_native('gr2_producer_leave',context)
+    return dict(native_prepare=native_prepare,native_restore=native_restore,restored_mode=bytes(uc.mem_read(context+0x408,1))[0],color_mode=tone,recipe=descriptor[5],monochrome=descriptor[17],descriptor_hex=descriptor.hex(),aux_hex=bytes(uc.mem_read(aux,12)).hex(),
+                context_unchanged=unchanged,
+                output_guards_unchanged=all(bytes(uc.mem_read(at,8))==b'\xa5'*8 for at in (output-8,output+64,aux-8,aux+12)),
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
+                scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
+
 def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None)->dict:
     """Original fixed-block image pool/factory/clone/retirement CPU evidence.
 
@@ -1160,7 +1206,7 @@ def main():
                 sd_tell=[probe_sd_tell(code,position) for position in (0,104,0x100000001)],
                 sd_seek=[probe_sd_seek(code,offset,origin) for offset,origin in ((0,0),(4096,0),(-1,1),(-4096,2))],
                 c_heap=probe_c_heap_startup(code),reserved_c_heap=probe_c_heap_startup(code,reserved_end=0xa0800000),
-                memory_regions=probe_memory_regions(code,[1,17,1024]),rtos_pool=probe_rtos_pool(code),image_object_pools=[probe_image_object_pools(code,extra=extra) for extra in (0,128)],
+                isp_color_recipes=[probe_isp_color_recipe(code,tone) for tone in range(21)],memory_regions=probe_memory_regions(code,[1,17,1024]),rtos_pool=probe_rtos_pool(code),image_object_pools=[probe_image_object_pools(code,extra=extra) for extra in (0,128)],
                 isp_completion_wait=probe_isp_completion_wait(code),
                 main_yuv_handoff=probe_main_yuv_handoff(code),
                 capture_owner=[probe_capture_owner(code,kind) for kind in (1,2,3)],

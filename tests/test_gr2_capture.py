@@ -1,6 +1,7 @@
 """Admission uses stock image ownership handles, not guessed RAM address ranges."""
 import struct
 import unittest
+import zlib
 from tests import test_gr2_runtime_build as runtime_tests
 
 class Gr2CaptureTests(unittest.TestCase):
@@ -18,6 +19,113 @@ class Gr2CaptureTests(unittest.TestCase):
         u.mem_write(0xa05fb0e8,b'MPL '+struct.pack('>4I',0x01000000,block,60*block,0)+struct.pack('>2H',1,0))
         u.mem_write(0xa00b5bfc,struct.pack('>H',1));u.mem_write(0xa00b5bdc,struct.pack('>I',0x50008000))
         u.mem_write(0x50008000,struct.pack('>6I',0xffffffff,base,0,60*block,block,base))
+
+    def enter_user_task(self,u,runtime):
+        from scripts.analyze_unity_runtime import parse_executable_load_map
+        from tests.test_unity_update import component
+        from unicorn import UC_HOOK_INTR,arm_const as r
+        code=component('gr2','b01firm8');low=parse_executable_load_map(code)[15]
+        u.mem_map(0,0x10000);u.mem_write(low['address'],code[low['source_file_offset']:low['source_file_offset']+low['length']])
+        u.mem_write(0xa0044f4c,bytes.fromhex(runtime['cache_gateway_patch_hex']));syscalls=[]
+        def interrupt(uc,number,unused):
+            self.assertEqual(number,2);old=uc.reg_read(r.UC_ARM_REG_CPSR);resume=uc.reg_read(r.UC_ARM_REG_PC)
+            syscalls.append(struct.unpack('>I',uc.mem_read(resume-4,4))[0]&0xffffff)
+            uc.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|0x13);uc.reg_write(r.UC_ARM_REG_SP,0x50017000)
+            uc.reg_write(r.UC_ARM_REG_SPSR,old);uc.reg_write(r.UC_ARM_REG_LR,resume);uc.reg_write(r.UC_ARM_REG_PC,0x844)
+        u.hook_add(UC_HOOK_INTR,interrupt)
+        u.mem_write(0xa00c22c0,struct.pack('>H',1));u.mem_write(0xa05fa969,b'\x01')
+        old=u.reg_read(r.UC_ARM_REG_CPSR);u.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|0x12);u.reg_write(r.UC_ARM_REG_SP,0x50016000)
+        u.reg_write(r.UC_ARM_REG_CPSR,(old&~0x3f)|0x10)
+        return syscalls
+
+    def test_installed_jpeg_veneer_renders_frozen_pixels_before_encoder_and_preserves_stock_release(self):
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        from tests.test_unity_update import component
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        import zlib
+        runtime=self.build();self.assertIn('jpeg_hook_patch_hex',runtime)
+        for kind,corrupt,mode in ((1,False,0x13),(3,False,0x13),(1,True,0x13),(1,False,0x10)):
+            with self.subTest(kind=kind,corrupt=corrupt,mode=mode):
+                u=runtime_machine(component('gr2','b01firm8'));u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']))
+                u.mem_write(0xa02adc98,bytes.fromhex(runtime['jpeg_hook_patch_hex']))
+                u.mem_write(0xa00b5bfe,struct.pack('>H',1));u.mem_write(0xa00b5be0,struct.pack('>I',0x50007000));u.mem_write(0x50007000,struct.pack('>h',-2))
+                self.call(u,0xa0024bcb,[]);u.mem_map(0x51000000,0x10000);context=0x51000008
+                u.mem_write(context-8,b'IMG '+bytes(4));self.owner_pool(u,extra=128)
+                for address in (0x60000000,0x64000000,0x68000000):u.mem_map(address,4096)
+                pixels=bytes((i*31+9)%256 for i in range(256));u.mem_write(0x60000000,pixels);u.mem_write(0x68000000,b'\xa5'*4096)
+                source_offset=(0x1f4,0x1fc,0x200)[kind-1];output_offset=0x200+4*kind
+                for offset,handle,address,used,capacity in ((source_offset,0x5000a000,0x60000000,256,256),(output_offset,0x5000a100,0x64000000,0,4096),(0x1e4,0x5000a200,0x68000000,4096,4096)):
+                    u.mem_write(context+offset,struct.pack('>I',handle));u.mem_write(handle,b'BUFF'+struct.pack('>5I',address,used,0,0,capacity))
+                u.mem_write(context+0x3e0+4*kind,struct.pack('>I',(4<<16)|32));u.mem_write(context+0x400,b'\x02')
+                self.call(u,runtime['symbols']['m10v_library_init'],[0x50002000]);state=bytearray(u.mem_read(0x50002000,104));struct.pack_into('>H',state,12,33);struct.pack_into('>I',state,100,zlib.crc32(state[:100]));u.mem_write(0x50002000,bytes(state))
+                self.assertEqual(self.call(u,runtime['symbols']['gr2_frame_freeze'],[context,0x50002000,0,1234]),1)
+                if corrupt:u.mem_write(context+0xfb0c+12,bytes(4))
+                timeline=[];cache=[]
+                def boundary(uc,address,size,unused):
+                    if address==0xa01324ba:
+                        request=uc.reg_read(r.UC_ARM_REG_R0);timeline.append('encode')
+                        self.assertEqual(bytes(uc.mem_read(0x60000000,256))==pixels,corrupt)
+                        uc.mem_write(request+0x28,struct.pack('>I',512));value=0
+                    elif address==0xa029aa1a:
+                        self.assertEqual(uc.reg_read(r.UC_ARM_REG_R0),context+source_offset)
+                        timeline.append('release');uc.mem_write(context+source_offset,bytes(4));value=0
+                    elif address in (0xa0039f9c,0xa003a01a):self.fail('stock capture assertion')
+                    else:value=0x2b if address==0xa02adb7c else 0x100000
+                    uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
+                for address in (0xa01324ba,0xa029aa1a,0xa02adb7c,0xa029ab3c,0xa0039f9c,0xa003a01a):u.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+                def cp15(uc,address,size,unused):
+                    word=struct.unpack('>I',uc.mem_read(address,4))[0]
+                    if word&0x0f100f10==0x0e000f10:cache.append(address);uc.reg_write(r.UC_ARM_REG_PC,address+4)
+                u.hook_add(UC_HOOK_CODE,cp15,begin=runtime['symbols']['gr2_cache_before'],end=runtime['symbols']['gr2_cache_gateway']+80)
+                for register in range(r.UC_ARM_REG_R4,r.UC_ARM_REG_R11+1):u.reg_write(register,0x12340000+register)
+                syscalls=self.enter_user_task(u,runtime) if mode==0x10 else []
+                self.call(u,0xa02ae5c1 if kind==1 else 0xa02ae611,[context])
+                if mode==0x10:
+                    self.assertEqual(syscalls,[5,4,3,5,4,3,0]);self.assertEqual(u.reg_read(r.UC_ARM_REG_CPSR)&31,16)
+                self.assertEqual(timeline,['encode','release']);self.assertEqual(len(cache),1 if corrupt else 2)
+                self.assertEqual(bytes(u.mem_read(0x68000000,4096)),b'\xa5'*4096)
+                self.assertEqual(u.reg_read(r.UC_ARM_REG_SP),0x50018000)
+                for register in range(r.UC_ARM_REG_R4,r.UC_ARM_REG_R11+1):self.assertEqual(u.reg_read(register),0x12340000+register)
+
+    def test_prepared_frames_reach_the_original_isp_recipe_as_standard_then_restore_stock_mode(self):
+        from scripts.analyze_gr2_native_contract import probe_isp_color_recipe
+        from tests.test_unity_update import component
+        runtime=self.build()
+        for tone in (0,8,9,10,11,12,18,19,20):
+            with self.subTest(tone=tone):
+                result=probe_isp_color_recipe(component('gr2','b01firm8'),tone,native_runtime=runtime)
+                carriers=(9,10,11,18,8);prepared=tone in carriers
+                self.assertEqual(result['native_prepare'],int(prepared))
+                self.assertEqual(result['native_restore'],int(prepared))
+                self.assertEqual(result['restored_mode'],tone)
+                if prepared:self.assertEqual(result['recipe'],0)
+                self.assertTrue(result['context_unchanged'])
+                self.assertTrue(result['output_guards_unchanged'])
+                self.assertEqual(result['helpers_intercepted'],[])
+
+    def test_producer_ingress_neutralizes_only_gr2_carriers_after_freezing_and_restores_owned_mode(self):
+        report=self.build();self.assertIn('gr2_producer_ingress',report['symbols']);self.assertIn('gr2_producer_leave',report['symbols'])
+        u=self.machine(report);u.mem_map(0x51000000,0x10000);context=0x51000008;state=0x50002000
+        u.mem_write(context-8,b'IMG '+bytes(4));self.owner_pool(u,extra=128)
+        self.call(u,report['symbols']['m10v_library_init'],[state])
+        enter=report['symbols']['gr2_producer_ingress'];leave=report['symbols']['gr2_producer_leave']
+        for tone in range(21):
+            u.mem_write(context+0x408,bytes([tone]));u.mem_write(context+0xfb0c,bytes(128))
+            before=bytes(u.mem_read(context,0xfb8c));carriers=(9,10,11,18,8)
+            result=self.call(u,enter,[context,state,1234])
+            if tone not in carriers:
+                self.assertEqual(result,0);self.assertEqual(bytes(u.mem_read(context,0xfb8c)),before);continue
+            self.assertEqual(result,1);self.assertEqual(bytes(u.mem_read(context+0x408,1)),bytes(1))
+            snapshot=bytes(u.mem_read(context+0xfb0c,128));self.assertEqual(struct.unpack_from('>2I',snapshot,8),(carriers.index(tone),1234))
+            self.assertEqual(self.call(u,leave,[context]),1);self.assertEqual(bytes(u.mem_read(context+0x408,1)),bytes([tone]))
+            processed=bytearray(snapshot);struct.pack_into('>I',processed,120,5);struct.pack_into('>I',processed,124,zlib.crc32(processed[:124]));u.mem_write(context+0xfb0c,bytes(processed))
+            self.assertEqual(self.call(u,enter,[context,0,9999]),1)
+            self.assertEqual(bytes(u.mem_read(context+0xfb0c,128)),snapshot)
+            u.mem_write(context+0x408,b'\x07');self.assertEqual(self.call(u,leave,[context]),0)
+            self.assertEqual(bytes(u.mem_read(context+0x408,1)),b'\x07')
+        u.mem_write(context+0x408,b'\x09');u.mem_write(context+0xfb0c,bytes(128));self.owner_pool(u)
+        self.assertEqual(self.call(u,enter,[context,state,1234]),0xffffffff)
+        self.assertEqual(bytes(u.mem_read(context+0x408,1)),b'\x09')
 
     def test_inline_frame_snapshot_freezes_recipe_once_and_rejects_unextended_or_corrupt_owners(self):
         report=self.build();self.assertIn('gr2_frame_freeze',report['symbols']);self.assertIn('gr2_frame_read',report['symbols'])
@@ -180,6 +288,19 @@ class Gr2CaptureTests(unittest.TestCase):
                     self.assertEqual(len(cache),2)
                     self.assertEqual(timeline[0],"cache")
                     pixels=bytes(u.mem_read(0x60000000,256))
-                    if failure=='frozen':self.assertEqual(pixels,rendered)
+                    if failure=='frozen':
+                        self.assertEqual(pixels,rendered)
+                        self.assertEqual(self.call(u,report['symbols']['gr2_capture_frozen'],[context,1,0x50001000]),0)
+                        self.assertEqual(bytes(u.mem_read(0x60000000,256)),pixels)
+                        self.assertEqual(len(cache),3)
+                        # Distinct kind3 output still needs its own rendering.
+                        u.mem_write(0x60000200,y+chroma)
+                        u.mem_write(0x5000a300,b'BUFF'+struct.pack('>5I',0x60000200,256,0,0,256))
+                        for offset,value in ((0x200,0x5000a300),(0x20c,0x5000a100),(0x3ec,(4<<16)|32)):u.mem_write(context+offset,struct.pack('>I',value))
+                        third=bytearray(descriptor);struct.pack_into('>I',third,0,0x60000200);u.mem_write(0x50001000,bytes(third))
+                        self.assertEqual(self.call(u,report['symbols']['gr2_capture_frozen'],[context,3,0x50001000]),0)
+                        self.assertEqual(bytes(u.mem_read(0x60000200,256)),pixels)
+                        self.assertEqual(len(cache),5)
+                        self.assertEqual(struct.unpack('>I',u.mem_read(context+0xfb0c+120,4))[0],5)
                     elif mode==0x13:rendered=pixels
                     self.assertNotEqual(bytes(u.mem_read(0x60000000,256)),y+chroma)

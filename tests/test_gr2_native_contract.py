@@ -10,6 +10,19 @@ class Gr2NativeContractTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('gr2_native_contract',source)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
+    def test_original_isp_color_recipe_reads_frame_408_in_its_own_numeric_space(self):
+        module=self.implementation();expected=[0,1,14,2,3,4,5,6,7,8,9,10,11,12,13,0,16,0,15,17,18]
+        self.assertTrue(hasattr(module,'probe_isp_color_recipe'))
+        for tone,recipe in enumerate(expected):
+            with self.subTest(frame_color_mode=tone):
+                report=module.probe_isp_color_recipe(component('gr2','b01firm8'),tone)
+                self.assertEqual(report['recipe'],recipe)
+                self.assertEqual(report['monochrome'],int(tone in (5,7)))
+                self.assertTrue(report['context_unchanged'])
+                self.assertTrue(report['output_guards_unchanged'])
+                self.assertTrue(report['stack_preserved'])
+                self.assertEqual(report['helpers_intercepted'],[])
+
     def test_original_rtc_wrapper_expands_compact_driver_time_to_six_big_endian_halfwords(self):
         module=self.implementation()
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')

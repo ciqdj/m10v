@@ -96,6 +96,15 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     if displacement%4 or not -(1<<25)<=displacement<(1<<25):raise ValueError('cache callback ARM branch range invalid')
     report['cache_gateway_patch_hex']=struct.pack('>I',0xea000000|((displacement>>2)&0xffffff)).hex()
     report['startup_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_startup_chain'])).hex()
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA02ADC98 and 0xA02ADCA0<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA02ADC98-row['address'];break
+    else:raise ValueError('original JPEG hook outside executable load ranges')
+    if official[source:source+8]!=bytes.fromhex('a806f684fc0e980a'):raise ValueError('original JPEG hook instructions differ')
+    report['jpeg_hook_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_jpeg_chain'])).hex()
+    report['jpeg_hook_source_offset']=source
+
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),
                   limits=['Shared scalar renderer and ABI bridges; capture ownership/cache/mode lifecycle and menu/storage integration remain researching.','Reserved C-heap window needs original literal adjustment; no firmware patch or download is emitted.','ARMv4T soft-float subset avoids assuming a newer CPU or floating-point unit.'])
