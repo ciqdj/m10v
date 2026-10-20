@@ -190,3 +190,14 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
             self.assertEqual(bytes(u.mem_read(address,2*n)),expected)
         u.hook_del(hook)
         self.assertEqual(bytes(u.mem_read(address-4,2*n+8)),b'\xa5'*4+original+b'\xa5'*4)
+
+    def test_compiled_detached_effect_view_init_matches_original_constructor_and_bounds(self):
+        from scripts.analyze_gr2_native_contract import probe_effect_view_init
+        report=self.build();self.assertTrue('gr2_effect_view_init' in report['symbols'])
+        code=component('gr2','b01firm8');expected=probe_effect_view_init(code)
+        actual=probe_effect_view_init(code,native_runtime=report)
+        for key in ('returned','widget_offsets','focus','event_handler','guards_unchanged','stack_preserved','external_writes'):
+            self.assertEqual(actual[key],expected[key])
+        u=self.machine(report);u.mem_write(0x50004000,b'\xa5'*0x600)
+        self.assertEqual(self.call(u,report['symbols']['gr2_effect_view_init'],[0x50004000,0x5ff]),0)
+        self.assertEqual(bytes(u.mem_read(0x50004000,0x600)),b'\xa5'*0x600)

@@ -98,3 +98,60 @@ class Gr2StorageTests(unittest.TestCase):
                 self.assertEqual(result['write_returned'],written);self.assertEqual(result['read_returned'],read)
                 self.assertEqual(result['backend_close_calls'],2);self.assertEqual(result['metadata_free_calls'],2)
                 self.assertTrue(result['magic_cleared_before_free'])
+
+    def test_compiled_pack_range_reads_seek_and_always_close_without_whole_pack_allocation(self):
+        from scripts.analyze_gr2_native_contract import probe_sd_file_lifecycle
+        from tests.test_unity_update import component
+        report=self.build();self.assertTrue('gr2_file_read_at' in report['symbols'])
+        payload=bytes((i*23+19)&255 for i in range(104));code=component('gr2','b01firm8')
+        for offset,fail_seek in ((0,False),(29,False),(104,False),(105,False),(29,True)):
+            with self.subTest(offset=offset,fail_seek=fail_seek):
+                actual=probe_sd_file_lifecycle(code,native_runtime=report,read_offset=offset,fail_seek=fail_seek)
+                expected=payload[offset:]
+                self.assertEqual(actual['read_returned'],0xffffffff if fail_seek else len(expected))
+                self.assertEqual(actual['backend_close_calls'],1);self.assertEqual(actual['metadata_free_calls'],1)
+                self.assertTrue(actual['magic_cleared_before_free'])
+                if not fail_seek:self.assertEqual(actual['buffer_hex'],expected.hex()+'a5'*(105-len(expected)))
+
+    def test_compiled_file_size_checks_64_bit_position_close_and_keeps_failed_output_unchanged(self):
+        from scripts.analyze_gr2_native_contract import probe_sd_file_lifecycle
+        from tests.test_unity_update import component
+        report=self.build();self.assertTrue('gr2_file_size' in report['symbols']);code=component('gr2','b01firm8')
+        for flags in ({},{'reported_size':0},{'reported_size':0x100000001},{'fail_seek':True},{'fail_tell':True},{'fail_close':True},{'fail_open':True}):
+            with self.subTest(flags=flags):
+                actual=probe_sd_file_lifecycle(code,native_runtime=report,query_size=True,**flags)
+                success=not any(flags.get(key) for key in ('fail_seek','fail_tell','fail_close','fail_open')) and flags.get('reported_size',104)<1<<32
+                self.assertEqual(actual['size_returned'],int(success))
+                expected=flags.get('reported_size',104).to_bytes(4,'big').hex() if success else 'a5'*4
+                self.assertEqual(actual['buffer_hex'],expected+'a5'*101)
+                self.assertEqual(actual['backend_close_calls'],0 if flags.get('fail_open') else 1)
+                self.assertEqual(actual['metadata_free_calls'],actual['backend_close_calls'])
+
+    def test_streamed_pack_fetch_checks_actual_size_identity_and_record_before_acceptance(self):
+        import subprocess
+        from tests.test_unity_update import ROOT
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        report=self.build();self.assertTrue('gr2_pack_fetch' in report['symbols']);u=self.machine(report)
+        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
+        source={'bytes':pack};requests=[];size_fn=0x5001d000;read_fn=0x5001d004
+        u.mem_write(0x50000000,struct.pack('>2I',size_fn,read_fn))
+        def io(uc,address,size,context):
+            data=source['bytes']
+            if address==size_fn:uc.mem_write(uc.reg_read(r.UC_ARM_REG_R1),struct.pack('>I',len(data)));value=1
+            else:
+                offset=uc.reg_read(r.UC_ARM_REG_R1);target=uc.reg_read(r.UC_ARM_REG_R2);count=uc.reg_read(r.UC_ARM_REG_R3)
+                payload=data[offset:offset+count];uc.mem_write(target,payload);value=len(payload);requests.append((offset,count))
+            uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE,io,begin=size_fn,end=read_fn)
+        def fetch(index,expected,full):
+            u.mem_write(0x50018000,struct.pack('>I',full))
+            return self.call(u,report['symbols']['gr2_pack_fetch'],[0x50000000,index,expected,0x50004000])
+        for index in (0,13,45):
+            identity=struct.unpack_from('<I',pack,64+index*12)[0]
+            self.assertEqual(fetch(index,0,0),identity);self.assertEqual(fetch(index,identity,1),identity)
+            self.assertEqual(bytes(u.mem_read(0x50005000,12288)),pack[4096+index*12288:4096+(index+1)*12288])
+        self.assertEqual(fetch(46,0,0),0);self.assertEqual(fetch(0,288,1),0)
+        for invalid in (pack[:-1],pack+b'!',pack[:4096]+bytes([pack[4096]^1])+pack[4097:]):
+            source['bytes']=invalid
+            self.assertEqual(fetch(0,33,1),0)
+        self.assertTrue(all(count in (4096,12288) for _,count in requests))

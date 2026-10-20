@@ -42,7 +42,7 @@ def audit_elf(data:bytes)->dict:
             name,value,size,info,other,index=struct.unpack_from('>IIIBBH',data,at)
             label=strings[name:].split(b'\0',1)[0].decode('ascii')
             if label and not index:undefined.append(label)
-            if label.startswith(('gr2_','m10v_library_','m10v_sd_')) and info>>4:
+            if label.startswith(('gr2_','m10v_library_','m10v_sd_','m10v_settings_')) and info>>4:
                 if not BASE<=value<BASE+memsize:raise ValueError('export outside runtime')
                 symbols[label]=value
     if undefined:raise ValueError('unresolved runtime helpers: '+','.join(undefined))
@@ -80,8 +80,10 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_files.c'),'-o',str(files)],check=True,capture_output=True)
     ui=out_dir/'ui.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_ui.c'),'-o',str(ui)],check=True,capture_output=True)
-    render_objects=[str(planar),str(capture),str(storage),str(services),str(cache),str(files),str(ui)]
-    for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library'):
+    sd=out_dir/'sd.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_sd.c'),'-o',str(sd)],check=True,capture_output=True)
+    render_objects=[str(planar),str(capture),str(storage),str(services),str(cache),str(files),str(ui),str(sd)]
+    for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings'):
         target=out_dir/(name+'.o')
         subprocess.run([clang,*FLAGS,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
         render_objects.append(str(target))

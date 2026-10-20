@@ -233,3 +233,64 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertTrue(all(row['payload']==[0x12345678,0x23456789] for row in routes))
         self.assertTrue(all(row['returned']==1 for row in routes))
         self.assertEqual(next(row['source_name'] for row in routes if row['source_event']==0x60001017),'APP_EVENT_SYS_JOG_LEFT')
+
+    def test_original_effect_screen_constructor_initializes_embedded_views_without_helpers(self):
+        module=self.implementation();report=module.probe_effect_view_init(component('gr2','b01firm8'))
+        self.assertEqual(report['returned'],1)
+        self.assertEqual(report['widget_offsets'],[0x44,0x84,0x42c,0x4a0,0x294,0x304,0x344])
+        self.assertEqual(report['focus'],0)
+        self.assertTrue(report['guards_unchanged']);self.assertTrue(report['stack_preserved'])
+        self.assertLessEqual(report['highest_written_offset'],0x600)
+        self.assertEqual(report['external_writes'],[])
+        self.assertEqual(report['helpers_intercepted'],[])
+
+    def test_original_effect_screen_init_uses_property_bank_and_defers_animation_without_rendering(self):
+        module=self.implementation();report=module.probe_effect_view_init(component('gr2','b01firm8'),activate=True)
+        self.assertEqual(report['returned'],0)
+        self.assertEqual(report['list_count'],18);self.assertEqual(report['list_cursor'],1)
+        self.assertEqual(report['effect_property'],5)
+        self.assertEqual(report['animation_state'],2)
+        self.assertGreater(report['pending_draw_mask'],0)
+        self.assertTrue(report['guards_unchanged']);self.assertTrue(report['stack_preserved'])
+        self.assertEqual(report['helpers_intercepted'],[])
+
+    def test_original_osd_context_and_animation_use_distinct_physical_and_logical_geometry(self):
+        module=self.implementation();report=module.probe_effect_view_init(component('gr2','b01firm8'),activate=True,settle_animation=True)
+        self.assertEqual(report['physical_size'],[720,480]);self.assertEqual(report['logical_size'],[640,480])
+        self.assertEqual(report['animation_state'],0)
+        self.assertEqual(report['palette_backend_calls'],3)
+        self.assertEqual(report['effect_property'],5)
+        self.assertTrue(report['guards_unchanged']);self.assertTrue(report['stack_preserved'])
+        self.assertFalse(report['hardware_tested'])
+
+    def test_original_ui_preview_preserves_first_value_and_cancel_or_commit_frees_all_storage(self):
+        module=self.implementation();code=component('gr2','b01firm8')
+        for commit in (False,True):
+            with self.subTest(commit=commit):
+                report=module.probe_ui_undo(code,commit=commit)
+                self.assertEqual(report['preview_values'],[6,7]);self.assertEqual(report['saved_original_values'],[5,5])
+                self.assertEqual(report['final_effect'],7 if commit else 5)
+                self.assertEqual(report['stack_depth_after'],0);self.assertEqual(report['active_after'],0)
+                self.assertEqual(report['pool_bytes_after'],report['pool_bytes_before'])
+                self.assertEqual(report['helpers_intercepted'],[])
+
+    def test_original_seek_sign_extends_offset_and_passes_origin_on_stack(self):
+        module=self.implementation();code=component('gr2','b01firm8')
+        for offset,origin in ((0,0),(4096,0),(0x7fffffff,0),(-1,1),(-4096,2)):
+            with self.subTest(offset=offset,origin=origin):
+                report=module.probe_sd_seek(code,offset,origin)
+                self.assertEqual(report['offset_high'],0xffffffff if offset<0 else 0)
+                self.assertEqual(report['offset_low'],offset&0xffffffff)
+                self.assertEqual(report['origin'],origin);self.assertEqual(report['returned'],0)
+                self.assertTrue(report['stack_preserved'])
+        self.assertEqual(module.probe_sd_seek(code,4096,0,fail=True)['returned'],0xffffffff)
+
+    def test_original_tell_copies_big_endian_64_bit_position_only_after_success(self):
+        module=self.implementation();code=component('gr2','b01firm8')
+        for position in (0,104,0x100000001):
+            with self.subTest(position=position):
+                report=module.probe_sd_tell(code,position)
+                self.assertEqual(report['position_hex'],position.to_bytes(8,'big').hex())
+                self.assertEqual(report['returned'],0);self.assertTrue(report['guards_unchanged'])
+        error=module.probe_sd_tell(code,104,fail=True)
+        self.assertEqual(error['returned'],0xffffffff);self.assertEqual(error['position_hex'],'a5'*8)

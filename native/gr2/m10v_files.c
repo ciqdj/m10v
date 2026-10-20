@@ -33,3 +33,24 @@ int32_t gr2_file_write(const char *path,const uint8_t *bytes,uint32_t count){
 static const gr2_storage_io io={gr2_file_read,gr2_file_write};
 int gr2_load_state(m10v_library_state *state){return gr2_journal_load(&io,state);}
 int gr2_save_state(const m10v_library_state *state){return gr2_journal_store(&io,state);}
+int32_t gr2_file_read_at(const char *path,uint32_t offset,uint8_t *out,uint32_t capacity){
+    if(!owned(path,0)||!out||!capacity||capacity>0x1000000u||offset>0x7fffffffu||capacity>0x7fffffffu-offset)return -1;
+    uint32_t handle=((open_fn)(uintptr_t)0xA002C70Fu)(path,0);if(!handle)return -1;
+    typedef int32_t (*seek_fn)(uint32_t,int32_t,uint32_t);
+    int32_t read=-1;
+    if(((seek_fn)(uintptr_t)0xA002E491u)(handle,(int32_t)offset,0)==0)
+        read=((transfer_fn)(uintptr_t)0xA002CA99u)(handle,out,capacity);
+    int closed=close_owned(handle);return closed?read:-1;
+}
+int gr2_file_size(const char *path,uint32_t *out){
+    if(!owned(path,0)||!out)return 0;
+    uint32_t handle=((open_fn)(uintptr_t)0xA002C70Fu)(path,0);if(!handle)return 0;
+    typedef int32_t (*seek_fn)(uint32_t,int32_t,uint32_t);
+    typedef int32_t (*tell_fn)(uint32_t,uint32_t *);
+    uint32_t position[2]={0,0};int valid=0;
+    if(((seek_fn)(uintptr_t)0xA002E491u)(handle,0,2)==0&&
+       ((tell_fn)(uintptr_t)0xA002E39Fu)(handle,position)==0&&position[0]==0)valid=1;
+    if(!close_owned(handle))valid=0;
+    if(valid)*out=position[1];
+    return valid;
+}
