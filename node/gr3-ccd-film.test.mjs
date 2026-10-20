@@ -32,5 +32,6 @@ test('CCD preview preserves neutral endpoints, alpha and monotonic grey ramp',as
   assert.ok(Math.max(...out.slice(i*4,i*4+3))-Math.min(...out.slice(i*4,i*4+3))<=1);
   if(i)for(let c=0;c<3;c++)assert.ok(out[i*4+c]>=out[(i-1)*4+c]);
  }
- assert.ok(out[32*4]<32);assert.ok(out[224*4]>224);
+ // The IXUS-inspired interpretation darkens the toe and gently restrains bright tones.
+ assert.ok(out[32*4]<32);assert.ok(out[224*4]<224);
 });

@@ -8,7 +8,9 @@ enum {M10V_ISP_RECIPE_EMPTY=0,M10V_ISP_RECIPE_READY=1,
       M10V_ISP_RECIPE_APPLIED=2,M10V_ISP_RECIPE_REJECTED=3,
       M10V_ISP_RECIPE_MISMATCH=4,M10V_ISP_RECIPE_BUSY=5,M10V_ISP_RECIPE_UNSUPPORTED=6,M10V_ISP_RECIPE_OBSERVED=7};
 typedef struct {
-    uint32_t magic,version,bytes,status,sequence,tone,si,info,tuning,busy;
+    uint32_t magic,version,bytes,status,sequence;
+    uint16_t tone,selected_tone; /* selected carrier frozen at producer ingress */
+    uint32_t si,info,tuning,busy;
     union {
       m10v_isp_frame_target target;
       struct {uint32_t magic,si,tone,grain,size,planned,armed,noise_ready,done;} native_grain;

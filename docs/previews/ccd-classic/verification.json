@@ -6,67 +6,43 @@
   "extra_scratch_bytes": 0,
   "timings": {
     "cpu_lut_fallback": {
-      "median_seconds": 0.32523533300263807,
+      "median_seconds": 0.31813404202694073,
       "samples_seconds": [
-        0.29642104101367295,
-        0.2965796660282649,
-        0.3699807079974562,
-        0.32523533300263807,
-        0.3536445840145461
+        0.3229170420090668,
+        0.3114960420061834,
+        0.3517612499999814,
+        0.31813404202694073,
+        0.31345904199406505
       ]
     },
     "native_color_completed_residual": {
-      "median_seconds": 1.7500133253633976e-06,
+      "median_seconds": 2.249958924949169e-06,
       "samples_seconds": [
-        5.457957740873098e-06,
-        1.9579892978072166e-06,
-        1.7500133253633976e-06,
-        1.625041477382183e-06,
-        1.5830155462026596e-06
+        5.708017852157354e-06,
+        2.249958924949169e-06,
+        1.667009200900793e-06,
+        1.6249832697212696e-06,
+        9.207986295223236e-06
       ]
     }
   },
   "interpolation": {
     "samples": 8192,
     "seed": 697071,
-    "delta_e00_p95": 0.3831117996392403
+    "delta_e00_p95": 0.4698290075871548
   },
   "isp_target_fit": {
     "samples": 8192,
-    "rgb_code_abs_mean": 0.8437374113111001,
-    "rgb_code_abs_p95": 2.0043530198839066,
-    "rgb_code_abs_max": 5.923916452344785,
-    "de00_mean": 0.28108261107047494,
-    "de00_median": 0.26940415456582567,
-    "de00_p95": 0.49237699768662757,
-    "de00_max": 3.097503516330743,
-    "fraction_de00_below_1": 0.9906005859375,
-    "fraction_de00_below_2": 0.998779296875,
+    "rgb_code_abs_mean": 2.5079038872821986,
+    "rgb_code_abs_p95": 8.394586499760054,
+    "rgb_code_abs_max": 77.32367638078583,
+    "de00_mean": 0.7584744901283035,
+    "de00_median": 0.6246316563881049,
+    "de00_p95": 1.7794927390558715,
+    "de00_max": 4.251385081763269,
+    "fraction_de00_below_1": 0.7611083984375,
+    "fraction_de00_below_2": 0.9652099609375,
     "fraction_rgb_all_channels_unchanged": 0.0
   },
-  "preview_scope": "existing display image, not paired GR DIGITAL capture; ISP model is approximate",
-  "regression": {
-    "node_full": {
-      "tests": 285,
-      "passed": 280,
-      "failed": 1,
-      "skipped": 4,
-      "remaining_failure": "composition matrix used stale caption MOV opcode 0xe30003ac; updated to 0xe30003ad, then complete release/debug matrix passed"
-    },
-    "composition_retest": {
-      "passed": 1,
-      "failed": 0,
-      "coverage": "all eight extension combinations in release and debug"
-    },
-    "ccd_and_isp_targeted": {
-      "passed": 15,
-      "failed": 0
-    },
-    "python_all_discovery": "not completed; affected native and ARM integration suite is reported separately",
-    "affected_native_arm_integration": {
-      "tests": 89,
-      "passed": 89,
-      "failed": 0
-    }
-  }
+  "preview_scope": "existing display image, not paired GR DIGITAL capture; ISP model is approximate"
 }

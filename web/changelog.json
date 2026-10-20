@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.2",
+      "date": "2026-10-20",
+      "title": "CCD 改为 IXUS 70 色彩方向，修复已配置槽位切换延迟",
+      "changes": [
+        "CCD Classic 改用佳能 DIGITAL IXUS 70／PowerShot SD1000 的选择性色彩方向，调整红色、青蓝、肤色及高光；数值为独立设计参数，尚非实机标定。",
+        "GR III 取景读取已提交的当前槽位；GR III／GR IIIx 拍摄入口固定所选槽位，原生色彩、颗粒与 CPU 后处理沿用同一照片快照，避免首张仍使用旧槽位。",
+        "保留原始 ShootingInfo、RAW 保护与排队照片归属；仍使用 15³ 色表和原厂 ISP 参数，不增加全图处理步骤。更新后需下载匹配的 M10V/FILMS.M10。",
+        "补全此前 GR IV 内存优化的本地修改来源哈希，保留上游身份与独立固件验证。补充槽位切换、排队冻结和色彩回归检查；离线验证不等同真机验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.1",
       "date": "2026-10-20",
       "title": "精选新增 CCD Classic，模拟老 GR DIGITAL 色彩",
@@ -11,9 +25,9 @@
         "更新配套 SD 胶卷包身份合同与资源边界，保留已有胶卷 ID 和五槽存储格式；更新固件后需重新下载匹配胶卷包。",
         "完成 CCD 色表／ISP 专项、89 项原生与 ARM 集成测试、组合功能复测及 GR III／GR IIIx 候选构建；提供参数来源与离线对照，尚未完成老 GR 同场景真机标定。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "9ed4a5a65844ddbc23c4ab4918886b5d0848836f",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/9ed4a5a65844ddbc23c4ab4918886b5d0848836f"
     },
     {
       "version": "2026.10.19.14",

@@ -179,6 +179,13 @@ int m10v_capture_library(uint32_t context) {
     settings_source=m10v_camera_library_load(&state);
     M10V_PROFILE(3);
     if (settings_source < 0) REJECT(-5,16,(uint32_t)settings_source,0);
+#if M10V_RECIPE_SNAPSHOT
+    if(settings_source==4&&snapshot->selected_tone){
+        uint32_t selected=snapshot->selected_tone;slot=5;
+        for(uint32_t i=0;i<5;i++)if(tones[i]==selected)slot=i;
+        if(slot==5)REJECT(-4,7,tone,0);
+    }
+#endif
     uint32_t completed=0;
 #if M10V_ISP_NATIVE_LOOK
     completed=m10v_isp_frame_recipe_completed((void *)(uintptr_t)recipe,shooting,tone,&state);

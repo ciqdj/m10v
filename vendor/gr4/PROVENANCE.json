@@ -218,6 +218,16 @@
       "upstream_sha256": "c98536554009af5b400362ba35a293d6b248e3326e89b8945c3ea2a243031359",
       "local_sha256": "bbfedab7db868a154ff8ea8ce2578f62566465686f28255229d18e5fc5714ac8",
       "reason": "Use crop verification only when the public crop compiler is selected, not for native filter-registry builds"
+    },
+    "gr4_editor/codec/container.py": {
+      "upstream_sha256": "7f6f83ac21387dd08002a5a0c20fccac6f212e398079c9694304463b6c163a45",
+      "local_sha256": "2da89f427cc01f2363ef9a8d681d6c43a5207fe4bfb04a421c18b31d4337f87d",
+      "reason": "M10V bounded-memory repacking from commit 61ac876: chunked checksum and early release of temporary firmware copies; independent decode verification retained"
+    },
+    "gr4_editor/firmware.py": {
+      "upstream_sha256": "73647a27247a8cad39f2da4a9725d1d787e44c1fc757280d4a230f613563635e",
+      "local_sha256": "9f02f81c6cae0b63c797c0a421c1adba141ccafe82d6bd98c756f2e6aee25401",
+      "reason": "M10V bounded-memory repacking from commit 61ac876: chunked checksum and early release of temporary firmware copies; independent decode verification retained"
     }
   },
   "local_authored_files": {
