@@ -11,7 +11,7 @@ test('GR exact official image reads 119 resources with volume header adjustment'
   assert.equal(image.declared_offset,0xa7400);assert.equal(image.payload_offset,0xa7600);assert.equal(image.size,614400);
   const code=readGr1Component(source,'b01firm8');assert.equal(code.length,5824084);
   assert.equal(code.readUInt16BE(18),0x0501);assert.equal(report.proof.byte_exact_roundtrip,true);
-  assert.equal(report.proof.modified_update_checksum,false);assert.equal(report.capabilities.native_film_library.can_build,false);
+  assert.equal(report.proof.modified_update_checksum,true);assert.equal(report.capabilities.native_film_library.can_build,false);
   assert.throws(()=>readGr1Component(source,'RTOS'),/unknown component/);
 });
 test('GR identity gate rejects changed and truncated official input',{skip:!existsSync(sample)},async()=>{

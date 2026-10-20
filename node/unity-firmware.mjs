@@ -1,6 +1,7 @@
 // Strict UNITY framing and identity-locked GR / GR II inventory. No modified writer.
 import {createHash} from 'node:crypto';
 import {unityProfiles} from './unity-model-profiles.mjs';
+import {verifyUnityComponentChecksum} from './unity-checksum.mjs';
 const MAGIC=Buffer.from('UNITY FILE V1.10 / RICOH COMPANY');
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const need=(value,reason)=>{if(!value)throw Error(reason);};
@@ -64,6 +65,7 @@ function official(data, model) {
     need(row.sha256===profile.components[name].sha256&&row.size===profile.components[name].size,`${profile.model} component identity differs`);
     need(row.decoded.readUInt16BE(18)===profile.version,`${profile.model} internal version differs`);
     need(row.decoded.readUInt32BE(0x168)===row.size&&row.decoded.readUInt32BE(0x164)===row.size-512,`${profile.model} component length differs`);
+    row.update_checksum=verifyUnityComponentChecksum(row.decoded);
   }
   return {profile,rows};
 }
@@ -92,7 +94,7 @@ export function inspectUnityModel(data,model){
   return {schema:'m10v-model-firmware-inventory/v1',model:profile.model,public_version:profile.public_version,
     internal_version:profile.public_version,sha256:profile.sha256,size:data.length,filename:profile.filename,
     components:rows.map(({decoded,nested,...row})=>row),resources:resourceRows(disk.decoded,profile),
-    proof:{identity:true,strict_record_bounds:true,nested_container:true,resource_bounds:true,byte_exact_roundtrip:true,modified_update_checksum:false},
+    proof:{identity:true,strict_record_bounds:true,nested_container:true,resource_bounds:true,byte_exact_roundtrip:true,modified_update_checksum:true},
     capabilities:{inspect:{status:'verified_offline',can_read:true},native_film_library:{status:'researching',can_build:false,
-      reason:`${profile.model} native menu, capture ABI and modified update checksum require proof`}},hardware_tested:false};
+      reason:`${profile.model} native menu, capture ABI and final loading chain require proof`}},hardware_tested:false};
 }

@@ -95,19 +95,31 @@
       ],
       "models": {
         "gr1": {
-          "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "status": "verified_offline",
+          "implementation_files": [
+            "scripts/analyze_unity_update.py"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-checksum-loader-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_unity_update tests.test_gr2_update"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
         },
         "gr2": {
-          "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "status": "verified_offline",
+          "implementation_files": [
+            "scripts/analyze_unity_update.py"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-checksum-loader-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_unity_update tests.test_gr2_update"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
@@ -122,19 +134,35 @@
       ],
       "models": {
         "gr1": {
-          "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "status": "verified_offline",
+          "implementation_files": [
+            "scripts/analyze_unity_update.py",
+            "node/unity-checksum.mjs"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-checksum-loader-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_unity_update tests.test_gr2_update",
+            "node --test node/unity-checksum.test.mjs"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
         },
         "gr2": {
-          "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "status": "verified_offline",
+          "implementation_files": [
+            "scripts/analyze_unity_update.py",
+            "node/unity-checksum.mjs"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-checksum-loader-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_unity_update tests.test_gr2_update",
+            "node --test node/unity-checksum.test.mjs"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
