@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildSdFilmPack,auditSdFilmPack,sdFilmRecord,SD_RECORD_BYTES,sdCrc,sdExpectedHeader} from './gr3-sd-film-pack.mjs';
+import {parseCustomCube} from './gr3-custom-lut.mjs';
 test('SD pack contains every current platform recipe, independent of five active slots',()=>{
  const b=buildSdFilmPack();const a=auditSdFilmPack(b);assert.equal(a.count,40);assert.deepEqual(a.ids,[33,66,67,68,69,70,71,72,...Array.from({length:32},(_,i)=>34+i)]);
  assert.equal(b.length,4096+40*SD_RECORD_BYTES);
@@ -50,4 +51,23 @@ test('packs carrying the preceding renderer contract are rejected even with repa
   r.writeUInt32LE(sdCrc(r.subarray(0,-4)),SD_RECORD_BYTES-4);b.writeUInt32LE(r.readUInt32LE(SD_RECORD_BYTES-4),68+i*12);
  }
  b.writeUInt32LE(sdCrc(b.subarray(0,4092)),4092);assert.throws(()=>auditSdFilmPack(b),/配方版本不兼容/);
+});
+
+test('mixed pack carries a named portable LUT while preserving built-in records',()=>{
+ const cube=Buffer.from('LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n');
+ const custom=parseCustomCube(cube,'identity.cube','My Film');
+ const pack=buildSdFilmPack([33],[custom]);
+ const audit=auditSdFilmPack(pack);
+ assert.equal(audit.count,2);
+ assert.deepEqual(audit.ids,[33,73]);
+ assert.deepEqual(pack.subarray(4096,4096+SD_RECORD_BYTES),sdFilmRecord(33));
+ assert.equal(pack.subarray(4096+SD_RECORD_BYTES+16,4096+SD_RECORD_BYTES+23).toString(),'My Film');
+});
+test('CRC repaired custom record with changed reserved byte is rejected',()=>{
+ const custom=parseCustomCube(Buffer.from('LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n'),'identity.cube','My Film');
+ const pack=buildSdFilmPack([],[custom]),record=pack.subarray(4096);record[7000]^=1;
+ record.writeUInt32LE(sdCrc(record.subarray(0,-4)),SD_RECORD_BYTES-4);
+ pack.writeUInt32LE(record.readUInt32LE(SD_RECORD_BYTES-4),68);
+ pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);
+ assert.throws(()=>auditSdFilmPack(pack));
 });
