@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Import named 3D `.cube` LUTs into the SD film library, install them into camera slots, render saved JPEGs with them, and keep one web timestamp control in Imaging.
+**Goal:** Import named 3D `.cube` LUTs into the SD film library, install them into camera slots, render saved JPEGs with them, and keep one web timestamp control in Imaging with an independent film-name imprint.
 
 **Architecture:** A versioned 12288-byte record carries a 13³ RGB8 table and bounded name. The camera validates and saves the record before switching a slot; capture reads the saved record, never the SD card. Existing built-in records and state remain compatible.
 
@@ -26,6 +26,7 @@
 - A custom snapshot write that succeeds but fails readback must leave all five slots unchanged: Task 4 test.
 - A missing or corrupt custom snapshot after restart must not feed arbitrary data into JPEG rendering: Tasks 4 and 5 tests.
 - Enabling or disabling timestamp in Imaging after editing film slots must preserve all slot values: Task 6 test.
+- Film name alone must render with an invalid camera date, while overlong names must not write beyond image bounds: Task 6 test.
 
 ---
 
@@ -86,13 +87,13 @@
 
 ### Task 6: One timestamp web entry
 
-**Files:** Modify `web/gr3/native-library-controls.html`, `web/gr3/native-library.js`, `web/gr3/studio.js`, `web/gr3/sd-library.html`; test `node/ui-contract.test.mjs`, `node/gr3-unified-state.test.mjs`.
+**Files:** Modify `web/gr3/native-library-controls.html`, `web/gr3/native-library.js`, `web/gr3/studio.js`, `web/gr3/sd-library.html`, `native/gr3/m10v_library.h`, `native/gr3/m10v_library.c`, `native/gr3/m10v_settings.c`, `native/gr3/m10v_settings_view.c`, camera resource definitions; test `node/ui-contract.test.mjs`, `node/gr3-unified-state.test.mjs`, `tests/test_gr3_m10v_library.py`, `tests/test_gr3_settings.py`.
 
-**Interfaces:** Imaging renders the existing global `stamp/format/corner/color` fields; native editor no longer renders duplicate time stamp controls. Camera time-stamp menu and stored fields stay unchanged.
+**Interfaces:** Imaging renders the existing global `stamp/format/corner/color` fields and a `filmNameStamp` boolean; native editor no longer renders duplicate controls. Camera state stores the new flag in a versioned field, defaulting false on older records; the time-stamp menu edits the same flag.
 
-- [ ] Write tests asserting one visible web time stamp editor, slot preservation across toggle/edit, legacy draft preservation and correct in-camera menu instructions.
+- [ ] Write tests asserting one visible web time stamp editor, slot preservation across toggle/edit, legacy draft preservation, correct in-camera menu instructions, name-only rendering with invalid date, date plus name on two lines, and bounds-safe long-name rejection.
 - [ ] Run named tests; confirm new tests fail.
-- [ ] Move controls and event binding to Imaging, remove duplicate editor controls, and update copy/instructions.
+- [ ] Move controls and event binding to Imaging, remove duplicate editor controls, extend 5×7 glyphs for allowed name characters, store the new camera flag, add menu value and render the current slot name with existing stamp color, size and shadow.
 - [ ] Run tests and browser inspection; commit.
 
 ### Task 7: End-to-end audit and device handoff
