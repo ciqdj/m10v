@@ -3,7 +3,7 @@
  * semantics; journal failure restores the visible slider to committed state. */
 #include "m10v_library.h"
 #include "m10v_debug.h"
-extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables;
+extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables, m10v_detail_phoenix_tables;
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef void (*text_fn)(uint32_t,uint32_t,const char *);
@@ -25,7 +25,7 @@ uint32_t m10v_detail_table(uint32_t ui){
  m10v_library_state s;
  int i=load(ui,&s);if(i<0)return 0x53d9a458u;
  uint32_t film=s.slots[i].film;
- return (uint32_t)(uintptr_t)(film==33||film==67?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
+ return (uint32_t)(uintptr_t)(film==67?&m10v_detail_phoenix_tables:film==33?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
 }
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
@@ -42,7 +42,7 @@ static void defaults(m10v_library_state *s,uint32_t target,uint32_t film){
  m10v_slot *v=&s->slots[target];v->film=(uint16_t)film;
  v->grain=film==72?0:film==68||film==71?2:film>=66?1:0;v->soft=0;
  v->halo_gain=film==33?3:film==67?2:0;v->halo_spread=3;v->halo_threshold=5;
- m10v_film_effects e={film==67||film==69||film==70||film==72?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
+ m10v_film_effects e={film==67||film==69||film==70||film==72||film==74||film==75||film==77||film==78?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
 }
 uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  /* Every visible row passes this operation before the original ID switch.
@@ -64,12 +64,13 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==3)field=arg>>16;
  if(op==4)field=((fn1)0x531ca630u)(ui)-19;
  uint32_t film=s.slots[target].film;
- if(op!=7&&(field>10||(field<3&&film!=33&&film!=67)||(field==10&&film!=68)))return 0;
+ if(op==9)return film==67?1:2;
+ if(op!=7&&(field>10||(field<3&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
  if(op==4){m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
  const m10v_slot *old=&s.slots[target];
  if(op==1)return value(&s,(uint32_t)target,field);
  if(op==2||op==7){
-  if(op==2&&v>limit(field))return 0;
+  if(op==2&&(v>limit(field)||(field==10&&film==67&&v>1)))return 0;
   uint32_t previous=op==2?value(&s,(uint32_t)target,field):0;
   int result;
   if(op==7)result=m10v_camera_library_reset(&s,(uint32_t)target);
@@ -99,9 +100,10 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    * shuffle, and exposure compensation. No resource directory is modified.
    * Enum values retain the slider's exact 0-based range; RED uses EI125/64/250.
    * Its three-digit value alone gets 60px, still inside the native 120px rail. */
-  static const uint16_t icons[11]={500,488,413,493,595,1096,424,596,381,50,647};
+  static const uint16_t icons[11]={500,488,413,493,595,1102,424,596,381,50,647};
   v=value(&s,(uint32_t)target,field);char text[4]={(char)('0'+v),0,0,0};
   if(field==10){text[0]=v==1?'6':v==2?'2':'1';text[1]=v==1?'4':v==2?'5':'2';text[2]=v==1?0:v==2?'0':'5';}
+  if(field==10&&film==67){text[0]=v?'1':'2';text[1]=v?'2':'0';text[2]='0';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x198);if(!ram(list,4))return 0;
   uint32_t row=((fn2)0x53570a9cu)(list,arg&65535);if(!ram(row,4))return 0;
   ((text_fn)0x5357a900u)(row,icons[field],text);return 1;

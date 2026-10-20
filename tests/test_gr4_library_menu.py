@@ -128,13 +128,13 @@ class MenuTests(unittest.TestCase):
   self.select(u,3);self.assertEqual(self.mode(u),5)
   stamps=[e for e in self.events if e[0]=='m10v_camera_library_stamp'];self.assertEqual(stamps[-1][2:5],(0,0,3))
  def test_back_done_and_third_native_footer_are_bounded(self):
-  u=self.machine();self.group(u,2);self.select(u,40);self.assertEqual(self.mode(u),1)
-  self.group(u,2);self.select(u,42);self.assertEqual(self.mode(u),2) # third footer is inert in private mode
-  self.select(u,41);self.assertEqual(self.mode(u),0)
+  u=self.machine();self.group(u,2);self.select(u,46);self.assertEqual(self.mode(u),1)
+  self.group(u,2);self.select(u,48);self.assertEqual(self.mode(u),2) # third footer is inert in private mode
+  self.select(u,47);self.assertEqual(self.mode(u),0)
   self.assertTrue(any(e[0]=='original' and e[1]==TRAMP+0x60 for e in self.events))
  def test_private_pages_have_exactly_two_footers_while_stock_retains_three(self):
   u=self.machine();self.assertEqual(self.call(u,'rows',CONTROLLER),29)
-  self.group(u,2);self.assertEqual(self.call(u,'rows',CONTROLLER),42)
+  self.group(u,2);self.assertEqual(self.call(u,'rows',CONTROLLER),48)
   self.group(u,3);self.assertEqual(self.call(u,'rows',CONTROLLER),7)
  def test_gr4_ok_key_and_back_events(self):
   u=self.machine();u.mem_write(LIST+0x110,struct.pack('<H',25));u.mem_write(0x10000100,struct.pack('<H',0xe0))

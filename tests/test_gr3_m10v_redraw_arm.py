@@ -28,6 +28,7 @@ class NativeRedrawArmTests(unittest.TestCase):
     visible_film_count = 65
     slot_five_film_index = 32
     slot_one_film_index = 0
+    choose_slot_index = 4
 
     @classmethod
     def setUpClass(cls):
@@ -233,7 +234,7 @@ class FixedNativeRedrawArmTests(NativeRedrawArmTests):
         self.focus(11)
         self.focus(12)
         self.call('m10v_menu_confirm', CONTROLLER)
-        self.focus(4)
+        self.focus(self.choose_slot_index)
         self.call('m10v_menu_confirm', CONTROLLER)  # Choose Slot
         self.assertEqual(self.call(0x53394820, VIEW), 4)
         self.focus(0)

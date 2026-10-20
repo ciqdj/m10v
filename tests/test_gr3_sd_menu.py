@@ -13,5 +13,5 @@ class SdMenuTests(unittest.TestCase):
   texts=manifest['resources']['texts']
   self.assertEqual(texts[937-786:939-786],['胶卷库','时间水印'])
   self.assertIn('颗粒尺寸',texts)
-  self.assertIn('RED 曝光',texts)
+  self.assertIn('模拟曝光EI',texts)
 if __name__=='__main__':unittest.main()

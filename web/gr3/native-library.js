@@ -37,10 +37,13 @@ function render(){
  const film=configuration.slots[active].film;
  const label=$('#active-slot-label');if(label)label.textContent=`槽位 ${active+1} · ${films.find(f=>f.id===film)?.name||'载入中'}`;
  $('#halo-controls').hidden=![33,67].includes(film);
- $('#red-controls').hidden=film!==68;
+ $('#red-controls').hidden=![67,68].includes(film);
+ $('#red-controls .label').textContent=(film===67?'蓝凤凰':'哈曼 RED')+' · 模拟曝光EI';
+ const eiOptions=film===67?[[0,'EI 200 · 标准'],[1,'EI 120 · 增加曝光']]:[[0,'EI 125 · 标准'],[1,'EI 64 · 明亮橙黄'],[2,'EI 250 · 浓郁暗红']];
+ $('#effect-filmExposure').replaceChildren(...eiOptions.map(([value,text])=>{const option=document.createElement('option');option.value=String(value);option.textContent=text;return option;}));
  $('#halo-controls .label').textContent=(film===67?'蓝凤凰':'800T')+' 光晕 · 当前槽位';
  const effects=configuration.slots[active].effects;
- for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy||(k==='filmExposure'&&film!==68);}
+ for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy||(k==='filmExposure'&&![67,68].includes(film));}
  $('#reset-texture').disabled=busy;
  const halo=configuration.slots[active].halo;
  for(const k of ['gain','spread','threshold']){$('#halo-'+k).value=String(halo[k]);$('#halo-'+k+'-value').textContent=halo[k]+'/8';$('#halo-'+k).disabled=busy;}

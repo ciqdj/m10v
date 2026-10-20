@@ -17,7 +17,7 @@ typedef uint32_t (*root_fn)(void);
 static const uint8_t tones[5] = {36,37,38,39,40};
 /* The persistent catalog keeps IDs 1..65 for existing journals. Only the
  * curated 800T and original 32 simulations are offered for replacement. */
-static const uint8_t counts[22] = {13,7,40,5,4,7,5,4,4,4,3,9,9,9,0,5,3,9,6,9,2,3};
+static const uint8_t counts[22] = {13,7,46,5,4,7,5,4,4,4,3,9,9,9,0,5,3,9,6,9,2,3};
 static uint8_t *model(void) {
     uint32_t root = ((root_fn)0x5323ea84u)();
     return (uint8_t *)(uintptr_t)((get_fn)0x5323f928u)(root);
@@ -43,7 +43,7 @@ uint32_t m10v_menu_count(uint32_t address) {
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x80u))(address);
     return mode(m)?group_count(mode(m),m):((get_fn)(M10V_NATIVE_BASE + 0x80u))(address)+1;
 }
-uint32_t m10v_menu_max_count(void) { return 40; }
+uint32_t m10v_menu_max_count(void) { return 46; }
 /* GR4 owns three native footer rows; private M10V pages have Back/Done only.
  * This helper replaces only ImageControlController total-active-row lookup. */
 uint32_t m10v_menu_rows(uint32_t controller) {
@@ -57,7 +57,7 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!group) return index == ((get_fn)(M10V_NATIVE_BASE + 0x80u))(address) ? 128 : ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     if (index >= group_count(group,m)) return 0;
     static const uint8_t first[15] = {0,129,144,176,180,184,208,192,196,200,218,224,224,224,233};
-    if(group==2)return index==0?213:index<=7?(index<=3?287+index:340+index):256+index-8;
+    if(group==2)return index==0?213:index<=13?(index<=3?287+index:340+index):256+index-14;
     if(group==1&&index==5)return 300;
     if(group==1&&index==6){m10v_library_state s;
         if(m10v_camera_library_load(&s)>=0){uint32_t film=s.slots[slot(m)].film;return film==68?340:film==67?339:214;}
@@ -73,7 +73,7 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     return first[group]+index;
 }
 static uint32_t resource(uint32_t tone) {
-    if(tone>=344&&tone<=347)return 970+tone-344;
+    if(tone>=344&&tone<=353)return 970+tone-344;
     if(tone==288)return 911;
     if(tone==289||tone==290)return 930+tone-289;
     if(tone==339)return 932;
@@ -106,7 +106,7 @@ static uint32_t resource(uint32_t tone) {
 static uint32_t film_resource(uint32_t film) {
     if (film >= 1 && film <= 32) return 786 + film - 1;
     if (film == 66) return 911;
-    if(film>=69&&film<=72)return 970+film-69;
+    if(film>=69&&film<=78)return 970+film-69;
     if (film >= 67 && film <= 68) return 930+film-67;
     if (film == 33) return 860;
     if (film >= 34 && film <= 65) return 879 + film - 34;
@@ -133,7 +133,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone, uint32_t flags) {
     /* Native GR4 hides this icon family whenever its third argument is nonzero. */
     if(flags)return 0;
     if(tone>=144 && tone<176)return 1024+tone-144;
-    if(tone>=344&&tone<=347)return 1092+tone-344;
+    if(tone>=344&&tone<=353)return 1092+tone-344;
     if(tone>=288&&tone<=290)return 1089+tone-288;
     if(tone==213)return 1056;
     if(tone>=256 && tone<288)return 1057+tone-256;
@@ -167,7 +167,7 @@ static void redraw(uint32_t controller) {
         if(m10v_camera_library_load(&state)>=0){const m10v_slot *v=&state.slots[target];
             /* Hidden historical looks stay active until an explicit confirm.
              * Their browsing cursor safely starts at 800T without a write. */
-            if(group==2)selected=v->film==33?0:v->film>=66?v->film-65:v->film>=34?v->film-27:0;
+            if(group==2)selected=v->film==33?0:v->film>=66?v->film-65:v->film>=34?v->film-20:0;
             else if(group==3)selected=v->grain;else if(group==4)selected=v->soft;
             else if(group==5)selected=state.stamp;else if(group==7)selected=state.format;
             else if(group==8)selected=state.corner;else if(group==9)selected=state.color;
@@ -235,7 +235,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     else if(group>=11){const m10v_slot *v=&state.slots[target];
         result=m10v_camera_library_halation(&state,target,group==11?index:v->halo_gain,group==12?index:v->halo_spread,group==13?index:v->halo_threshold,group==14?index:v->halo_profile);
     }
-    else if (group == 2) result = m10v_camera_library_select(&state, target, index==0?33:index<=7?65+index:26+index);
+    else if (group == 2) result = m10v_camera_library_select(&state, target, index==0?33:index<=13?65+index:20+index);
     else if (group == 3) result = m10v_camera_library_texture(&state, target, index, state.slots[target].soft);
     else if (group == 4) result = m10v_camera_library_texture(&state, target, state.slots[target].grain, index);
     else result = m10v_camera_library_stamp(&state, group == 5 ? index : state.stamp,

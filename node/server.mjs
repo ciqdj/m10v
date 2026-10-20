@@ -1,3 +1,5 @@
+import {bindPowerPreparation,applyPowerImages,previewPowerImages} from './gr3-power-images.mjs';
+import {createHash} from 'node:crypto';
 import {handleGr4CustomizationRequest} from './gr4-customization.mjs';
 import {handleGr4NativeRequest,gr4WorkbenchHtml,gr4SdLibraryHtml} from './gr4-native-routes.mjs';
 import {prepareGr3Bridge,exportGr3Bridge} from './gr3-bridge.mjs';
@@ -197,7 +199,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const haloMatch = /^\/api\/projects\/([0-9a-f]{64})\/800t\/(prepare|build)$/.exec(pathname);
     const editMatch = /^\/api\/projects\/([0-9a-f]{64})\/edit\/(prepare|build)$/.exec(pathname);
     if (!['/api/import', '/api/backup/inspect', '/api/backup/restore', '/api/gr3/film/fit',
-      '/api/gr3/sd-library/export','/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
+      '/api/gr3/power-images/preview','/api/gr3/sd-library/export','/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
       !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch && !bridgeMatch)
       return send(response, 404, { error: 'not found' });
     if (request.headers['x-m10v-token'] !== token ||
@@ -207,8 +209,9 @@ export function createServer(store = new Store(path.join(root, 'data')),
       const body = await readBody(request, pathname==='/api/gr3/sd-library/export' ? 24 * 1024 * 1024 : pathname==='/api/gr3/film-bay/pack' ? 2048 :
         pathname === '/api/platform/inspect-official' ? 4096 :
         pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
-        bridgeMatch || nativeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
+        nativeMatch || pathname==='/api/gr3/power-images/preview' ? 3*1024*1024 : bridgeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
         sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
+      if(pathname==='/api/gr3/power-images/preview')return send(response,200,previewPowerImages(JSON.parse(body.toString('utf8'))));
       if(pathname==='/api/gr3/sd-library/export'){const {zip}=exportSdFilms(JSON.parse(body.toString('utf8')));return send(response,200,zip,'application/zip','M10V-SD-films.zip');}
       if(pathname==='/api/platform/inspect'||pathname==='/api/platform/inspect-official'){
         const bytes=pathname==='/api/platform/inspect'?body:await readModelOfficial(JSON.parse(body.toString('utf8')).model);
@@ -229,9 +232,14 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(nativeMatch[2]==='prepare')return send(response,200,prepareNative(original,input.configuration,{debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled}));
+        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled};
+        const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
+        if(nativeMatch[2]==='prepare')return send(response,200,powerPreparation);
+        if(input.accepted_configuration_sha256!==powerPreparation.configuration_sha256)throw Error('方案已变化，请重新核验图片与固件');
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
-        const {candidate,receipt}=await generateNative(original,input.configuration,input.accepted_configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled});
+        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled});
+        const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
+        const receipt={...nativeResult.receipt,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
         return send(response,200,candidate,'application/octet-stream',receipt.filename);
       }

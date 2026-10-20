@@ -40,7 +40,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         wrapper = Path(cls.tmp.name) / 'date_probe.c'
         wrapper.write_text('#include "' + str(ROOT / 'native/gr3/m10v_library.c') + '"\nuint32_t m10v_test_date(char *out,const m10v_library_date *date,uint32_t format,uint32_t mode){return date_text(out,date,format,mode);}')
         subprocess.run([shutil.which('clang') or 'clang', '-O2', '-Wall', '-Wextra', '-Werror',
-                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'), '-o', str(out)],
+                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'), '-o', str(out)],
                        check=True, capture_output=True)
         cls.lib = C.CDLL(str(out))
         cls.lib.m10v_library_init.argtypes = [C.POINTER(State)]
@@ -67,17 +67,17 @@ class NativeFilmLibraryTests(unittest.TestCase):
 
     def test_custom_slot_bank_commits_only_with_state_and_clears_on_builtin(self):
         state=self.state();before=bytes(state);bad=STORE(lambda ctx,next:-1);ok=STORE(lambda ctx,next:0)
-        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,73,1,bad,None),-2)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,79,1,bad,None),-2)
         self.assertEqual(bytes(state),before)
-        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,73,1,ok,None),0)
-        self.assertEqual(state.slots[0].film,73);self.assertEqual(state.effects[0][6],2)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,79,1,ok,None),0)
+        self.assertEqual(state.slots[0].film,79);self.assertEqual(state.effects[0][6],2)
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)),1)
         self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,33,ok,None),0)
         self.assertEqual(state.effects[0][6],0)
 
     def test_custom_lut_changes_saved_rgb_without_sd_and_missing_table_is_rejected(self):
         state=self.state();ok=STORE(lambda ctx,next:0)
-        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,73,0,ok,None),0)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,79,0,ok,None),0)
         image,y,uv,scratch=self.image();uv[0]=80;uv[1]=200;before=(bytes(y),bytes(uv))
         self.assertLess(self.render(image,state,scratch),0)
         self.assertEqual((bytes(y),bytes(uv)),before)
@@ -154,7 +154,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual([slot.film for slot in state.slots], [34,35,36,37,33])
         names = [self.lib.m10v_library_name(i) for i in range(1, 66)]
         self.assertEqual(len(set(names)), 65); self.assertTrue(all(names))
-        self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(73))
+        self.assertIsNone(self.lib.m10v_library_name(0)); self.assertIsNone(self.lib.m10v_library_name(79))
         state.slots[2].film = 31
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 0)
 
@@ -172,7 +172,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual(self.lib.m10v_library_valid(C.byref(state)), 1)
         before = bytes(state)
         self.assertLess(self.lib.m10v_library_select(C.byref(state), 5, 1, success, None), 0)
-        self.assertLess(self.lib.m10v_library_select(C.byref(state), 0, 73, success, None), 0)
+        self.assertLess(self.lib.m10v_library_select(C.byref(state), 0, 79, success, None), 0)
         self.assertEqual(bytes(state), before)
 
     def test_neutral_disabled_effects_are_byte_identical_and_padding_is_protected(self):

@@ -33,17 +33,17 @@ test('final joined firmware contains all selected components and rejects repaire
  assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.equal(result.manifest.base,0x540ba000);
  assert.ok(result.receipt.composition.verified);
- assert.equal(result.receipt.composition.aspect_resource_id,985);
+ assert.equal(result.receipt.composition.aspect_resource_id,991);
  assert.equal(result.receipt.composition.native_resource_range[0],786);
- assert.equal(result.receipt.composition.native_resource_range[1],984);
+ assert.equal(result.receipt.composition.native_resource_range[1],990);
  assert.equal(sum32(result.candidate),0);
  const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
  let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
- // Independent opcode expectations: native resource bounds end at 984;
- // aspect's caption ID follows at 985.
- for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe30033d8);
- assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe30003d9);
- for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c3d9);
+ // Independent opcode expectations: native resource bounds end at 990;
+ // aspect's caption ID follows at 991.
+ for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe30033de);
+ assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe30003df);
+ for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c3df);
  assert.equal(d.readUInt32LE(at+16+0xb348c0),10);
  assert.equal(d.subarray(at+16+0xb3501e,at+16+0xb35020).toString('hex'),'020f');
  assert.deepEqual(auditIntegratedNative(source,result.candidate,result.nativeCandidate,result.runtime,result.manifest,result.component,extensions),result.receipt.composition);

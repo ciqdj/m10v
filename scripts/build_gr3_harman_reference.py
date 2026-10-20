@@ -31,6 +31,9 @@ PARAMETERS = {
         'tone': 'x + toe_lift*x*(1-x)^2 - shoulder_compression*x^4',
         'neutral_axis': 'all chromatic changes vanish on neutral RGB; common monotone curve',
         'calibration': 'no GR3 calibration, no scene reconstruction, no measured stock matching',
+        'ei': {'base':200,'options':[200,120],
+               'adapter':'decode sRGB; g=200/EI; y=g*x/(1+(g-1)*x); encode sRGB before display look',
+               'status':'assumed display exposure adapter with white-preserving shoulder; not recovered scene exposure or measured EI120 stock data'},
     },
     'red': {
         'status': 'all numeric parameters assumed; official channel topology only',
@@ -47,6 +50,7 @@ STOCKS = [
     {'id':68,'name':'HARMAN RED 125','model':'red','ei':125},
     {'id':68,'name':'HARMAN RED 125','model':'red','ei':64},
     {'id':68,'name':'HARMAN RED 125','model':'red','ei':250},
+    {'id':67,'name':'HARMAN Phoenix II 200','model':'phoenix-ii','ei':120},
 ]
 SOURCES = [
     {'url':'https://www.harmanphoto.co.uk/amfile/file/download/file/1965/product/2170/',
@@ -71,10 +75,11 @@ def red_record_exposure(linear_rgb, ei=125):
 
 
 class ReferenceHarman:
-    def __init__(self, stock='phoenix-ii', ei=125):
+    def __init__(self, stock='phoenix-ii', ei=None):
         if stock not in ('phoenix-ii','red'):
             raise ValueError('unknown Harman stock')
-        if not np.isfinite(ei) or ei <= 0:
+        if ei is None: ei = 200 if stock == 'phoenix-ii' else 125
+        if not np.isfinite(ei) or ei <= 0 or (stock == 'phoenix-ii' and ei not in (120,200)):
             raise ValueError('EI must be positive and finite')
         self.stock, self.ei = stock, ei
 
@@ -87,6 +92,13 @@ class ReferenceHarman:
             # Parameters describe already-rendered display code values. There
             # is no attempted inverse ISP or conversion into scene exposure.
             x = np.clip(rgb,0,1).copy()
+            if self.ei != 200:
+                # Display-domain adaptation only: missing sensor/scene spectra
+                # cannot be reconstructed from rendered RGB. The shoulder
+                # keeps white and highlight detail instead of hard clipping.
+                linear = colour.cctf_decoding(x,function='sRGB')
+                gain = 200/self.ei
+                x = colour.cctf_encoding(gain*linear/(1+(gain-1)*linear),function='sRGB')
             warm = p['warm_strength']*np.maximum(x[...,0]-x[...,1],0)
             x[...,0] += warm*(1-x[...,0])
             x[...,2] *= 1-warm
@@ -161,7 +173,7 @@ def generate(root=ROOT):
                 'highlight_min_step_90_95_100':float(np.diff(gray[-3:,0]).min())}
 
     header='/* Generated assumed HARMAN models; see harman-reference.json. Not official LUTs. */\n'
-    header+='static const uint8_t m10v_harman_luts[4][3375][3] = {\n'
+    header+='static const uint8_t m10v_harman_luts[5][3375][3] = {\n'
     for values in tables:
         header+='{\n'+''.join('{%d,%d,%d},\n'%tuple(v) for v in values)+'},\n'
     header+='};\n'

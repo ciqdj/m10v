@@ -38,7 +38,7 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_settings_controller_vtable','m10v_settings_view_create',
          'm10v_settings_view_draw','m10v_settings_view_destroy',
          'm10v_camera_library_load','m10v_sd_camera_item','m10v_sd_camera_install',
-         'm10v_camera_library_stamp','m10v_debug_log']
+         'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -123,7 +123,7 @@ class ControllerLifetimeTests(unittest.TestCase):
   u.mem_write(page+VIEW+160,struct.pack('<I',37));u.mem_write(page+VIEW+39*4,struct.pack('<I',heap))
   for i in range(5):u.mem_write(heap+470440+4*i,struct.pack('<I',heap+470400+8*i))
   directory=self.call(u,'card_directory')
-  for i in range(5):self.assertEqual(self.word(u,directory+(743+i)*4),heap+470400+8*i)
+  for i in range(5):self.assertEqual(self.word(u,directory+(749+i)*4),heap+470400+8*i)
 
  def test_embedded_initialization_and_stable_factory_identity(self):
   u=self.machine();u.mem_write(OWNER+0x193c,b"CANARY!!");self.setup_owner(u)

@@ -241,7 +241,7 @@ class M10VCaptureTests(unittest.TestCase):
             self.assertEqual(h.call(u,'m10v_capture_library',context),0)
             clock = [e for e in h.capture_events if e[0] == 120]
             self.assertEqual(clock,[(120,context,status,2,0x55006000)])
-            self.assertEqual([e[0] for e in h.capture_events],[100,125,113,120,121,124,122,110,112,111,123,101])
+            self.assertEqual([e[0] for e in h.capture_events],[100,125,113,138,120,121,124,122,110,112,111,123,101])
             self.assertEqual([e for e in h.capture_events if e[0]==125],[(125,context,18,0,0x60000000)])
             self.assertFalse(any(e[0]==114 for e in h.capture_events))
             self.assertEqual(h.capture_events[-1][2],0)

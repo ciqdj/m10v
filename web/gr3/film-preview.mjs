@@ -34,13 +34,17 @@ export function previewFilmPixels(source, look) {
 // RGB colour approximation only: these tables do not simulate spatial halation,
 // grain, diffusion or leaks, and do not establish a camera/film calibration.
 export function previewHarmanPixels(source, lut, film, filmExposure=0) {
-  if(![67,68].includes(film)||!Number.isInteger(filmExposure)||filmExposure<0||filmExposure>2||(film===67&&filmExposure!==0))throw new RangeError('Harman 胶卷或模拟曝光EI无效');
-  const size=lut.size,table=lut.stocks[film===67?0:filmExposure+1]?.values;
+  if(![67,68].includes(film)||!Number.isInteger(filmExposure)||filmExposure<0||filmExposure>2||(film===67&&filmExposure>1))throw new RangeError('Harman 胶卷或模拟曝光EI无效');
+  const size=lut.size,table=lut.stocks[film===67?(filmExposure===1?4:0):filmExposure+1]?.values;
   return previewRgbLutPixels(source,lut,table);
 }
 export function previewCuratedPixels(source,lut,film){
   if(!Number.isInteger(film)||film<69||film>72)throw new RangeError('精选胶卷无效');
   return previewRgbLutPixels(source,lut,lut.stocks[film-69]?.values);
+}
+export function previewNewStocksPixels(source,lut,film){
+  if(!Number.isInteger(film)||film<73||film>78)throw new RangeError('新增胶卷无效');
+  return previewRgbLutPixels(source,lut,lut.stocks[film-73]?.values);
 }
 function previewRgbLutPixels(source,lut,table){
   const size=lut.size;
@@ -58,9 +62,13 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
-let harmanTablesPromise,curatedTablesPromise;
+let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise;
 export async function renderPreviewPixels(source, look) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=73&&film<=78){
+    newstocksTablesPromise??=fetch(new URL('./newstocks-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('新增胶卷预览色表载入失败');return r.json();}).catch(error=>{newstocksTablesPromise=undefined;throw error;});
+    return previewNewStocksPixels(source,await newstocksTablesPromise,film);
+  }
   if([69,70,71,72].includes(film)){
     curatedTablesPromise??=fetch(new URL('./curated-luts.json',import.meta.url)).then(r=>{
       if(!r.ok)throw new Error('精选胶卷预览色表载入失败');return r.json();

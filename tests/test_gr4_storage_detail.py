@@ -17,14 +17,14 @@ class Gr4StorageDetailTests(unittest.TestCase):
   def compile_one(name,base,prefix,externals):
    obj=cls.folder/(Path(name).name+'.o')
    subprocess.run([os.environ.get('M10V_LLVM_CLANG','clang'),*FLAGS,'-I',str(ROOT/'native/gr3'),'-c',str(ROOT/'native/gr4'/name),'-o',str(obj)],check=True)
-   raw,symbols=link_object(obj.read_bytes(),base,externals,prefix,omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear') if prefix=='m10v_camera_library_' else ())
+   raw,symbols=link_object(obj.read_bytes(),base,externals,prefix,omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_film_name_stamp','m10v_camera_library_select_custom') if prefix=='m10v_camera_library_' else ('m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name') if prefix=='m10v_sd_camera_' else ())
    cls.images.append((base,raw));cls.symbols.update(symbols);return symbols
   compile_one('../gr3/m10v_sd_library.c',0x54470000,'m10v_sd_',cls.symbols)
   compile_one('m10v_library_camera.c',0x54480000,'m10v_camera_library_',cls.symbols)
   compile_one('m10v_sd_camera.c',0x54490000,'m10v_sd_camera_',cls.symbols)
   blob,detail=build_detail(0x544b0000,{'m10v_detail_table':0x544a0000,'m10v_detail_control':0x544a0100})
   ext=dict(cls.symbols)
-  ext.update(m10v_detail_tables=detail['variant_tables']['halo'],m10v_detail_common_tables=detail['variant_tables']['common'],m10v_detail_red_tables=detail['variant_tables']['red'])
+  ext.update(m10v_detail_tables=detail['variant_tables']['halo'],m10v_detail_common_tables=detail['variant_tables']['common'],m10v_detail_red_tables=detail['variant_tables']['red'],m10v_detail_phoenix_tables=detail['variant_tables']['phoenix'])
   compile_one('m10v_detail.c',0x544a0000,'m10v_detail_',ext)
   cls.blob,cls.detail=build_detail(0x544b0000,cls.symbols)
   cls.images.append((0x544b0000,cls.blob))
@@ -86,7 +86,7 @@ class Gr4StorageDetailTests(unittest.TestCase):
   u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.symbols.get(name,name),0x550ff000,count=10000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x550ff000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp);return u.reg_read(UC_ARM_REG_R0)
  def test_sd_pages_exact_read_and_handle_cleanup(self):
-  for page,row,want in [(0,0,33),(0,3,68),(4,7,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
+  for page,row,want in [(0,0,33),(0,3,68),(4,7,59),(5,5,65),(5,6,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
   self.short=True;self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
   self.assertEqual((self.opened,self.allocations),(0,0))
  def test_complete_sd_snapshot_before_journal_and_without_card(self):

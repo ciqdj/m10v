@@ -19,5 +19,5 @@ class NativePipelineBuildTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    with self.assertRaises(ValueError):build(d,native_grain=True)
    with self.assertRaises(ValueError):build(d,view_deferred=True)
-   with self.assertRaisesRegex(ValueError,'allocator'):build(d,debug_mode=True,lifecycle_trace=True,hdf_enabled=True)
+   with self.assertRaisesRegex(ValueError,'Shared HDF requires native color/grain snapshot owners'):build(d,debug_mode=True,lifecycle_trace=True,hdf_enabled=True)
    with self.assertRaises(ValueError):build(d,hdf_enabled=False,hdf_default=1)

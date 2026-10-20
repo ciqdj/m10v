@@ -161,7 +161,7 @@ int m10v_isp_frame_recipe_finish(const void *context){
     uint32_t tone=selected_tone(s,s->tone);
     uint32_t slot=tone==12?0:tone-17;
     uint32_t film=s->state.slots[slot].film;
-    uint32_t exposure=film==68?s->state.effects[slot].film_exposure:0;
+    uint32_t exposure=(film==67||film==68)?s->state.effects[slot].film_exposure:0;
     uint32_t generation=(uint32_t)(uintptr_t)s^s->si^s->sequence;
     if(!generation)generation=1;
     m10v_isp_native_look look;
@@ -286,7 +286,7 @@ int m10v_isp_frame_live_color(void *tuning,void *info){
     uint32_t tone=committed_tone(raw_tone),slot=tone==12?0:tone>=18&&tone<=21?tone-17:5;
     if(slot>=5)return 0;
     m10v_library_state state;if(!m10v_camera_library_preview(&state))return 0;
-    uint32_t film=state.slots[slot].film,exposure=film==68?state.effects[slot].film_exposure:0;
+    uint32_t film=state.slots[slot].film,exposure=(film==67||film==68)?state.effects[slot].film_exposure:0;
     m10v_isp_native_look look;
     return m10v_isp_native_look_prepare(&look,film,exposure,state.sequence+1u)&&
         m10v_isp_native_look_apply(&look,*(const void *const *)((const uint8_t *)tuning+0x17c),info,shot[0x7be]==1);

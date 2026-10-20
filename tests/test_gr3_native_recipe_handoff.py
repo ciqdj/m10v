@@ -1,5 +1,6 @@
 """Installed StillMake must apply native color and authorize exactly one shot."""
-import tempfile,unittest
+import tempfile,unittest,struct,zlib
+from unicorn import UC_HOOK_CODE
 from unicorn import arm_const as A
 from tests import test_gr3_isp_recipe_color as prior
 library_fragment,state,StockISP,BASE,ROOT=prior.library_fragment,prior.state,prior.StockISP,prior.BASE,prior.ROOT
@@ -34,6 +35,15 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   for p in cls.manifest['patches']:candidate[p['address']-BASE:p['address']-BASE+4]=bytes.fromhex(p['replacement_hex'])
   cls.candidate=bytes(candidate)
  # Native profiles intentionally have different frame banks from old CPU LUTs.
+ def test_phoenix_ei120_reaches_installed_still_native_profile(self):
+  e,r,o,i,c,si=self.fixture();data=bytearray(state((67,)*5));data[61]=1
+  struct.pack_into('<I',data,100,zlib.crc32(data[:100]))
+  self.assertEqual(self.snapshot(e,r,data)[0],1)
+  observed=[];prepare=self.manifest['exports']['m10v_isp_native_look_prepare']
+  e.u.hook_add(UC_HOOK_CODE,lambda u,a,n,d:observed.append((u.reg_read(A.UC_ARM_REG_R1),u.reg_read(A.UC_ARM_REG_R2))) if a==prepare else None)
+  self.callback(e,o,i,c)
+  self.assertEqual(self.status(e,r),2)
+  self.assertEqual(observed,[(67,1)])
  def test_unsupported_3d_lut_and_wrong_si_leave_frame_stock(self):
   e,r,o,i,c,si=self.fixture();self.snapshot(e,r,state((67,)*5));self.callback(e,o,i,c);self.assertEqual(self.status(e,r),2)
  def test_installed_native_apply_has_exact_per_shot_completion_identity(self):

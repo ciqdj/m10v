@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.5",
+      "date": "2026-10-20",
+      "title": "新增六款胶卷、蓝凤凰 EI 档位与开关机图片替换",
+      "changes": [
+        "GR III 2.10 新增开机／关机图片上传、裁剪、最终压缩预览、恢复默认和统一固件导出；开机资源替换已离线验证，正常开机显示与关机显示仍待实机验收，暂不支持 GR IIIx／GR IV 图片替换。",
+        "GR III／GR IIIx／GR IV 共享胶卷目录新增富士 C200、Kodak ProImage 100、T-Max 100、Aerochrome III 1443、Aerocolor IV 2460 和 VISION3 50D 5203，公开目录增至 46 款；更新机内图标、SD 胶卷包与原生色彩参数，旧 SD 包须重新生成。",
+        "蓝凤凰增加 EI 200／120 模拟档，五槽独立保存并接通网页预览、机内调节、静态／实时原生色彩及固件初始配置；模拟档不改变机身 ISO。",
+        "修复新增目录后的机内菜单定位及 GR IV 设置接口初始化；补充官方技术资料、开源数据来源和拟合误差记录。胶卷效果为显示域近似，尤其 Aerochrome 无法从 RGB 恢复红外信息，尚未完成相机／真实胶片标定。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.4",
       "date": "2026-10-20",
       "title": "修复 GR IV 发布兼容并上线自定义胶卷",
@@ -11,9 +25,9 @@
         "修复 GR IV 构建器对共享配置中关闭的胶卷名称字段及 GR III 专用接口的误拒绝，保留 GR IV 原有型号保护和独立固件回读。",
         "HDF 菜单已做 GR III 离线组合回归，网友缺菜单反馈尚无实机记录可复现；新增功能仍待真机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "6ddfa465b24481ea6f2e4ba2ef830b749294b058",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39383470000"
     },
     {
       "version": "2026.10.20.3",

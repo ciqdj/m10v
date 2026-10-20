@@ -12,8 +12,8 @@ class SdLibraryTests(unittest.TestCase):
   cls.lib=C.CDLL(str(out));cls.lib.m10v_sd_header.argtypes=[C.c_void_p,C.c_uint32];cls.lib.m10v_sd_record.argtypes=[C.c_void_p,C.c_uint32,C.c_uint32]
   cls.pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
  def test_all_current_recipes_and_indices(self):
-  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),40)
-  for i in range(40):
+  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),46)
+  for i in range(46):
    id=struct.unpack_from('<I',self.pack,64+i*12)[0]
    r=self.pack[4096+i*12288:4096+(i+1)*12288]
    self.assertEqual(self.lib.m10v_sd_record(r,len(r),id),id)
@@ -34,9 +34,9 @@ class SdLibraryTests(unittest.TestCase):
   pack=subprocess.check_output(['node','--input-type=module','-e',source],cwd=ROOT)
   record=pack[4096:]
   self.assertEqual(self.lib.m10v_sd_header(pack[:4096],len(pack)),1)
-  self.assertEqual(self.lib.m10v_sd_record(record,len(record),73),73)
+  self.assertEqual(self.lib.m10v_sd_record(record,len(record),79),79)
   damaged=bytearray(record);damaged[7000]^=1;struct.pack_into('<I',damaged,12284,zlib.crc32(damaged[:-4]))
-  self.assertEqual(self.lib.m10v_sd_record(bytes(damaged),len(damaged),73),0)
+  self.assertEqual(self.lib.m10v_sd_record(bytes(damaged),len(damaged),79),0)
  def test_previous_v1_builtin_record_remains_accepted(self):
   record=bytearray(self.pack[4096:4096+12288])
   record[8448:8480]=bytes.fromhex('52c0e9f5e8bc84b0430702ecd187c0a9dc816822f20ec8d5de670b9e97276d59')

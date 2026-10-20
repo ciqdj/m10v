@@ -156,6 +156,22 @@ class ControllerLifetimeTests(unittest.TestCase):
   self.view_fail=False
   self.assertEqual(self.call(u,'ready',PAGE,0x0200f100),1)
 
+ def test_stamp_cursor_stops_at_four_gr4_rows(self):
+  u=self.machine();self.setup_owner(u);p=PAGE+STRIDE
+  self.assertEqual(self.call(u,'ready',p,0x0200f101),1)
+  for raw in (0xd7,0xd7,0xd7,0xd7,0xd5,0xdb):
+   u.mem_write(0x10000100,struct.pack('<H',raw));self.call(u,'key',p,0x10000100)
+  self.assertEqual(self.word(u,p+SCREEN+4),3)
+  u.mem_write(0x10000100,struct.pack('<H',0xe0));self.call(u,'key',p,0x10000100)
+  self.assertEqual(self.word(u,p+SCREEN),4)
+  self.assertEqual(self.word(u,p+SCREEN+4),3)
+
+ def test_ready_initializes_all_ops_with_zeroed_or_poisoned_stack(self):
+  for fill in (0,255):
+   u=self.machine();self.setup_owner(u)
+   u.mem_write(0x100ef000,bytes([fill])*4096)
+   self.assertEqual(self.call(u,'ready',PAGE,0x0200f100),1)
+
  def test_cached_view_reentry_reuses_widgets_and_unregisters(self):
   u=self.machine();self.setup_owner(u)
   for cycle in range(3):

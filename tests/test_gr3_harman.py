@@ -4,6 +4,25 @@ import unittest
 from tests.test_gr3_m10v_library import NativeFilmLibraryTests,STORE,State
 
 class HarmanFilmTests(NativeFilmLibraryTests):
+    def test_phoenix_ei120_is_atomic_persistent_and_changes_rendered_pixels(self):
+        s=self.state();ok=STORE(lambda _,p:0);bad=STORE(lambda _,p:-1)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(s),0,67,ok,None),0)
+        self.lib.m10v_library_texture(C.byref(s),0,0,0,ok,None)
+        self.lib.m10v_library_halation(C.byref(s),0,0,3,5,2,ok,None)
+        before=bytes(s)
+        self.assertEqual(self.effects(s,6,1,bad),-2);self.assertEqual(bytes(s),before)
+        im,y,uv,tmp=self.image();self.assertEqual(self.render(im,s,tmp),0);normal=(bytes(y),bytes(uv))
+        self.assertEqual(self.effects(s,6,1),0);self.assertEqual(s.effects[0][5],1)
+        im,y,uv,tmp=self.image();self.assertEqual(self.render(im,s,tmp),0)
+        self.assertNotEqual((bytes(y),bytes(uv)),normal)
+        self.assertEqual(bytes(y)[im.y_bytes:],bytes([173]*32))
+        self.assertEqual(self.effects(s,5,0),0);self.assertEqual(s.effects[0][5],1)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(s),0,67,ok,None),0)
+        self.assertEqual(s.effects[0][5],1)
+        self.assertLess(self.effects(s,6,2),0)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(s),0,68,ok,None),0)
+        self.assertEqual(s.effects[0][5],0)
+
     def effects(self,s,field,value,store=None):
         self.lib.m10v_library_effects.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
         return self.lib.m10v_library_effects(C.byref(s),0,field,value,store or STORE(lambda _,p:0),None)

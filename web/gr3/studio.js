@@ -1,3 +1,4 @@
+import {mountPowerImages} from './power-images.js';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFirmwareSaveGate} from './firmware-save-gate.mjs';
 import { createEditorState, createImportGate } from './editor-state.mjs';
@@ -12,6 +13,7 @@ const nativeApi=gr4Workbench?'/api/gr4/native-library':'/api/gr3/native-library'
 let chosenModel=gr4Workbench?'gr4':location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
 let modelLabel=chosenModel==='gr4'?'GR IV':chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
+let powerImages;
 let settingsTab='library';
 let debugMode=false;
 const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.features.has('level'),negativeGrain:state.features.has('negativeGrain'),rawNr:state.features.has('rawNr')?state.rawNr:{mode:'stock'}});
@@ -51,8 +53,9 @@ state.filmTexture = {}; state.stockPresets = []; state.stockCapabilities = []; s
 let filmPreview = createFilmPreview();
 window.addEventListener('pageshow',event=>{if(event.persisted)filmPreview=createFilmPreview();});
 let restoringHistory=false;
-function historyConfiguration(){return {...selection(),features:[...state.features],profile:state.profile,nativeConfiguration:state.nativeConfig,unresolvedSlots:state.unresolvedSlots,toolFeaturesDraft:state.toolFeaturesDraft};}
+function historyConfiguration(){return {powerImages:powerImages?.getConfiguration()||{},...selection(),features:[...state.features],profile:state.profile,nativeConfiguration:state.nativeConfig,unresolvedSlots:state.unresolvedSlots,toolFeaturesDraft:state.toolFeaturesDraft};}
 const editHistory=createEditorState(historyConfiguration());
+powerImages=mountPowerImages($('power-images'),{api,onChange:()=>invalidate(),model:()=>chosenModel});powerImages.setModel();
 const iconImports=createImportGate();
 let saving=false,riskAcceptedRevision=-1;
 let bridgeBusy=false,bridgePlan=null,bridgeProject=null;
@@ -67,6 +70,7 @@ const zeroParams = () => Object.fromEntries(fields.map(([key]) => [key, 0]));
 function updateHistoryButtons(){const snapshot=editHistory.snapshot();$('undo-edit').disabled=!snapshot.canUndo;$('redo-edit').disabled=!snapshot.canRedo;}
 function restoreHistory(direction){
   editHistory[direction]();const saved=normalizeWorkbenchDraft(editHistory.snapshot().config,state.nativeCatalog,state.nativeConfig);
+  powerImages?.setConfiguration(saved.powerImages);
   state.profile='native';state.unresolvedSlots=saved.unresolvedSlots||[];state.toolFeaturesDraft=saved.toolFeaturesDraft||[];
   restoringHistory=true;if(saved.nativeConfiguration)nativeEditor?.setConfiguration(saved.nativeConfiguration);restoringHistory=false;nativeEditor?.setUnresolved(state.unresolvedSlots);
   state.features=new Set(saved.features);state.recipes=new Map((saved.recipes||[]).map(r=>[r.slotId,r]));
@@ -107,7 +111,7 @@ function saveDraft() {
   if(!draftPersistenceAllowed)return;
   try {
     localStorage.setItem(draftKey, JSON.stringify({
-      profile:state.profile,toolFeaturesDraft:state.toolFeaturesDraft,unresolvedSlots:state.unresolvedSlots, features: [...state.features], recipes: [...state.recipes.values()],
+      powerImages:powerImages?.getConfiguration()||{},profile:state.profile,toolFeaturesDraft:state.toolFeaturesDraft,unresolvedSlots:state.unresolvedSlots, features: [...state.features], recipes: [...state.recipes.values()],
       filmIds: state.filmIds, filmLibrary: state.filmLibrary,
       filmTexture: state.filmTexture, nativeConfiguration:state.nativeConfig, stockPresets:state.stockPresets, rawNr:state.rawNr,
     }));
@@ -116,12 +120,13 @@ function saveDraft() {
 function restoreDraft() {
   try {
     const raw=localStorage.getItem(draftKey);
-    if(raw&&raw.length>512*1024)throw Error('草稿过大');
+    if(raw&&raw.length>4*1024*1024)throw Error('草稿过大');
     if(raw){
       const previous=JSON.parse(raw);
       preserveLegacyDraft(localStorage,draftKey,raw,previous);
       const draft=normalizeWorkbenchDraft(previous,state.nativeCatalog,state.nativeConfig);
       state.profile='native';state.features=new Set(draft.features);state.recipes=new Map();state.stockPresets=[];
+      powerImages?.setConfiguration(draft.powerImages);
       state.rawNr=draft.rawNr;state.unresolvedSlots=draft.unresolvedSlots;state.toolFeaturesDraft=[];
       restoringHistory=true;
       try{nativeEditor.setConfiguration(draft.nativeConfiguration);}finally{restoringHistory=false;}
@@ -179,6 +184,7 @@ function renderVersionUnlock(){
  $('version-error').textContent=error;return !error;
 }
 function renderLedger() {
+  powerImages?.setModel();
   const ledger = $('plan-ledger');
   ledger.replaceChildren();
   const native=state.profile==='native';
@@ -186,6 +192,7 @@ function renderLedger() {
     ['机型',state.source?`${state.source.model} · ${state.source.public_version}`:modelLabel],
     ['胶卷',native&&state.features.has('film')?state.nativeConfig.slots.map(s=>state.nativeCatalog.find(f=>f.id===s.film)?.name||`#${s.film}`).join(' / '):state.features.has('film')?`${state.filmIds.length} / 5 款`:'未启用'],
     ['固件来源',state.projectId?'官方文件已核验':'等待导入'],
+    ['开关机图片',chosenModel==='gr3'?Object.keys(powerImages?.getConfiguration()||{}).map(k=>k==='startup'?'开机':'关机').join(' / ')||'原厂默认':'该机型未启用'],
     ['保存状态',activeBuildController?'正在处理':state.preparation?'方案已核验':'保存时自动核验'],
   ];
   $('open-build-desk').hidden=false;
@@ -539,7 +546,7 @@ async function download(response, filename) {
 }
 async function prepare() {
   if (!state.projectId) return;
-  let request;try{request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot()}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  let request;try{request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel==='gr3'?{power_images:powerImages?.getConfiguration()||{}}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();
   $('prepare-build').disabled = true;

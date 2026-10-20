@@ -7,6 +7,7 @@ from scripts.build_gr3_menu_patches import assembly, branch, movw
 BASE=0x53000000
 FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']
 DETAIL_IDS={'halo':[i for i in range(18,28) if i!=22],'common':[i for i in range(21,28) if i!=22],'red':[i for i in range(21,29) if i!=22]}
+DETAIL_IDS['phoenix']=[i for i in range(18,29) if i!=22]
 STOCK_TABLE=bytes.fromhex('2c4cb35309000000f04ab35309000000144ab3530a000000104fb353090000008c4ab353090000005050b3530a0000000c50b35309000000ac4ab35309000000ec4fb3530a000000584eb3530a000000d049b35304000000b849b3530a000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000')
 STOCK_CAPTIONS=bytes.fromhex('e3011901e1011b01e2011d01da011f01db012101dc012301e5012501e9012f01e9012f0167012f01e9012f01e9013f01dd012701e4013701d9013101de013301e0013501f8000000')
 STOCK_SLIDER=bytes.fromhex('0dc0a0e1f0d82de97c5705e3055445e304b04ce268d04de2003095e50060a0e10040a0e320300be55b7701eb9f7a01eb9811d6e5305904eb0afdffeb04408de50f30a0e300308de51420a0e30c208de5233ea0e310308de54020a0e314208de5c730a0e318308de50070a0e108408de50410a0e10820a0e32d30a0e354004be248c807eb093da0e30420a0e100308de50710a0e11e30a0e354004be258c807eb54004be20410a0e15dc807eb647196e554104be20700a0e19fc807eb5c400be50c00a0e37c0814eb0030a0e1d02f00e31b2345e30700a0e1002083e5042a0ce3044083e51a2345e3086083e564104be264300be55c390ce358200be51a3345e35c300be56efb07eb5c301be5040053e10300000a64004be20320a0e30010a0e133ff2fe120201be5003095e5030052e10100001a1cd04be2f0a89de8d1cb19eb')
@@ -91,10 +92,13 @@ def build_detail(base,symbols):
  # Private IDs keep stable meanings across the three visible lists.
  # Restore the original setup frame before dispatch; retain the selected ID
  # in ip because r0 must be the stock controller for the slider constructor.
+ exposure_dispatch=stub('push {r0,r4,r12,lr};mov r1,r0;mov r0,#9;mov r2,#0;bl '+hex(control)+';cmp r0,#1;pop {r0,r4,r12,lr};beq '+hex(sliders[1])+';b '+hex(sliders[2]),'film-specific exposure range')
+ entries['exposure_dispatch']=exposure_dispatch
  dispatch=''
  for id in range(18,29):
   maximum=[8,8,8,3,3,2,8,5,8,1,2][id-18]
-  dispatch+=f'cmp ip,#{id};beq {hex(sliders[maximum])};'
+  destination=exposure_dispatch if id==28 else sliders[maximum]
+  dispatch+=f'cmp ip,#{id};beq {hex(destination)};'
  dispatch_stub=stub(dispatch+f'b {hex(sliders[8])}','slider dispatch')
  entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')

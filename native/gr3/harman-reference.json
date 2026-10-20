@@ -22,7 +22,16 @@
       "shoulder_compression": 0.018,
       "tone": "x + toe_lift*x*(1-x)^2 - shoulder_compression*x^4",
       "neutral_axis": "all chromatic changes vanish on neutral RGB; common monotone curve",
-      "calibration": "no GR3 calibration, no scene reconstruction, no measured stock matching"
+      "calibration": "no GR3 calibration, no scene reconstruction, no measured stock matching",
+      "ei": {
+        "base": 200,
+        "options": [
+          200,
+          120
+        ],
+        "adapter": "decode sRGB; g=200/EI; y=g*x/(1+(g-1)*x); encode sRGB before display look",
+        "status": "assumed display exposure adapter with white-preserving shoulder; not recovered scene exposure or measured EI120 stock data"
+      }
     },
     "red": {
       "status": "all numeric parameters assumed; official channel topology only",
@@ -72,7 +81,7 @@
     },
     "spatial_effects": "grain, diffusion and leaks use shared user controls; no baked halation"
   },
-  "parameters_sha256": "30c3137c6f10000ab2acde73780bf6a86aa0d14eb87166f1c916d3c7f03ec7e8",
+  "parameters_sha256": "60060adeb24517da3e3fd9684f20db815634e865ce629ea3fb9a0176abae484e",
   "sources": [
     {
       "url": "https://www.harmanphoto.co.uk/amfile/file/download/file/1965/product/2170/",
@@ -94,7 +103,7 @@
   "sources_sha256": "3fabc66716e6f11b3df6e929d716e6a66f7b8ea3d0845d7fb4c7cf5dcc3eb195",
   "generator": {
     "path": "scripts/build_gr3_harman_reference.py",
-    "sha256": "16c20dc0cd0e8c1a5251153a557e8e1840782ec9f3fbbc31c9745b51a5426156"
+    "sha256": "02f098e3bff0c9ecfd2a48f5bb894e4e8dff440bd1a9d0584dc2633d563bf1cf"
   },
   "dependencies": {
     "numpy": "2.5.3",
@@ -212,6 +221,56 @@
         "delta_e_00_median": 0.08225738810517388,
         "delta_e_00_p95": 0.19249200085300316,
         "delta_e_00_max": 2.5239268593818336
+      }
+    },
+    {
+      "id": 67,
+      "name": "HARMAN Phoenix II 200",
+      "model": "phoenix-ii",
+      "ei": 120,
+      "table_bytes": 10125,
+      "table_sha256": "7c4c56c513024b57e5a6a48580dd763d5d913c700d46a7e6b505da50079f8164",
+      "interpolation_validation": {
+        "samples": 8192,
+        "seed": 68125,
+        "encoded_domain": [
+          0,
+          1
+        ],
+        "rgb_abs_p95": 0.002063700535140739,
+        "rgb_abs_max": 0.008963156090127593,
+        "delta_e_00_median": 0.0813140836069561,
+        "delta_e_00_p95": 0.2066690296625679,
+        "delta_e_00_max": 0.8069971146875298
+      },
+      "display_mapping": {
+        "model": "bounded-display-srgb-v1",
+        "input": "encoded display sRGB D65 after camera ISP",
+        "output": "encoded display sRGB D65",
+        "scene_radiance_recovered": false,
+        "intent": "restrained neutral/warm display look with selective blue/cyan; not a measured stock match",
+        "grey_input": [
+          0.0,
+          0.1,
+          0.25,
+          0.5,
+          0.75,
+          0.9,
+          0.95,
+          1.0
+        ],
+        "grey_output": [
+          0.0,
+          0.14029283125736391,
+          0.3228686423447998,
+          0.5961810758309032,
+          0.8170300333380284,
+          0.9223614881962166,
+          0.9531857001513908,
+          0.9819999999999999
+        ],
+        "grey_max_abs_change": 0.09618107583090318,
+        "highlight_min_step_90_95_100": 0.02881429984860906
       }
     }
   ]

@@ -1,5 +1,5 @@
 """Execute delivered view with all firmware ROM RX, actual bitmap resource lookup and heap lifecycle."""
-import hashlib,json,os,struct,subprocess,unittest
+import hashlib,json,os,struct,subprocess,tempfile,unittest
 from pathlib import Path
 from unicorn import UC_PROT_READ,UC_PROT_EXEC
 from unicorn import arm_const as A
@@ -8,9 +8,23 @@ ROOT=Path(__file__).resolve().parents[1]
 class MenuReadonlyTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  os.environ['M10V_GR3_ORIGINAL_RTOS']=str(ROOT/'builds/gr3-extension-validation/official-rtos.bin')
+  from scripts.build_gr3_m10v_library import build,capture_stock_rtos
+  cls.tmp=tempfile.TemporaryDirectory(prefix='m10v-menu-readonly-');cls.addClassCleanup(cls.tmp.cleanup)
+  tmp=Path(cls.tmp.name);original=tmp/'official-rtos.bin';original.write_bytes(capture_stock_rtos())
+  previous=os.environ.get('M10V_GR3_ORIGINAL_RTOS')
+  def restore_environment():
+   if previous is None:os.environ.pop('M10V_GR3_ORIGINAL_RTOS',None)
+   else:os.environ['M10V_GR3_ORIGINAL_RTOS']=previous
+  cls.addClassCleanup(restore_environment);os.environ['M10V_GR3_ORIGINAL_RTOS']=str(original)
   SettingsViewTests.setUpClass();cls.addClassCleanup(SettingsViewTests.doClassCleanups)
-  cls.folder=Path(os.environ.get('M10V_MENU_CANDIDATE',str(ROOT/'builds/gr3-v8-menu-fix/candidate')))
+  explicit=os.environ.get('M10V_MENU_CANDIDATE')
+  cls.folder=Path(explicit) if explicit else tmp/'candidate'
+  if not explicit:
+   manifest=build(tmp/'runtime',sd_library=True)
+   (cls.folder/'evidence').mkdir(parents=True)
+   (cls.folder/'evidence/M10V-runtime-manifest.json').write_text(json.dumps(manifest))
+   js="import{readFileSync,writeFileSync}from'node:fs';import{buildNativeLibrary}from'./node/gr3-m10v-native-build.mjs';const m=JSON.parse(readFileSync(process.argv[1]));const r=readFileSync(process.argv[2]);const {candidate}=buildNativeLibrary(readFileSync('bin/fwdc239b-gr3-official.bin'),r,m);writeFileSync(process.argv[3],candidate);"
+   subprocess.run(['node','--input-type=module','-e',js,str(cls.folder/'evidence/M10V-runtime-manifest.json'),str(tmp/'runtime/m10v-library-arm.bin'),str(cls.folder/'fwdc239b.bin')],cwd=ROOT,check=True,capture_output=True)
   cls.manifest=json.loads((cls.folder/'evidence/M10V-runtime-manifest.json').read_text())
   js="import{readFileSync}from'node:fs';import{decodeFrameMap}from'./node/gr3-frames.mjs';let b=readFileSync(process.argv[1]),d=decodeFrameMap(b,b.readUInt32LE(b.length-8)).decoded;process.stdout.write(d.subarray(0x10870,0x10870+d.readUInt32LE(0x1086c)));"
   cls.rom=subprocess.check_output(['node','--input-type=module','-e',js,str(cls.folder/'fwdc239b.bin')],cwd=ROOT)
@@ -31,10 +45,10 @@ class MenuReadonlyTests(unittest.TestCase):
    heap=struct.unpack('<I',u.mem_read(view+39*4,4))[0]
    for i in range(5):
     w,ht,p=struct.unpack('<HHI',u.mem_read(heap+470400+i*8,8));self.assertEqual((w,ht,p*4),(120,196,heap+i*94080))
-    self.assertEqual(self.call(u,0x53209fb8,0,739+i),120)
-    self.assertEqual(self.call(u,0x53209fec,0,739+i),196)
+    self.assertEqual(self.call(u,0x53209fb8,0,749+i),120)
+    self.assertEqual(self.call(u,0x53209fec,0,749+i),196)
    h.call(u,'destroy',view);self.assertFalse(h.live)
-   self.assertEqual(self.call(u,0x53209fb8,0,739),40) # Safe immutable fallback after owner releases RAM.
+   self.assertEqual(self.call(u,0x53209fb8,0,749),40) # Safe immutable fallback after owner releases RAM.
   self.assertEqual(hashlib.sha256(bytes(u.mem_read(0x53000000,len(self.rom)))).digest(),before)
  def test_timestamp_view_never_allocates_card_metadata(self):
   h,u,view=self.fixture();h.call(u,'create',view);h.state(u,3,0);h.call(u,'draw',view,0x10002000,0)
@@ -45,11 +59,11 @@ class MenuReadonlyTests(unittest.TestCase):
   heap=struct.unpack('<I',u.mem_read(view+39*4,4))[0]
   registers=[getattr(A,'UC_ARM_REG_R'+str(i))for i in range(13)]+[A.UC_ARM_REG_LR,A.UC_ARM_REG_SP]
   for name,outreg,idreg,end in [('width',3,1,0x53209fd4),('height',3,1,0x5320a008),('draw',2,3,0x5320a80c)]:
-   for icon in (671,739,743):
+   for icon in (671,749,753):
     for i,reg in enumerate(registers):u.reg_write(reg,0x12340000+i*256)
     u.reg_write(registers[idreg],icon);u.reg_write(A.UC_ARM_REG_SP,0x100f0000)
     flags=(u.reg_read(A.UC_ARM_REG_CPSR)&0x0fffffff)|0xa0000000;u.reg_write(A.UC_ARM_REG_CPSR,flags)
-    expected=[u.reg_read(reg)for reg in registers];expected[outreg]=heap+470440-739*4 if icon>=739 else self.manifest['icons']['table']
+    expected=[u.reg_read(reg)for reg in registers];expected[outreg]=heap+470440-749*4 if icon>=749 else self.manifest['icons']['table']
     u.emu_start(self.manifest['film_cards']['directory_hooks'][name],end,count=100000)
     self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),end)
     self.assertEqual([u.reg_read(reg)for reg in registers],expected)
@@ -58,5 +72,5 @@ class MenuReadonlyTests(unittest.TestCase):
  def test_large_card_oom_keeps_original_icons_and_tears_down_cleanly(self):
   h,u,view=self.fixture(fail=True);h.call(u,'create',view);h.state(u);h.call(u,'draw',view,0x10002000,0)
   self.assertEqual(struct.unpack('<I',u.mem_read(view+39*4,4))[0],0)
-  self.assertEqual(self.call(u,0x53209fb8,0,739),40)
+  self.assertEqual(self.call(u,0x53209fb8,0,749),40)
   h.call(u,'destroy',view);self.assertFalse(h.live)

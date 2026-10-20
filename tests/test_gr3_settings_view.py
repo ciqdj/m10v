@@ -79,7 +79,7 @@ class SettingsViewTests(unittest.TestCase):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u)
   self.state(u);self.call(u,'draw',0x10001000,0x10002000,0)
   ids=[struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)]
-  self.assertEqual(ids,[743,744,745,746,747])
+  self.assertEqual(ids,[749,750,751,752,753])
   for i in range(5):
    width,height,pixels=struct.unpack('<HHI',u.mem_read(struct.unpack('<I',u.mem_read(0x10001000+39*4,4))[0]+470400+i*8,8))
    self.assertEqual((width,height),(120,196))
@@ -118,7 +118,7 @@ class SettingsViewTests(unittest.TestCase):
   for p in w[1:37]:self.assertEqual(struct.unpack('<I',u.mem_read(p+4,4))[0],w[0])
   self.state(u);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(5)],[1,1,6,1,1])
-  self.assertEqual([struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)],[743,744,745,746,747])
+  self.assertEqual([struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)],[749,750,751,752,753])
   p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0];self.assertEqual(bytes(u.mem_read(p,28)),'3 / 5  PORTRA\0'.encode('utf-16le'))
   self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],937)
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)

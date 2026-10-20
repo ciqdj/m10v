@@ -6701,7 +6701,7 @@
   "files": {
     "scripts/build_gr3_curated_reference.py": "cb61d1cbec87211a1a0e976d0ea8d74d689f76ec3e882cd88a5b61808801b543",
     "scripts/build_gr3_isp_film_targets.py": "abcc850cb0d090c3413c7453c4b9eb537b5e87516c9613a05053dd076b7b3a54",
-    "scripts/build_gr3_harman_reference.py": "16c20dc0cd0e8c1a5251153a557e8e1840782ec9f3fbbc31c9745b51a5426156",
+    "scripts/build_gr3_harman_reference.py": "02f098e3bff0c9ecfd2a48f5bb894e4e8dff440bd1a9d0584dc2633d563bf1cf",
     "third_party/curated-film-luts/kodak_portra_160.cube": "dc7a832737c22ca0a2056cc244047e0e08872fa4143bd9c4bb0f60fc89748120",
     "third_party/curated-film-luts/fuji_superia_100.cube": "cf93ea0307ba96e5b204a67afb2479791dd3f74765ddda8a1c2aa582f14ab917",
     "third_party/curated-film-luts/LICENSE": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",

@@ -42,10 +42,10 @@ export function gr4SdInstructions(){return `M10V SD 胶卷库 / GR IV 1.11
 解压，将 SD/M10V 目录复制到 SD 卡根目录，与 DCIM 并列。更新时只替换 FILMS.M10，保留其他文件。
 机内：MENU > 设置 > 胶卷库，选择要替换的槽位并按 OK，直接进入卡上的胶卷列表。
 左右选卷、上下翻页，按 OK 装入；成功后返回五槽列表。MENU 返回上一级，五槽页按 MENU 退出。
-最多五个活动槽，卡上可存全部40款当前胶卷。装入成功后重启或换卡仍保留。无卡、损坏或不兼容文件不替换原槽。
+最多五个活动槽，卡上可存全部46款当前胶卷。装入成功后重启或换卡仍保留。无卡、损坏或不兼容文件不替换原槽。
 时间水印：MENU > 设置 > 时间水印，设置模式、日期格式、位置、颜色，OK 保存，MENU 取消当前编辑。
 文件包含配方身份快照和图标；5207、Phoenix II、HARMAN RED 通过 SHA-256 绑定固件内完整 LUT（含 RED 三档曝光），不在文件中存放 LUT。
-仅接受匹配版本的40款胶卷，未来新配方需匹配固件。固件与资源包使用同一份渲染合同。
+仅接受匹配版本的46款胶卷，未来新配方需匹配固件。固件与资源包使用同一份渲染合同。
 胶卷效果作用于保存的静态 JPEG，实时取景和机内 RAW 再开发沿用原厂流程。异常时间只跳过日期水印。
 离线验证通过，GR IV 刷入、菜单、拍摄和 SD 换卷仍需真机验收。\n`;}
 export function gr4WorkbenchHtml(shared){return shared.replaceAll('GR III／GR IIIx','GR IV').replace('GR III / GR IIIx','GR IV').replaceAll('GR III / GR IIIx','GR IV').replace('支持 GR III 与 GR IIIx · 导入后自动识别机型','支持 GR IV · 官方固件身份核验').replace('<option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option>','<option value="gr4">GR IV · 1.11</option>').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replace('<a href="/gr4/">GR IV</a>','<a href="/gr4/reference/">GR IV 参考工具</a>');}

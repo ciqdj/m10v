@@ -35,7 +35,7 @@ class NativeDetailTests(unittest.TestCase):
    descriptor=resources['descriptors'][resource_id-resources['first_id']]-base
    length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
    labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
-  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','已停用','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
+  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','已停用','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Film Exposure'])
 
 class StockDetailArmTests(NativeDetailTests):
  @classmethod
@@ -90,7 +90,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     # Match the real selected private list row, including each stock prefix.
     kind=uc.mem_read(ui+0x19a,1)[0];setting=uc.mem_read(ui+0x199,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
-    ids=[i for i in range(18,28) if i!=22] if film in (33,67) else [i for i in range(21,29 if film==68 else 28) if i!=22]
+    ids=[i for i in range(18,29 if film==67 else 28) if i!=22] if film in (33,67) else [i for i in range(21,29 if film==68 else 28) if i!=22]
     result=n+ids.index(18+field) if 18+field in ids else n
    elif real_row and a==0x536af31c:result=0x5500c000
    elif real_row and a==0x533ad3c0:calls.append(('visible',args[0],args[1]))
@@ -312,6 +312,24 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    self.assertIn(('visible',row+0x200,1),calls)
    self.assertIn(('visible',row+0x400,0),calls)
    self.assertIn(('visible',text_widget,1),calls)
+
+ def test_phoenix_exposure_row_has_two_positions_and_uses_actual_ei_numbers(self):
+  from unicorn.arm_const import UC_ARM_REG_PC,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_LR
+  for value,text in [(0,'200'),(1,'120')]:
+   u,ui,slider,calls,state=self.machine(film=67,field=10)
+   for i in range(5):state[61+i*8]=value
+   u.reg_write(UC_ARM_REG_R3,28);u.reg_write(UC_ARM_REG_R4,0);u.reg_write(UC_ARM_REG_R5,ui)
+   u.reg_write(UC_ARM_REG_LR,0x531b0064)
+   u.emu_start(self.manifest['detail']['entries']['row'],0x531b0064,count=30000)
+   self.assertIn(('row',648,text),calls)
+   self.execute(u,0x531b05c4,ui)
+   self.assertIn(('range',0,1),calls)
+
+ def test_fine_grain_new_stocks_restore_the_same_size_in_stock_slider_defaults(self):
+  for film in (74,75,77,78):
+   u,ui,slider,calls,state=self.machine(film=film,field=5)
+   self.execute(u,0x531b05c4,ui)
+   self.assertIn(('default',0),calls)
 
  def test_red_exposure_uses_real_ei_numbers_in_selected_and_unselected_rows(self):
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP

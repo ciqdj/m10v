@@ -8,7 +8,7 @@ class CuratedFilmsTests(unittest.TestCase):
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup)
   path=Path(cls.tmp.name)/'lut.so'
-  subprocess.run(['clang','-shared','-fPIC','-O2',str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),'-o',str(path)],check=True,capture_output=True)
+  subprocess.run(['clang','-shared','-fPIC','-O2',str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),'-o',str(path)],check=True,capture_output=True)
   cls.lib=C.CDLL(str(path));cls.fn=cls.lib.m10v_harman_rgb
   cls.fn.argtypes=[C.c_uint32,C.POINTER(C.c_uint8),C.POINTER(C.c_uint8)]
  def test_assets_have_matching_provenance_and_c_web_bytes(self):

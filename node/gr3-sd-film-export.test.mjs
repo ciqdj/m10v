@@ -6,7 +6,7 @@ const cube='LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 
 test('named cube exports with built-in film in one SD pack',()=>{
  const result=exportSdFilms({model:'gr3',ids:[33],customFilms:[{name:'My Film',filename:'test.cube',base64:Buffer.from(cube).toString('base64')}]});
  assert.equal(result.receipt.count,2);
- assert.deepEqual(result.receipt.ids,[33,73]);
+ assert.deepEqual(result.receipt.ids,[33,79]);
  assert.ok(result.zip.includes(Buffer.from('My Film')));
 });
 test('duplicate user film names fail export',()=>{

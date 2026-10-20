@@ -8,3 +8,9 @@ Retrieved 2026-10-19 from [YahiaAngelo/Film-Luts](https://github.com/YahiaAngelo
 These display LUTs are community interpretations, not manufacturer-supplied film data. Their input encoding is not documented upstream; M10V explicitly assumes display sRGB. Interpreting them on already-rendered camera RGB cannot recover the exposure or spectrum of the photographed scene.
 
 No Lucky Super 200 LUT is included. New Lucky C200 has a separately authored, community-inspired display interpretation; Ross McConaghy's Firebird/Daisy LUT files were not downloaded or redistributed.
+
+Retrieved 2026-10-20: `kodak_t-max_100.cube` from `luts/bw/kodak_t-max_100.cube`
+in the same MIT repository. This is specifically the named T-Max **100**
+community interpretation; developer/time/input transfer-function matching is
+unknown. The new film reference records its exact SHA-256. M10V converts the
+result to equal RGB monochrome and does not borrow T-Max 400/3200 data.

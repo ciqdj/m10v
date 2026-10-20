@@ -38,7 +38,7 @@ uint32_t m10v_sd_header(const uint8_t *p,uint32_t total){
 }
 static uint32_t custom_record(const uint8_t *p,uint32_t id){
  static const uint8_t magic[8]={'M','1','0','V','R','E','C','2'};
- if(id<73||id>288||m10v_sd_u32(p+12)!=4)return 0;
+ if(id<79||id>288||m10v_sd_u32(p+12)!=4)return 0;
  for(uint32_t i=0;i<8;++i)if(p[i]!=magic[i])return 0;
  uint32_t name=0;for(;name<24&&p[16+name];++name)if(p[16+name]<32||p[16+name]>126)return 0;
  if(!name||name>23)return 0;
@@ -61,7 +61,7 @@ static uint32_t custom_record(const uint8_t *p,uint32_t id){
 }
 uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
  if(!p||n!=M10V_SD_RECORD_BYTES||id<33||id>288||m10v_sd_u32(p+8)!=id||m10v_sd_crc(p,n-4)!=m10v_sd_u32(p+n-4))return 0;
- if(id>=73)return custom_record(p,id);
+ if(id>=79)return custom_record(p,id);
  uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
  for(uint32_t i=0;i<n;i+=64)block(h,p+i);
  uint8_t tail[64];for(uint32_t i=0;i<64;++i)tail[i]=0;tail[0]=128;
@@ -69,7 +69,7 @@ uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
  uint32_t current=1,legacy=1;
  for(uint32_t i=0;i<32;++i){uint8_t v=(uint8_t)(h[i>>2]>>(24-8*(i&3)));
   if(v!=m10v_sd_hashes[id-33][i])current=0;
-  if(v!=m10v_sd_legacy_hashes[id-33][i])legacy=0;}
+  if(id>72||v!=m10v_sd_legacy_hashes[id-33][i])legacy=0;}
  if(!current&&!legacy)return 0;
  return id;
 }

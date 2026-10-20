@@ -8,6 +8,7 @@ BASE=0x53000000
 RTOS_SHA256="a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1"
 FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']
 DETAIL_IDS={'halo':list(range(19,29)),'common':list(range(22,29)),'red':list(range(22,30))}
+DETAIL_IDS['phoenix']=list(range(19,30))
 STOCK_TABLE_ADDRESS=0x53d9a458
 STOCK_CAPTIONS_ADDRESS=0x53d9a724
 
@@ -95,10 +96,13 @@ def build_detail(base,symbols,rtos=None):
  # Private IDs keep stable meanings across the three visible lists.
  # Restore the original setup frame before dispatch; retain the selected ID
  # in ip because r0 must be the stock controller for the slider constructor.
+ exposure_dispatch=stub('push {r0,r4,r12,lr};mov r1,r0;mov r0,#9;mov r2,#0;bl '+hex(control)+';cmp r0,#1;pop {r0,r4,r12,lr};beq '+hex(sliders[1])+';b '+hex(sliders[2]),'film-specific exposure range')
+ entries['exposure_dispatch']=exposure_dispatch
  dispatch=''
  for id in range(19,30):
   maximum=[8,8,8,3,3,2,8,5,8,1,2][id-19]
-  dispatch+=f'cmp ip,#{id};beq {hex(sliders[maximum])};'
+  destination=exposure_dispatch if id==29 else sliders[maximum]
+  dispatch+=f'cmp ip,#{id};beq {hex(destination)};'
  dispatch_stub=stub(dispatch+f'b {hex(sliders[8])}','slider dispatch')
  entries['setup']=stub(gate('r0','r4',0x531cad30)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531cb4e8)+f'sub r2,r5,#19;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531cb2f4;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
@@ -119,4 +123,4 @@ def build_detail(base,symbols,rtos=None):
  word(0x531ca76c,0xe350001d,'detail caption range')
  word(0x531ca7c0,movw(3,captions&65535),'detail captions low')
  word(0x531ca7c4,movw(3,captions>>16,True),'detail captions high')
- return bytes(image),{'patches':patches,'schema':'m10v-gr4-native-detail/v1','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(19,30)),'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[500,488,413,493,595,1092,424,596,381,50,647],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}
+ return bytes(image),{'patches':patches,'schema':'m10v-gr4-native-detail/v1','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(19,30)),'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[500,488,413,493,595,1102,424,596,381,50,647],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}

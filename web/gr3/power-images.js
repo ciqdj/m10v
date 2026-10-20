@@ -1,0 +1,19 @@
+export function mountPowerImages(root,{api,onChange,model}){
+ let configuration={};
+ const cards={};
+ for(const [kind,label] of [['startup','开机图片'],['shutdown','关机图片']]){
+  const card=document.createElement('section');card.className='power-image-card';
+  card.innerHTML=`<h3>${label}</h3><p>${kind==='startup'?'替换原生 StartUp.jpg；显示时机仍待真机验证。原生槽较小，细节可能被压缩。':'替换所有五种原厂关机请求（含 Street）；相机显示仍待真机验证。'}</p><canvas width="720" height="480" aria-label="${label}裁切预览"></canvas><label class="outline power-upload">上传图片<input type="file" accept="image/jpeg,image/png,image/webp" hidden></label><div class="power-crop" hidden><label>缩放<input data-field="zoom" type="range" min="1" max="3" step="0.01" value="1"></label><label>左右<input data-field="x" type="range" min="0" max="1" step="0.01" value="0.5"></label><label>上下<input data-field="y" type="range" min="0" max="1" step="0.01" value="0.5"></label><button type="button" class="outline" data-apply>应用裁切</button></div><button type="button" class="outline" data-reset>恢复默认</button><p role="status" aria-live="polite" class="power-status">使用原厂图片</p>`;
+  root.append(card);
+  const canvas=card.querySelector('canvas'),context=canvas.getContext('2d'),status=card.querySelector('.power-status'),crop=card.querySelector('.power-crop');
+  let bitmap=null,localSequence=0;
+  const draw=()=>{context.fillStyle='#171717';context.fillRect(0,0,720,480);if(!bitmap){context.fillStyle='#ddd';context.textAlign='center';context.font='24px sans-serif';context.fillText('原厂图片',360,245);return;}const value=k=>Number(card.querySelector(`[data-field="${k}"]`).value),scale=Math.max(720/bitmap.width,480/bitmap.height)*value('zoom'),w=bitmap.width*scale,h=bitmap.height*scale;context.drawImage(bitmap,-(w-720)*value('x'),-(h-480)*value('y'),w,h);};
+  async function showSaved(){const mySequence=++localSequence;bitmap?.close?.();bitmap=null;crop.hidden=true;draw();if(!configuration[kind]){status.textContent='使用原厂图片';return;}status.textContent='正在核验压缩预览…';try{const result=await(await api('/api/gr3/power-images/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[kind]:configuration[kind]})})).json();if(mySequence!==localSequence)return;const response=await fetch(result[kind].preview_data_url),image=await createImageBitmap(await response.blob());if(mySequence!==localSequence){image.close();return;}context.drawImage(image,0,0,720,480);image.close();status.textContent=`已加入同一固件 · 720 × 480 · 压缩质量 ${result[kind].quality}`;}catch(error){status.textContent=error.message;}}
+  card.querySelector('input[type=file]').addEventListener('change',async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;const mySequence=++localSequence;try{if(file.size>20*1024*1024)throw Error('图片最大 20 MB');const image=await createImageBitmap(file);if(image.width*image.height>40000000){image.close();throw Error('图片最大 4000 万像素');}if(mySequence!==localSequence){image.close();return;}bitmap?.close?.();bitmap=image;for(const [key,value] of [['zoom',1],['x',0.5],['y',0.5]])card.querySelector(`[data-field="${key}"]`).value=value;crop.hidden=false;draw();status.textContent='调整裁切后点“应用裁切”加入固件';}catch(error){status.textContent=error.message;}});
+  for(const input of card.querySelectorAll('input[type=range]'))input.addEventListener('input',draw);
+  card.querySelector('[data-apply]').addEventListener('click',async()=>{if(!bitmap)return;configuration[kind]={jpeg_base64:canvas.toDataURL('image/jpeg',0.95).split(',')[1]};onChange();await showSaved();});
+  card.querySelector('[data-reset]').addEventListener('click',()=>{delete configuration[kind];onChange();showSaved();});
+  cards[kind]={showSaved,card};draw();
+ }
+ return {getConfiguration:()=>structuredClone(configuration),setConfiguration:value=>{configuration=structuredClone(value||{});for(const item of Object.values(cards))item.showSaved();},setModel:()=>{root.hidden=model()!=='gr3';}};
+}

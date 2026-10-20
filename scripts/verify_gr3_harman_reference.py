@@ -40,15 +40,15 @@ def verify(root):
         if canonical(definitions['SOURCES'])!=canonical(manifest['sources']): raise ValueError('provenance/source definition mismatch')
         if (web['size'],web['bits'],web['order'])!=(15,8,'RGB, blue fastest'): raise ValueError('web format')
         if (manifest['table_size'],manifest['table_bits'],manifest['order'])!=(15,8,'RGB, blue fastest'): raise ValueError('manifest format')
-        if len(web['stocks'])!=4 or len(manifest['stocks'])!=4: raise ValueError('stock count')
+        if len(web['stocks'])!=5 or len(manifest['stocks'])!=5: raise ValueError('stock count')
         clean=re.sub(r'/\*.*?\*/','',header,flags=re.S)
-        match=re.fullmatch(r'\s*static const uint8_t m10v_harman_luts\[4\]\[3375\]\[3\]\s*=\s*\{(.*)\};\s*',clean,re.S)
+        match=re.fullmatch(r'\s*static const uint8_t m10v_harman_luts\[5\]\[3375\]\[3\]\s*=\s*\{(.*)\};\s*',clean,re.S)
         if not match or re.search(r'[^\d,\s{}]',match.group(1)): raise ValueError('C format')
         # Validate every nested array dimension, not just the total number count.
         body=re.sub(r',\s*}', '}', '{'+match.group(1)+'}')
         arrays=json.loads(body.replace('{','[').replace('}',']'))
-        if len(arrays)!=4 or any(len(t)!=3375 or any(len(v)!=3 for v in t) for t in arrays): raise ValueError('C dimensions')
-        expected=[(67,200,'phoenix-ii'),(68,125,'red'),(68,64,'red'),(68,250,'red')]
+        if len(arrays)!=5 or any(len(t)!=3375 or any(len(v)!=3 for v in t) for t in arrays): raise ValueError('C dimensions')
+        expected=[(67,200,'phoenix-ii'),(68,125,'red'),(68,64,'red'),(68,250,'red'),(67,120,'phoenix-ii')]
         results=[]
         for i,(stock,ref) in enumerate(zip(web['stocks'],manifest['stocks'])):
             if (stock['id'],stock['ei'],stock['model'])!=expected[i]: raise ValueError('stock identity')

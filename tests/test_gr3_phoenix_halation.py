@@ -9,7 +9,7 @@ class PhoenixHalationTests(unittest.TestCase):
     state=harness.NativeFilmLibraryTests.state
     render=harness.NativeFilmLibraryTests.render
 
-    def run_scene(self,gain=3,spread=3,threshold=5,width=256,height=192,film=67,source=True,source_light=255):
+    def run_scene(self,gain=3,spread=3,threshold=5,width=256,height=192,film=67,source=True,source_light=255,scratch_bytes=6*384*256+32):
         state=self.state();ok=harness.STORE(lambda *_:0)
         self.lib.m10v_library_select(C.byref(state),0,film,ok,None)
         self.lib.m10v_library_halation(C.byref(state),0,gain,spread,threshold,2,ok,None)
@@ -23,7 +23,7 @@ class PhoenixHalationTests(unittest.TestCase):
             center=(height//2)*stride+(width//2&~1)
             y[center]=source_light;y[center+1]=source_light
         image=harness.Image(y,uv,size,size,width,height,stride)
-        scratch=(C.c_uint8*(6*384*256+32))();C.memset(scratch,173,len(scratch))
+        scratch=(C.c_uint8*scratch_bytes)();C.memset(scratch,173,len(scratch))
         self.assertEqual(self.render(image,state,scratch),0)
         self.assertEqual(bytes(scratch)[-32:],bytes([173])*32)
         self.assertEqual(bytes(y)[size:],bytes([64])*32)
@@ -55,8 +55,14 @@ class PhoenixHalationTests(unittest.TestCase):
         self.assertEqual(on[1][:2],off[1][:2])
 
     def test_zero_gain_is_exact_colour_path_and_does_not_touch_scratch(self):
-        off=self.run_scene(gain=0)
+        # Below the optional 64 KiB colour-cache capacity, a disabled halo
+        # needs no workspace. A larger caller-owned buffer may cache colour.
+        off=self.run_scene(gain=0,scratch_bytes=65532)
         self.assertEqual(off[3],bytes([173])*len(off[3]))
+        cached=self.run_scene(gain=0)
+        self.assertEqual(off[:2],cached[:2])
+        self.assertNotEqual(cached[3][:65536],bytes([173])*65536)
+        self.assertEqual(cached[3][65536:],bytes([173])*(len(cached[3])-65536))
         self.assertEqual(off[:2],self.run_scene(gain=0,spread=8,threshold=0)[:2])
         # Compare against the actual film-colour function with no halo stage,
         # rather than comparing two calls through the same disabled branch.

@@ -17,8 +17,18 @@ class NativeLookTests(unittest.TestCase):
   return e,e.alloc(1600),0x60001400,gamma
  def call(self,e,name,*args):
   e.call(self.manifest['symbols']['m10v_isp_native_look_'+name],*args);return e.u.reg_read(UC_ARM_REG_R0)
+ def test_phoenix_ei120_has_an_independent_native_profile_and_matching_generation(self):
+  e,s,f,g=self.fixture()
+  self.assertEqual(self.call(e,'prepare',s,67,0,12),1)
+  standard=bytes(e.u.mem_read(s+28,1572))
+  self.assertEqual(self.call(e,'prepare',s,67,1,13),1)
+  self.assertNotEqual(bytes(e.u.mem_read(s+28,1572)),standard)
+  self.assertEqual(self.call(e,'apply',s,g,f,0),1)
+  self.assertEqual(self.call(e,'matches',s,67,1,13),1)
+  self.assertEqual(self.call(e,'matches',s,67,0,13),0)
+  self.assertEqual(self.call(e,'prepare',s,67,2,14),0)
  def test_all_films_and_red_exposures_apply_owned_frame_without_cached_mutation(self):
-  for film,exposure in [(f,0) for f in range(33,73)]+[(68,1),(68,2)]:
+  for film,exposure in [(f,0) for f in range(33,79)]+[(68,1),(68,2)]:
    with self.subTest(film=film,exposure=exposure):
     e,s,f,g=self.fixture();before=bytes(e.u.mem_read(f,0x9000));cached=bytes(e.u.mem_read(g,0x3240));obj=bytes(e.u.mem_read(0x60000000,0x400))
     self.assertEqual(self.call(e,'prepare',s,film,exposure,41),1)
@@ -36,7 +46,7 @@ class NativeLookTests(unittest.TestCase):
  def test_rejection_and_reprepare_prevent_stale_cpu_skip(self):
   e,s,f,g=self.fixture()
   self.assertEqual(self.call(e,'prepare',s,66,0,7),1);self.assertEqual(self.call(e,'apply',s,g,f,0),1)
-  for film,exposure,generation in [(32,0,8),(73,0,8),(66,1,8),(68,3,8),(68,0,0)]:
+  for film,exposure,generation in [(32,0,8),(79,0,8),(66,1,8),(68,3,8),(68,0,0)]:
    self.assertEqual(self.call(e,'prepare',s,film,exposure,generation),0)
    self.assertEqual(self.call(e,'matches',s,66,0,7),0)
   self.assertEqual(self.call(e,'prepare',s,67,0,9),1)

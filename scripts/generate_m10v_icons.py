@@ -21,6 +21,12 @@ def label(name,i):
  if name=='哈曼 RED':return 'RED','125','#c74435'
  if name=='富士业务用 100':return 'FUJI','100','#41a66b'
  if name=='乐凯 C200':return 'LUCKY','C200','#d94735'
+ if name=='富士 C200':return 'FUJI','C200','#41995b'
+ if name=='Kodak ProImage 100':return 'PROIM','100','#c7a357'
+ if name=='T-Max 100':return 'TMAX','100','#84817b'
+ if name=='Aerochrome III 1443':return 'AERO','1443','#ca527d'
+ if name=='Aerocolor IV 2460':return 'AERO','2460','#58a3a8'
+ if name=='VISION3 50D 5203':return '5203','50D','#bfaa4c'
  if name=='CCD Classic':return 'GR','CCD','#567f8e'
  if name=='5207':return '5207','250D','#b59a45'
  if name=='800T':return 'CINE','800T','#c83737'
@@ -53,8 +59,8 @@ def text(d,x,y,s,c):
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
  names += [v['name'] for v in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]
- names += ['5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200','CCD Classic']
- if len(names)!=72:raise ValueError('catalog must contain 72 films')
+ names += ['5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','Kodak ProImage 100','T-Max 100','Aerochrome III 1443','Aerocolor IV 2460','VISION3 50D 5203']
+ if len(names)!=78:raise ValueError('catalog must contain 78 films')
  # Preserve exact official directory pointers; original descriptors stay in RAM.
  import subprocess,struct
  js="import {readFileSync} from 'node:fs';import {officialResources} from './node/gr3-stock-presets.mjs';const {decoded:d,sections:s}=officialResources(readFileSync('bin/fwdc239b-gr3-official.bin'));process.stdout.write(d.subarray(s.RTOS.offset+0x107b540+0x20fc,s.RTOS.offset+0x107b540+0x20fc+671*4));"

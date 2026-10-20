@@ -89,3 +89,29 @@ The three Q10 coefficient rows in `scripts/build_gr3_digital_hdf.py` reference
 The GR III firmware addresses, recipe ownership adapters, settings integration
 and audit are independently implemented from the exact GR III 2.10 firmware.
 No GR IV executable patch or camera firmware binary is copied into the source.
+
+## GR III power image resource references
+
+The fixed-size shutdown JPEG replacement and A-drive installation approach were
+informed by [Darkslide GR](https://github.com/LiorMoment/darkslide-gr),
+`darkslide/shared_shutdown.py` and `darkslide/a_shutdown.py` (GPL-2.0-only).
+M10V rechecks paths, descriptors and resource slots against its hash-pinned
+GR III 2.10 input and implements its own JS container composition and readback.
+The independent StartUp JPEG slot is not a GR II BRP patch. No manufacturer's
+firmware or JPEG artwork is added to the source distribution.
+
+## Additional film colour references
+
+The C200, Aerochrome 1443, Aerocolor 2460 and VISION3 5203 models use their
+individual digitized characteristic and sensitivity data from Jan Lohse's
+[spectral_film_lut](https://github.com/JanLohse/spectral_film_lut) (MIT).
+The retained license is `third_party/spectral-film-lut/LICENSE`; exact input
+hashes and M10V's separate display adaptation are recorded in
+`native/gr3/newstocks-reference.json`.
+
+The T-Max 100 display reference comes from
+[YahiaAngelo/Film-Luts](https://github.com/YahiaAngelo/Film-Luts), identified
+upstream as a G'MIC film LUT. Its MIT license and original cube header are
+retained in `third_party/curated-film-luts/`. ProImage 100 uses M10V's manual
+reading of Kodak E-4L curves. These are approximate display interpretations,
+not manufacturer-supplied transforms or measured camera/film calibration.

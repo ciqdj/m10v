@@ -103,7 +103,7 @@ static int persist_custom(const uint8_t *record,uint32_t slot,uint32_t bank){
 }
 int m10v_sd_camera_custom_record(const m10v_library_state *state,uint32_t slot,uint8_t *out,uint32_t bytes){
  if(!state||slot>=5||!ram((uint32_t)(uintptr_t)out,bytes)||bytes<M10V_SD_RECORD_BYTES)return 0;
- uint32_t id=state->slots[slot].film,which=state->effects[slot].reserved[0];if(id<73||id>288||which<1||which>2)return 0;
+ uint32_t id=state->slots[slot].film,which=state->effects[slot].reserved[0];if(id<79||id>288||which<1||which>2)return 0;
  uint32_t manager=((get_fn)0x53828014u)();if(!ram(manager,12))return 0;
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
@@ -124,7 +124,7 @@ int m10v_sd_camera_custom_name(const m10v_library_state *state,uint32_t slot,cha
  ((free_fn)0x536af2e4u)(memory);return ok;
 }
 int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,uint32_t capacity){
- if(index>=256||expected_id<73||expected_id>288)return 0;
+ if(index>=256||expected_id<79||expected_id>288)return 0;
  uint8_t *memory=allocate();if(!memory)return 0;
  int ok=fetch(index/8,index%8,memory,1)==expected_id&&record_name(memory+4096,out,capacity);
  ((free_fn)0x536af2e4u)(memory);return ok;

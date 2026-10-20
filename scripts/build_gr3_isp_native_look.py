@@ -64,6 +64,12 @@ def profiles():
         h=[v for sector in q['hue_q10'] for row in sector for v in row]
         if min(h)<-2048 or max(h)>2047:raise ValueError('sector overflow')
         header+=f'static const int16_t native_{name}_hue[108] = '+arr(h)+';\n'
+    phoenix120=json.loads((ROOT/'native/gr3/phoenix-exposure-native.json').read_text())
+    for path,digest in phoenix120['files'].items():
+        if hashlib.sha256((ROOT/path).read_bytes()).hexdigest()!=digest:raise ValueError('stale Phoenix EI120 profile: '+path)
+    q=phoenix120['parameters']
+    header+='static const native_frame_packed native_phoenix120_frame = '+frame(q)+';\n'
+    header+='static const int16_t native_phoenix120_hue[108] = '+arr([v for sector in q['hue_q10'] for row in sector for v in row])+';\n'
     red=[next(t for t in old['targets'] if t['film_id']==68 and t['ei']==ei) for ei in (125,64,250)]
     header+='static const native_frame_packed native_red_frame[3] = {'+','.join(frame(q,True) for q in red)+'};\n'
     # New 800T creative definition: same mild contrast/lift/bend, desaturation,
@@ -82,12 +88,17 @@ def profiles():
     curated=json.loads((ROOT/'native/gr3/curated-reference.json').read_text())
     header+='static const native_frame_packed native_curated_frame[4] = {'+','.join(frame(q) for q in curated['native_profiles_full'])+'};\n'
     header+='static const int16_t native_curated_hue[4][108] = {'+','.join(arr([v for sector in q['hue_q10'] for row in sector for v in row]) for q in curated['native_profiles_full'])+'};\n'
+    newstocks=json.loads((ROOT/'native/gr3/newstocks-reference.json').read_text())
+    header+='static const native_frame_packed native_newstocks_frame[6] = {'+','.join(frame(q) for q in newstocks['native_profiles_full'])+'};\n'
+    header+='static const int16_t native_newstocks_hue[6][108] = {'+','.join(arr([v for sector in q['hue_q10'] for row in sector for v in row]) for q in newstocks['native_profiles_full'])+'};\n'
     header+='static const uint8_t native_curve_stream['+str(len(curve_data))+'] = '+arr(curve_data)+';\n'
-    evidence={'schema':'gr3-native-look/v1','camera_validated':False,'hardware_pixel_emulated':False,'old_cpu_color_equivalent':False,'static_profile_bytes':10*48+len(curve_data)+6*216,'curve_stream_bytes':len(curve_data),'profile_curve_encoding':'lossless 2bit delta-of-delta with8bit absolute escape; exact original256 knots',
+    evidence={'schema':'gr3-native-look/v1','camera_validated':False,'hardware_pixel_emulated':False,'old_cpu_color_equivalent':False,'static_profile_bytes':17*48+len(curve_data)+13*216,'curve_stream_bytes':len(curve_data),'profile_curve_encoding':'lossless 2bit delta-of-delta with8bit absolute escape; exact original256 knots',
        '800t':'new representable native creative definition: contrast264 saturation238 lift1 bend3, blue/cyan midtone tint; old YUV LUT equivalence unclaimed',
        'curated':{str(q['film_id']):q['holdout'] for q in curated['native_profiles_full']},
+       'newstocks':{str(q['film_id']):q['holdout'] for q in newstocks['native_profiles_full']},
        'profiles':{'5207':fit['targets']['5207']['metrics']['random_holdout'],'phoenix':fit['targets']['phoenix_ii']['metrics']['random_holdout'],
         'red':{str(q['ei']):q['holdout'] for q in red}},
+       'phoenix_ei120':phoenix120['holdout'],
        'red_model_warning':'RED errors use synthetic reference domain, not extracted full native stock-gamma model; new creative profile requires visual camera validation',
        'stock_frame_preservation':'relative current-frame CCA/CSP; gamma derived from initialized stock object; no tuning/cache/white-balance writes',
        'cpu_skip_contract':'matches(film,exposure,queued_generation) only after APPLIED; all textures/spatial effects still required'}

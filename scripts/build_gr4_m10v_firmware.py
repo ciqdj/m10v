@@ -36,7 +36,7 @@ def initial_state(configuration):
         if set(s)!={'film','grain','soft','halo','effects'}:raise ValueError('invalid slot fields')
         h=s['halo'];e=s['effects']
         if set(h)!={'gain','spread','threshold','profile'} or set(e)!={'grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'}:raise ValueError('invalid effect fields')
-        film=integer(s['film'],72)
+        film=integer(s['film'],78)
         if not film:raise ValueError('film zero is invalid')
         struct.pack_into('<H6B',b,12+i*8,film,integer(s['grain'],3),integer(s['soft'],3),
             integer(h['gain'],8) if integer(h['profile'],3) else 0,integer(h['spread'],8),integer(h['threshold'],8),h['profile'])
@@ -47,7 +47,7 @@ def initial_state(configuration):
 
 def install_resources(patch,icons):
     labels=catalog_texts();text_end=1024+len(labels)
-    if len(labels)!=188:raise ValueError('shared camera labels changed')
+    if len(labels)!=194:raise ValueError('shared camera labels changed')
     descriptors=[]
     for text in labels:
         encoded=(text+'\0').encode('utf-16-le')
@@ -59,7 +59,7 @@ def install_resources(patch,icons):
         contents=bytes(patch.image[old-BASE:old-BASE+896*4])
         if len(contents)!=896*4:raise ValueError('text directory extent differs')
         row=bytearray(text_end*4);row[:len(contents)]=contents
-        struct.pack_into('<188I',row,1024*4,*descriptors)
+        struct.pack_into('<'+str(len(descriptors))+'I',row,1024*4,*descriptors)
         roots.append(patch.append(row,16))
     for i,at in enumerate(roots):patch.set_word(TEXT_CATALOG+4*i,at,'M10V preserved native language directory')
     text_bound=[]
@@ -68,22 +68,23 @@ def install_resources(patch,icons):
         if patch.word(helper)!=0xe52d3004:raise ValueError('text bound continuation differs')
         patch.set_word(helper+4,_mov(3,text_end-1),'M10V text upper bound');text_bound.append(helper+4)
     artwork=(ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
-    if len(artwork)!=72*6400:raise ValueError('shared film artwork incomplete')
+    if len(artwork)!=78*6400:raise ValueError('shared film artwork incomplete')
     grain_artwork=(ROOT/'native/gr4/grain_size_icon.rgba').read_bytes()
     if len(grain_artwork)!=6400 or sha(grain_artwork)!='4d4ab11bf24c60777a57b9cddff4223c771dd361035dc4338ce99b7fa9f23711':raise ValueError('GR3 grain size artwork differs')
-    directory=bytearray((1024+73)*4)
+    film_count=len(artwork)//6400; icon_count=film_count+1;icon_last=1024+icon_count-1
+    directory=bytearray((1024+icon_count)*4)
     directory[:1024*4]=patch.image[ICON_CATALOG-BASE:ICON_CATALOG-BASE+1024*4]
     pixels=bytearray(icons);pixels.extend(bytes(-len(pixels)&3));pixel_start=len(pixels);pixels.extend(artwork)
     pixels.extend(grain_artwork)
-    for i in range(73):
+    for i in range(icon_count):
         descriptor=patch.append(struct.pack('<HHHHI',1,40,40,0,(pixel_start+6400*i)//4),16)
         struct.pack_into('<I',directory,(1024+i)*4,descriptor)
     table=patch.append(directory,16)
     patch.set_word(0x533ef604,_mov(0,table&65535),'M10V icon directory low')
     patch.set_word(0x533ef608,_mov(0,table>>16,high=True),'M10V icon directory high')
-    for site,reg in ((0x5323dbb4,3),(0x5323e40c,2)):patch.set_word(site,_mov(reg,1096),'M10V icon upper bound')
+    for site,reg in ((0x5323dbb4,3),(0x5323e40c,2)):patch.set_word(site,_mov(reg,icon_last),'M10V icon upper bound')
     return bytes(pixels),{'text_first':1024,'text_last':text_end-1,'texts':labels,'descriptors':descriptors,
-        'text_bound_sites':text_bound,'language_rows':roots,'icon_first':1024,'icon_last':1096,'icon_table':table,
+        'text_bound_sites':text_bound,'language_rows':roots,'icon_first':1024,'icon_last':icon_last,'film_icon_last':1024+film_count-1,'grain_size_icon':icon_last,'icon_table':table,
         'pixel_offset':pixel_start,'artwork_sha256':sha(artwork),'grain_size_icon_sha256':sha(grain_artwork)}
 
 def prepare_package_policy(rtos,base):
@@ -174,14 +175,19 @@ def prepare(source,config,out):
         size,kind,zero,pointer=struct.unpack_from('<BBHI',result,at)
         encoded=(text+'\0').encode('utf-16-le')
         if kind!=1 or zero or size*2!=len(encoded) or result[pointer-BASE:pointer-BASE+len(encoded)]!=encoded:raise ValueError('GR4 text readback failed')
+    for i in range(79):
+        descriptor=struct.unpack_from('<I',result,resources['icon_table']-BASE+4*(1024+i))[0]
+        kind,width,height,zero,pointer=struct.unpack_from('<HHHHI',result,descriptor-BASE)
+        if (kind,width,height,zero)!=(1,40,40,0) or pointer*4!=resources['pixel_offset']+6400*i:raise ValueError('GR4 icon descriptor readback failed')
+    if icons[resources['pixel_offset']:resources['pixel_offset']+len(artwork)]!=artwork:raise ValueError('GR4 icon artwork readback failed')
     source_files={str(p.relative_to(ROOT)):sha(p.read_bytes()) for folder in ('native/gr3','native/gr4','scripts')
         for p in (ROOT/folder).glob('*') if p.is_file() and p.suffix in ('.c','.h','.py','.json','.rgba')}
     return result,icons,{'schema':'m10v-gr4-firmware-build/v1','ready':True,'model':'GR IV','filename':'fwdc248b.bin',
         'source_sha256':OFFICIAL_SHA,'runtime_source_sha256':sha(json.dumps(source_files,sort_keys=True).encode()),
         'runtime':manifest,'resources':resources,'patches':applied,'extensions':extensions,
         'update_policy_requested':True,'update_policy_installation':update_policy,
-        'configuration':config['configuration'],'film_count':72,'active_slots':5,'external_film_pack':True,
-        'features':['film','800t','5207','phoenix-ii-200','harman-red-125','grain','soft','timestamp'],
+        'configuration':config['configuration'],'film_count':78,'active_slots':5,'external_film_pack':True,
+        'features':['film','800t','5207','phoenix-ii-200','harman-red-125','fuji-c200','kodak-proimage-100','kodak-tmax-100','aerochrome-iii-1443','aerocolor-iv-2460','vision3-50d-5203','grain','soft','timestamp'],
         'camera_tested':False,'validation':{'offline':'passed','hardware':'not_tested','canonical_source_recovered':True}}
 
 def main():

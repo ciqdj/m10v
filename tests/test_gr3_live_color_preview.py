@@ -1,5 +1,6 @@
 """Real Live Make + original packer. No ISP pixels or real LCD is emulated."""
-import json,struct,tempfile,unittest
+import json,struct,tempfile,unittest,zlib
+from unicorn import UC_HOOK_CODE
 from pathlib import Path
 from unicorn import arm_const as A
 from scripts.build_gr3_m10v_library import build
@@ -31,6 +32,13 @@ class LiveColorPreviewTests(unittest.TestCase):
    for repeat in range(3):
     e.call(self.entry,obj,f);self.assertEqual(bytes(e.u.mem_read(f,0x9000)),expected,(film,repeat))
    self.assertFalse(e.assertions)
+ def test_phoenix_ei120_reaches_installed_live_native_profile(self):
+  e,obj,f=self.fixture(67);data=bytearray(state((67,)*5));data[61]=1
+  struct.pack_into('<I',data,100,zlib.crc32(data[:100]));e.u.mem_write(0x550d1944,bytes(data))
+  observed=[];prepare=self.snapshot['exports']['m10v_isp_native_look_prepare']
+  e.u.hook_add(UC_HOOK_CODE,lambda u,a,n,d:observed.append((u.reg_read(A.UC_ARM_REG_R1),u.reg_read(A.UC_ARM_REG_R2))) if a==prepare else None)
+  e.call(self.entry,obj,f)
+  self.assertEqual(observed,[(67,1)])
  def test_empty_busy_or_destroyed_cache_keeps_stock_liveview(self):
   for ready,version in ((False,2),(True,1),(True,0)):
    e,obj,f=self.fixture();before=bytes(e.u.mem_read(f,0x9000));self.cache(e,35,ready,version)

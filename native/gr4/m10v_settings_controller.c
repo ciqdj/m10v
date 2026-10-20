@@ -27,7 +27,10 @@ static int stamp(void *ctx,uint32_t enabled,uint32_t format,uint32_t corner,uint
  if(m10v_camera_library_load(&fresh)<0)return -1;
  return m10v_camera_library_stamp(&fresh,enabled,format,corner,color);
 }
-static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;}
+/* GR IV exposes four timestamp rows; film-name imprint is unsupported. Still
+ * initialize the shared operations ABI fully, including its rejection path. */
+static int film_name_stamp(void *ctx,uint32_t enabled){(void)ctx;(void)enabled;return -1;}
+static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
@@ -83,7 +86,12 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
  case 0x8a:case 0x8d:case 0xe2:key=M10V_KEY_BACK;break;
  default:return 0;
  }
- m10v_settings_ops o;ops(&o);m10v_settings_key(&p->state,&o,key);
+ m10v_settings_ops o;ops(&o);
+ /* The shared state machine also supports GR III's fifth imprint row. Keep
+  * this adapter within the four rows owned by the GR IV view. */
+ if(p->page==M10V_SETTINGS_STAMP&&p->state.focus>3)p->state.focus=3;
+ m10v_settings_key(&p->state,&o,key);
+ if(p->page==M10V_SETTINGS_STAMP&&p->state.focus>3)p->state.focus=3;
  M10V_LOG(83,raw,p->state.screen,p->state.focus,(p->state.error<<16)|p->state.value);
  if(p->state.screen==M10V_SETTINGS_CLOSED)((fn1)0x53182e9cu)((uint32_t)(uintptr_t)p);
  else m10v_settings_view_draw(&p->view,&p->state,&o);

@@ -63,8 +63,8 @@ class HarmanReferenceTests(unittest.TestCase):
         m = self.model()
         verify = importlib.import_module('scripts.verify_gr3_harman_reference').verify
         payloads = verify(ROOT)
-        self.assertEqual([len(p) for p in payloads], [10125]*4)
-        self.assertEqual(len(set(payloads)), 4)
+        self.assertEqual([len(p) for p in payloads], [10125]*5)
+        self.assertEqual(len(set(payloads)), 5)
         manifest = json.loads((ROOT/'native/gr3/harman-reference.json').read_text())
         self.assertFalse(manifest['camera_calibrated'])
         self.assertFalse(manifest['film_calibrated'])

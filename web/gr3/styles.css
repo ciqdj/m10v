@@ -90,3 +90,5 @@ html{scroll-padding-top:96px}.studio>.steps{z-index:10}.studio>.plan-rail{top:94
 @media(max-width:850px){html{scroll-padding-top:84px}.studio>.plan-rail{position:static;top:auto}.stage :is(button,input,select,[tabindex]){scroll-margin-top:88px}}
 
 .hdf-levels{display:flex;gap:8px;margin-bottom:12px}.hdf-levels button[aria-pressed="true"]{background:var(--accent,#dab268);color:#151515}
+
+.power-images{margin:24px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.power-images[hidden]{display:none}.power-image-card{padding:20px;border:1px solid var(--line,#ddd);border-radius:8px}.power-image-card h3{margin:0 0 10px}.power-image-card p{font-size:13px;line-height:1.6;color:#777}.power-image-card canvas{display:block;width:100%;aspect-ratio:3/2;border-radius:8px;margin:14px 0}.power-upload{display:inline-flex;cursor:pointer;margin:0 8px 8px 0}.power-crop label{display:flex;align-items:center;gap:12px;margin:10px 0;font-size:13px}.power-crop input{flex:1}.power-status{min-height:2em}@media(max-width:720px){.power-images{grid-template-columns:1fr}}
