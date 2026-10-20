@@ -57,6 +57,49 @@ CPU 测试使用合成的 16 条记录、文件、目标 RAM 和 boot context，
 
 低地址最终提交、启动上下文初始化、更新/boot-ROM 的完整调用顺序和最终跳转仍待追踪；`deferred_commit_proved` 保持 false。此缺口不判定为机型不支持，也不通过模拟一个成功回调来抹掉。
 
+## GR II 正常启动的按记录加载链
+
+通用文件加载器不是正常启动的全部路径。官方 `0xA0020944` 启动编排调用 `0xA0022E28`，后者检查完成标志，并经 `0xA003FB02` 调用存储加载器 `0xA0056722`。该加载器按一个记录索引读取扇区，执行非对齐首尾拷贝、aux 清零、加载完成标记；索引超界或读取失败返回 `0xFFFFFFFF`。
+
+CPU 探针分别验证源偏移 0、1、511、512，长度 1、512、513、1024、1025，首尾哨兵、37 字节 aux 清零、失败读取和无效索引。存储描述符与块读取被替换，原厂扇区运算、memcpy、清零及返回路径执行不变。此处的源偏移相对组件载荷；通用文件加载器则需加上 512 字节头，不能混用。
+
+正常启动探针的模块顺序为 `0,1,4,2,3,5,10,11,8,9,6,12,13,14`。已测试的提前分支也先加载记录 14，再到达共同调用位置 `0xA0020AB4`（原目标 `0xA0023234`）。探针执行原厂分支和调用顺序，各子系统初始化与模块服务返回值为明确的合成边界；尚未证明完整相机启动。记录 14 原本仅 4 字节，因此存在后置原生初始化的研究方向；这里尚未生成补丁或授权任意目标内存。
+
+原厂记录 15 的低地址代码保持原样。不能把按记录加载器的成功，扩大为已证明低地址最终提交或 boot-ROM 更新全过程。
+
+## GR II 原厂更新区容量策略
+
+执行原厂描述符工厂 `0xA005658E`、容量回调 `0xA0056560` 和 NAND 单位计算 `0xA0044036 → 0xA005FD06`，只替换驱动初始化/解锁边界，得到每块 256 扇区 ×512 =131072 字节。
+
+| 组件类型 | 原厂块数 | 追加扇区 | 载荷上限（不含 512 字节头） |
+| --- | --- | --- | --- |
+| 1，b01firm8 | 64 | 254 | 0x81FC00 / 8,518,656 字节 |
+| 2，b01firm6 | 63 | 254 | 0x7FFC00 / 8,387,584 字节 |
+
+测试确认恰好上限返回 0，上限 +1 返回 `0xFFFFFFFF`。没有关闭 `bCheckRomSize`，也没有替换容量计算来接受增大的组件。此证据不涉及实际擦写和 NAND 坏块处理；GR 的容量尚未沿其独立实现证明。
+
+## GR II RTC 原生 ABI
+
+通过原厂 `RTC_GetTime` 字符串及断言交叉定位包装函数 `0xA00341A8`。它调用紧凑驱动读取 `0xA005AE20`，将年（u16）、月/日/时/分/秒（u8）转换为调用者的六个大端 u16，共 12 字节。R0 最终等于秒值；把它当作布尔成功值会在整分钟误判。
+
+`scripts/analyze_gr2_native_contract.py` 执行此原厂包装函数，仅替换 RTC 硬件读取，验证三组日期、输出端序、边界哨兵和被调用者保存寄存器。RTC 就绪/时间有效性、印字渲染与捕获生命周期仍待接入；该项保持 researching。
+
+复现新增证据：
+
+```sh
+.venv/bin/python -m unittest tests.test_unity_runtime tests.test_unity_update tests.test_gr2_update tests.test_gr2_native_contract
+.venv/bin/python scripts/analyze_unity_runtime.py --model gr2 --component data/research/gr2/implementation/b01firm8.bin --out data/research/gr2/implementation/loader-proof.json
+.venv/bin/python scripts/analyze_gr2_native_contract.py --component data/research/gr2/implementation/b01firm8.bin --out data/research/gr2/implementation/native-contract.json
+```
+
+## GR II 普通文件读写 ABI
+
+普通文件入口分别是 open `0xA002C70E`、read `0xA002CA98`、write `0xA002CC4A`。更新器的 `0xA00550A4`/`0xA0055252` 等包装函数会根据全局后端模式切换特殊存储读取，不能直接作为配置持久化 API。
+
+原厂 H: 路径打开模式选择已执行到 `fopen` 边界，并在那里停止，没有创建文件：flags 0→`r`，1→`w`，9→`a`，2→`r+`，10→`a+`，0x102→`w+`。媒体状态、锁与就绪检查为合成边界；原始位测试、比较和模式字符串选择没有替换。
+
+原厂读/写包装函数分别执行到完整传输返回：read 调底层 `0xA0065386(buffer,1,count,file)`，write 调 `0xA0065428(buffer,count,1,file)`。后者检查底层项数等于 1，再返回 count 字节。测试使用带正确 magic 的合成句柄、H: 路径及后端数据，校验原始 magic 检查/路径分派、参数顺序、返回值和缓冲哨兵。另以 8 字节请求、3 字节读取加 EOF 边界，确认原厂返回 3 并保留其余缓冲哨兵。文件打开/关闭生命周期、短写与错误恢复、介质挂载、原子持久化仍需继续证明；不能把这组 ABI 测试视为实际 SD 保存成功。
+
 ## 还需完成
 
 - 追踪暂存低地址段的最终提交和启动交接。

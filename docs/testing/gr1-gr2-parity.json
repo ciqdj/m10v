@@ -539,8 +539,13 @@
         "gr2": {
           "status": "researching",
           "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "evidence_files": [
+            "docs/research/gr2-checksum-loader-2026-10-20.md",
+            "scripts/analyze_gr2_native_contract.py"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_native_contract"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
@@ -647,8 +652,13 @@
         "gr2": {
           "status": "researching",
           "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "evidence_files": [
+            "docs/research/gr2-checksum-loader-2026-10-20.md",
+            "scripts/analyze_gr2_native_contract.py"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_native_contract"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
