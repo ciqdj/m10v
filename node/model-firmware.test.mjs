@@ -2,10 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync} from 'node:fs';
 import {createServer} from './server.mjs';
-const gr2 = new URL('../bin/rg2_v003/rg2_v003.frm',import.meta.url);
+const gr2 = new URL('../bin/rg2_v003.frm',import.meta.url);
+const gr1 = new URL('../bin/rg1_v051.frm',import.meta.url);
 const gr4 = new URL('../bin/fwdc248b-gr4-officical.bin',import.meta.url);
 const implementation = new URL('./model-firmware.mjs',import.meta.url);
 async function module(){assert.ok(existsSync(implementation),'multi-model firmware inspection is not implemented');return import(implementation);}
+test('local GR II source uses the supplied root sample path',{skip:!existsSync(gr2)},async()=>{
+  const {readModelOfficial}=await module();
+  assert.deepEqual(await readModelOfficial('gr2'),readFileSync(gr2));
+});
+test('GR content identity selects its own inventory and local source',{skip:!existsSync(gr1)},async()=>{
+  const {inspectModelFirmware,readModelOfficial}=await module();
+  const source=readFileSync(gr1),report=await inspectModelFirmware(source);
+  assert.equal(report.model,'GR');assert.equal(report.workspace_url,'/gr1/');
+  assert.equal(report.resources.length,119);
+  assert.deepEqual(await readModelOfficial('gr1'),source);
+});
 test('content identity selects GR II regardless of original filename', {skip:!existsSync(gr2)}, async()=>{
   const {inspectModelFirmware}=await module();
   const report=await inspectModelFirmware(readFileSync(gr2));

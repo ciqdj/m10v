@@ -54,10 +54,17 @@
       ],
       "models": {
         "gr1": {
-          "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "status": "verified_offline",
+          "implementation_files": [
+            "node/gr1-firmware.mjs",
+            "node/unity-firmware.mjs"
+          ],
+          "evidence_files": [
+            "docs/research/gr1-gr2-official-evidence-2026-10-20.md"
+          ],
+          "automated_checks": [
+            "node --test node/gr1-firmware.test.mjs node/unity-firmware.test.mjs node/model-firmware.test.mjs"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
@@ -65,13 +72,14 @@
         "gr2": {
           "status": "verified_offline",
           "implementation_files": [
-            "node/gr2-firmware.mjs"
+            "node/gr2-firmware.mjs",
+            "node/unity-firmware.mjs"
           ],
           "evidence_files": [
             "docs/research/gr1-gr2-official-evidence-2026-10-20.md"
           ],
           "automated_checks": [
-            "node scripts/analyze_gr2_firmware.mjs bin/rg2_v003.frm --out data/research/gr2"
+            "node --test node/gr2-firmware.test.mjs node/unity-firmware.test.mjs node/model-firmware.test.mjs"
           ],
           "browser_evidence": [],
           "hardware_status": "pending",
