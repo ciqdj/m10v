@@ -7,6 +7,8 @@
  * contention returns immediately. No function in this module opens files. */
 int gr2_configuration_publish(const m10v_library_state *,const uint8_t *const records[5]);
 int gr2_configuration_read(m10v_library_state *);
+/* One atomic UI value snapshot, five persistent-label inputs, 96 UTF16 units each. */
+int gr2_configuration_names(uint16_t out[5][96]);
 int gr2_configuration_freeze(uint8_t *context,uint32_t seed);
 int gr2_configuration_clear(void);
 /* UI owner only: load journal and every selected LUT before publishing. */

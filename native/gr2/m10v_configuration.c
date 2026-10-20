@@ -102,3 +102,24 @@ int gr2_configuration_reload(void){
     }
     int ok=gr2_configuration_publish(&state,records);gr2_release(work);return ok;
 }
+
+int gr2_configuration_names(uint16_t out[5][96]){
+    if(!span(out,5*96*2,2)||!lock())return 0;
+    configuration *current=published;int ok=current&&current->magic==CONFIG_MAGIC;
+    if(ok){uintptr_t a=(uintptr_t)out,b=(uintptr_t)current;ok=!(a<b+current->bytes&&b<a+5*96*2);}
+    uint16_t next[5][96];
+    if(ok)for(uint32_t i=0;i<5;i++){
+        uint32_t id=current->state.slots[i].film,offset=current->offsets[i];
+        const char *name=id<=M10V_FILM_COUNT?m10v_library_name(id):0;
+        uint32_t limit=95;
+        if(id>M10V_FILM_COUNT&&offset>=sizeof(configuration)&&offset<=current->bytes&&M10V_SD_RECORD_BYTES<=current->bytes-offset){
+            name=(const char *)current+offset+16;limit=23;
+        }
+        if(!name){ok=0;break;}
+        uint32_t n=0;for(;n<limit&&name[n];n++)next[i][n]=(uint8_t)name[n];
+        if(!n||name[n]){ok=0;break;}
+        for(;n<96;n++)next[i][n]=0;
+    }
+    if(ok)copy(out,next,5*96*2);
+    unlock();return ok;
+}

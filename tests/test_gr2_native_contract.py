@@ -10,6 +10,12 @@ class Gr2NativeContractTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('gr2_native_contract',source)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
+    def test_original_file_mode_parser_does_not_accept_assumed_exclusive_stdio_modes(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_file_mode_flags'))
+        result=module.probe_file_mode_flags(component('gr2','b01firm8'))
+        self.assertEqual(result['flags'],{'r':2,'rb':2,'r+':10,'w':1,'wb':1,'w+':9,'a':4,'a+':12,'wx':0,'wbx':0,'x':0})
+        self.assertEqual(result['helpers_intercepted'],[])
+
     def test_original_mutex_enforces_owner_nonrecursive_and_nonblocking_handoff(self):
         module=self.implementation();self.assertTrue(hasattr(module,'probe_rtos_mutex'))
         result=module.probe_rtos_mutex(component('gr2','b01firm8'))

@@ -64,6 +64,10 @@ class Gr2ConfigurationTests(unittest.TestCase):
         u.mem_write(context+0x408,b'\x09');self.assertEqual(invoke('freeze',context,1234),0)
         self.assertEqual(invoke('publish',state,records),1);resident=free();self.assertLess(resident,before)
         self.assertEqual(invoke('read',out),1);self.assertEqual(bytes(u.mem_read(out,104)),initial)
+        self.assertIn('gr2_configuration_names',sym)
+        self.assertEqual(invoke('names',0x50004000),1)
+        names=bytes(u.mem_read(0x50004000,960)).decode('utf-16-be').split('\0')
+        self.assertEqual(names[0],'Ektar 100')
         # A second task holding the actual kernel mutex prevents publication and
         # capture admission without spinning, altering state or leaking memory.
         set_task(2);self.assertEqual(self.call(u,0xa0066d94,[1,0]),0)
@@ -75,6 +79,8 @@ class Gr2ConfigurationTests(unittest.TestCase):
         self.assertEqual(invoke('publish',state,records),0)
         u.mem_write(0x52000000,record);u.mem_write(records,struct.pack('>5I',0x52000000,0,0,0,0));self.assertEqual(invoke('publish',state,records),1)
         u.mem_write(state,b'\xa5'*104);u.mem_write(0x52000000,b'\xa5'*12288);u.mem_write(records,bytes(20))
+        self.assertEqual(invoke('names',0x50004000),1)
+        self.assertEqual(bytes(u.mem_read(0x50004000,192)).decode('utf-16-be').split('\0')[0],'Published LUT')
         self.assertEqual(invoke('freeze',context,1234),1);self.assertEqual(bytes(u.mem_read(context+0x408,1)),b'\x09')
         self.assertEqual(self.call(u,sym['gr2_frame_read'],[context,out]),1)
         self.assertEqual(bytes(u.mem_read(out+16,104)),bytes(custom));self.assertEqual(bytes(u.mem_read(context+0xfb8c,12288)),record)

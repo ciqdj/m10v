@@ -132,6 +132,74 @@ def probe_rtos_mutex(code:bytes)->dict:
     return dict(create_returned=created,returns=returns,owners=owners,stack_preserved=True,helpers_intercepted=[],hardware_tested=False,
                 scope='Original kernel mutex create, polling lock, owner chain and unlock on synthetic task records; no preemption, wait queues or camera thread timing proof.')
 
+def probe_file_mode_flags(code:bytes)->dict:
+    """Execute the stock stdio mode parser, without opening any files."""
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);stop=0x5001f000;pointer=0x50001000;flags={}
+    for mode in ('r','rb','r+','w','wb','w+','a','a+','wx','wbx','x'):
+        uc.mem_write(pointer,mode.encode()+b'\0')
+        uc.reg_write(r.UC_ARM_REG_R0,pointer);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,stop|1)
+        uc.emu_start(0xA00754AD,stop,count=10000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=0x50018000:raise RuntimeError('original stdio mode parser budget/stack failure')
+        flags[mode]=uc.reg_read(r.UC_ARM_REG_R0)
+    return dict(flags=flags,helpers_intercepted=[],hardware_tested=False,
+                scope='Exact original stdio spellings and bitmasks only; no inference that other low-level exclusive-create APIs are absent.')
+
+def probe_effect_names(code:bytes,*,native_runtime:dict)->dict:
+    """Stock locale lookup through RAM-installed, stable private name values."""
+    from unicorn import arm_const as r
+    from scripts.gr2_text_contract import effect_name_contract
+    import zlib
+    uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']));stop=0x5001f000
+    def word(pointer):return struct.unpack('>I',uc.mem_read(pointer,4))[0]
+    def run(entry,*args,thumb=False):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,stop|int(thumb))
+        uc.emu_start(entry|int(thumb),stop,count=1000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=0x50018000:raise RuntimeError('effect label operation budget/stack failure')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    sym=native_runtime['symbols'];state=0x50002000;records=0x50002400
+    uc.mem_write(0xA00B5BFE,struct.pack('>H',1));uc.mem_write(0xA00B5BE0,struct.pack('>I',0x50007000));uc.mem_write(0x50007000,struct.pack('>h',-2));run(0xA0024BCA,thumb=True)
+    uc.mem_write(0xA00B5BF8,struct.pack('>h',1));uc.mem_write(0xA00B5BD4,struct.pack('>I',0x50006C00));uc.mem_write(0x50006C00,struct.pack('>h',-2))
+    uc.mem_write(0xA06B6DE0,b'\1');uc.mem_write(0xA06B6DE3,b'\1');uc.mem_write(0xA00C22C0,struct.pack('>h',1))
+    task=0xA05F5C28+68;uc.mem_write(task+8,struct.pack('>2h',-1,-1));uc.mem_write(task+24,struct.pack('>3h',20,0,20))
+    free=lambda:word(word(0x50007004)+12)*word(0x50007014)
+    available=free();contract=effect_name_contract(code);ids=contract['ids'];rows=contract['rows']
+    tables=lambda:[bytes(uc.mem_read(row,847*4)) for row in rows]
+    original=tables();run(sym['m10v_library_init'],state)
+    if run(sym['gr2_configuration_publish'],state,records)!=1 or run(sym['gr2_effect_names_refresh'])!=1:raise RuntimeError('effect name installation failed')
+    installed=tables()
+    uc.mem_map(0x51000000,0x10000)
+    uc.mem_write(0x51000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383);uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x51000000,0x50005000,0x383));uc.mem_write(0x50005000,struct.pack('>6I',0,0x51006000,0x383,0x5000D000,0,0))
+    pointers=[[word(row+4*(identity-1)) for identity in ids] for row in rows]
+    def caption(identity,language):
+        pointer=run(sym['gr2_original_text'],identity,language)
+        return bytes(uc.mem_read(pointer,192)).decode('utf-16-be').split('\0')[0]
+    initial=[caption(identity,1) for identity in ids]
+    match=True
+    for language in range(21):
+        uc.mem_write(0x5000D000+0x1e4*4,struct.pack('>I',language))
+        for index,identity in enumerate(ids):
+            current=run(0xA03A4AEE,identity,thumb=True)
+            match=match and caption(identity,language)==initial[index] and bytes(uc.mem_read(current,192)).decode('utf-16-be').split('\0')[0]==initial[index]
+    unrelated=all(before[4*i:4*i+4]==after[4*i:4*i+4] for before,after in zip(original,installed) for i in range(847) if i+1 not in ids)
+    next_state=bytearray(uc.mem_read(state,104));struct.pack_into('>H',next_state,12,33);struct.pack_into('>I',next_state,100,zlib.crc32(next_state[:100]));uc.mem_write(state,bytes(next_state))
+    if run(sym['gr2_configuration_publish'],state,records)!=1:raise RuntimeError('effect name configuration update failed')
+    retained=[run(sym['gr2_allocate'],size) for size in (available-4096,0xe00)]
+    if not all(retained):raise RuntimeError(f'effect name low-memory fixture did not retain its bounded blocks: pointers={retained} free={free()} available={available}')
+    low_memory_rejected=run(sym['gr2_effect_names_refresh'])==0 and caption(112,1)==initial[0] and tables()==installed
+    for pointer in retained:run(sym['gr2_release'],pointer)
+    if run(sym['gr2_effect_names_refresh'])!=1:raise RuntimeError('effect name update failed')
+    updated=caption(112,1);stable=pointers==[[word(row+4*(identity-1)) for identity in ids] for row in rows]
+    target=rows[0]+4*(ids[0]-1);own=word(target);uc.mem_write(target,struct.pack('>I',0xdeadbeef));foreign=tables()
+    rejected=run(sym['gr2_effect_names_refresh'])==0 and run(sym['gr2_effect_names_restore'])==0 and tables()==foreign
+    uc.mem_write(target,struct.pack('>I',own));restored=run(sym['gr2_effect_names_restore'])==1 and tables()==original
+    run(sym['gr2_configuration_clear'])
+    return dict(low_memory_rejected=low_memory_rejected,languages=21,aliases=7,initial_names=initial,all_languages_match=match,stable_pointers=stable,updated_first_name=updated,
+                unrelated_labels_preserved=unrelated,foreign_change_rejected=rejected,all_original_tables_restored=restored,pool_restored=free()==available,
+                helpers_intercepted=[],hardware_tested=False,scope='Original explicit-language stock accessor, 21 complete pointer tables, native label buffers and actual RTOS pool/mutex; no native screen pixels, hardware display or cached widget redraw proof.')
+
 def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False,active_configuration:bool=False)->dict:
     """Original IQ library constructor/parser and full capture producer body.
 

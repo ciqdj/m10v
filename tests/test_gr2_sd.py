@@ -69,6 +69,9 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(word(page+104),2);self.assertEqual(word(page+120),79)
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
         self.assertEqual(bytes(u.mem_read(0x50005000,104)),bytes(u.mem_read(page,104)))
+        self.assertEqual(self.call(u,report['symbols']['gr2_effect_names_refresh'],[]),1)
+        name_pointer=self.call(u,report['symbols']['gr2_original_text'],[112,4])
+        self.assertEqual(bytes(u.mem_read(name_pointer,192)).decode('utf-16-be').split('\0')[0],'Native LUT')
         self.call(u,report['symbols']['m10v_settings_key'],[page,ops,5])
         self.assertEqual(word(page+104),1)
         self.assertEqual(self.call(u,report['symbols']['m10v_settings_open'],[page,ops,3]),0)
@@ -86,6 +89,8 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_reload'],[]),0)
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
         self.assertEqual(bytes(u.mem_read(0x50005000,104)),committed)
+        self.assertEqual(self.call(u,report['symbols']['gr2_original_text'],[112,4]),name_pointer)
+        self.assertEqual(self.call(u,report['symbols']['gr2_effect_names_restore'],[]),1)
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_clear'],[]),1)
         self.assertEqual(len(metadata),len(closed));self.assertEqual(len(metadata),len(freed));self.assertEqual(free(),before)
 
