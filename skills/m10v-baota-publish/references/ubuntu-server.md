@@ -22,6 +22,7 @@ admin 可使用 sudo。服务器 Ed25519 指纹应为 `SHA256:14wdxfbNTDj0zIp43y
 - 完整发布的 GR III 扩展组合和 GR IV 定制需要锁定的 `.runtime/grlife-current`。初始化必须运行 `node scripts/sync-grlife-runtime.mjs --current`，或传输已核验缓存并以 www 验证 `runtimeAvailable()` 为 true；保持 manifest 与逐文件 SHA-256 校验。缓存默认权限为 600/700，需要仅对该目录改为文件 644、目录 755。缺失会导致发布回退，不能跳过组合构建。
 - 三个官方输入分别为 `bin/fwdc239b-gr3-official.bin`、`bin/fwdc243b-gr3x-official.bin`、`bin/fwdc248b-gr4-officical.bin`。它们不在 Git，重建服务器时单独安全传输并核对完整 SHA-256。
 - 2 GB 节点保留至少 1 GB swap（当前宝塔已配置 1 GB），并对服务及发布构建设置 `NODE_OPTIONS=--max-old-space-size=128`。这是 JS 堆限制，Buffer、Python、编译器仍需额外内存。
+- 主机 `vm.swappiness=60`。2026-10-20 核实原配置为 0，网站处理与部署构建并发时出现内核 global OOM、swap 使用仍为 0；已在 `/etc/sysctl.conf.before-m10v-swap-20261020` 备份并改为 60。重建时同时检查 `sysctl vm.swappiness`、`swapon --show` 与实际 swap 使用，不能只看已分配的 swap 总量。构建采用 `MemoryHigh=600M`、`MemoryMax=700M`、`MemorySwapMax=384M`，仍保留超时、整组停止及回滚。
 - Nginx 使用仓库 `deploy/nginx-location.conf`：300 秒超时、16k 响应头缓冲、`proxy_buffers 4 16k`、`proxy_busy_buffers_size 32k`，避免约 7 KB 审计头超过默认缓冲。先 `nginx -t`，再 reload。Nginx 由宝塔官方极速安装器安装，当前 1.28.3。
 - 宝塔新建站点的默认图片、JS/CSS 本地缓存 location 会截获代理静态资源并返回 404。只移除这两类缓存规则，保留敏感文件及 ACME 规则，并分别验证 studio.js、styles.css、logo.png 返回 200。
 

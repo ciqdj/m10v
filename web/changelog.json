@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.9",
+      "date": "2026-10-20",
+      "title": "修复主机交换策略并重新验证完整发布",
+      "changes": [
+        "核实内核 global OOM 先后杀掉网站处理与部署构建进程；主机虽已配置 1 GiB swap，但 vm.swappiness=0，本轮构建 swap 峰值仍为 0。已备份原主机配置并调整为 60，保留现有 swap 大小。",
+        "保留上一轮 600 MiB 提前回收、700 MiB 内存硬上限与 384 MiB 交换上限，继续执行三机型顺序构建、型号保护和失败回滚；之前失败尝试不作为上线成功证据。",
+        "包含水印放大、切卷首张选择与 ProImage 100／Aerochrome／2460／5203 名称调整；固件构建和线上检查仍不能替代相机刷入、首张效果与保存耗时实测。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.8",
       "date": "2026-10-20",
       "title": "收紧发布构建内存限制，保留系统运行余量",
@@ -10,9 +23,9 @@
         "此前两次 GR III 构建期间服务器 SSH 失联，失联前全机可用内存约 73 MiB；尚无内核 OOM 证据，不能认定内存压力为唯一原因。本次优先为约 1.6 GiB 可用物理内存的主机保留余量。",
         "包含上一条水印放大、切卷首张选择及四款胶卷改名的源码修复。此前发布未取得完整成功标记，未将其归档为已验证部署；相机刷入与首张效果仍待实机确认。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "4b777678977eeb79760a7e664b10d0db853d0510",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/4b777678977eeb79760a7e664b10d0db853d0510"
     },
     {
       "version": "2026.10.20.7",
