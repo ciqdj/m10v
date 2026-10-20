@@ -20,6 +20,18 @@ class Gr2CaptureTests(unittest.TestCase):
         u.mem_write(0xa00b5bfc,struct.pack('>H',1));u.mem_write(0xa00b5bdc,struct.pack('>I',0x50008000))
         u.mem_write(0x50008000,struct.pack('>6I',0xffffffff,base,0,60*block,block,base))
 
+    def test_native_producer_wrapper_runs_original_iq_lookup_before_engine_and_restores_color_mode(self):
+        from scripts.analyze_gr2_native_contract import probe_producer_iq
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertIn('gr2_producer_run',runtime['symbols'])
+        for tone in (8,9,10,11,18):
+            with self.subTest(tone=tone):
+                result=probe_producer_iq(component('gr2','b01firm8'),component('gr2','b01firm6'),native_runtime=runtime,tone=tone)
+                self.assertEqual(result['engine_mode'],0);self.assertEqual(result['restored_mode'],tone)
+                self.assertEqual(result['snapshot_valid'],1);self.assertEqual(result['producer_return'],(4<<16)|32)
+                self.assertTrue(result['response_copied']);self.assertTrue(result['arena_guards_unchanged'])
+                self.assertTrue(result['stack_preserved']);self.assertEqual(result['helpers_intercepted'],['ISP engine completion'])
+
     def enter_user_task(self,u,runtime):
         from scripts.analyze_unity_runtime import parse_executable_load_map
         from tests.test_unity_update import component

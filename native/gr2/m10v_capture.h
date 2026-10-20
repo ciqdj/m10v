@@ -16,6 +16,7 @@ typedef struct {
  * 0 ordinary stock frame, -1 rejected without changing the color mode. */
 int gr2_producer_ingress(uint8_t *,const m10v_library_state *,uint32_t);
 int gr2_producer_leave(uint8_t *);
+uint32_t gr2_producer_run(uint8_t *,uint32_t,const m10v_library_state *,uint32_t);
 int gr2_frame_freeze(uint8_t *,const m10v_library_state *,uint32_t,uint32_t);
 int gr2_frame_read(const uint8_t *,m10v_gr2_frame *);
 uint32_t gr2_image_owner_bytes(const uint8_t *);

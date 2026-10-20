@@ -40,3 +40,22 @@ gr2_jpeg_chain:
 2:  .word 0xA01324BB
 4:  .word 0xA02ADCA1
 .size gr2_jpeg_chain,.-gr2_jpeg_chain
+
+/* Exact original producer prelude; callable independently of a future entry
+ * interception, so the original body remains reachable without recursion. */
+.thumb
+.balign 4
+.global gr2_producer_original
+.type gr2_producer_original,%function
+.thumb_func
+gr2_producer_original:
+    push {r4-r7,lr}
+    movs r4,r0
+    movs r5,r1
+    sub sp,#180
+    movs r1,#152
+    ldr r3,5f
+    bx r3
+.balign 4
+5:  .word 0xA02AD495
+.size gr2_producer_original,.-gr2_producer_original

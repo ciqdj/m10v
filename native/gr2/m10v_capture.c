@@ -203,3 +203,11 @@ int gr2_capture_process(const uint8_t *context,uint32_t kind,const uint8_t *requ
 int gr2_capture_frozen(const uint8_t *context,uint32_t kind,const uint8_t *request){
     return process(context,kind,request,0,0,1);
 }
+
+extern uint32_t gr2_producer_original(uint8_t *,uint32_t);
+uint32_t gr2_producer_run(uint8_t *context,uint32_t argument,const m10v_library_state *state,uint32_t seed){
+    int prepared=gr2_producer_ingress(context,state,seed);
+    uint32_t result=gr2_producer_original(context,argument);
+    if(prepared>0)gr2_producer_leave(context);
+    return result;
+}

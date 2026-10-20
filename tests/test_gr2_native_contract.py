@@ -10,6 +10,31 @@ class Gr2NativeContractTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('gr2_native_contract',source)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
+    def test_original_iq_engine_builds_hardware_configuration_and_returns_its_computed_matrix(self):
+        module=self.implementation()
+        result=module.probe_producer_iq(component('gr2','b01firm8'),component('gr2','b01firm6'),deep=True)
+        self.assertEqual(result['hardware_mode'],6)
+        self.assertEqual(result['hardware_raw_address'],0x68000000)
+        self.assertEqual(result['hardware_yuv_address'],0x60000000)
+        self.assertTrue(result['computed_response_nonzero']);self.assertTrue(result['response_copied'])
+        self.assertTrue(result['stack_preserved']);self.assertGreater(result['mutex_boundaries'],0)
+        self.assertEqual(result['helpers_intercepted'],['mutex lock/unlock','ISP hardware pipeline'])
+
+    def test_original_iq_library_initialization_and_producer_request_run_with_official_resources(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_producer_iq'))
+        result=module.probe_producer_iq(component('gr2','b01firm8'),component('gr2','b01firm6'))
+        self.assertEqual(result['iq_bytes'],194848);self.assertEqual(result['common_bytes'],60)
+        self.assertEqual(result['constructor_return'],0);self.assertEqual(result['load_return'],0)
+        self.assertEqual(result['library_ready'],1)
+        self.assertEqual(result['raw_address'],0x68000000);self.assertEqual(result['yuv_address'],0x60000000)
+        self.assertEqual(result['frame_address'],0x51000008)
+        self.assertEqual(result['producer_return'],(4<<16)|32)
+        self.assertTrue(result['response_copied']);self.assertTrue(result['source_resources_unchanged'])
+        self.assertTrue(result['arena_guards_unchanged']);self.assertTrue(result['stack_preserved'])
+        self.assertEqual(result['helpers_intercepted'],['ISP engine completion'])
+        changed=bytearray(component('gr2','b01firm6'));changed[1000]^=1
+        with self.assertRaises(ValueError):module.probe_producer_iq(component('gr2','b01firm8'),bytes(changed))
+
     def test_original_isp_color_recipe_reads_frame_408_in_its_own_numeric_space(self):
         module=self.implementation();expected=[0,1,14,2,3,4,5,6,7,8,9,10,11,12,13,0,16,0,15,17,18]
         self.assertTrue(hasattr(module,'probe_isp_color_recipe'))
@@ -200,7 +225,7 @@ class Gr2NativeContractTests(unittest.TestCase):
     def test_original_image_object_fixed_pools_own_construct_clone_and_retirement(self):
         module=self.implementation()
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
-        for extra in (0,128):
+        for extra in (0,128,128+12288):
             with self.subTest(inline_extension=extra):
                 report=module.probe_image_object_pools(component('gr2','b01firm8'),extra=extra)
                 self.assertEqual(report['pool_counts'],[60,91])

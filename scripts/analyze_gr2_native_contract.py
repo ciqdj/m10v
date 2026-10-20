@@ -102,6 +102,78 @@ def probe_rtos_pool(code:bytes,*,native_runtime:dict|None=None)->dict:
                 oversized_returned=oversized,allocation_returns=allocation_returns,free_returned=released,reallocate_returned=allocated_again,reallocated_pointer=again,helpers_intercepted=[],
                 hardware_tested=False,scope='Original RTOS pool arithmetic and lifecycle; synthetic one-pool kernel table and single-thread SVC CPU context. Scheduler/concurrency not emulated.')
 
+def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False)->dict:
+    """Original IQ library constructor/parser and full capture producer body.
+
+    Only ISP engine completion is substituted. The complete official IQ and
+    COMMON files feed the original relocator, lookup and color-profile code.
+    """
+    import hashlib
+    if hashlib.sha256(disk).hexdigest()!='9e0d291f5b9b74f76a2dd269c4b23fe8f524b5db92b86bf82150d5dc3096abf8':raise ValueError('exact GR II official resource component identity required')
+    if type(tone) is not int or not 0<=tone<=20:raise ValueError('stock frame color mode required')
+    resources={}
+    for index in range(121):
+        at=0x786000+index*64;name=disk[at:at+32].split(b'\0',1)[0].decode('ascii');offset,size=struct.unpack_from('>2I',disk,at+32)
+        if name in ('A:/isp/IQ.bin','A:/isp/COMMON.BIN'):
+            start=512+offset
+            if start>len(disk) or size>len(disk)-start:raise ValueError('official ISP resource extent differs')
+            resources[name]=disk[start:start+size]
+    iq=resources['A:/isp/IQ.bin'];common=resources['A:/isp/COMMON.BIN']
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code)
+    for address,size in ((0x51000000,0x10000),(0x52000000,0x10000),(0x53000000,0x100000),(0x54000000,0x40000),(0x55000000,4096)):uc.mem_map(address,size)
+    uc.mem_write(0x52000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383);uc.mem_write(0x52006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x52000000,0x50005000,0x383));uc.mem_write(0x50005000,struct.pack('>6I',0,0x52006000,0x383,0x5000D000,0,0))
+    context=0x51000008;arena=0x53000010;stack=0x50018000;stop=0x5001f000;captured=[];engine_modes=[];requests=[];responses=[];hardware=[];mutex_calls=[]
+    uc.mem_write(arena-16,b'\xa5'*16);uc.mem_write(arena+0x80000,b'\xa5'*16)
+    uc.mem_write(0x54000000,iq);uc.mem_write(0x55000000,common)
+    response=b''.join(struct.pack('>H',0x1200+i) for i in range(33))
+    def boundary(machine,address,size,unused):
+        if address==0xA02AD6F0:
+            responses.append(bytes(machine.mem_read(requests[-1]+0x54,66)));return
+        if address in (0xA0027360,0xA00273A4):mutex_calls.append(hex(address))
+        elif address==0xA013B4F0:hardware.append(bytes(machine.mem_read(machine.reg_read(r.UC_ARM_REG_R0),128)))
+        elif address==0xA0130D72:
+            request=machine.reg_read(r.UC_ARM_REG_R0);requests.append(request);captured.append(bytes(machine.mem_read(request,152)));engine_modes.append(bytes(machine.mem_read(context+0x408,1))[0])
+            if deep:return
+            machine.mem_write(request+0x54,response)
+        else:raise RuntimeError('original IQ/producer assertion')
+        machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    boundaries=(0xA0130D72,0xA02AD6F0,0xA0039F9C,0xA003A01A)+((0xA013B4F0,0xA0027360,0xA00273A4) if deep else ())
+    for address in boundaries:uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def run(entry,*args,thumb=True):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1 if thumb else stop)
+        uc.emu_start(entry|1 if thumb else entry,stop,count=5000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('original IQ/producer stack or instruction budget failure')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    constructor=run(0xA014DDE8,arena);loaded=run(0xA01507CC,0,0x54000000,0x55000000)
+    for offset,handle,data in ((0x1e0,0x5000A000,0x68000000),(0x1f0,0x5000A100,0x60000000)):
+        uc.mem_write(context+offset,struct.pack('>I',handle));uc.mem_write(handle,b'BUFF'+struct.pack('>5I',data,256,0,0,256))
+    for offset,value in ((0x258,(4<<16)|32),(0x3e4,(4<<16)|32),(0x2b8,32),(0x2bc,4)):uc.mem_write(context+offset,struct.pack('>I',value))
+    uc.mem_write(context+0x408,bytes([tone]));snapshot_valid=None
+    if native_runtime:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        block=0xfb94
+        uc.mem_write(context-8,b'IMG '+bytes(4));uc.mem_write(0xA0129C54,struct.pack('>I',0xA05FB0E8));uc.mem_write(0xA01137EC,struct.pack('>I',block-8))
+        uc.mem_write(0xA05FB0E8,b'MPL '+struct.pack('>4I',0x01000000,block,60*block,0)+struct.pack('>2H',1,0))
+        uc.mem_write(0xA00B5BFC,struct.pack('>H',1));uc.mem_write(0xA00B5BDC,struct.pack('>I',0x50008000))
+        uc.mem_write(0x50008000,struct.pack('>6I',0xffffffff,0x51000000,0,60*block,block,0x51000000))
+        run(native_runtime['symbols']['m10v_library_init'],0x50006000,thumb=False)
+        result=run(native_runtime['symbols']['gr2_producer_run'],context,0,0x50006000,1234,thumb=False)
+        snapshot_valid=run(native_runtime['symbols']['gr2_frame_read'],context,0x50006080,thumb=False)
+    else:result=run(0xA02AD48A,context,0)
+    if len(captured)!=1 or len(responses)!=1 or (deep and len(hardware)!=1):raise RuntimeError('original producer engine request/response count differs')
+    raw,yuv=struct.unpack_from('>2I',captured[0]);frame=struct.unpack_from('>I',captured[0],0x48)[0]
+    return dict(hardware_mode=hardware[0][0] if hardware else None,hardware_raw_address=struct.unpack_from('>I',hardware[0],4)[0] if hardware else None,hardware_yuv_address=struct.unpack_from('>I',hardware[0],8)[0] if hardware else None,computed_response_nonzero=any(responses[0]),mutex_boundaries=len(mutex_calls),engine_mode=engine_modes[0],restored_mode=bytes(uc.mem_read(context+0x408,1))[0],snapshot_valid=snapshot_valid,iq_bytes=len(iq),common_bytes=len(common),constructor_return=constructor,load_return=loaded,
+                library_ready=struct.unpack('>I',uc.mem_read(arena,4))[0],raw_address=raw,yuv_address=yuv,frame_address=frame,
+                producer_return=result,request_hex=captured[0].hex(),response_copied=bytes(uc.mem_read(context+0xf730,66))==responses[0],
+                source_resources_unchanged=bytes(uc.mem_read(0x54000000,len(iq)))==iq and bytes(uc.mem_read(0x55000000,len(common)))==common,
+                arena_guards_unchanged=all(bytes(uc.mem_read(address,16))==b'\xa5'*16 for address in (arena-16,arena+0x80000)),
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['mutex lock/unlock','ISP hardware pipeline'] if deep else ['ISP engine completion'],hardware_tested=False,
+                scope='Original IQ constructor, official IQ/COMMON parsing and relocation, profile lookups, full A02AD48A request construction and returned matrix copy. Synthetic metadata/no-observer property bank and bounded arena; completion or deeper hardware pipeline and mutex operations are explicit boundaries; deep mode executes A0130D72 and original IQ calculations, no sensor/DMA/IRQ or peak-memory proof.')
+
 def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)->dict:
     """Original frame->ISP color descriptor, including software-float helpers.
 
@@ -155,10 +227,10 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     are explicit single-thread boundaries; MPF arithmetic and object ownership
     helpers, property setters, zeroing/copying and releases execute unchanged.
     """
-    if type(extra) is not int or not 0<=extra<=4096 or extra&3:raise ValueError('bounded aligned synthetic inline extension required')
+    if type(extra) is not int or not 0<=extra<=16384 or extra&3:raise ValueError('bounded aligned synthetic inline extension required')
     from unicorn import UC_HOOK_CODE
     from unicorn import arm_const as r
-    uc=runtime_machine(code);uc.mem_map(0xA1000000,0x200000);stop=0x5001f000;stack=0x50018000
+    uc=runtime_machine(code);uc.mem_map(0xA1000000,0x400000);stop=0x5001f000;stack=0x50018000
     word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
     for maximum,pointer,table,count,stride in ((0xA00B5BFE,0xA00B5BE0,0x50007000,1,28),(0xA00B5BFC,0xA00B5BDC,0x50008000,2,24)):
         uc.mem_write(maximum,struct.pack('>H',count));uc.mem_write(pointer,struct.pack('>I',table))
@@ -1216,6 +1288,8 @@ def main():
                 sd_modes=[probe_sd_open_mode(code,flags) for flags in (0,1,9,2,10,0x102)],can_build=False)
     if args.resource_component:
         disk=args.resource_component.read_bytes()
+        report['producer_iq']=probe_producer_iq(code,disk)
+        report['producer_iq_engine']=probe_producer_iq(code,disk,deep=True)
         report['effect_font_draw']=probe_effect_view_draw(code,disk)
         report['effect_root_lifecycle']=probe_effect_view_draw(code,disk,attach=True)
         report['effect_modal_lifecycle']=probe_effect_view_draw(code,disk,attach=True,overlay=True)
