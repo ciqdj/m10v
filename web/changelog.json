@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.20.3",
+      "date": "2026-10-20",
+      "title": "统一时间水印并支持自定义 LUT 胶卷",
+      "changes": [
+        "GR III／GR IIIx 的时间水印统一在影像方案设置，机内也可调整；可独立开启胶卷名称，以胶卷时间戳风格写入静态 JPEG。",
+        "SD 胶卷库支持命名导入 sRGB 3D .cube，生成新版胶卷包并在机内装入；自定义效果作用于保存的 JPEG，旧版内置胶卷包仍可读取。",
+        "修复开启胶卷名称水印时初始配置被固件构建器拒绝的问题；补充 HDF 菜单离线回归，启用 HDF 且档位为关闭时仍应保留机内菜单。",
+        "GR III 的 HDF 缺菜单反馈尚无固件记录或机内照片，当前离线构建未复现；自定义 LUT、名称水印及 HDF 组合仍待真机验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.2",
       "date": "2026-10-20",
       "title": "CCD 改为 IXUS 70 色彩方向，修复已配置槽位切换延迟",
@@ -11,9 +25,9 @@
         "保留原始 ShootingInfo、RAW 保护与排队照片归属；仍使用 15³ 色表和原厂 ISP 参数，不增加全图处理步骤。更新后需下载匹配的 M10V/FILMS.M10。",
         "补全此前 GR IV 内存优化的本地修改来源哈希，保留上游身份与独立固件验证。补充槽位切换、排队冻结和色彩回归检查；离线验证不等同真机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "feaf5e8817651eea19758b741f72c4ab6d967e25",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39362650461"
     },
     {
       "version": "2026.10.20.1",
