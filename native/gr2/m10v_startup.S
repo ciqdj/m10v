@@ -59,3 +59,32 @@ gr2_producer_original:
 .balign 4
 5:  .word 0xA02AD495
 .size gr2_producer_original,.-gr2_producer_original
+
+/* A0394950 follows the stock 16-byte PUSH. Preserve its provider/message and
+ * original callee-saved register contract; consume private raw keys before
+ * the state watchers queue converted SPEC events. All other events replay
+ * the exact displaced prelude and original conditional continuation. */
+.arm
+.balign 4
+.global gr2_ui_event_chain
+.type gr2_ui_event_chain,%function
+gr2_ui_event_chain:
+    stmdb sp!,{r0-r3,ip,lr}
+    mov r0,r1
+    bl gr2_settings_raw_event
+    cmp r0,#0
+    ldmia sp!,{r0-r3,ip,lr}
+    bne 7f
+    mov r6,r0
+    mov r5,r1
+    mov r4,#0
+    cmp r1,#0
+    ldr ip,6f
+    bx ip
+7:  mov r4,#1
+    ldr ip,8f
+    bx ip
+.balign 4
+6:  .word 0xA0394959
+8:  .word 0xA03949D3
+.size gr2_ui_event_chain,.-gr2_ui_event_chain

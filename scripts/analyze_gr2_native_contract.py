@@ -102,6 +102,36 @@ def probe_rtos_pool(code:bytes,*,native_runtime:dict|None=None)->dict:
                 oversized_returned=oversized,allocation_returns=allocation_returns,free_returned=released,reallocate_returned=allocated_again,reallocated_pointer=again,helpers_intercepted=[],
                 hardware_tested=False,scope='Original RTOS pool arithmetic and lifecycle; synthetic one-pool kernel table and single-thread SVC CPU context. Scheduler/concurrency not emulated.')
 
+def probe_rtos_mutex(code:bytes)->dict:
+    """Original create/try-lock/unlock with two explicit kernel task identities.
+
+    This exercises ownership and polling, not a concurrent task scheduler.
+    No mutex, critical section or bookkeeping helper is substituted.
+    """
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);stop=0x5001f000;stack=0x50018000;table=0x50008000
+    uc.mem_write(0xA00B5BF8,struct.pack('>h',2));uc.mem_write(0xA00B5BD4,struct.pack('>I',table))
+    for index in range(2):uc.mem_write(table+14*index,struct.pack('>h',-2))
+    # Active task/dispatch flags, two empty owned-mutex chains and equal base
+    # and effective priorities. These are kernel state, not replacement code.
+    uc.mem_write(0xA06B6DE0,b'\x01');uc.mem_write(0xA06B6DE3,b'\x01')
+    for identity in (1,2):
+        task=0xA05F5C28+68*identity
+        uc.mem_write(task+8,struct.pack('>2h',-1,-1));uc.mem_write(task+24,struct.pack('>3h',20,0,20))
+    uc.mem_write(0x50001000,struct.pack('>2HI',2,0,0))
+    def run(entry,*args):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop)
+        uc.emu_start(entry,stop,count=100000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('original mutex execution budget/stack failure')
+        return struct.unpack('>i',struct.pack('>I',uc.reg_read(r.UC_ARM_REG_R0)))[0]
+    created=run(0xA00665CC,0x50001000);returns=[];owners=[]
+    if created!=1:raise RuntimeError('original mutex did not use first free table entry')
+    for task,entry in ((1,0xA0066D94),(1,0xA0066D94),(2,0xA0066D94),(2,0xA00671B8),(1,0xA00671B8),(2,0xA0066D94),(2,0xA00671B8)):
+        uc.mem_write(0xA00C22C0,struct.pack('>h',task));returns.append(run(entry,created,0));owners.append(struct.unpack('>h',uc.mem_read(table+12,2))[0])
+    return dict(create_returned=created,returns=returns,owners=owners,stack_preserved=True,helpers_intercepted=[],hardware_tested=False,
+                scope='Original kernel mutex create, polling lock, owner chain and unlock on synthetic task records; no preemption, wait queues or camera thread timing proof.')
+
 def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False)->dict:
     """Original IQ library constructor/parser and full capture producer body.
 
@@ -979,7 +1009,7 @@ def probe_osd_colors(code:bytes)->dict:
     return dict(colors=rows,helpers_intercepted=[],hardware_tested=False,
                 scope='Original palette lookup, fixed-point YUV to RGB and channel/alpha nibble packing. CPU format evidence, no display hardware or compositing proof.')
 
-def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False)->dict:
+def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False,settings_overlay:bool=False,language:int=1,settings_out_dir:Path|None=None,settings_raw_hook:bool=False)->dict:
     """Original stock list/graphics/font bodies, with bounded ROM-file reads.
 
     All display planes, active geometry and property/kernel state are synthetic.
@@ -987,7 +1017,10 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     generation, widget drawing, navigation, allocation or property mutation.
     """
     import hashlib
-    if overlay and not attach:raise ValueError('overlay evidence requires the original active root transition')
+    if (overlay or settings_overlay) and not attach:raise ValueError('overlay evidence requires the original active root transition')
+    if settings_overlay and native_runtime is None:raise ValueError('native settings overlay requires compiled runtime')
+    if settings_raw_hook and not settings_overlay:raise ValueError('raw hook evidence requires owned settings page')
+    if not isinstance(language,int) or not 0<=language<=20:raise ValueError('official language index out of range')
     official_profile(code,'gr2')
     if hashlib.sha256(disk).hexdigest()!='9e0d291f5b9b74f76a2dd269c4b23fe8f524b5db92b86bf82150d5dc3096abf8':
         raise ValueError('exact GR II official resource component identity required')
@@ -1012,7 +1045,7 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
     uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x51000000,0x50003000,0x383))
     uc.mem_write(0x50003000,struct.pack('>6I',0,0x51006000,0x383,0x5000D000,0,0))
-    for property_id,value in ((43,5),(0x1e4,1)):uc.mem_write(0x5000D000+property_id*4,struct.pack('>I',value))
+    for property_id,value in ((43,5),(0x1e4,language)):uc.mem_write(0x5000D000+property_id*4,struct.pack('>I',value))
     control=word(0xA039CF20)
     uc.mem_write(control+0x1c,struct.pack('>I',0x5000C000));uc.mem_write(0x5000C000,struct.pack('>I',32));uc.mem_write(control+0x10,struct.pack('>I',1))
     uc.mem_write(0xA00B5BFE,struct.pack('>H',1));uc.mem_write(0xA00B5BE0,struct.pack('>I',0x50007000));uc.mem_write(0x50007000,struct.pack('>h',-2))
@@ -1104,6 +1137,111 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
         overlay_report=dict(overlay_attach_return=attached,overlay_duplicate_return=duplicate,overlay_detach_return=detached,
             overlay_second_detach_return=second_detach,overlay_events=overlay_events,overlay_destructor_calls=destructor_calls,
             overlay_underlying_effects=effects,overlay_full_rejected=full_rejected)
+    settings_report={}
+    if settings_overlay:
+        import zlib
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        functions=[0x5001D200+4*i for i in range(5)];ops=0x50006100;out=0x50006400
+        run(native_runtime['symbols']['m10v_library_init'],0x50006000,thumb=False)
+        saved=bytearray(uc.mem_read(0x50006000,104));ids=[33,*range(66,79),*range(34,66)];writes=[]
+        uc.mem_write(ops,struct.pack('>6I',0x50006200,*functions))
+        def settings_backend(machine,address,size,unused):
+            if machine.reg_read(r.UC_ARM_REG_R0)!=0x50006200:raise RuntimeError('private settings backend context mismatch')
+            a,b,c=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)];value=0
+            if address==functions[0]:machine.mem_write(a,bytes(saved))
+            elif address==functions[1]:value=ids[a] if a<len(ids) else 0
+            elif address==functions[2]:
+                if a>=len(ids) or ids[a]!=b or c>=5:raise RuntimeError('private settings install identity mismatch')
+                struct.pack_into('>H',saved,12+c*8,b);writes.append(['install',c,b])
+            elif address==functions[3]:
+                color=word(machine.reg_read(r.UC_ARM_REG_SP));saved[52:56]=bytes((a,b,c,color));writes.append(['stamp',a,b,c,color])
+            else:struct.pack_into('>I',saved,96,a);writes.append(['name',a])
+            struct.pack_into('>I',saved,100,zlib.crc32(saved[:100]))
+            machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        uc.hook_add(UC_HOOK_CODE,settings_backend,begin=functions[0],end=functions[-1])
+        def snapshot():
+            if run(native_runtime['symbols']['gr2_settings_peek'],out,thumb=False)!=1:raise RuntimeError('private settings page unexpectedly closed')
+            return list(struct.unpack('>7I',uc.mem_read(out+104,28)))
+        raw_deliveries=[];raw_inflight=False
+        preserved=[r.UC_ARM_REG_R4,r.UC_ARM_REG_R5,r.UC_ARM_REG_R6,r.UC_ARM_REG_R7,r.UC_ARM_REG_R8,r.UC_ARM_REG_R9,r.UC_ARM_REG_R10,r.UC_ARM_REG_R11]
+        original_ui_hook=bytes(uc.mem_read(0xA0394950,8))
+        if settings_raw_hook:
+            uc.mem_write(0xA0394950,bytes.fromhex(native_runtime['ui_event_hook_patch_hex']))
+            def observe_raw(machine,address,size,unused):
+                if raw_inflight:raw_deliveries.append(address)
+            for address in (0xA0394B60,0xA0398E6C):uc.hook_add(UC_HOOK_CODE,observe_raw,begin=address,end=address)
+        def key(identity):
+            nonlocal raw_inflight
+            raw={0x60002001:0x60001009,0x60002002:0x60001008,0x60002003:0x60001006,0x60002004:0x60001007,0x60002005:0x6000100a,0x60002006:0x6000100e}.get(identity,identity if 0x60001000<=identity<0x60001100 else None)
+            uc.mem_write(event,struct.pack('>3I',raw if settings_raw_hook and raw else identity,1,0))
+            if not settings_raw_hook or raw is None:return run(0xA0398E6C,event)
+            for index,register in enumerate(preserved):uc.reg_write(register,0x12340000+index)
+            raw_inflight=True
+            result=run(0xA039494E,0,event);raw_inflight=False
+            if result!=1 or any(uc.reg_read(register)!=0x12340000+index for index,register in enumerate(preserved)):
+                raise RuntimeError('private raw key did not consume once with original ABI intact')
+            return result
+        def pool_free():return word(word(0x50007004)+12)*word(0x50007014)
+        def save_settings(name):
+            if settings_out_dir is None:return
+            from PIL import Image
+            # CPU reconstruction of two stock planes; not a hardware screenshot.
+            palette={row['index']:row['rgb4444'] for row in probe_osd_colors(code)['colors']}
+            indexed=bytes(uc.mem_read(0x68000000,720*480));rgb=bytes(uc.mem_read(0x68200000,720*480*2));pixels=bytearray(720*480*3)
+            for i,index in enumerate(indexed):
+                base=int.from_bytes(rgb[2*i:2*i+2],'big');over=palette.get(index,0);alpha=(over&15)/15
+                for channel,shift in enumerate((12,8,4)):
+                    pixels[3*i+channel]=round(((over>>shift&15)*alpha+(base>>shift&15)*(1-alpha))*17)
+            target=Path(settings_out_dir);target.mkdir(parents=True,exist_ok=True)
+            Image.frombytes('RGB',(720,480),bytes(pixels)).save(target/(name+'.png'))
+        available=pool_free();before_settings=bytes(uc.mem_read(0x68200000,720*480*2))
+        opened=run(native_runtime['symbols']['gr2_settings_open'],ops,1,thumb=False)
+        duplicate=run(native_runtime['symbols']['gr2_settings_open'],ops,1,thumb=False)
+        initial=snapshot()
+        uc.mem_write(event,struct.pack('>3I',0x60001013,1,0))
+        if run(native_runtime['symbols']['gr2_settings_raw_event'],event,thumb=False)!=0 or snapshot()!=initial:
+            raise RuntimeError('private raw handler consumed an unmapped power event')
+        if settings_raw_hook:
+            for identity in (0x60001018,0x60001017,0x60001015,0x60001014,0x60001007,0x60001006):key(identity)
+            if snapshot()!=initial:raise RuntimeError('GR II dial/directional round trip changed page state')
+        run(0xA0398F20);save_settings('films')
+        changed=sum(a!=b for a,b in zip(before_settings,bytes(uc.mem_read(0x68200000,720*480*2))))
+        key(0x60002001);after_right=snapshot();key(0x60002005);after_catalog=snapshot();run(0xA0398F20);save_settings('catalog');key(0x60002001);key(0x60002006)
+        if writes:raise RuntimeError('private catalog cancel performed a write')
+        for identity in (0x60002005,0x60002001,0x60002005):key(identity)
+        after_install=snapshot();run(0xA0398F20);key(0x60002006)
+        closed=[run(native_runtime['symbols']['gr2_settings_close'],thumb=False)]
+        if not run(native_runtime['symbols']['gr2_settings_open'],ops,3,thumb=False):raise RuntimeError('private stamp page failed to reopen')
+        run(0xA0398F20);save_settings('stamp')
+        for identity in (0x60002005,0x60002001,0x60002006):key(identity)
+        if len(writes)!=1:raise RuntimeError('private value cancel performed a write')
+        for identity in (0x60002005,0x60002001,0x60002005):key(identity)
+        run(0xA0398F20);key(0x60002006);closed.append(run(native_runtime['symbols']['gr2_settings_close'],thumb=False))
+        raw_scope_restored=run(native_runtime['symbols']['gr2_settings_raw_event'],event,thumb=False)==0
+        if settings_raw_hook:
+            raw_scope_restored=raw_scope_restored and run(0xA039494E,0,0)==0
+            # No private page: execute the full original provider chain twice,
+            # with and without the installed RAM veneer. Only the provider's
+            # application callback is a boundary, just as in stock firmware.
+            provider=0x50006A00;pre_calls=[]
+            uc.mem_write(provider,struct.pack('>7I',0,0x5001D301,0,0,0,0,0))
+            provider_slot=word(0xA0394B28);prior_provider=bytes(uc.mem_read(provider_slot,4));uc.mem_write(provider_slot,struct.pack('>I',provider))
+            def provider_pre(machine,address,size,unused):
+                pre_calls.append([machine.reg_read(r.UC_ARM_REG_R0),machine.reg_read(r.UC_ARM_REG_R1)])
+                machine.reg_write(r.UC_ARM_REG_R0,1);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+            uc.hook_add(UC_HOOK_CODE,provider_pre,begin=0x5001D300,end=0x5001D300)
+            uc.mem_write(event,struct.pack('>3I',0x60001009,1,0));returns=[]
+            for patched in (False,True):
+                uc.mem_write(0xA0394950,bytes.fromhex(native_runtime['ui_event_hook_patch_hex']) if patched else original_ui_hook)
+                uc.ctl_remove_cache(0xA039494E,0xA03949D6)
+                try:returns.append(run(0xA039494E,provider,event))
+                except Exception as error:raise RuntimeError(f'provider chain failed patched={patched} PC={uc.reg_read(r.UC_ARM_REG_PC):08x} LR={uc.reg_read(r.UC_ARM_REG_LR):08x} SP={uc.reg_read(r.UC_ARM_REG_SP):08x}') from error
+            uc.mem_write(provider_slot,prior_provider)
+            raw_scope_restored=raw_scope_restored and returns==[1,1] and pre_calls==[[provider,event],[provider,event]]
+        settings_report=dict(settings_raw_scope_restored=raw_scope_restored,settings_raw_double_deliveries=len(raw_deliveries),settings_opened=opened,settings_duplicate=duplicate,settings_initial=initial,settings_after_right=after_right,
+            settings_after_catalog=after_catalog,settings_after_install=after_install,settings_writes=writes,settings_changed_bytes=changed,
+            settings_camera_root_preserved=word(word(0xA0398DC4))==root,settings_pool_restored=pool_free()==available,
+            settings_closed=closed,settings_underlying_effect=word(0x5000D000+43*4))
     native_text_return=None;native_text_changed_bytes=0;native_text_outside_bounds=0
     if native_runtime is not None:
         uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
@@ -1132,6 +1270,18 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     native_card_report={}
     if native_runtime is not None and native_card:
         def pool_free():return word(word(0x50007004)+12)*word(0x50007014)
+        def save_settings(name):
+            if settings_out_dir is None:return
+            from PIL import Image
+            # CPU reconstruction of two stock planes; not a hardware screenshot.
+            palette={row['index']:row['rgb4444'] for row in probe_osd_colors(code)['colors']}
+            indexed=bytes(uc.mem_read(0x68000000,720*480));rgb=bytes(uc.mem_read(0x68200000,720*480*2));pixels=bytearray(720*480*3)
+            for i,index in enumerate(indexed):
+                base=int.from_bytes(rgb[2*i:2*i+2],'big');over=palette.get(index,0);alpha=(over&15)/15
+                for channel,shift in enumerate((12,8,4)):
+                    pixels[3*i+channel]=round(((over>>shift&15)*alpha+(base>>shift&15)*(1-alpha))*17)
+            target=Path(settings_out_dir);target.mkdir(parents=True,exist_ok=True)
+            Image.frombytes('RGB',(720,480),bytes(pixels)).save(target/(name+'.png'))
         if native_card_allocation_failure:
             run(native_runtime['symbols']['gr2_allocate'],pool_free(),thumb=False)
         available=pool_free();before_card=bytes(uc.mem_read(0x68200000,720*480*2))
@@ -1154,11 +1304,11 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
             native_card_pool_restored=pool_free()==available)
     frame=bytes(uc.mem_read(0x68000000,720*480))
     if frame_out is not None:Path(frame_out).write_bytes(frame)
-    return dict(**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
+    return dict(**settings_report,**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
                 page_returns=page_returns,navigation_effects=navigation,draw_returns=draw_returns,
                 display_nonzero_bytes=sum(value!=0 for value in frame),display_sha256=hashlib.sha256(frame).hexdigest(),
                 palette_backend_calls=palette_calls,guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,
-                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply']+(['private overlay event/destruction callbacks'] if overlay else []),hardware_tested=False,
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply']+(['private overlay event/destruction callbacks'] if overlay else [])+(['private settings backend callbacks'] if settings_overlay else []),hardware_tested=False,
                 scope='Six original graphics constructors and official Latin/monitor fonts initialized before detached stock effect page CREATE/INIT, then original list DRAW and property-mutating navigation. Synthetic display/active geometry, kernel and no-observer property fixtures; optional root transition starts with an empty active root and original draw dispatcher using an explicitly loaded low-address module; no real ROM filesystem, hardware state transition/display or custom M10V page installation.')
 
 def probe_effect_key_routes(code:bytes)->dict:

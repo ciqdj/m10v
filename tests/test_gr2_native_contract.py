@@ -10,6 +10,14 @@ class Gr2NativeContractTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('gr2_native_contract',source)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
+    def test_original_mutex_enforces_owner_nonrecursive_and_nonblocking_handoff(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_rtos_mutex'))
+        result=module.probe_rtos_mutex(component('gr2','b01firm8'))
+        self.assertEqual(result['create_returned'],1)
+        self.assertEqual(result['returns'],[0,-28,-50,-28,0,0,0])
+        self.assertEqual(result['owners'],[1,1,1,1,0,2,0])
+        self.assertTrue(result['stack_preserved']);self.assertEqual(result['helpers_intercepted'],[])
+
     def test_original_iq_engine_builds_hardware_configuration_and_returns_its_computed_matrix(self):
         module=self.implementation()
         result=module.probe_producer_iq(component('gr2','b01firm8'),component('gr2','b01firm6'),deep=True)

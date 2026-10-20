@@ -1,0 +1,160 @@
+#include "m10v_settings_page.h"
+#include "m10v_settings_backend.h"
+#include "m10v_ui.h"
+#include "m10v_model.h"
+#include "../gr3/m10v_sd_library.h"
+#include "m10v_settings_labels.h"
+#define PAGE_MAGIC 0x47525047u
+typedef struct {
+    gr2_overlay overlay;
+    uint32_t magic,native_backend;
+    m10v_settings state;
+    m10v_settings_ops ops;
+    gr2_settings_backend backend;
+} page;
+static page *active;
+static void copy(void *out,const void *in,uint32_t bytes){for(uint32_t i=0;i<bytes;i++)((uint8_t *)out)[i]=((const uint8_t *)in)[i];}
+static int text(const uint16_t *caption,int16_t left,int16_t top,int16_t right,int16_t bottom){
+    uint32_t count=0;while(count<96&&caption[count])count++;
+    int16_t box[4]={left,top,right,bottom};return count<96&&gr2_text_draw_full(caption,count,box,0x20001);
+}
+static int fill(uint32_t index,int16_t left,int16_t top,int16_t right,int16_t bottom,uint32_t color){
+    int16_t box[4]={left,top,right,bottom};return gr2_fill_rect(index,box,color);
+}
+static uint32_t film(page *p,uint32_t index){
+    if(p->state.screen==M10V_SETTINGS_CATALOG){
+        uint32_t row=(p->state.index/5)*5+index,id=p->ops.item(p->ops.context,row);
+        return id>=33&&id<=M10V_CUSTOM_MAX_ID?id:0;
+    }
+    return p->state.saved.slots[index].film;
+}
+static int film_name(page *p,uint32_t focus){
+    uint32_t id=film(p,focus),number=p->state.screen==M10V_SETTINGS_CATALOG?p->state.index+1:focus+1;
+    const char *name=m10v_library_name(id);char custom[24];
+    if(id>M10V_FILM_COUNT){
+        name="Custom LUT";
+        if(p->native_backend){
+            uint8_t *record=gr2_allocate(M10V_SD_RECORD_BYTES);
+            if(record){
+                uint32_t ok=p->state.screen==M10V_SETTINGS_CATALOG?
+                    gr2_sd_frozen_record(&p->backend.manifest,p->state.index,id,record,M10V_SD_RECORD_BYTES):
+                    (uint32_t)gr2_sd_custom_record(&p->state.saved,focus,record,M10V_SD_RECORD_BYTES);
+                if(ok){uint32_t i=0;for(;i<23&&record[16+i];i++)custom[i]=(char)record[16+i];custom[i]=0;name=custom;}
+                gr2_release(record);
+            }
+        }
+    }
+    uint16_t caption[96];uint32_t n=0;
+    if(number>=100)caption[n++]=(uint16_t)('0'+number/100);
+    if(number>=10)caption[n++]=(uint16_t)('0'+(number/10)%10);
+    caption[n++]=(uint16_t)('0'+number%10);
+    if(p->state.screen==M10V_SETTINGS_FILMS){caption[n++]=' ';caption[n++]='/';caption[n++]=' ';caption[n++]='5';}
+    caption[n++]=' ';caption[n++]=' ';
+    if(name)for(uint32_t i=0;name[i]&&n<95;i++)caption[n++]=(uint8_t)name[i];
+    caption[n]=0;return text(caption,24,380,695,423);
+}
+static int draw(page *p){
+    if(!p||p->magic!=PAGE_MAGIC||p->state.screen==M10V_SETTINGS_CLOSED)return 0;
+    uint32_t films=p->state.screen==M10V_SETTINGS_FILMS||p->state.screen==M10V_SETTINGS_CATALOG;
+    uint32_t focus=p->state.screen==M10V_SETTINGS_CATALOG?p->state.index%5:p->state.focus;
+    if(focus>=5)return 0;
+    /* Transparent text plane over an opaque stock RGB background. */
+    if(!fill(0,0,0,719,479,0x20000)||!fill(1,0,0,719,479,0x20004))return 0;
+    uint32_t title=films?(p->state.screen==M10V_SETTINGS_CATALOG?32:0):1;
+    if(p->state.screen==M10V_SETTINGS_VALUE)title=focus==4?35:28+focus;
+    int ok=text(labels[title],20,12,699,53);
+    uint32_t footer=p->state.screen==M10V_SETTINGS_CATALOG?3:films?2:p->state.screen==M10V_SETTINGS_VALUE?5:4;
+    ok=text(labels[footer],20,430,699,469)&&ok;
+    if(films){
+        for(uint32_t i=0;i<5;i++){
+            uint32_t id=film(p,i);int16_t x=(int16_t)(24+136*i);
+            if(i==focus)ok=fill(1,x,102,x+127,305,0x20001)&&fill(1,x+2,104,x+125,303,0x20004)&&ok;
+            if(id)ok=gr2_card_draw(id>M10V_FILM_COUNT?33:id,i,i==focus,(106u<<16)|(uint32_t)(x+4))&&ok;
+        }
+        ok=film_name(p,focus)&&ok;
+    }else{
+        uint32_t values[4]={p->state.saved.stamp,p->state.saved.format,p->state.saved.corner,p->state.saved.color};
+        static const uint8_t first[4]={13,16,20,24};
+        if(p->state.screen==M10V_SETTINGS_VALUE&&focus<4)values[focus]=p->state.value;
+        for(uint32_t i=0;i<4;i++){
+            if(values[i]>(i?3u:2u))return 0;
+            int16_t y=(int16_t)(90+72*i);
+            if(i==focus)ok=fill(1,24,y-6,695,y+57,0x20001)&&fill(1,30,y,689,y+51,0x20004)&&ok;
+            ok=text(labels[9+i],36,y,335,y+51)&&text(labels[first[i]+values[i]],350,y,679,y+51)&&ok;
+        }
+        uint32_t enabled=p->state.screen==M10V_SETTINGS_VALUE&&focus==4?p->state.value:p->state.saved.reserved&1u;
+        if(enabled>1)return 0;
+        uint16_t caption[96];uint32_t n=0;
+        if(focus==4){caption[n++]='>';caption[n++]=' ';}
+        for(uint32_t i=0;labels[33+enabled][i]&&n<95;i++)caption[n++]=labels[33+enabled][i];caption[n]=0;
+        ok=text(caption,24,380,695,423)&&ok;
+    }
+    if(p->state.error>=1&&p->state.error<=3)ok=text(labels[5+p->state.error],20,375,699,414)&&ok;
+    p->overlay.dirty=ok?0:1;return ok;
+}
+static int destroy(void *owner,uint32_t reason){
+    (void)reason;page *p=owner;
+    if(active==p)active=0;
+    p->magic=0;fill(0,0,0,719,479,0x20000);fill(1,0,0,719,479,0x20000);
+    gr2_release(p);return 1;
+}
+int gr2_settings_close(void){return active?gr2_overlay_detach(&active->overlay):0;}
+int gr2_settings_key(uint32_t key){
+    page *p=active;if(!p||p->magic!=PAGE_MAGIC||key>M10V_KEY_NEXT)return 0;
+    if(p->native_backend&&p->state.screen==M10V_SETTINGS_FILMS&&key==M10V_KEY_OK)gr2_settings_backend_refresh(&p->backend);
+    m10v_settings_key(&p->state,&p->ops,key);
+    if(p->state.screen==M10V_SETTINGS_CLOSED)return gr2_settings_close();
+    p->overlay.dirty=1;return 1;
+}
+/* Run before stock state watchers can translate one raw key into a queued
+ * SPEC key. Only the owned page consumes these exact official GR II events.
+ * MENU/OK is SYS_KEY_OK; no fictitious independent raw MENU is accepted. */
+int gr2_settings_raw_event(const uint32_t *message){
+    if(!active||!message||((uintptr_t)message&3))return 0;
+    uint32_t key;
+    switch(message[0]){
+        case 0x60001006u:key=M10V_KEY_UP;break;
+        case 0x60001007u:key=M10V_KEY_DOWN;break;
+        case 0x60001008u:case 0x60001014u:key=M10V_KEY_LEFT;break;
+        case 0x60001009u:case 0x60001015u:key=M10V_KEY_RIGHT;break;
+        case 0x6000100au:case 0x60001016u:key=M10V_KEY_OK;break;
+        case 0x6000100eu:key=M10V_KEY_BACK;break;
+        case 0x60001017u:key=M10V_KEY_UP;break;
+        case 0x60001018u:key=M10V_KEY_DOWN;break;
+        default:return 0;
+    }
+    return gr2_settings_key(key);
+}
+static uint32_t event(void *owner,const uint32_t *message){
+    page *p=owner;if(!message||p!=active||p->magic!=PAGE_MAGIC)return 0;
+    uint32_t id=message[0],key;
+    if(id==0x60000003u)return (uint32_t)draw(p);
+    if(id==0x60000005u){p->state.screen=M10V_SETTINGS_CLOSED;return 1;}
+    switch(id){
+        case 0x60002001u:case 0x60002506u:key=M10V_KEY_RIGHT;break;
+        case 0x60002002u:case 0x60002505u:key=M10V_KEY_LEFT;break;
+        case 0x60002003u:case 0x60002503u:key=M10V_KEY_UP;break;
+        case 0x60002004u:case 0x60002504u:key=M10V_KEY_DOWN;break;
+        case 0x60002005u:case 0x60002501u:key=M10V_KEY_OK;break;
+        case 0x60002006u:case 0x60002502u:key=M10V_KEY_BACK;break;
+        default:return 0;
+    }
+    return (uint32_t)gr2_settings_key(key);
+}
+void *gr2_settings_open(const m10v_settings_ops *ops,uint32_t screen){
+    if(active||(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP))return 0;
+    page *p=gr2_allocate(sizeof(*p));if(!p)return 0;
+    for(uint32_t i=0;i<sizeof(*p);i++)((uint8_t *)p)[i]=0;
+    if(ops)copy(&p->ops,ops,sizeof(*ops));
+    else {p->native_backend=1;if(!gr2_settings_backend_bind(&p->backend,&p->ops)){gr2_release(p);return 0;}}
+    if(m10v_settings_open(&p->state,&p->ops,screen)||!m10v_library_valid(&p->state.saved)){gr2_release(p);return 0;}
+    p->magic=PAGE_MAGIC;p->overlay.event=event;p->overlay.destroy=destroy;
+    if(!gr2_overlay_attach(&p->overlay)){gr2_release(p);return 0;}
+    active=p;return p;
+}
+int gr2_settings_draw(void){return draw(active);}
+int gr2_settings_peek(m10v_settings *out){
+    page *p=active;uintptr_t o=(uintptr_t)out,b=(uintptr_t)p;
+    if(!p||!out||(o&3)||sizeof(*out)>UINTPTR_MAX-o||(o<b+sizeof(*p)&&b<o+sizeof(*out)))return 0;
+    copy(out,&p->state,sizeof(*out));return 1;
+}

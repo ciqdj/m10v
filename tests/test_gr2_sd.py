@@ -57,6 +57,23 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(struct.unpack('>H',u.mem_read(0x5000100c,2))[0],79);self.assertEqual(bytes(u.mem_read(0x5000103e,1)),b'\x01')
         self.assertEqual(self.call(u,report['symbols']['gr2_sd_custom_record'],[0x50001000,0,0x53000000,12288]),1)
         self.assertEqual(bytes(u.mem_read(0x53000000,12288)),pack[4096:]);self.assertEqual(tokens,{})
+        self.assertIn('gr2_settings_backend_bind',report['symbols'])
+        u.mem_map(0x54000000,0x2000);ops=0x50004000;page=0x50003000
+        self.assertEqual(self.call(u,report['symbols']['gr2_settings_backend_bind'],[0x54000000,ops]),1)
+        self.assertEqual(self.call(u,report['symbols']['m10v_settings_open'],[page,ops,1]),0)
+        self.call(u,report['symbols']['m10v_settings_key'],[page,ops,4])
+        self.assertEqual(word(page+104),2);self.assertEqual(word(page+120),79)
+        self.call(u,report['symbols']['m10v_settings_key'],[page,ops,5])
+        self.assertEqual(word(page+104),1)
+        self.assertEqual(self.call(u,report['symbols']['m10v_settings_open'],[page,ops,3]),0)
+        count=len(writes)
+        for key in (4,1,5):self.call(u,report['symbols']['m10v_settings_key'],[page,ops,key])
+        self.assertEqual(word(page+104),3);self.assertEqual(len(writes),count)
+        for key in (4,1,4):self.call(u,report['symbols']['m10v_settings_key'],[page,ops,key])
+        self.assertEqual(word(page+104),3);self.assertEqual(writes[-1],'H:/M10V5A.bin')
+        self.assertEqual(self.call(u,report['symbols']['gr2_load_state'],[0x50001000]),1);self.assertEqual(bytes(u.mem_read(0x50001034,1)),b'\x01')
+        for key in (3,3,3,3,4,1,4):self.call(u,report['symbols']['m10v_settings_key'],[page,ops,key])
+        self.assertEqual(self.call(u,report['symbols']['gr2_load_state'],[0x50001000]),1);self.assertEqual(word(0x50001060),1)
         self.assertEqual(len(metadata),len(closed));self.assertEqual(len(metadata),len(freed));self.assertEqual(free(),before)
 
     def test_frozen_custom_install_commits_journal_only_after_verified_inactive_snapshot(self):
