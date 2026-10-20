@@ -14,6 +14,7 @@ typedef struct {
 _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,"controller tail capacity");
 #define M10V_SETTINGS_FILMS_ROUTE 0x0200f100u
 #define M10V_SETTINGS_STAMP_ROUTE 0x0200f101u
+#define M10V_SETTINGS_NAME_ROUTE 0x0200f103u
 uint32_t m10v_settings_controller_owner_size(void);
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner);
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner);

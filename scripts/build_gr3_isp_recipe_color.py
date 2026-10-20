@@ -25,7 +25,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     if type(external_noise)is not bool or (external_noise and not native_grain):raise ValueError('external noise requires native grain')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native per-recipe color mode')
     if type(native_color)is not bool or (native_color and observer):raise ValueError('native color requires apply mode')
-    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_load',) if producer_snapshot else ())+(('m10v_isp_native_effects_noise_shape',) if external_noise else ())
+    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_load',) if producer_snapshot else ())+(('m10v_isp_native_effects_noise_shape',) if external_noise else ())
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
     compiler=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
     if not Path(compiler).is_file():compiler=shutil.which('clang')

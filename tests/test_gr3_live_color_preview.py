@@ -24,7 +24,7 @@ class LiveColorPreviewTests(unittest.TestCase):
   e=StockISP(self.candidate);self.cache(e,film)
   e.make(12,1,True,actual_live=True);return e,0x60000000,0x60001400
  def test_installed_wrapper_matches_native_target_and_never_accumulates(self):
-  for film in (33,35,66,67,68):
+  for film in (33,35,58,66,67,68):
    e,obj,f=self.fixture(film);base=bytes(e.u.mem_read(f,0x9000));s=e.alloc(1600);gamma=struct.unpack('<I',e.u.mem_read(obj+0x17c,4))[0]
    e.call(self.snapshot['exports']['m10v_isp_native_look_prepare'],s,film,0,8)
    e.call(self.snapshot['exports']['m10v_isp_native_look_apply'],s,gamma,f,0);expected=bytes(e.u.mem_read(f,0x9000))
@@ -78,3 +78,20 @@ class LiveColorPreviewTests(unittest.TestCase):
    e=StockISP(self.candidate);self.cache(e,66);base,_,_=e.make(tone,1,True,actual_live=True)
    e.call(self.entry,0x60000000,0x60001400)
    self.assertEqual(bytes(e.u.mem_read(0x60001400,0x9000)),base,tone)
+
+ def test_producer_freezes_validated_preview_without_per_shot_storage_reads(self):
+  capture.M10VCaptureTests.setUpClass();self.addCleanup(capture.M10VCaptureTests.doClassCleanups)
+  c=capture.M10VCaptureTests();c.manifest=self.manifest;c.code=self.code
+  h,u,context,*_=c.fixture(film=66,raw=1,stamp=0)
+  u.mem_map(0x55345000,4096) # Uninitialized committed-tone backend guard.
+  owner=0x550d0000;recipe=context-0x9b8
+  h.call(u,'m10v_camera_library_preview_init',owner)
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner))
+  h.call(u,'m10v_camera_library_load',0x55001000)
+  u.mem_write(recipe,struct.pack('<I',0x53d0fc90));u.mem_write(recipe+0x4778,struct.pack('<I',0x31545653))
+  h.manifest={**h.manifest,'symbols':{**h.manifest['symbols'],**self.snapshot['exports']}}
+  h.file_calls.clear()
+  self.assertEqual(h.call(u,'m10v_isp_frame_recipe_producer',recipe),1)
+  self.assertEqual(h.file_calls,[])
+  self.assertEqual(h.call(u,'m10v_isp_frame_recipe_state',recipe,0x55002000),1)
+  self.assertEqual(struct.unpack('<H',u.mem_read(0x55002000+20,2))[0],66)

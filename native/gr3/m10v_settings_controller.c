@@ -22,7 +22,11 @@ static int install(void *ctx,uint32_t i,uint32_t id,uint32_t slot){
   static const uint8_t tones[5]={12,18,19,20,21};
   uint32_t root=((uint32_t (*)(void))0x5320ad88u)();
   uint32_t model=((fn1)0x5320ba9cu)(root);
-  ((fn2)0x532c26c0u)(model,tones[slot]);
+  /* Setup has no ImageControl enter/leave lifecycle. Its model may still
+   * describe playback or RAW development. Scope the stock setter to shooting
+   * and restore that borrowed context before returning. */
+  uint8_t *m=(uint8_t *)(uintptr_t)model;uint8_t prior=m[0x1b];m[0x1b]=0;
+  ((fn2)0x532c26c0u)(model,tones[slot]);m[0x1b]=prior;
  }
  return r;
 }
@@ -69,13 +73,13 @@ uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
  return m10v_settings_top_dtor_original(owner);
 }
 uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
- if(route!=M10V_SETTINGS_FILMS_ROUTE&&route!=M10V_SETTINGS_STAMP_ROUTE)
+ if(route!=M10V_SETTINGS_FILMS_ROUTE&&route!=M10V_SETTINGS_STAMP_ROUTE&&route!=M10V_SETTINGS_NAME_ROUTE)
   return m10v_settings_factory_original(factory,route);
  uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
- return owner?(uint32_t)(uintptr_t)page(owner,route==M10V_SETTINGS_STAMP_ROUTE):0;
+ return owner?(uint32_t)(uintptr_t)page(owner,route!=M10V_SETTINGS_FILMS_ROUTE):0;
 }
 uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t route){
- (void)route;m10v_settings_ops o;ops(&o);
+ p->page=route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_STAMP:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
  if(m10v_settings_open(&p->state,&o,p->page))return 0;
  return p->view.count==M10V_VIEW_COUNT&&p->view.widgets[0] ? 1 : m10v_settings_view_create(&p->view)==0;
 }
@@ -109,7 +113,7 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
 /* Scoped to the original key dispatch call site, never the global route getter. */
 uint32_t m10v_settings_controller_key_route(uint32_t model){
  uint32_t route=((fn1)0x53228c4cu)(model);
- return route==M10V_SETTINGS_FILMS_ROUTE||route==M10V_SETTINGS_STAMP_ROUTE?0x0200004au:route;
+ return route==M10V_SETTINGS_FILMS_ROUTE||route==M10V_SETTINGS_STAMP_ROUTE||route==M10V_SETTINGS_NAME_ROUTE?0x0200004au:route;
 }
 
 /* Dynamic bitmap metadata belongs to the same heap allocation as its pixels.

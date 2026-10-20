@@ -12,8 +12,8 @@ test('independent settings audit binds owned controllers, original fallback and 
   const m=JSON.parse(readFileSync(join(dir,'m10v-library-arm.json'))),r=readFileSync(join(dir,'m10v-library-arm.bin'));
   checkSettings(r,m);
   const p=settingsPatches(m);
-  assert.equal(p.length,10);
-  assert.equal(p.find(x=>x.address===0x53b36adc).replacement,0x201d1b19);
+  assert.equal(p.length,12);
+  assert.equal(p.find(x=>x.address===0x53b36adc).replacement,0x211d1b19);
   assert.equal(p.find(x=>x.address===0x5316fcec).replacement,0xe301093c);
   for(const a of [m.settings_menu.vtable,m.settings_menu.exports.m10v_settings_factory_original,m.settings_menu.rows[0]]){
    const broken=Buffer.from(r);broken[a-m.base]^=1;

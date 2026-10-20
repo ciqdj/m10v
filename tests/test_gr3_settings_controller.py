@@ -87,7 +87,9 @@ class ControllerLifetimeTests(unittest.TestCase):
     m.reg_write(UC_ARM_REG_R0,result)
    elif a==0x5320ad88:m.reg_write(UC_ARM_REG_R0,0x55007000)
    elif a==0x5320ba9c:m.reg_write(UC_ARM_REG_R0,0x55008000)
-   elif a==0x532c26c0:self.events.append(('activate_tone',*r))
+   elif a==0x532c26c0:
+    self.assertEqual(bytes(m.mem_read(r[0]+0x1b,1)),b'\0','Setup must activate shooting context, regardless of stale ImageControl context')
+    self.events.append(('activate_tone',*r))
    elif a==0x5319aa68:
     self.events.append(('stock_top_ctor',r[0]));m.mem_write(r[0],bytes(0x13bc))
    elif a==0x5316d354:
@@ -151,9 +153,11 @@ class ControllerLifetimeTests(unittest.TestCase):
    self.install_fail=True;key(0xd8)
    self.assertEqual(self.word(u,p+SCREEN),2)
    self.assertEqual(self.count('activate_tone'),0)
+   u.mem_write(0x5500801b,b'\x01')
    self.install_fail=False;key(0xd8)
    installs=[e[1:] for e in self.events if e[0]=='m10v_sd_camera_install']
    self.assertEqual(installs,[(4,3,68,slot)]*2)
+   self.assertEqual(bytes(u.mem_read(0x5500801b,1)),b'\x01')
    self.assertEqual(self.word(u,p+SCREEN),1)
    self.assertEqual([e[2] for e in self.events if e[0]=='activate_tone'],[tone])
 
@@ -229,9 +233,9 @@ class ControllerLifetimeTests(unittest.TestCase):
 
  def test_key_alias_only_translates_private_route_return_value(self):
   u=self.machine()
-  for route in (0x0200f100,0x0200f101,0x0200004e,0x08000000,0x0200ffff):
+  for route in (0x0200f100,0x0200f101,0x0200f103,0x0200004e,0x08000000,0x0200ffff):
    self.route=route
-   self.assertEqual(self.call(u,'key_route',0x55012300),0x0200004a if route in (0x0200f100,0x0200f101) else route)
+   self.assertEqual(self.call(u,'key_route',0x55012300),0x0200004a if route in (0x0200f100,0x0200f101,0x0200f103) else route)
    self.assertEqual(self.route,route)
 
 class ControllerDebugTests(ControllerLifetimeTests):

@@ -29,7 +29,7 @@ class NativeFastCaptureTests(unittest.TestCase):
   for addr in (0x55010000,0x55020000):u.hook_add(UC_HOOK_MEM_READ|UC_HOOK_MEM_WRITE,access,begin=addr,end=addr+136*96-1)
   return h,u,c,y,uv,cache,frees,reads,writes
  def test_native_only_does_not_touch_planes_allocate_or_flush_for_all_native_films(self):
-  for film in range(33,69):
+  for film in range(33,79):
    with self.subTest(film=film):
     h,u,c,y,uv,cache,frees,reads,writes=self.fixture(film)
     self.assertEqual(h.call(u,'m10v_capture_library',c),0)

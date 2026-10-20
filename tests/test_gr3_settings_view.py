@@ -157,10 +157,10 @@ class SettingsViewTests(unittest.TestCase):
    self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[int(i==focus) for i in range(4)])
    self.assertEqual([u.mem_read(w[21+i]+0xea,1)[0] for i in range(4)],[6]*4)
    self.assertEqual([u.mem_read(w[6+i]+0x9e,1)[0] for i in range(5)],[0]*5)
-  self.state(u,3,4);self.call(u,'draw',0x10001000,0x10002000,0)
-  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0]*4)
-  p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(p,34)),'> Film Name: OFF\0'.encode('utf-16le'))
+  self.state(u,5,0);self.call(u,'draw',0x10001000,0x10002000,0)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],990)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[29]+0xea,2))[0],989)
+  self.assertEqual([u.mem_read(w[29+i]+0x9e,1)[0] for i in range(4)],[1,0,0,0])
   self.state(u,1,4);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0]*4)
   self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(5)],[1,1,1,1,6])
@@ -177,5 +177,14 @@ class SettingsViewTests(unittest.TestCase):
   self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],969)
   p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
   self.assertEqual(bytes(u.mem_read(p,20)),'7  PORTRA\0'.encode('utf-16le'))
+
+
+
+ def test_film_names_do_not_alias_watermark_captions(self):
+  from scripts.build_gr3_m10v_library import build
+  with tempfile.TemporaryDirectory() as folder:
+   m=build(Path(folder),sd_library=True)
+   texts=m['resources']['texts']
+   self.assertEqual(texts[978-786:988-786],['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','Kodak ProImage 100','T-Max 100','Aerochrome III 1443','Aerocolor IV 2460','VISION3 50D 5203'])
 
 if __name__=='__main__':unittest.main()

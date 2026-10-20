@@ -32,13 +32,12 @@ def build_settings_hooks(base,symbols,live_color=False):
    (0x53221a4c,0xeb001c7e,'key_route',True)]:
   word(address,original,branch(address,symbols['m10v_settings_controller_'+name],link),'settings '+name)
  word(0x5316fcec,0xe30103bc,movw(0,0x19bc if live_color else 0x193c),'TopMenu owned controller tail')
- word(0x53b36adc,0x1e1d1b19,0x201d1b19,'Setup row count30 to32')
- for i in range(2):
-  caption=937+i
+ word(0x53b36adc,0x1e1d1b19,0x211d1b19,'Setup row count30 to33')
+ for i,caption in enumerate([937,938,990]):
   render=stub('push {r4,lr};mov r4,r1;mov r0,r4;mov r1,#0;bl 0x5339de20;'+
    f'mov r0,r4;movw r1,#{caption};mov r2,r1;pop {{r4,lr}};b 0x5339dc70')
   rows.append(render)
   patch(0x53b36bd0+i*8,bytes(8),struct.pack('<II',render,0),'Setup independent row renderer')
-  word(0x53b36c88+i*4,0x10000000,0x0200f100+i,'Setup independent destination')
+  word(0x53b36c88+i*4,0x10000000,[0x0200f100,0x0200f101,0x0200f103][i],'Setup independent destination')
  return bytes(image),dict(exports=exports,vtable=vt,rows=rows,patches=patches,owner_bytes=0x19bc if live_color else 0x193c,
-   private_routes=[0x0200f100,0x0200f101],camera_tested=False)
+   private_routes=[0x0200f100,0x0200f101,0x0200f103],camera_tested=False)

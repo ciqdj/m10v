@@ -90,7 +90,10 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     /* Only called by the two post-mutex producer adapters, before queueing.
      * Never called from factory/ISP/encoder callbacks. */
     m10v_library_state state;
-    if(m10v_camera_library_load(&state)<0)return 0;
+    /* A validated owner cache is published only after journal readback. Avoid
+     * two AppData reads per exposure; unavailable/busy caches retain the
+     * durable loader fallback before queueing. */
+    if(!m10v_camera_library_preview(&state)&&m10v_camera_library_load(&state)<0)return 0;
     if(!m10v_isp_frame_recipe_snapshot(recipe,&state))return 0;
     /* This selection belongs to the producer event, never a later UI change.
      * Keep s->tone/SI for the raw frame identity and completion handoff. */

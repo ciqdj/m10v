@@ -47,7 +47,7 @@ class NativeRecipeHandoffTests(unittest.TestCase):
  def test_unsupported_3d_lut_and_wrong_si_leave_frame_stock(self):
   e,r,o,i,c,si=self.fixture();self.snapshot(e,r,state((67,)*5));self.callback(e,o,i,c);self.assertEqual(self.status(e,r),2)
  def test_installed_native_apply_has_exact_per_shot_completion_identity(self):
-  for film in (33,35,66,67,68):
+  for film in (33,35,58,59,60,66,67,68):
    for tone in (12,18,19,20,21):
     with self.subTest(film=film,tone=tone):
      e,r,o,i,c,si=self.fixture(tone);self.snapshot(e,r,state((film,)*5));self.callback(e,o,i,c);self.assertEqual(self.status(e,r),2)
