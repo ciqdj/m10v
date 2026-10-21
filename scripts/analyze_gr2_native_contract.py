@@ -558,6 +558,50 @@ def probe_clarity_graph_admission(code:bytes,strength:int,geometry:int)->dict:
                 hardware_tested=False,helpers_intercepted=['first stage admission only'],
                 scope='Complete original A014ADEE prelude, A014D460 expansion and extra tables, stopped at A013EA7C before its driver calls. Four distinct synthetic arenas sized like tag20/tag2E/input tag17/output tag17. Not actual pool/capture integration or pixel execution.')
 
+def probe_clarity_stage_submit(code:bytes,geometry:int)->dict:
+    """Execute first Clarity stage through original register/DMA submission.
+
+    A passive register bank never produces pixels or a completion interrupt.
+    Kernel lock/SVC and resource admission are explicit single-thread fixtures.
+    """
+    admission=probe_clarity_graph_admission(code,1,geometry)
+    from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_WRITE,arm_const as r
+    uc=runtime_machine(code);packet=0x50001000;payload=bytes.fromhex(admission['descriptor']);uc.mem_write(packet,payload)
+    uc.mem_map(0x90000000,4096);uc.mem_map(0x60070000,4096)
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    half=lambda address:struct.unpack('>H',uc.mem_read(address,2))[0]
+    clock_control=word(0xA014266C);uc.mem_write(clock_control,struct.pack('>I',0x77))
+    resources=[];clock=[];critical=[];observed={};io=[]
+    def boundary(machine,address,size,unused):
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]
+        if address==0xA010DF3C:
+            pointer=word(0x60070044);observed.update(wait_timeout=args[0],dma_descriptor=bytes(machine.mem_read(pointer,32)).hex())
+            machine.emu_stop();return
+        if address in (0xA0059F38,0xA0059F4E,0xA0059F5A,0xA0059F72):
+            instruction=half(address)
+            if instruction not in (0xDF06,0xDF07):raise RuntimeError('original critical-section SVC differs')
+            critical.append(instruction&255);machine.reg_write(r.UC_ARM_REG_PC,(address+2)|1);return
+        if address==0xA00688E8:resources.append(args[:2])
+        elif address==0xA00CE994:clock.append(args)
+        machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0059F38,0xA0059F4E,0xA0059F5A,0xA0059F72,0xA010DF3C):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def write(machine,access,address,size,value,unused):io.append([address,size,value])
+    uc.hook_add(UC_HOOK_MEM_WRITE,write,begin=0x60070000,end=0x60070FFF)
+    for reg,value in ((r.UC_ARM_REG_R0,packet),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):uc.reg_write(reg,value)
+    uc.emu_start(0xA013EA7D,0x5001F000,count=100000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0xA010DF3C:raise RuntimeError('original Clarity hardware wait not reached')
+    dma=bytes.fromhex(observed['dma_descriptor']);depth=0;balanced=True
+    for svc in critical:
+        depth+=1 if svc==7 else -1;balanced=balanced and depth in (0,1)
+    return dict(**observed,resource_requests=resources,clock_requests=clock,input_address=word(0x60070010),
+                input_width=half(0x60070016),input_height=half(0x60070018),input_stride=half(0x60070014),
+                output_address=word(0x60070020),output_stride=half(0x60070024),mmio_writes=io,
+                descriptor_matches_submission=dma[:16]==bytes.fromhex('00000080000000800200000000000200') and dma[20:24]==payload[16:18]+payload[14:16],
+                pixel_addresses_not_accessed=True,critical_sections_balanced=balanced and depth==0 and bool(critical),
+                completion_claimed=False,hardware_tested=False,
+                scope='Original A013EA7C, A01425EE, A010E01C/A010E07E/A010E87A plus critical-section register arithmetic; passive60070000/90000000 register banks. Mutex/resource/SVC/clock-peripheral boundaries are fixtures. Stops before A010DF3C wait; pixel addresses remain unmapped so any pixel access fails. No hardware completion, DMA execution, cleanup or cache-coherence claim.')
+
 def probe_clarity_entry(code:bytes,strength:int,*,hdr:bool=False)->dict:
     """Original Clarity/HDR prelude through coefficient admission or bypass.
 

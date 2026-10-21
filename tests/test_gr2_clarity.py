@@ -75,3 +75,19 @@ class Gr2ClarityTests(unittest.TestCase):
                     self.assertEqual(result['table_write_bytes'],0xe000)
                     self.assertTrue(result['cpu_workspace_writes_bounded']);self.assertTrue(result['arena_guards_preserved'])
                     self.assertTrue(result['request_preserved']);self.assertTrue(result['context_preserved'])
+
+    def test_original_first_clarity_stage_submits_exact_geometry_before_waiting_for_hardware_completion(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_clarity_stage_submit'))
+        for geometry in (0x00040020,0x0cc01340):
+            with self.subTest(geometry=geometry):
+                result=native.probe_clarity_stage_submit(component('gr2','b01firm8'),geometry)
+                self.assertEqual(result['resource_requests'],[[5,0xffffffff]])
+                self.assertEqual(result['wait_timeout'],0xffffffff)
+                self.assertEqual(result['input_address'],0x55000000)
+                self.assertEqual(result['input_width'],geometry&0xffff)
+                self.assertEqual(result['input_height'],geometry>>16)
+                self.assertEqual(result['input_stride'],geometry&0xffff)
+                self.assertTrue(result['descriptor_matches_submission'])
+                self.assertTrue(result['pixel_addresses_not_accessed']);self.assertTrue(result['critical_sections_balanced'])
+                self.assertFalse(result['completion_claimed'])
