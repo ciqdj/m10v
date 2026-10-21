@@ -146,6 +146,18 @@ class ObserverProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cls.libbase,cls.libcode,cls.libsymbols=library_fragment(d)
             cls.libsymbols['m10v_camera_library_load']=0x54140000
+            # Headless observer: execute the production preview function with
+            # live color disabled, rather than inventing a cache-success stub.
+            camera=(ROOT/'native/gr3/m10v_library_camera.c').read_text()
+            fragment=camera[camera.index('int m10v_camera_library_preview('):camera.index('void m10v_camera_library_preview_init(')]
+            src=Path(d)/'preview.c';obj=Path(d)/'preview.o'
+            src.write_text('#include "'+str(ROOT/'native/gr3/m10v_library.h')+'"\n'+fragment)
+            cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
+            if not Path(cc).is_file():cc=shutil.which('clang')
+            subprocess.run([cc,*FLAGS,'-DM10V_LIVE_COLOR=0','-c',str(src),'-o',str(obj)],check=True,capture_output=True)
+            from scripts.build_gr3_halation import extract_text
+            cls.preview_code=extract_text(obj.read_bytes(),'m10v_camera_library_preview')
+            cls.libsymbols['m10v_camera_library_preview']=0x54140100
             owner={'storage':{'color_offset':0x4a08,'color_bytes':1716,'extended_recipe_bytes':0x50f0},'patches':[{'address':0x53523e0c}]}
             cls.code,cls.manifest=build(d,cls.rom,cls.libsymbols,owner,observer=True,producer_snapshot=True)
         cls.candidate=bytearray(cls.rom)
@@ -154,6 +166,8 @@ class ObserverProducerTests(unittest.TestCase):
             if end>len(cls.candidate):cls.candidate.extend(bytes(end-len(cls.candidate)))
             cls.candidate[at-BASE:end]=code
         for p in cls.manifest['patches']:cls.candidate[p['address']-BASE:p['address']-BASE+4]=bytes.fromhex(p['replacement_hex'])
+        at=cls.libsymbols['m10v_camera_library_preview']-BASE
+        cls.candidate[at:at+len(cls.preview_code)]=cls.preview_code
         cls.candidate=bytes(cls.candidate)
 
     def producer(self,e,recipe,site,data):

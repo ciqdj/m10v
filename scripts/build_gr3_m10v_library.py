@@ -20,6 +20,7 @@ FLAGS = ['--target=armv7-none-eabi', '-mcpu=cortex-a9', '-marm', '-mfloat-abi=so
          '-fno-vectorize', '-fno-slp-vectorize', '-Wall', '-Wextra', '-Werror']
 # Saved-image CPU loops must optimize for throughput. Keep the UI/ABI modules
 # size-optimized, and keep scalar soft-float ARM (no unproved NEON/FPU state).
+AB_CONTROLLER_EXPORTS=tuple('m10v_settings_controller_ab_'+n for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','setup','render','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch'])
 RENDER_FLAGS = ['-O2' if flag == '-Os' else flag for flag in FLAGS]
 
 
@@ -132,6 +133,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_menu_': {'m10v_menu_count', 'm10v_menu_max_count', 'm10v_menu_index', 'm10v_menu_name',
             'm10v_menu_value_name', 'm10v_menu_icon', 'm10v_menu_value_icon', 'm10v_menu_focus',
             'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter'} | ({'m10v_menu_custom_resource'} if 'm10v_sd_camera_custom_name' in (externals or {}) else set()),
+        'm10v_tone_menu_': {'m10v_tone_menu_'+n for n in ['index','menu_name','menu_icon','adj_name','adj_icon','menu_matches','adj_matches','adj_select']},
         'm10v_capture_': {'m10v_capture_library'},
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
@@ -153,7 +155,10 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False):
+    if type(appended_slots)is not bool or (appended_slots and (not film_library or not sd_library)):raise ValueError('appended slots require the film/SD library')
+    compile_flags=FLAGS+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
+    render_flags=RENDER_FLAGS+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
     native_owned=bool(native_color and native_grain and recipe_snapshot and lifecycle_trace)
     if live_color and (not native_color or not sd_library):raise ValueError('live color requires native color and owned settings')
     if type(texture_neon) is not bool or (texture_neon and (not spatial_neon or not (debug_mode or native_owned))):raise ValueError('full texture blocks require debug NEON ownership')
@@ -219,7 +224,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='m10v-native-library-') as folder:
         folder = Path(folder); obj = folder / 'library.o'
-        subprocess.run([compiler, *RENDER_FLAGS, *profile_flags, '-DM10V_INITIAL_STATE_BYTES=' + ','.join(str(v) for v in initial), '-c', str(ROOT / 'native/gr3/m10v_library.c'), '-o', str(obj)],
+        subprocess.run([compiler, *render_flags, *profile_flags, '-DM10V_INITIAL_STATE_BYTES=' + ','.join(str(v) for v in initial), '-c', str(ROOT / 'native/gr3/m10v_library.c'), '-o', str(obj)],
                        check=True, capture_output=True)
         spatial=b'';spatial_base=base+0x100;spatial_symbols={}
         if spatial_neon:
@@ -242,21 +247,21 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             spatial+=bytes(noise_base-spatial_base-len(spatial))+noise;spatial_symbols.update(noise_symbols)
         curated_base=(spatial_base+len(spatial)+15)&~15
         curated_obj=folder/'curated.o'
-        subprocess.run([compiler,*RENDER_FLAGS,'-c',str(ROOT/'native/gr3/film_curated.c'),'-o',str(curated_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*render_flags,'-c',str(ROOT/'native/gr3/film_curated.c'),'-o',str(curated_obj)],check=True,capture_output=True)
         curated,curated_symbols=link_object(curated_obj.read_bytes(),curated_base,prefix='m10v_curated_')
         spatial+=bytes(curated_base-spatial_base-len(spatial))+curated;spatial_symbols.update(curated_symbols)
         newstocks_base=(spatial_base+len(spatial)+15)&~15
         newstocks_obj=folder/'newstocks.o'
-        subprocess.run([compiler,*RENDER_FLAGS,'-c',str(ROOT/'native/gr3/film_newstocks.c'),'-o',str(newstocks_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*render_flags,'-c',str(ROOT/'native/gr3/film_newstocks.c'),'-o',str(newstocks_obj)],check=True,capture_output=True)
         newstocks,newstocks_symbols=link_object(newstocks_obj.read_bytes(),newstocks_base,prefix='m10v_newstocks_')
         spatial+=bytes(newstocks_base-spatial_base-len(spatial))+newstocks;spatial_symbols.update(newstocks_symbols)
         harman_base=(spatial_base+len(spatial)+15)&~15
         harman_obj=folder/'harman.o'
-        subprocess.run([compiler,*RENDER_FLAGS,*color_flags,'-c',str(ROOT/'native/gr3/film_harman.c'),'-o',str(harman_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*render_flags,*color_flags,'-c',str(ROOT/'native/gr3/film_harman.c'),'-o',str(harman_obj)],check=True,capture_output=True)
         halo,halo_symbols=link_object(harman_obj.read_bytes(),harman_base,externals=spatial_symbols,prefix='m10v_harman_',additional_exports=('m10v_harman_texture_table',) if texture_neon else ())
         halo_symbols.update(spatial_symbols)
         film_obj=folder/'5207.o'
-        subprocess.run([compiler,*RENDER_FLAGS,*color_flags,'-c',str(ROOT/'native/gr3/film_5207.c'),'-o',str(film_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*render_flags,*color_flags,'-c',str(ROOT/'native/gr3/film_5207.c'),'-o',str(film_obj)],check=True,capture_output=True)
         film_base=(harman_base+len(halo)+15)&~15
         film,film_symbols=link_object(film_obj.read_bytes(),film_base,halo_symbols,prefix='m10v_5207_')
         halo_symbols.update(film_symbols)
@@ -274,13 +279,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             0x90: (0x532c2c80, 0xe1a0c00d), 0xa0: (0x531ab914, 0xe1a0c00d),
             0xb0: (0x531ac140, 0xe1a0c00d),
         }
+        if appended_slots:original.update({0xc0:(0x531abe0c,0xe1a0c00d),0xd0:(0x531a1500,0xe1a0c00d),0xe0:(0x531a0ba0,0xe1a0c00d)})
         for offset, (address, word) in original.items():
             delta = address + 4 - (base + offset + 4) - 8
             if delta & 3 or not -(1 << 25) <= delta < 1 << 25: raise ValueError('trampoline branch out of range')
             struct.pack_into('<II', image, offset, word, 0xea000000 | ((delta >> 2) & 0xffffff))
         (out / 'm10v-library-arm.o').write_bytes(obj.read_bytes())
         camera_obj = folder / 'camera.o'
-        subprocess.run([compiler, *FLAGS, '-DM10V_LIVE_COLOR='+str(int(live_color)), '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
+        subprocess.run([compiler, *compile_flags, '-DM10V_LIVE_COLOR='+str(int(live_color)), '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
                        check=True, capture_output=True)
         camera_base = (base + len(image) + 15) & ~15
         camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, symbols, 'm10v_camera_library_')
@@ -290,7 +296,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         hdf_report=None
         if hdf_enabled:
             hdf_obj=folder/'digital-hdf.o'
-            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*compile_flags,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
             hdf_base=(base+len(image)+15)&~15
             hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else ())
             image+=bytes(hdf_base-base-len(image))+hdf_code;symbols.update(hdf_symbols)
@@ -305,7 +311,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             subprocess.run([node,'scripts/generate_gr3_sd_contract.mjs','--check'],cwd=ROOT,check=True,capture_output=True)
             for sd_source,sd_prefix in [('m10v_sd_library.c','m10v_sd_'),('m10v_sd_camera.c','m10v_sd_camera_')]:
                 sd_obj=folder/(sd_source+'.o')
-                subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr3'/sd_source),'-o',str(sd_obj)],check=True,capture_output=True)
+                subprocess.run([compiler,*compile_flags,'-c',str(ROOT/'native/gr3'/sd_source),'-o',str(sd_obj)],check=True,capture_output=True)
                 sd_base=(base+len(image)+15)&~15
                 sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
                 image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
@@ -316,7 +322,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if not debug_mode:
                 debug_source=folder/'debug-disabled.c'
                 debug_source.write_text('#include <stdint.h>\nint m10v_debug_batch(const uint32_t *e,uint32_t n){(void)e;(void)n;return 0;}\nint m10v_debug_log(uint32_t e,uint32_t a,uint32_t b,uint32_t c,uint32_t d){(void)e;(void)a;(void)b;(void)c;(void)d;return 0;}\n')
-            subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(debug_source),'-o',str(debug_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*compile_flags,*debug_flags,'-c',str(debug_source),'-o',str(debug_obj)],check=True,capture_output=True)
             debug_base=(base+len(image)+15)&~15
             debug,debug_symbols=link_object(debug_obj.read_bytes(),debug_base,prefix='m10v_debug_')
             image+=bytes(debug_base-base-len(image))+debug;symbols.update(debug_symbols)
@@ -329,7 +335,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             trace,owner_report=build_save_trace(out/'save-trace',trace_base,rtos=stock_path)
             image+=bytes(trace_base-base-len(image))+trace;symbols.update(owner_report['exports'])
             phase_obj=folder/'lifecycle.o'
-            subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_capture_lifecycle.c'),'-o',str(phase_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*compile_flags,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_capture_lifecycle.c'),'-o',str(phase_obj)],check=True,capture_output=True)
             phase_base=(base+len(image)+15)&~15
             phase,phase_symbols=link_object(phase_obj.read_bytes(),phase_base,symbols,'m10v_lifecycle_')
             image+=bytes(phase_base-base-len(image))+phase;symbols.update(phase_symbols)
@@ -360,14 +366,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if recipe_snapshot:
                 from scripts.build_gr3_isp_recipe_color import build as build_recipe_color
                 snapshot_base=(base+len(image)+15)&~15
-                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain,live_color=live_color,shared_hdf=hdf_enabled)
+                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain,live_color=live_color,shared_hdf=hdf_enabled,appended_slots=appended_slots)
                 image+=bytes(snapshot_base-base-len(image))+snapshot_code;symbols.update(snapshot_report['exports'])
                 lifecycle_report['snapshot']=snapshot_report
                 lifecycle_report['patches']+=snapshot_report['patches']
             if native_grain:
                 from scripts.build_gr3_native_grain_hooks import build as build_grain_hooks
                 grain_base=(base+len(image)+15)&~15
-                grain_code,grain_report=build_grain_hooks(out/'native-grain-hooks',grain_base,symbols,rtos=stock)
+                grain_code,grain_report=build_grain_hooks(out/'native-grain-hooks',grain_base,symbols,rtos=stock,appended_slots=appended_slots)
                 image+=bytes(grain_base-base-len(image))+grain_code
                 lifecycle_report['native_grain']=grain_report
                 lifecycle_report['patches']+=grain_report['patches']
@@ -391,25 +397,25 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if (ROOT/'native/gr3/m10v_film_card_data.h').read_text()!=card_data():raise ValueError('film card labels differ from catalog')
             for name,prefix in [('m10v_film_card.c','m10v_film_card_'),('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
                 obj_path=folder/(name+'.o')
-                subprocess.run([compiler,*FLAGS,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
+                subprocess.run([compiler,*compile_flags,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
                 start=(base+len(image)+15)&~15
                 code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix)
                 image+=bytes(start-base-len(image))+code;symbols.update(entries)
             controller_obj=folder/'settings-controller.o'
-            subprocess.run([compiler,*FLAGS,*debug_flags,'-DM10V_LIVE_COLOR='+str(int(live_color)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*compile_flags,*debug_flags,'-DM10V_LIVE_COLOR='+str(int(live_color)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
-            placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable']}
-            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_')
+            placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch']]]}
+            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
             hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=live_color)
-            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_')
+            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
         hdf_menu_report=None
         if sd_library and hdf_enabled:
             menu_obj=folder/'hdf-menu.o';start=(base+len(image)+15)&~15
-            subprocess.run([compiler,*FLAGS,'-DM10V_HDF_OWNER_OFFSET='+hex((0x19bc if live_color else 0x193c) if film_library else 0x13bc),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*compile_flags,'-DM10V_HDF_OWNER_OFFSET='+hex((0x19bc if live_color else 0x193c) if film_library else 0x13bc),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
             names=['m10v_hdf_menu_parent_'+n for n in ['ctor','dtor','factory','key_route']]+['m10v_hdf_menu_vtable']
             provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start)},'m10v_hdf_menu_')
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
@@ -420,25 +426,31 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         # Link dedicated stock-detail backend against the same camera journal.
         from scripts.build_gr3_native_detail import build_detail, STOCK_TABLE
         detail_obj=folder/'detail.o'
-        subprocess.run([compiler,*FLAGS,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_detail.c'),'-o',str(detail_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*compile_flags,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_detail.c'),'-o',str(detail_obj)],check=True,capture_output=True)
         detail_base=(base+len(image)+15)&~15
         provisional,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,**{n:detail_base for n in ['m10v_detail_tables','m10v_detail_common_tables','m10v_detail_red_tables','m10v_detail_phoenix_tables','m10v_detail_charmera_tables']}},'m10v_detail_')
         shims_base=(detail_base+len(provisional)+15)&~15
-        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols},sd_library=sd_library)
+        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols},sd_library=sd_library,appended_slots=appended_slots)
         detail,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,'m10v_detail_tables':detail_report['tables'],'m10v_detail_common_tables':detail_report['variant_tables']['common'],'m10v_detail_red_tables':detail_report['variant_tables']['red'],'m10v_detail_phoenix_tables':detail_report['variant_tables']['phoenix'],'m10v_detail_charmera_tables':detail_report['variant_tables']['charmera']},'m10v_detail_')
         image+=bytes(detail_base-base-len(image))+detail
         image+=bytes(shims_base-base-len(image))+shims
         symbols.update(detail_symbols)
         menu_obj = folder / 'menu.o'
-        subprocess.run([compiler, *FLAGS, *debug_flags, f'-DM10V_NATIVE_BASE={base}u', '-c',
+        subprocess.run([compiler, *compile_flags, *debug_flags, f'-DM10V_NATIVE_BASE={base}u', '-c',
                         str(ROOT / 'native/gr3/m10v_library_menu.c'), '-o', str(menu_obj)], check=True, capture_output=True)
         menu_base = (base + len(image) + 15) & ~15
         menu, menu_symbols = link_object(menu_obj.read_bytes(), menu_base, symbols, 'm10v_menu_')
         image += bytes(menu_base - base - len(image)) + menu
         symbols.update(menu_symbols)
         (out / 'm10v-library-menu-arm.o').write_bytes(menu_obj.read_bytes())
+        if appended_slots:
+            tone_obj=folder/'tone-menu.o'
+            subprocess.run([compiler,*compile_flags,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3/m10v_tone_menu.c'),'-o',str(tone_obj)],check=True,capture_output=True)
+            tone_base=(base+len(image)+15)&~15
+            tone_code,tone_symbols=link_object(tone_obj.read_bytes(),tone_base,symbols,'m10v_tone_menu_')
+            image+=bytes(tone_base-base-len(image))+tone_code;symbols.update(tone_symbols)
         capture_obj = folder / 'capture.o'
-        subprocess.run([compiler, *FLAGS, *debug_flags, '-c', str(ROOT / 'native/gr3/m10v_library_capture.c'),
+        subprocess.run([compiler, *compile_flags, *debug_flags, '-c', str(ROOT / 'native/gr3/m10v_library_capture.c'),
                         '-o', str(capture_obj)], check=True, capture_output=True)
         capture_base = (base + len(image) + 15) & ~15
         capture, capture_symbols = link_object(capture_obj.read_bytes(), capture_base, symbols, 'm10v_capture_')
@@ -476,6 +488,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         texts+=['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
         if sd_library:
             texts+=['胶卷名称：关闭','胶卷名称：开启','胶卷名称水印']
+            texts+=['A/B 快速对比','A 风格','B 风格','开始对比','退出对比','上下选择 左右换风格 OK确定 MENU返回','槽位 1','槽位 2','槽位 3','槽位 4','槽位 5']
+            texts+=['页面验证（只读）','原厂页面显示验证','返回与重复进入验证','请检查正常关机','未启用滤镜切换']
             texts+=['Custom LUT']*5
         texts+=['Kodak Charmera','颜色','红','黄','蓝','灰']
         last_resource=786+len(texts)-1
@@ -540,10 +554,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if sd_library:
             text=resource_asm.read_text()
             for name,target,register in [('primary',0x53396700,7),('secondary',0x5339710c,3)]:
-                code=f"""movw r3,#991
+                code=f"""movw r3,#1007
             cmp r7,r3
             blo .L{name}_static
-            movw r3,#995
+            movw r3,#1011
             cmp r7,r3
             bhi .L{name}_static
             sub sp,sp,#80
@@ -558,7 +572,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 code+=f"ldr pc,={hex(target)}\n.L{name}_static:\n"
                 text=text.replace('m10v_resource_'+name+':','m10v_resource_'+name+':\n'+code)
             resource_asm.write_text(text)
-        subprocess.run([compiler, *FLAGS, '-c', str(resource_asm), '-o', str(resource_obj)], check=True, capture_output=True)
+        subprocess.run([compiler, *compile_flags, '-c', str(resource_asm), '-o', str(resource_obj)], check=True, capture_output=True)
         resource_code_base = (base + len(image) + 15) & ~15
         resource_code, resource_symbols = link_object(resource_obj.read_bytes(), resource_code_base,
             {'m10v_string_descriptors': resource_base,**symbols}, 'm10v_resource_')
@@ -587,7 +601,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             .ltorg
         '''.replace('            bl m10v_capture_library',
             '            mov r1,#193\n            mov r2,#0\n            bl m10v_lifecycle_phase\n            mov r0,r4\n            bl m10v_capture_library\n            mov r2,r0\n            mov r0,r4\n            mov r1,#194\n            bl m10v_lifecycle_phase\n            mov r0,r4\n            mov r1,#190\n            mov r2,#0\n            bl m10v_lifecycle_phase' if lifecycle_trace else '            bl m10v_capture_library'))
-        subprocess.run([compiler, *FLAGS, '-c', str(chain_asm), '-o', str(chain_obj)], check=True, capture_output=True)
+        subprocess.run([compiler, *compile_flags, '-c', str(chain_asm), '-o', str(chain_obj)], check=True, capture_output=True)
         chain_base = (base + len(image) + 15) & ~15
         chain, chain_symbols = link_object(chain_obj.read_bytes(), chain_base, symbols, 'm10v_chain_')
         image += bytes(chain_base - base - len(image)) + chain; symbols.update(chain_symbols)
@@ -652,15 +666,21 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 text+=f"bl m10v_settings_controller_card_directory\ncmp r0,#0\nstrne r0,[sp,#{8+reg*4}]\n.L{name}_done:\npop {{ip,lr}}\nmsr cpsr_fs,ip\npop {{r0-r12,lr}}\nldr pc,={hex(ret)}\n.ltorg\n"
             icon_asm.write_text(text)
 
-        subprocess.run([compiler,*FLAGS,'-c',str(icon_asm),'-o',str(icon_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*compile_flags,'-c',str(icon_asm),'-o',str(icon_obj)],check=True,capture_output=True)
         icon_base=(base+len(image)+15)&~15
         icon_code,icon_symbols=link_object(icon_obj.read_bytes(),icon_base,externals=symbols,prefix='m10v_icon_',additional_exports=tuple('m10v_icon_directory_'+n for n in ('width','height','draw')) if sd_library else ())
         image += bytes(icon_base-base-len(image))+icon_code; symbols.update(icon_symbols)
         from scripts.build_gr3_isp_base import build_isp_base
         isp_base = (base + len(image) + 15) & ~15
-        isp_code, isp_report = build_isp_base(isp_base)
+        isp_code, isp_report = build_isp_base(isp_base,appended_slots=appended_slots)
         image += bytes(isp_base-base-len(image)) + isp_code
     sha = lambda data: hashlib.sha256(data).hexdigest()
+    appended_report=None
+    if appended_slots:
+        from scripts.build_gr3_film_slot_extension import build_appended_slots
+        append_base=(base+len(image)+15)&~15
+        append_code,appended_report=build_appended_slots(append_base,base,capture_stock_rtos(),symbols)
+        image+=bytes(append_base-base-len(image))+append_code
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 79, 'slots': 5,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
@@ -673,11 +693,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                              'scripts/build_gr3_m10v_library.py','scripts/generate_m10v_icons.py',
                              'native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin')},
                 'compiler': subprocess.check_output([compiler, '--version'], text=True).splitlines()[0],
-                'flags': FLAGS, 'render_flags': RENDER_FLAGS, 'debug_compile_flags': debug_flags, 'firmware_artifact': False, 'camera_tested': False,
+                'flags': compile_flags, 'render_flags': render_flags, 'debug_compile_flags': debug_flags, 'firmware_artifact': False, 'camera_tested': False,
                 'abi': 'M10V state104 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','scripts/generate_m10v_film_cards.py','native/gr3/m10v_custom_icon.rgba']})
+    manifest['appended_slots']=appended_report
+    manifest['sources']['native/gr3/m10v_tone.h']=sha((ROOT/'native/gr3/m10v_tone.h').read_bytes())
+    if appended_slots:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']})
     manifest['sd_library']=sd_library
     manifest['film_library_enabled']=film_library
     manifest['hdf_menu']=hdf_menu_report
@@ -712,13 +735,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-prior-contract.json','scripts/generate_gr3_sd_contract.mjs']})
     manifest['settings_menu']=settings_report
     if sd_library:
-        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','scripts/build_gr3_settings_hooks.py','node/gr3-settings-menu.mjs']})
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','native/gr3/m10v_ab.h','native/gr3/m10v_ab_camera.inc','native/gr3/m10v_ab_host.inc','scripts/build_gr3_settings_hooks.py','node/gr3-settings-menu.mjs']})
     manifest['detail']=detail_report
     manifest['isp_base']=isp_report
     manifest['debug_mode']=debug_mode
     manifest['capture_profile']={'schema':'m10v-capture-profile/v1','counter_service':0x53050b7c,'units':'milliseconds','flush':'once after render and cache writeback','max_batch':32} if profile_mode else None
     manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
-        'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'],
+        'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'],
         'page_bytes':4096,'records_per_channel':63,'guard_address':0x5506821f} if debug_mode else None
     initial_offset = bytes(image).find(initial)
     if initial_offset < 0 or bytes(image).find(initial, initial_offset+1) >= 0: raise ValueError('initial state not uniquely embedded')
@@ -747,7 +770,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if offset<0:raise ValueError('new stock LUT absent from compiled image')
         manifest['film_newstocks'].append({'film_id':73+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
     manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
-    if sd_library:manifest['custom_film_display']={'name_resources':[991,995],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-derived-uppercase-alphanumeric-prefix-5-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
+    if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-derived-uppercase-alphanumeric-prefix-5-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest
@@ -756,6 +779,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'builds/gr3-m10v-library')
+    parser.add_argument('--appended-slots',action='store_true')
     parser.add_argument('--base',type=lambda v:int(v,0),default=0x540b6000)
     parser.add_argument('--initial-state-hex')
     parser.add_argument('--sd-library',action='store_true')
@@ -776,4 +800,4 @@ if __name__ == '__main__':
     parser.add_argument('--hdf-default',type=int,default=0)
     parser.add_argument('--no-hdf',action='store_true')
     parser.add_argument('--with-hdf',action='store_true')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))

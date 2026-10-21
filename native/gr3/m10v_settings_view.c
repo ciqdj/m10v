@@ -6,6 +6,7 @@
  */
 #include "m10v_settings_view.h"
 #include "m10v_film_card.h"
+#include "m10v_ab.h"
 #include "m10v_sd_library.h"
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
@@ -85,6 +86,7 @@ static uint32_t valueres(uint32_t row,uint32_t value){
 void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const m10v_settings_ops *o){
  if(!v||!s||v->count!=COUNT)return;
  uint32_t name_page=s->screen==M10V_SETTINGS_NAME;
+ uint32_t ab_page=s->screen==M10V_SETTINGS_AB;
  uint32_t films=s->screen==M10V_SETTINGS_FILMS||s->screen==M10V_SETTINGS_CATALOG;
  uint32_t focus=s->screen==M10V_SETTINGS_CATALOG?s->index%5:s->focus;
  caption(v->widgets[TITLE],s->screen==M10V_SETTINGS_CATALOG?M10V_VIEW_CHOOSE_FILM:films?M10V_VIEW_FILMS:M10V_VIEW_STAMP);
@@ -102,7 +104,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
   if(id){
-   uint32_t icon=M10V_CUSTOM(id)?754:id==M10V_CHAR_ID?755:670+id;
+   uint32_t icon=M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[39]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
     if(M10V_CUSTOM(id)){
@@ -160,6 +162,22 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   visible(v->widgets[ROW],1);
   caption(v->widgets[ROW],s->value?M10V_VIEW_NAME_ON:M10V_VIEW_NAME_OFF);
   ((fn2)0x5339658cu)(v->widgets[ROW],10);
+ }
+ if(ab_page){
+  caption(v->widgets[TITLE],M10V_VIEW_AB_TITLE);caption(v->widgets[FOOTER],M10V_VIEW_AB_HELP);
+  visible(v->widgets[NAME],1);
+  /* Dynamic name uses the established ASCII widget, including SD names. */
+  uint32_t choice=s->focus==1?s->index:s->slot,slot=m10v_ab_slot(choice);
+  const char *name=slot<5?m10v_library_name(s->saved.slots[slot].film):m10v_ab_stock_name(choice);
+  char custom[24];
+  if(slot<5&&M10V_CUSTOM(s->saved.slots[slot].film)&&m10v_sd_camera_custom_name(&s->saved,slot,custom,sizeof(custom)))name=custom;
+  ((fn2)0x53390ef8u)(v->widgets[NAME],ptr(name?name:""));
+  for(uint32_t i=0;i<4;i++){
+   caption(v->widgets[ROW+i],M10V_VIEW_AB_A+i);visible(v->widgets[VALUE+i],i<2);
+   if(i<2){uint32_t c=i?s->index:s->slot,k=m10v_ab_slot(c);
+    caption(v->widgets[VALUE+i],m10v_ab_caption(c,k<5?s->saved.slots[k].film:0));
+   }
+  }
  }
  ((fn1)0x533ad308u)(v->widgets[ROOT]);
 }

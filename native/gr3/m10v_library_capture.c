@@ -2,6 +2,7 @@
  * The original encoder call is chained separately by an ARM trampoline.
  * CFA is checked as a protected interval and is never read or written.
  */
+#include "m10v_tone.h"
 #include "m10v_library.h"
 #include "m10v_debug.h"
 #include "m10v_capture_profile.h"
@@ -125,8 +126,8 @@ int m10v_capture_library(uint32_t context) {
     const uint8_t *req = (const uint8_t *)(uintptr_t)request;
     if (req[12] != 1 || req[13] > 1 || ((const uint8_t *)(uintptr_t)jpeg)[16] != 1) REJECT(-4,6,req[12],req[13]);
     uint32_t tone = ((const uint8_t *)(uintptr_t)shooting)[0x77c], slot = 5;
-    static const uint8_t tones[5] = {12,18,19,20,21};
-    for (uint32_t i = 0; i < 5; ++i) if (tones[i] == tone) slot = i;
+
+    for (uint32_t i = 0; i < 5; ++i) if (m10v_slot_tone(i) == tone) slot = i;
     if (slot == 5) REJECT(-4,7,tone,0);
     const uint32_t *desc = (const uint32_t *)(uintptr_t)descriptor;
     const uint16_t *dims = (const uint16_t *)(uintptr_t)(descriptor + 16);
@@ -185,7 +186,7 @@ int m10v_capture_library(uint32_t context) {
 #if M10V_RECIPE_SNAPSHOT
     if(settings_source==4&&snapshot->selected_tone){
         uint32_t selected=snapshot->selected_tone;slot=5;
-        for(uint32_t i=0;i<5;i++)if(tones[i]==selected)slot=i;
+        for(uint32_t i=0;i<5;i++)if(m10v_slot_tone(i)==selected)slot=i;
         if(slot==5)REJECT(-4,7,tone,0);
     }
 #endif

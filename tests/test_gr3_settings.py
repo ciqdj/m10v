@@ -58,6 +58,16 @@ int main(void){
  m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(saved.slots[0].film==73&&p.screen==M10V_SETTINGS_FILMS);
  assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
  assert(m10v_settings_open(&p,&ops,99)<0);
+ assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
+ assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_AB)==0);
+ assert(p.screen==6&&p.slot==1&&p.index==5&&p.focus==0);
+ m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);assert(p.slot==2);
+ m10v_settings_key(&p,&ops,M10V_KEY_DOWN);assert(p.focus==1);
+ m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);assert(p.index==6);
+ m10v_settings_key(&p,&ops,M10V_KEY_DOWN);
+ m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(p.value==1&&p.screen==6);
+ m10v_settings_key(&p,&ops,M10V_KEY_DOWN);m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(p.value==2);
+ m10v_settings_key(&p,&ops,M10V_KEY_BACK);assert(p.screen==M10V_SETTINGS_CLOSED);
  return 0;
 }
 '''

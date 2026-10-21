@@ -86,6 +86,34 @@ writeFileSync(dir+'/rtos.bin',d.subarray(at+16,at+16+d.readUInt32LE(at+12)));
                     self.assertLess(tone,128)
                     if index==12:self.assertEqual((writes,backs,tone),([],[1],18))
 
+    def test_stock_high_contrast_bw_and_installed_film_use_the_real_tone_setter(self):
+        for index,expected in ((1,12),(5,16),(1,12),(5,16)):
+            with self.subTest(index=index):
+                writes,backs,tone=self.probe(index)
+                self.assertEqual(writes,[expected])
+                self.assertEqual(backs,[0]) # normal stock confirmation, not private return
+                self.assertEqual(tone,expected)
+
+    def test_imagecontrol_reentry_snapshots_the_new_stock_filter_not_the_old_film(self):
+        u=machine(self.stock);model=0x55068200;controller=0x55005000
+        u.mem_write(model,bytes([12])+bytes(31))
+        u.mem_write(0x55006000,struct.pack('<I',0x55007000))
+        calls=[]
+        def boundary(uc,address,size,_):
+            if address==0x5320ad88:result=0x55006000
+            elif address==0x5320ba9c:result=model
+            elif address==0x53525d5c:result=0x55006000
+            elif address==0x53549ee8:result=16
+            elif address==0x532bd6d4:result=0
+            elif address in (0x531ab4d0,0x531ac0b0,0x531ac074,0x531ab750,0x531ab324,0x5316d354):result=0
+            elif address==0x532c26c0:self.fail('reentry must not reapply the previous film')
+            else:return
+            calls.append(address);uc.reg_write(UC_ARM_REG_R0,result);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE,boundary)
+        u.reg_write(UC_ARM_REG_R0,controller);run(u,0x531ac140)
+        self.assertEqual(bytes(u.mem_read(model,1)),b'\x10')
+        self.assertIn(0x53549ee8,calls)
+
     def test_detail_callback_uses_stock_table_even_with_stale_library_mode(self):
         for group in range(15):
             u=machine(self.code)

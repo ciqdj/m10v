@@ -12,8 +12,8 @@ typedef void (*free_fn)(void *);
 typedef int (*open_fn)(uint32_t,const char *,uint32_t,uint32_t *,uint32_t *);
 typedef int (*io_fn)(uint32_t,uint32_t,void *,uint32_t,uint32_t *);
 typedef int (*close_fn)(uint32_t,uint32_t,uint32_t *);
-static const char paths[6][16]={"C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN","C:\\M10VIO0.BIN","C:\\M10VIO1.BIN"};
-static uint32_t event_channel(uint32_t event){return event>=180&&event<=209?3u:event>=100?2u:1u;}
+static const char paths[8][16]={"C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN","C:\\M10VIO0.BIN","C:\\M10VIO1.BIN","C:\\M10VAK0.BIN","C:\\M10VAK1.BIN"};
+static uint32_t event_channel(uint32_t event){return event>=85&&event<=99?4u:event>=180&&event<=209?3u:event>=100?2u:1u;}
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int code(uint32_t p,uint32_t n){return !(p&3)&&p>=0x53000000u&&p<0x540b6000u&&n<=0x540b6000u-p;}
 static uint32_t crc(const uint32_t *words){

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { inspectOfficial } from './firmware.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
-import {settingsSources,settingsPatches,checkSettings} from './gr3-settings-menu.mjs';
+import {settingsSources,settingsPatches,checkSettings,abPatches} from './gr3-settings-menu.mjs';
 import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 
@@ -41,7 +41,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/m10v_tone.h','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
@@ -55,7 +55,7 @@ const viewDeferredSources=['native/gr3/m10v_view_deferred.c','native/gr3/m10v_vi
 const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h'];
 const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
 const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-prior-contract.json','scripts/generate_gr3_sd_contract.mjs'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify([...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
   const delta = target - address - 8;
@@ -72,14 +72,16 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 79 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
+  const expectedSources=[...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
   need(typeof manifest.sd_library==='boolean','missing SD capability');
   need(!manifest.sd_library||(runtime.includes(Buffer.from('C:\\M10V\\FILMS.M10'))&&['m10v_sd_camera_item','m10v_sd_camera_install'].every(n=>Number.isInteger(manifest.symbols[n])&&manifest.symbols[n]>=BASE&&manifest.symbols[n]<BASE+runtime.length)),'SD runtime incomplete');
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);
+  need(manifest.flags.includes('-DM10V_APPENDED_SLOTS=1')===!!manifest.appended_slots,'appended compile mode differs');
   checkIspBase(runtime,manifest);
+  appendedSlotPatches(runtime,manifest);
   if(manifest.experimental_capture?.candidate_color){
     const header=readFileSync(new URL('../native/gr3/m10v_film_color_candidates.h',import.meta.url),'utf8');
     const names=['m10v_5207_candidate_lut','m10v_phoenix_ii_candidate_lut'];
@@ -128,7 +130,7 @@ function checkRuntime(runtime, manifest) {
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
     manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
     /^[0-9a-f]{8}$/.test(manifest.debug_log.build_id)&&manifest.debug_log.page_bytes===4096&&manifest.debug_log.records_per_channel===63&&
-    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'])&&
+    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'])&&
     manifest.debug_log.files.every(name=>runtime.includes(Buffer.from('C:\\'+name))):
     !manifest.debug_log&&((!manifest.symbols?.m10v_debug_log&&!manifest.symbols?.m10v_debug_batch)||quietDebugSinks)&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
   for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log','m10v_debug_batch']:[])]) {
@@ -156,7 +158,7 @@ function checkRuntime(runtime, manifest) {
       runtime.readUInt32LE(icons.table-BASE+754*4)===descriptor&&
       runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
       runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
-    need(JSON.stringify(custom.name_resources)==='[991,995]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
+    need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
     need(c?.first_id===749&&c.last_id===753&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
@@ -165,7 +167,7 @@ function checkRuntime(runtime, manifest) {
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?216:167;
+  const resourceCount=manifest.sd_library?232:167;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -196,7 +198,7 @@ function checkDetail(runtime,manifest,raw) {
  const captions=read(d.captions,120);
  const variants={halo:[18,19,20,21,23,24,25,26,27],common:[21,23,24,25,26,27],red:[21,23,24,25,26,27,28],charmera:[21,23,24,25,26,27,29],phoenix:[18,19,20,21,23,24,25,26,27,28]};
  need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
- const expectedIds=[862,863,864,827,828,913,914,915,916,917,933,manifest.sd_library?997:948];
+ const expectedIds=[862,863,864,827,828,913,914,915,916,917,933,manifest.sd_library?1013:948];
  for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
@@ -215,9 +217,9 @@ function checkDetail(runtime,manifest,raw) {
  if(raw){
   need(captions.subarray(0,72).equals(raw.subarray(0xb34bd8,0xb34c20)),'native detail stock captions differ');
   for(const [variant,ids] of Object.entries(variants)){
-   const table=read(d.variant_tables[variant],288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
-   for(let i=0;i<36;i++){
-    const old=0xb3488c+i*8,p=raw.readUInt32LE(old),n=raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
+   const table=read(d.variant_tables[variant],manifest.appended_slots?328:288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
+   for(let i=0;i<(manifest.appended_slots?41:36);i++){
+    const old=0xb3488c+(i%36)*8,p=raw.readUInt32LE(old),n=manifest.appended_slots?0:raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
     need(table.readUInt32LE(i*8+4)===n+ids.length,'native detail count differs');
     const list=read(fresh,n*2+suffix.length);
     need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(suffix),'native detail list differs');
@@ -251,7 +253,7 @@ function checkDetail(runtime,manifest,raw) {
 function checkIspBase(runtime,manifest) {
  const m=manifest.isp_base, base=manifest.base;
  need(m?.schema==='m10v-gr3-isp-base/v2'&&m.bytes===504&&m.base%16===0&&m.base>=base&&m.base+504<=base+runtime.length&&
-  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)==='[12,18,19,20,21]', 'native ISP base contract differs');
+  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)===(manifest.appended_slots?'[25,26,27,28,29]':'[12,18,19,20,21]'), 'native ISP base contract differs');
  need(Object.keys(m.entries||{}).sort().join('|')===ispHooks.map(h=>h[4]).sort().join('|')&&m.patches?.length===5,'native ISP inventory differs');
  for(const [i,[address,expected,reg,object,name]] of ispHooks.entries()) {
   const at=m.base+i*104, off=4+reg*4, compare=name==='local_process'?0x53513620:0x53dbd8a0;
@@ -260,6 +262,7 @@ function checkIspBase(runtime,manifest) {
    movw(1,compare&65535),(0xe3401000|(((compare>>>16)&0xf000)<<4)|((compare>>>16)&0xfff))>>>0,
    0xe1500001,0x1a000007,0xe59d2000|off,0xe352000c,0x0a000002,0xe2422012,0xe3520003,0x8a000001,
    0xe3a0200b,0xe58d2000|off,0xe49dc004,0xe12cf00c,0xe8bd500f];
+  if(manifest.appended_slots){words.splice(11,5,0xe2422019,0xe3520004,0x8a000003,0xe320f000,0xe320f000);if(name==='parameters')words[16]=0xe3a02019;}
   if(name!=='local_process')words.splice(9,0,0x0a000003,movw(1,0xd938),0xe34513db,0xe1500001);
   words.push(branch(at+words.length*4,address+4));
   for(const [j,word] of words.entries())need(runtime.readUInt32LE(at-base+j*4)===(word>>>0),'native ISP instruction differs: '+name+'+'+j*4);
@@ -343,6 +346,32 @@ function lifecyclePatches(manifest,runtime){
  }
  return expected;
 }
+function appendedSlotPatches(runtime,manifest,raw) {
+ const m=manifest.appended_slots;if(!m)return [];
+ need(manifest.sd_library&&manifest.film_library_enabled!==false&&m.schema==='m10v-gr3-appended-slots/v1'&&
+  JSON.stringify(m.tones)==='[25,26,27,28,29]'&&m.stock_choices===12&&m.shooting_choices===17&&
+  m.library_index===19&&m.stock_parameter_proxy===false&&m.state_version===4,'invalid appended slot contract');
+ const read=(at,n)=>{need(Number.isInteger(at)&&!(at&3)&&at>=manifest.base&&at+n<=manifest.base+runtime.length,'appended code outside runtime');return runtime.subarray(at-manifest.base,at-manifest.base+n);};
+ read(m.base,m.bytes);
+ const rows=[[0x532c2a9c,0xe1a0c00d,'count'],[0x532c2c80,0xe1a0c00d,'index'],
+  [0x532c2f08,0xe1a0c00d,'position'],[0x532c2b7c,0xe30d3368,'maximum'],
+  [0x5326c240,branch(0x5326c240,0x5326c2a0),'display']];
+ const patches=rows.map(([address,expected,name])=>{read(m.entries[name],4);return {address,expected,replacement:branch(address,m.entries[name]),name:'appended '+name};});
+ for(const [address,old,name] of [[0x531ab7a8,0x532a985c,'menu_name'],[0x531ab894,0x532a9988,'menu_icon'],[0x531ab8bc,0x532a9988,'menu_icon'],[0x531a05ac,0x532c2c80,'index'],[0x531a070c,0x532c2c80,'index'],[0x531a0588,0x532a985c,'adj_name'],[0x531a06e0,0x532a9988,'adj_icon']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:branch(address,old,true),replacement:branch(address,to,true),name:'appended visible '+name});}
+ for(const [address,name] of [[0x531abe0c,'menu_matches'],[0x531a1500,'adj_matches'],[0x531a0ba0,'adj_select']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:0xe1a0c00d,replacement:branch(address,to),name:'appended visible '+name});}
+ need(m.exif_bytes===68,'appended EXIF capacity differs');
+ const table=read(m.exif_table,68);
+ if(raw)need(table.subarray(0,48).equals(raw.subarray(0xd2b6f4,0xd2b724)),'stock EXIF pairs changed');
+ for(let i=0;i<5;i++)need(table.readUInt32LE(48+i*4)===((0x10c+i)<<16|25+i),'appended EXIF mapping differs');
+ const movt=(r,v)=>(0xe3400000|((v&0xf000)<<4)|(r<<12)|(v&0xfff))>>>0;
+ for(const [address,expected,replacement] of [
+  [0x53599df4,0xe3a00030,0xe3a00044],[0x53599e20,0xe30bc6f4,movw(12,m.exif_table&65535)],
+  [0x53599e2c,0xe345c3d2,movt(12,m.exif_table>>>16)],[0x53599e30,0xe2801030,0xe2801044],
+  [0x53599e4c,0xe353000c,0xe3530011],[0x53599e60,0xe2800030,0xe2800044],
+ ])patches.push({address,expected,replacement,name:'appended EXIF '+address.toString(16)});
+ need(m.patches.length===patches.length&&patches.every((p,i)=>p.address===m.patches[i].address&&p.expected===m.patches[i].expected&&p.replacement===m.patches[i].replacement),'appended patch inventory differs');
+ return patches;
+}
 function patchList(manifest,runtime) {
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
@@ -358,12 +387,12 @@ function patchList(manifest,runtime) {
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){
     need(manifest.sd_library&&manifest.hdf_menu,'independent HDF menu required');
-    return [...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),
+    return [...appendedSlotPatches(runtime,manifest),...abPatches(manifest),...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),
       ...hooks.filter(row=>row[2].startsWith('m10v_resource_')).map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.symbols[name],link),name})),
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...hdfPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...appendedSlotPatches(runtime,manifest),...abPatches(manifest),...hdfPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},
@@ -431,6 +460,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   const old=oldRows.find(row=>row.name==='RTOS'),fresh=newRows.find(row=>row.name==='RTOS');
   const raw=before.subarray(old.offset+16,old.offset+old.size);
   checkDetail(runtime,manifest,raw);
+  appendedSlotPatches(runtime,manifest,raw);
   const stockDirectory=raw.subarray(0x107b540+0x20fc,0x107b540+0x20fc+671*4);
   need(stockDirectory.equals(runtime.subarray(manifest.icons.table-BASE,manifest.icons.table-BASE+671*4)),'official icon directory differs');
   const table=raw.readUInt32LE(0x434)-LOAD,domains=raw.readUInt32LE(0x438);
@@ -462,10 +492,10 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:79,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:79,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:47,max_records:256,custom_lut:true,page_rows:8}:null,
-    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',adj_scope:'12 stock entries only; no private IDs',
-    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
-    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
+    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:79,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:47,max_records:256,custom_lut:true,page_rows:8}:null,
+    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:[25,26,27,28,29],stock_choices:12,shooting_choices:17,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus five independent M10V film slots':'12 stock entries only; no private IDs',
+    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
+    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
     camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color after first settings initialization; preview excludes grain/halo/leak; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }

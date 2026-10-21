@@ -1,20 +1,34 @@
 #ifndef M10V_SETTINGS_CONTROLLER_H
 #define M10V_SETTINGS_CONTROLLER_H
 #include "m10v_settings_view.h"
+#include "m10v_ab.h"
+#ifndef M10V_AB_NATIVE_HOST
+#define M10V_AB_NATIVE_HOST 1
+#endif
+/* Valid only while page==7. The native controller owns all referenced views;
+ * this stores cursor/lifetime state, never a second canvas or controller. */
+typedef struct {
+ uint32_t controller,mode,origin,source,position,offset,rebuilding,back_pending;
+} m10v_native_ab_host;
 /* Two instances are embedded after the original TopMenu object, never placed
  * in undocumented RAM or freed independently from their owner. */
 typedef struct {
  uint8_t base[0x158];
  m10v_settings_view view;
- m10v_settings state;
+ union {m10v_settings state;m10v_native_ab_host host;};
  uint32_t page;
+ m10v_ab ab;
+ uint32_t display_trace;
+ uint32_t pending_source;
 } m10v_settings_controller;
+_Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");
 #define M10V_SETTINGS_OWNER_BYTES 0x13bcu
 #define M10V_SETTINGS_CONTROLLER_BYTES 0x2c0u
 _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,"controller tail capacity");
 #define M10V_SETTINGS_FILMS_ROUTE 0x0200f100u
 #define M10V_SETTINGS_STAMP_ROUTE 0x0200f101u
 #define M10V_SETTINGS_NAME_ROUTE 0x0200f103u
+#define M10V_SETTINGS_AB_ROUTE 0x0200f104u
 uint32_t m10v_settings_controller_owner_size(void);
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner);
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner);

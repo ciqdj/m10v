@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.21.3",
+      "date": "2026-10-21",
+      "title": "GR III 在 Custom2 后新增独立五槽，保留全部原厂预设",
+      "changes": [
+        "GR III 2.10 胶卷库改用五个独立位置，MENU 与 ADJ 均排列在 Custom1／Custom2 后；原 Vivid、Bleach Bypass、Retro、HDR Tone、Cross Processing 恢复原厂名称、图标与处理路径。",
+        "旧五槽存档、槽位顺序、胶卷 ID 与 FILMS.M10 保持兼容；新槽 FN 提供该胶卷支持的 M10V 参数，原厂参数页仍归原厂风格。升级后手动选择新增槽位即可继续使用原有配方。",
+        "新增 tone 接通逐张配方冻结、原生色调、颗粒、HDF 和 EXIF；换卷激活使用普通拍摄 bank，保护 Custom1／Custom2 保存设置，A/B 配对兼容旧记录并扩展选择范围。",
+        "网页默认采用独立五槽，构建预检与最终固件审计绑定布局；CLI 提供 --legacy-slots 保留旧布局。GR IIIx／GR IV 保持各自原有槽位与机型保护。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.21.2",
       "date": "2026-10-21",
       "title": "新增 Kodak Charmera 四色胶卷，统一胶卷编号与数量",
@@ -11,9 +25,9 @@
         "新增独立高反差双色处理与统一颜色预览；重置公共质感保留颜色，完整重置恢复默认红色，保存失败保留原值。",
         "保持线上自定义胶卷卡片修复及HDF、时间水印、画幅、水平仪等组合能力；GR IV 保留现有46款目录。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "2ec67bf7c02fa42bcd8adafc2aaa634a3d9e7858",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39571095591"
     },
     {
       "version": "2026.10.21.1",

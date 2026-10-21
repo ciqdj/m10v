@@ -105,11 +105,11 @@ class SdCameraTests(unittest.TestCase):
     uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
   self.u.hook_add(UC_HOOK_CODE,model)
   self.u.mem_write(0x55068200,bytes([12])+bytes(31))
-  self.assertEqual(self.call('m10v_menu_name',0,12),991)
-  self.assertEqual(self.call('m10v_menu_name',0,208),991)
+  self.assertEqual(self.call('m10v_menu_name',0,12),1007)
+  self.assertEqual(self.call('m10v_menu_name',0,208),1007)
   self.assertEqual(self.call('m10v_menu_icon',0,12),754)
   self.assertEqual(self.call('m10v_menu_icon',0,208),754)
-  self.assertEqual(self.call('m10v_menu_custom_resource',991,0x5500c000),0x5500c000)
+  self.assertEqual(self.call('m10v_menu_custom_resource',1007,0x5500c000),0x5500c000)
   header=bytes(self.u.mem_read(0x5500c000,8));text=self.n(0x5500c004)
   self.assertEqual(bytes(self.u.mem_read(text,header[0]*2)).decode('utf-16le'),'My Film\0')
   self.assertEqual((self.opened,self.allocated),(0,0))
@@ -250,7 +250,7 @@ class SdCameraTests(unittest.TestCase):
   from unicorn.arm_const import UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12
   regs=[UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12]
   for name,target,outreg in [('primary',0x53396700,UC_ARM_REG_R7),('secondary',0x5339710c,UC_ARM_REG_R3)]:
-   for resource in range(991,991):
+   for resource in range(1007,1007):
     u=self.u;seen=[];sp=0x550fe000
     def stop(uc,pc,size,data):
      if pc==target:seen.append(pc);uc.emu_stop()

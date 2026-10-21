@@ -14,7 +14,7 @@ STOCK_CAPTIONS=bytes.fromhex('e3011901e1011b01e2011d01da011f01db012101dc012301e5
 STOCK_SLIDER=bytes.fromhex('0dc0a0e1f0d82de97c5705e3055445e304b04ce268d04de2003095e50060a0e10040a0e320300be55b7701eb9f7a01eb9811d6e5305904eb0afdffeb04408de50f30a0e300308de51420a0e30c208de5233ea0e310308de54020a0e314208de5c730a0e318308de50070a0e108408de50410a0e10820a0e32d30a0e354004be248c807eb093da0e30420a0e100308de50710a0e11e30a0e354004be258c807eb54004be20410a0e15dc807eb647196e554104be20700a0e19fc807eb5c400be50c00a0e37c0814eb0030a0e1d02f00e31b2345e30700a0e1002083e5042a0ce3044083e51a2345e3086083e564104be264300be55c390ce358200be51a3345e35c300be56efb07eb5c301be5040053e10300000a64004be20320a0e30010a0e133ff2fe120201be5003095e5030052e10100001a1cd04be2f0a89de8d1cb19eb')
 STOCK_LISTS={1404259372: '0200020102020203020402050206020d000e', 1404259056: '0200020102020203020402050206020d000e', 1404258836: '020202030204020502060207020c020d000e000f', 1404260112: '020202030204020502060207020c020d000f', 1404258956: '020202030204020502060207020d000e000f', 1404260432: '020202030204020502060207020c020d000e000f', 1404260364: '0200020102020203020402050206020d000e', 1404258988: '0200020102020203020402050206020d000e', 1404260332: '02000201020202030204020502060208020d000e', 1404259928: '02000201020202030204020502060209020d000e', 1404258768: '02000201020a0010', 1404258744: '0200020102020203020402050206020b020d000e', 1404258804: '02110200020102020203020402050206020d000e', 1404259428: '02110200020102020203020402050206020d000e', 1404259960: '0211020202030204020502060207020c020d000e000f', 1404259088: '0211020202030204020502060207020c020d000f', 1404260180: '0211020202030204020502060207020d000e000f', 1404260144: '0211020202030204020502060207020c020d000e000f', 1404260244: '02110200020102020203020402050206020d000e', 1404259868: '02110200020102020203020402050206020d000e', 1404260076: '021102000201020202030204020502060208020d000e', 1404259460: '021102000201020202030204020502060209020d000e', 1404258884: '021102000201020a0010', 1404260020: '02110200020102020203020402050206020b020d000e'}
 
-def build_detail(base,symbols,sd_library=True):
+def build_detail(base,symbols,sd_library=True,appended_slots=False):
  image=bytearray();entries={};blocks=[]
  def data(raw,label):
   image.extend(bytes(-len(image)&3));a=base+len(image);image.extend(raw);blocks.append([a,a+len(raw),label]);return a
@@ -30,16 +30,18 @@ def build_detail(base,symbols,sd_library=True):
  tables={}
  for variant,ids in DETAIL_IDS.items():
   table=bytearray(STOCK_TABLE)
-  for i in range(36):
+  if appended_slots:table+=STOCK_TABLE[:40]
+  for i in range(41 if appended_slots else 36):
    a,n=struct.unpack_from('<II',table,i*8)
    raw=bytes.fromhex(STOCK_LISTS[a]);assert len(raw)==n*2
+   if appended_slots:raw=b'';n=0
    a=data(raw+bytes(sum(([0,x] for x in ids),[])),'detail '+variant+' list '+str(i))
    struct.pack_into('<II',table,i*8,a,n+len(ids))
   tables[variant]=data(table,'dynamic '+variant+' detail tables')
  table_address=tables['halo']
  # Existing resource extension occupies IDs786..910. Reuse its text descriptors
  # for three captions, Grain and Soft Diffusion, avoiding another global hook.
- caption_ids=[862,863,864,827,828,913,914,915,916,917,933,997 if sd_library else 948]
+ caption_ids=[862,863,864,827,828,913,914,915,916,917,933,1013 if sd_library else 948]
  captions=data(STOCK_CAPTIONS+b''.join(struct.pack('<HH',i,i) for i in caption_ids),'detail caption pairs')
  # Each call site has already saved LR in the genuine stock prologue.
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:
@@ -104,4 +106,4 @@ def build_detail(base,symbols,sd_library=True):
  entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
  entries['reset']=stub('push {r4,lr};bl 0x532c282c;mov r1,r5;mov r0,#7;mov r2,#0;'+f'bl {hex(control)};pop {{r4,pc}}','preserve stock reset')
- return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(18,30)),'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,587,644,411,588,372,50,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}
+ return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(18,30)),'appended_slots':appended_slots,'variant_rows':41 if appended_slots else 36,'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,587,644,411,588,372,50,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}

@@ -10,6 +10,9 @@ EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'me
         50:'menu.redraw.before',51:'menu.redraw.after',60:'settings.commit.before',61:'settings.commit.after',
         70:'detail.change',71:'detail.reset',80:'page.enter.before',81:'page.enter.after',
         82:'page.key.before',83:'page.state.after',84:'page.draw.after',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',130:'capture.texture',131:'capture.texture.grain',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
+EVENTS.update({85:'ab.disp.route',86:'ab.setup.navigate',87:'ab.switch.result',88:'ab.controller.disp',89:'ab.setup.branch',90:'ab.owner',91:'ab.adj.scope',92:'ab.page.load',93:'ab.page.view',94:'ab.page.enter',95:'ab.raw.packet',96:'ab.navigation.return',99:'ab.navigation.gate'})
+EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
+EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
 EVENTS.update({102:'capture.rejected',121:'capture.image',125:'capture.request.identity',126:'capture.raw.lifetime',122:'capture.cpu-samples.before',
                123:'capture.cpu-samples.after',124:'capture.layout'})
 PROFILE_STAGES={1:'adapter.enter',2:'settings.before',3:'settings.after',4:'allocation.after',
@@ -35,14 +38,23 @@ GUARDS={1:'context',2:'recipe',3:'topology',4:'sequence-mode',5:'objects',6:'jpe
 def page_records(data):
     if len(data)!=4096:return None
     h=struct.unpack_from('<16I',data)
-    if h[0]!=0x4744564d or h[1]!=1 or h[3]>63 or h[4]>=63 or not 0<h[5]<0xffffff00 or h[5]<h[3] or h[6] not in (1,2,3) or h[15]!=zlib.crc32(data[:60]) or (h[3]<63 and h[4]!=h[3]):return None
+    if h[0]!=0x4744564d or h[1]!=1 or h[3]>63 or h[4]>=63 or not 0<h[5]<0xffffff00 or h[5]<h[3] or h[6] not in (1,2,3,4) or h[15]!=zlib.crc32(data[:60]) or (h[3]<63 and h[4]!=h[3]):return None
     records=[]
     for index in range(h[3]):
         raw=data[64+index*64:128+index*64];r=struct.unpack('<16I',raw)
         if r[0]!=0x474c564d or r[1]!=1 or not 0<r[2]<=h[5] or r[8]!=h[2] or r[9]!=h[6] or r[15]!=zlib.crc32(raw[:60]):return None
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
-                        'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io'}[r[9]]})
+                        'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab'}[r[9]]})
     for record in records:
+        if record['event']==208:
+            controller,route,kind,permission=record['arguments']
+            record['physical_disp']={'controller':hex(controller),'route':hex(route),'adj_type':kind,'phase1_enabled_before_dispatch':permission}
+        if record['event']==209:
+            controller,route,handled,mode=record['arguments']
+            record['disp_fallback']={'controller':hex(controller),'route':hex(route),'handled':handled,'host_mode':mode}
+        if record['event']==89:
+            key,reason,detail,value=record['arguments']
+            record['ab_branch']={'key':hex(key),'reason':{1:'invalid-model',2:'non-shooting-context',3:'private-submenu',4:'owner-unavailable',5:'release',6:'hold',7:'duplicate-down',8:'navigate',9:'pending-navigation-stale-a1'}.get(reason,reason),'detail':hex(detail),'value':value}
         if record['event']==102:
             context,guard,a,b=record['arguments']
             record['rejection']={'context':hex(context),'guard':GUARDS.get(guard,guard),

@@ -1,6 +1,7 @@
 /* Stock ImageControlDetailController adapter. No private allocator, shadow
  * settings or stock parameter storage. Callbacks follow stock immediate update
  * semantics; journal failure restores the visible slider to committed state. */
+#include "m10v_tone.h"
 #include "m10v_library.h"
 #include "m10v_debug.h"
 extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables, m10v_detail_phoenix_tables, m10v_detail_charmera_tables;
@@ -9,11 +10,11 @@ typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef void (*text_fn)(uint32_t,uint32_t,const char *);
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int slot(uint32_t ui){
- static const uint8_t tones[5]={12,18,19,20,21};
+
  if(!ram(ui,0x1a0))return -1;
  const uint8_t *m=(const uint8_t *)(uintptr_t)ui;
- if(m[0x199]>2||m[0x19a]>11||m[0x19b]||m[0x19d])return -1;
- for(uint32_t i=0;i<5;i++)if(m[0x198]==tones[i])return (int)i;
+ if(m[0x199]>2||m[0x19a]>=M10V_TONE_CHOICES||m[0x19b]||m[0x19d])return -1;
+ for(uint32_t i=0;i<5;i++)if(m[0x198]==m10v_slot_tone(i))return (int)i;
  return -1;
 }
 static int load(uint32_t ui,m10v_library_state *s){

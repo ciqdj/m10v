@@ -1,3 +1,4 @@
+#include "m10v_tone.h"
 #include "m10v_settings.h"
 #define CATALOG_LIMIT 256u
 static int ready(const m10v_settings_ops *o){return o&&o->load&&o->item&&o->install&&o->stamp&&o->film_name_stamp;}
@@ -11,15 +12,15 @@ static uint32_t value(const m10v_library_state *s,uint32_t field){
 int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t screen){
  if(!p||!ready(o))return -1;
  p->screen=M10V_SETTINGS_CLOSED;
- if(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP&&screen!=M10V_SETTINGS_NAME)return -1;
+ if(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP&&screen!=M10V_SETTINGS_NAME&&screen!=M10V_SETTINGS_AB)return -1;
  if(o->load(o->context,&p->saved)<0)return -1;
  if(p->saved.stamp>2||p->saved.format>3||p->saved.corner>3||p->saved.color>3)return -1;
  for(uint32_t i=0;i<5;i++)if(!p->saved.slots[i].film||(p->saved.slots[i].film>M10V_CUSTOM_MAX_ID&&p->saved.slots[i].film!=M10V_CHAR_ID))return -1;
  p->focus=p->slot=p->index=p->expected=p->value=p->error=0;
- p->screen=screen;if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
+ p->screen=screen;if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
 }
 void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key){
- if(!p||!ready(o)||key>M10V_KEY_NEXT)return;
+ if(!p||!ready(o)||key>M10V_KEY_DISP)return;
  uint32_t previous=key==M10V_KEY_LEFT||key==M10V_KEY_UP;
  uint32_t next=key==M10V_KEY_RIGHT||key==M10V_KEY_DOWN;
  if(p->screen==M10V_SETTINGS_FILMS){
@@ -31,6 +32,17 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
    uint32_t id=item(o,0);p->error=id?0:M10V_SETTINGS_EMPTY;
    if(id){p->slot=p->focus;p->index=0;p->expected=id;p->screen=M10V_SETTINGS_CATALOG;}
   }
+ }else if(p->screen==M10V_SETTINGS_AB){
+  p->value=0;
+  if(key==M10V_KEY_UP&&p->focus)p->focus--;
+  if(key==M10V_KEY_DOWN&&p->focus<3)p->focus++;
+  uint32_t *slot=p->focus==0?&p->slot:&p->index;
+  if(p->focus<2){
+   if(key==M10V_KEY_LEFT&&*slot)(*slot)--;
+   if(key==M10V_KEY_RIGHT&&*slot+1<M10V_TONE_CHOICES)(*slot)++;
+  }
+  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
+  if(key==M10V_KEY_OK&&p->focus>=2)p->value=p->focus-1;
  }else if(p->screen==M10V_SETTINGS_CATALOG){
   if(p->slot>=5||p->index>=CATALOG_LIMIT)return;
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_FILMS;p->focus=p->slot;p->error=0;return;}

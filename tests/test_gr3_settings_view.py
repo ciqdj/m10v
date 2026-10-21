@@ -116,6 +116,58 @@ class SettingsViewTests(unittest.TestCase):
    self.assertIn(p,range(0x10100000,self.heap))
    self.call(u,'destroy',0x10001000)
    self.assertEqual(bytes(u.mem_read(0x10001000,164)),bytes(164));self.assertFalse(self.live)
+ def test_ab_overlay_uses_original_text_tree_and_detaches_without_leaking(self):
+  from tests import test_gr3_settings_controller as adapter
+  adapter.ControllerLifetimeTests.setUpClass()
+  a=adapter.ControllerLifetimeTests
+  u=self.machine();self.heap=0x55110000
+  self.call(u,'create',0x10001000);root=self.widgets(u)[0];baseline=dict(self.live)
+  for at,blob in a.blobs:
+   u.mem_write(at,blob);u.ctl_remove_cache(at,at+len(blob))
+  owner=0x55040000;page=owner+0x13bc;ab=page+0x284;live=0x55050000
+  u.mem_write(page,struct.pack('<I',adapter.STUB+0x800))
+  u.mem_write(ab,struct.pack('<11I',1,5,1,0,1,34,0,0,0,0,0))
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner))
+  u.mem_write(live+0x15c,struct.pack('<I',root));clock=[1000]
+  reverse={addr:name for name,addr in a.externals.items() if adapter.STUB<=addr<adapter.STUB+0x100}
+  def hook(m,at,n,_):
+   name=reverse.get(at)
+   if name=='m10v_settings_controller_vtable':m.reg_write(UC_ARM_REG_R0,adapter.STUB+0x800)
+   elif name=='m10v_library_name':m.reg_write(UC_ARM_REG_R0,0x10000800)
+   elif name and name.startswith('m10v_ab_'):m.reg_write(UC_ARM_REG_R0,0)
+   elif at==0x532bd6b4:m.reg_write(UC_ARM_REG_R0,12)
+   elif at==0x53050b7c:
+    m.mem_write(m.reg_read(UC_ARM_REG_R0),struct.pack('<II',clock[0]//1000,(clock[0]%1000)*1000));m.reg_write(UC_ARM_REG_R0,0)
+   else:return
+   m.reg_write(UC_ARM_REG_PC,m.reg_read(UC_ARM_REG_LR))
+  u.hook_add(UC_HOOK_CODE,hook)
+  def call(name,*args):
+   for reg,val in zip((UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2),args):u.reg_write(reg,val)
+   u.reg_write(UC_ARM_REG_SP,0x100f0000);u.reg_write(UC_ARM_REG_LR,0x10000000)
+   try:u.emu_start(a.externals['m10v_settings_controller_ab_'+name],0x10000000,count=1000000)
+   except Exception as e:raise AssertionError((hex(u.reg_read(UC_ARM_REG_PC)),hex(u.reg_read(UC_ARM_REG_LR)),hex(u.reg_read(UC_ARM_REG_R0)))) from e
+   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x10000000)
+  call('live_enter',live,0x08000000,0)
+  widget=struct.unpack('<I',u.mem_read(ab+28,4))[0]
+  self.assertNotEqual(widget,0);self.assertEqual(struct.unpack('<I',u.mem_read(widget+4,4))[0],root)
+  text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,20)),'A  PORTRA\0'.encode('utf-16le'))
+  clock[0]=2600;call('live_event',live,0x10000100)
+  text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,4)),'A\0'.encode('utf-16le'))
+  call('live_leave',live)
+  self.assertEqual(self.live,baseline)
+  self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],0)
+ def test_ab_choices_include_actual_stock_high_contrast_black_and_white(self):
+  u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u)
+  self.state(u,6,1)
+  u.mem_write(0x10002000+112,struct.pack('<II',1,5))
+  self.call(u,'draw',0x10001000,0x10002000,0)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[33]+0xea,2))[0],860) # installed 800T
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[34]+0xea,2))[0],272) # native Hi-Contrast BW
+  p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(p,32)),'Hi-Contrast B&W\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
  def test_original_tree_film_selection_and_teardown(self):
   u=self.machine();self.assertEqual(self.call(u,'create',0x10001000),0)
   w=self.widgets(u);self.assertEqual(struct.unpack('<I',u.mem_read(0x100010a0,4))[0],37)

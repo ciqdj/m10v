@@ -22,7 +22,13 @@ def build_settings_hooks(base,symbols,live_color=False):
   at=base+len(image);exports[name]=data(struct.pack('<II',old,branch(at+4,a+4)))
  trampoline('m10v_settings_factory_original',0x5316f3b8,0xe300313b)
  trampoline('m10v_settings_top_dtor_original',0x5319667c,0xe1a0c00d)
+ ab_hooks=[]
+ for name,address in [('selector',0x53221a1c),('mapper',0x5320c844),('live_enter',0x5317696c),('live_leave',0x53176de4),('live_destroy',0x53170b50),('live_event',0x531771c0),('adj_event',0x531a4db8),('adj_refresh',0x531a4114),('adj_exit',0x531a3e88),('adj_destroy',0x5319ff24),('adj_changed',0x531a4cfc),('dispatch',0x5316d5dc)]:
+  old=0xe1d130b0 if name=='adj_event' else 0xe5d02270 if name=='adj_exit' else 0xe1a0c00d
+  trampoline('m10v_ab_'+name+'_original',address,old)
+  ab_hooks.append(dict(address=address,expected=old,replacement=branch(address,symbols['m10v_settings_controller_ab_'+name]),name='A/B '+name))
  table=list(BASE_VTABLE)
+ table[0x30//4]=symbols['m10v_settings_controller_ab_render']
  for offset,name in [(4,'destroy'),(8,'destroy'),(0x1c,'enter'),(0x24,'ready'),(0x28,'key')]:
   table[offset//4]=symbols['m10v_settings_controller_'+name]
  vt=data(struct.pack('<15I',*table))
@@ -40,4 +46,5 @@ def build_settings_hooks(base,symbols,live_color=False):
   patch(0x53b36bd0+i*8,bytes(8),struct.pack('<II',render,0),'Setup independent row renderer')
   word(0x53b36c88+i*4,0x10000000,[0x0200f100,0x0200f101,0x0200f103][i],'Setup independent destination')
  return bytes(image),dict(exports=exports,vtable=vt,rows=rows,patches=patches,owner_bytes=0x19bc if live_color else 0x193c,
-   private_routes=[0x0200f100,0x0200f101,0x0200f103],camera_tested=False)
+   private_routes=[0x0200f100,0x0200f101,0x0200f103,0x0200f104],ab_hooks=ab_hooks,
+   ab_host={'stage':'read-only','route':0x02000000,'menu_parent':0x02000012,'custom_root':False,'tone_changes':False},camera_tested=False)
