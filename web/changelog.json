@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.21.1",
+      "date": "2026-10-21",
+      "title": "修复自定义 LUT 的机内胶卷卡片、名称和图标",
+      "changes": [
+        "GR III／GR IIIx 自定义 LUT 胶卷卡片按填写名称生成字样与稳定配色，保留完整名称，不再错误套用 800T 图片。",
+        "影像控制与 ADJ 使用当前槽位已校验快照中的真实名称，并显示独立 LUT 图标；名称读取失败和图片内存分配失败均有安全回退。",
+        "保持旧 FILMS.M10、五槽存档、双 bank 快照、胶卷 ID 和 LUT 调色数值兼容，补充名称生命周期、图标篡改拒绝、目录翻页与原厂控件回归。",
+        "按用户本轮明确指令直接发布；尚未完成本候选相机实测。此次发布不包含本地 A/B 实验及其他未提交改动。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.20.9",
       "date": "2026-10-20",
       "title": "修复主机交换策略并重新验证完整发布",
@@ -10,9 +24,9 @@
         "保留上一轮 600 MiB 提前回收、700 MiB 内存硬上限与 384 MiB 交换上限，继续执行三机型顺序构建、型号保护和失败回滚；之前失败尝试不作为上线成功证据。",
         "包含水印放大、切卷首张选择与 ProImage 100／Aerochrome／2460／5203 名称调整；固件构建和线上检查仍不能替代相机刷入、首张效果与保存耗时实测。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "830907b6def12f2b5fa4a25a82a2ae1cb4084bc9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39451274337"
     },
     {
       "version": "2026.10.20.8",

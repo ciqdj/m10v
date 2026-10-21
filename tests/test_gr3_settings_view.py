@@ -30,7 +30,7 @@ class SettingsViewTests(unittest.TestCase):
    subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(card)],check=True,capture_output=True)
    cls.card,entries=link_object(card.read_bytes(),BASE+0x4000,prefix='m10v_film_card_')
    cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,**entries},prefix='m10v_settings_view_')
- def machine(self,fail_object=0,fail_cards=False,native_accessor=False):
+ def machine(self,fail_object=0,fail_cards=False,native_accessor=False,custom_names=None,catalog_ids=None):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   for addr,size in [(0x53000000,0x2000000),(0x55000000,0x1000000),(0x10000000,0x200000)]:u.mem_map(addr,size)
   u.mem_write(0x53000000,self.firmware);u.mem_write(BASE,self.code);u.mem_write(BASE+0x4000,self.card)
@@ -57,8 +57,12 @@ class SettingsViewTests(unittest.TestCase):
    elif a==0x540b60e0 and not native_accessor:uc.reg_write(UC_ARM_REG_R0,0x10004000)
    elif a==0x540b0000:uc.reg_write(UC_ARM_REG_R0,0x10000800)
    elif a==0x540b0010:
-    index=uc.reg_read(UC_ARM_REG_R1);uc.reg_write(UC_ARM_REG_R0,33+index if index<7 else 0)
-   elif a in (0x540b0020,0x540b0030):uc.reg_write(UC_ARM_REG_R0,0)
+    index=uc.reg_read(UC_ARM_REG_R1);uc.reg_write(UC_ARM_REG_R0,catalog_ids.get(index,0) if catalog_ids is not None else 33+index if index<7 else 0)
+   elif a in (0x540b0020,0x540b0030):
+    index=uc.reg_read(UC_ARM_REG_R0 if a==0x540b0020 else UC_ARM_REG_R1)
+    name=(custom_names or {}).get(index)
+    if name:uc.mem_write(uc.reg_read(UC_ARM_REG_R2),name.encode()+b'\0')
+    uc.reg_write(UC_ARM_REG_R0,int(name is not None))
    elif a in (0x536b93d0,0x53820074):self.fail('original assertion '+hex(a))
    else:return
    uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
@@ -186,5 +190,34 @@ class SettingsViewTests(unittest.TestCase):
    m=build(Path(folder),sd_library=True)
    texts=m['resources']['texts']
    self.assertEqual(texts[978-786:988-786],['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203'])
+
+ def test_custom_slot_cards_use_each_saved_name_and_safe_fallback_icon(self):
+  names={0:'LOMO',1:'Portra 400',2:'Night LUT',3:'My Film',4:'CUSTOM'}
+  u=self.machine(custom_names=names);self.call(u,'create',0x10001000);self.state(u,1,0)
+  for i in range(5):u.mem_write(0x10002000+12+8*i,struct.pack('<H',79+i))
+  self.call(u,'draw',0x10001000,0x10002000,0)
+  w=self.widgets(u);heap=w[39];images=[]
+  for i in range(5):images.append(bytes(u.mem_read(heap+i*120*196*4,120*196*4)))
+  self.assertEqual(len(set(images)),5)
+  text=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,24)),'1 / 5  LOMO\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+  u=self.machine(fail_cards=True);self.call(u,'create',0x10001000);self.state(u,1,0)
+  u.mem_write(0x10002000+12,struct.pack('<H',79));self.call(u,'draw',0x10001000,0x10002000,0)
+  w=self.widgets(u);self.assertEqual(struct.unpack('<H',u.mem_read(w[16]+0xea,2))[0],754)
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+
+ def test_custom_catalog_page_uses_each_absolute_index_and_complete_focus_name(self):
+  u=self.machine(custom_names={5:'LOMO',6:'Night LUT'},catalog_ids={5:79,6:80})
+  self.call(u,'create',0x10001000);self.state(u,2,0)
+  u.mem_write(0x10002000+116,struct.pack('<I',6))
+  u.mem_write(0x10003000,struct.pack('<5I',0,0,0x540b0010,0,0))
+  self.call(u,'draw',0x10001000,0x10002000,0x10003000)
+  w=self.widgets(u);heap=w[39]
+  self.assertNotEqual(bytes(u.mem_read(heap,120*196*4)),bytes(u.mem_read(heap+120*196*4,120*196*4)))
+  self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[1,1,0,0,0])
+  text=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,26)),'7  Night LUT\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
 
 if __name__=='__main__':unittest.main()

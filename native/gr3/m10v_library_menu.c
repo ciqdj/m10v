@@ -7,6 +7,9 @@
  */
 #include "m10v_library.h"
 #include "m10v_debug.h"
+#if M10V_SD_LIBRARY
+#include "m10v_sd_library.h"
+#endif
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -114,7 +117,12 @@ uint32_t m10v_menu_name(uint32_t translator, uint32_t tone) {
             /* Load initializes the compiled defaults even when storage is
              * unavailable. Never index a catalog with an unchecked journal. */
             m10v_camera_library_load(&state);
-            if (m10v_library_valid(&state)) return film_resource(state.slots[i].film);
+            if (m10v_library_valid(&state)) {
+#if M10V_SD_LIBRARY
+                if(state.slots[i].film>M10V_FILM_COUNT)return 991+i;
+#endif
+                return film_resource(state.slots[i].film);
+            }
         }
     }
     uint32_t id = resource(tone);
@@ -133,7 +141,12 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
     uint8_t *m=model();
     if(supported(m))for(uint32_t i=0;i<5;i++)if(tone==tones[i] || tone==208+i){
         m10v_library_state state;
-        if(m10v_camera_library_load(&state)>=0)return 670+state.slots[i].film;
+        if(m10v_camera_library_load(&state)>=0){
+#if M10V_SD_LIBRARY
+            if(state.slots[i].film>M10V_FILM_COUNT)return 754;
+#endif
+            return 670+state.slots[i].film;
+        }
     }
     return tone==128?671:tone>=128?0x224:((call2_fn)(M10V_NATIVE_BASE + 0x30u))(translator, tone);
 }
@@ -276,3 +289,19 @@ uint32_t m10v_menu_enter(uint32_t controller) {
     uint32_t result=((get_fn)(M10V_NATIVE_BASE + 0xb0u))(controller);
     M10V_LOG(11,controller,result,m[0],m[0x1d]);return result;
 }
+
+#if M10V_SD_LIBRARY
+/* The resource adapter reserves 80 bytes in the ORIGINAL getter's stack frame.
+ * Descriptor + UTF-16 live until that getter restores SP from FP; no retained
+ * heap pointer, writable ROM descriptor or shared scratch is published. The
+ * first 16 bytes remain available for original outgoing stack arguments. */
+uint32_t m10v_menu_custom_resource(uint32_t resource,uint32_t *out){
+ if(resource<991||resource>995||!out)return 0;
+ char name[24];const char *text="Custom LUT";m10v_library_state state;
+ if(m10v_camera_library_load(&state)>=0&&m10v_sd_camera_custom_name(&state,resource-991,name,sizeof(name)))text=name;
+ uint16_t *utf=(uint16_t *)(out+2);uint32_t n=0;
+ for(;n<23&&text[n];n++)utf[n]=(uint8_t)text[n];utf[n++]=0;
+ out[0]=n|0x100u;out[1]=(uint32_t)(uintptr_t)utf;
+ return (uint32_t)(uintptr_t)out;
+}
+#endif

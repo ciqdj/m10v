@@ -131,12 +131,12 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             'm10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_reset','m10v_camera_library_detail','m10v_camera_library_effects','m10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp'},
         'm10v_menu_': {'m10v_menu_count', 'm10v_menu_max_count', 'm10v_menu_index', 'm10v_menu_name',
             'm10v_menu_value_name', 'm10v_menu_icon', 'm10v_menu_value_icon', 'm10v_menu_focus',
-            'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter'},
+            'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter'} | ({'m10v_menu_custom_resource'} if 'm10v_sd_camera_custom_name' in (externals or {}) else set()),
         'm10v_capture_': {'m10v_capture_library'},
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
         'm10v_icon_': {'m10v_icon_pixels'},
-        'm10v_film_card_': {'m10v_film_card_render'},
+        'm10v_film_card_': {'m10v_film_card_render','m10v_film_card_custom'},
         'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
         'm10v_sd_camera_': {'m10v_sd_camera_item','m10v_sd_camera_install','m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name'},
         'm10v_debug_': {'m10v_debug_log','m10v_debug_batch'},
@@ -474,7 +474,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
         if sd_library:texts+=['HDF 模拟','左右选择 OK保存 MENU取消','关闭','弱','中','强','读取或保存失败','全局数字柔焦 · 独立于胶卷']
         texts+=['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
-        if sd_library:texts+=['胶卷名称：关闭','胶卷名称：开启','胶卷名称水印']
+        if sd_library:
+            texts+=['胶卷名称：关闭','胶卷名称：开启','胶卷名称水印']
+            texts+=['Custom LUT']*5
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
@@ -534,10 +536,31 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             ldr pc,=0x5339710c
             .ltorg
         '''.replace('#936',f'#{last_resource}'))
+        if sd_library:
+            text=resource_asm.read_text()
+            for name,target,register in [('primary',0x53396700,7),('secondary',0x5339710c,3)]:
+                code=f"""movw r3,#991
+            cmp r7,r3
+            blo .L{name}_static
+            movw r3,#995
+            cmp r7,r3
+            bhi .L{name}_static
+            sub sp,sp,#80
+            push {{r0-r12,lr}}
+            mov r0,r7
+            add r1,sp,#72
+            bl m10v_menu_custom_resource
+            str r0,[sp,#{register*4}]
+            pop {{r0-r12,lr}}
+"""
+                if name=='primary':code+="sub r8,fp,#0xb0\nmov r0,r8\n"
+                code+=f"ldr pc,={hex(target)}\n.L{name}_static:\n"
+                text=text.replace('m10v_resource_'+name+':','m10v_resource_'+name+':\n'+code)
+            resource_asm.write_text(text)
         subprocess.run([compiler, *FLAGS, '-c', str(resource_asm), '-o', str(resource_obj)], check=True, capture_output=True)
         resource_code_base = (base + len(image) + 15) & ~15
         resource_code, resource_symbols = link_object(resource_obj.read_bytes(), resource_code_base,
-            {'m10v_string_descriptors': resource_base}, 'm10v_resource_')
+            {'m10v_string_descriptors': resource_base,**symbols}, 'm10v_resource_')
         image += bytes(resource_code_base - base - len(image)) + resource_code; symbols.update(resource_symbols)
         chain_asm = folder / 'chain.S'; chain_obj = folder / 'chain.o'
         chain_asm.write_text('''
@@ -573,14 +596,20 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         stock_directory = (ROOT/'native/gr3/m10v_stock_icon_directory.bin').read_bytes()
         icon_pixels = (ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
         if len(stock_directory)!=671*4 or len(icon_pixels)!=78*6400: raise ValueError('icon inventory differs')
-        icon_count = 754 if sd_library else 749
+        icon_count = 755 if sd_library else 749
         icon_descriptors = icon_table + icon_count*4
-        icon_data = icon_descriptors + (83 if sd_library else 78)*8
-        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(83 if sd_library else 78))
+        icon_data = icon_descriptors + (84 if sd_library else 78)*8
+        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(84 if sd_library else 78))
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
+            image += struct.pack('<HHI',40,40,(icon_data+len(icon_pixels))//4)
         image += icon_pixels
+        if sd_library:
+            from scripts.generate_m10v_film_cards import custom_icon
+            custom_pixels=(ROOT/'native/gr3/m10v_custom_icon.rgba').read_bytes()
+            if custom_pixels!=custom_icon():raise ValueError('custom LUT icon differs from source')
+            image += custom_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
             .syntax unified
@@ -611,7 +640,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             # live view owner has published a valid RAM descriptor directory.
             for i,index in enumerate((32,65,66,67,34)):
                 struct.pack_into('<I',image,icon_table-base+(749+i)*4,icon_descriptors+index*8)
-            text=icon_asm.read_text().replace('movw ip,#748','movw ip,#753')
+            text=icon_asm.read_text().replace('movw ip,#748','movw ip,#754')
             for name,reg,idreg,ret in [('width',3,1,0x53209fd4),('height',3,1,0x5320a008),('draw',2,3,0x5320a80c)]:
                 text+=f"\n.global m10v_icon_directory_{name}\n.type m10v_icon_directory_{name},%function\nm10v_icon_directory_{name}:\n"
                 text+="push {r0-r12,lr}\nmrs ip,cpsr\npush {ip,lr}\n"
@@ -645,7 +674,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'abi': 'M10V state104 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
     if sd_library:
-        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','scripts/generate_m10v_film_cards.py']})
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','scripts/generate_m10v_film_cards.py','native/gr3/m10v_custom_icon.rgba']})
     manifest['sd_library']=sd_library
     manifest['film_library_enabled']=film_library
     manifest['hdf_menu']=hdf_menu_report
@@ -715,6 +744,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if offset<0:raise ValueError('new stock LUT absent from compiled image')
         manifest['film_newstocks'].append({'film_id':73+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
     manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
+    if sd_library:manifest['custom_film_display']={'name_resources':[991,995],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-derived-uppercase-alphanumeric-prefix-5-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest

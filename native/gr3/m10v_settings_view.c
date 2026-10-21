@@ -102,10 +102,16 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
   if(id){
-   uint32_t icon=670+id;
+   uint32_t icon=id>M10V_FILM_COUNT?754:670+id;
    if(v->widgets[39]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
-    m10v_film_card_render(pixels,id>M10V_FILM_COUNT?33:id,i,i==focus);
+    if(id>M10V_FILM_COUNT){
+     char name[24];uint32_t index=(s->index/5)*5+i;
+     int ok=s->screen==M10V_SETTINGS_CATALOG?
+      m10v_sd_camera_catalog_name(index,id,name,sizeof(name)):
+      m10v_sd_camera_custom_name(&s->saved,i,name,sizeof(name));
+     m10v_film_card_custom(pixels,ok?name:"LUT",i,i==focus);
+    }else m10v_film_card_render(pixels,id,i,i==focus);
     uint32_t *all=card_descriptors(v),*d=all+i*2;
     d[0]=M10V_CARD_WIDTH|(M10V_CARD_HEIGHT<<16);d[1]=ptr(pixels)/4;
     all[10+i]=ptr(d);

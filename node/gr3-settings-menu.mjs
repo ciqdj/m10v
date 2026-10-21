@@ -1,5 +1,5 @@
 // Independent readback contract for the two owned settings controllers.
-export const settingsSources=['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','scripts/generate_m10v_film_cards.py','native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','scripts/build_gr3_settings_hooks.py'];
+export const settingsSources=['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_custom_icon.rgba','scripts/generate_m10v_film_cards.py','native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','scripts/build_gr3_settings_hooks.py'];
 const need=(c,m)=>{if(!c)throw Error('independent settings: '+m);};
 const movw=(r,v)=>(0xe3000000|((v&0xf000)<<4)|(r<<12)|(v&0xfff))>>>0;
 const movt=(r,v)=>(movw(r,v)|0x00400000)>>>0;

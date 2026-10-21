@@ -88,6 +88,20 @@ class SdCameraTests(unittest.TestCase):
   self.card=b''
   self.assertEqual(self.call('m10v_sd_camera_custom_name',0x5500a000,0,0x5500c000,24),1)
   self.assertEqual(self.string(0x5500c000),'My Film')
+  def model(uc,pc,size,data):
+   if pc in (0x5320ad88,0x5320ba9c):
+    uc.reg_write(UC_ARM_REG_R0,0x55006000 if pc==0x5320ad88 else 0x55068200)
+    uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+  self.u.hook_add(UC_HOOK_CODE,model)
+  self.u.mem_write(0x55068200,bytes([12])+bytes(31))
+  self.assertEqual(self.call('m10v_menu_name',0,12),991)
+  self.assertEqual(self.call('m10v_menu_name',0,208),991)
+  self.assertEqual(self.call('m10v_menu_icon',0,12),754)
+  self.assertEqual(self.call('m10v_menu_icon',0,208),754)
+  self.assertEqual(self.call('m10v_menu_custom_resource',991,0x5500c000),0x5500c000)
+  header=bytes(self.u.mem_read(0x5500c000,8));text=self.n(0x5500c004)
+  self.assertEqual(bytes(self.u.mem_read(text,header[0]*2)).decode('utf-16le'),'My Film\0')
+  self.assertEqual((self.opened,self.allocated),(0,0))
   self.card=custom_pack
   self.fail_state=True
   self.assertNotEqual(self.call('m10v_sd_camera_install',0,0,79,0),0)
@@ -220,3 +234,25 @@ class SdCameraTests(unittest.TestCase):
   self.fail_stat=False;self.card=b''
   self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
   self.assertEqual((self.opened,self.allocated),(0,0))
+
+ def test_custom_resource_adapters_keep_descriptor_alive_and_original_registers(self):
+  from unicorn.arm_const import UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12
+  regs=[UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12]
+  for name,target,outreg in [('primary',0x53396700,UC_ARM_REG_R7),('secondary',0x5339710c,UC_ARM_REG_R3)]:
+   for resource in range(991,991):
+    u=self.u;seen=[];sp=0x550fe000
+    def stop(uc,pc,size,data):
+     if pc==target:seen.append(pc);uc.emu_stop()
+    handle=u.hook_add(UC_HOOK_CODE,stop)
+    for i,r in enumerate(regs):u.reg_write(r,0x55080000+i*256)
+    u.reg_write(UC_ARM_REG_R7,resource);u.reg_write(UC_ARM_REG_SP,sp);u.reg_write(UC_ARM_REG_LR,0x550ff000)
+    before={r:u.reg_read(r) for r in regs}
+    u.emu_start(self.manifest['symbols']['m10v_resource_'+name],0x550ff000,count=1000000)
+    u.hook_del(handle);self.assertEqual(seen,[target])
+    self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp-80)
+    ptr=u.reg_read(outreg);self.assertEqual(ptr,sp-64)
+    header=bytes(u.mem_read(ptr,8));text=self.n(ptr+4)
+    self.assertEqual(bytes(u.mem_read(text,header[0]*2)).decode('utf-16le'),'Custom LUT\0')
+    for r in regs:
+     if r not in ([UC_ARM_REG_R0,UC_ARM_REG_R3,UC_ARM_REG_R7,UC_ARM_REG_R8] if name=='primary' else [UC_ARM_REG_R3]):self.assertEqual(u.reg_read(r),before[r])
+    self.assertEqual((self.opened,self.allocated),(0,0));self.assertEqual(self.calls,[])

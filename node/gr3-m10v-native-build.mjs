@@ -138,13 +138,20 @@ function checkRuntime(runtime, manifest) {
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,(manifest.sd_library?754:749)*4],[icons.descriptors,(manifest.sd_library?83:78)*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+(manifest.sd_library?754:749)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?83:78)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(const [address,length] of [[icons.table,(manifest.sd_library?755:749)*4],[icons.descriptors,(manifest.sd_library?84:78)*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+(manifest.sd_library?755:749)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?84:78)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
   for(let i=0;i<78;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
   }
   if(manifest.sd_library){
+    const custom=manifest.custom_film_display,icon=readFileSync(new URL('../native/gr3/m10v_custom_icon.rgba',import.meta.url));
+    const descriptor=icons.descriptors+83*8,at=descriptor-BASE,pixels=icons.pixels+78*6400;
+    need(custom?.icon_id===754&&custom.icon_sha256===sha(icon)&&icon.length===6400&&
+      runtime.readUInt32LE(icons.table-BASE+754*4)===descriptor&&
+      runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
+      runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
+    need(JSON.stringify(custom.name_resources)==='[991,995]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
     need(c?.first_id===749&&c.last_id===753&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
@@ -153,7 +160,7 @@ function checkRuntime(runtime, manifest) {
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?205:161;
+  const resourceCount=manifest.sd_library?210:161;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {

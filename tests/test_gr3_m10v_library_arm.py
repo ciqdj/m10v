@@ -507,6 +507,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual([self.call(u, 'm10v_menu_name', 0, 144 + i) for i in range(32)], list(range(786, 818)))
 
     def test_private_utf16_resource_hooks_preserve_stock_fallback_and_locale(self):
+        static_last=990 if self.manifest['resources']['last_id']==995 else self.manifest['resources']['last_id']
         u = self.machine(); stop = 0x550ff000; table = 0x55008000; stock_record = 0x55009000
         for language in (0, 1, 20): u.mem_write(0x55002bac + 4 * language, struct.pack('<I', table))
         for identifier in (4, 785, self.manifest['resources']['last_id']+1): u.mem_write(table + identifier * 4, struct.pack('<I', stock_record))
@@ -515,8 +516,8 @@ class FilmLibraryArmTests(unittest.TestCase):
             if address in (0x53396700, 0x5339710c): calls.append(address); uc.reg_write(UC_ARM_REG_PC, stop)
         u.hook_add(UC_HOOK_CODE, done)
         for language in (0, 1, 20):
-            for identifier in (4, 785, 786, 817, 859, 936, self.manifest['resources']['last_id'],self.manifest['resources']['last_id']+1):
-                expected = (stock_record if identifier < 786 or identifier>self.manifest['resources']['last_id'] else self.manifest['resources']['descriptors'][identifier - 786])
+            for identifier in (4, 785, 786, 817, 859, 936, static_last,self.manifest['resources']['last_id']+1):
+                expected = (stock_record if identifier < 786 or identifier>static_last else self.manifest['resources']['descriptors'][identifier - 786])
                 for symbol, continuation in (('m10v_resource_primary', 0x53396700), ('m10v_resource_secondary', 0x5339710c)):
                     u.reg_write(UC_ARM_REG_R7, identifier); u.reg_write(UC_ARM_REG_R9, language)
                     u.reg_write(UC_ARM_REG_R0, language); u.reg_write(UC_ARM_REG_R11, 0x550fe080)
@@ -530,7 +531,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.manifest=build(Path(tmp),sd_library=True)
             self.code=(Path(tmp)/'m10v-library-arm.bin').read_bytes()
-        self.assertEqual(self.manifest['resources']['last_id'],990)
+        self.assertEqual(self.manifest['resources']['last_id'],995)
         self.test_private_utf16_resource_hooks_preserve_stock_fallback_and_locale()
 
     def test_v2_journal_migrates_to_v3_and_keeps_old_bytes_on_failed_save(self):

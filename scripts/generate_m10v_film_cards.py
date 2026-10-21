@@ -70,3 +70,18 @@ def generate():
  rows+=['};','']
  return '\n'.join(rows)
 if __name__=='__main__':(ROOT/'native/gr3/m10v_film_card_data.h').write_text(generate())
+
+
+def custom_icon():
+    """Original 40px LUT cartridge; distinct from every built-in stock."""
+    pixels=bytearray(40*40*4)
+    def rect(x,y,w,h,color):
+        for yy in range(y,y+h):
+            for xx in range(x,x+w):pixels[(yy*40+xx)*4:(yy*40+xx+1)*4]=bytes(color)
+    rect(8,3,24,34,(30,42,47,255));rect(11,7,20,25,(80,139,157,255))
+    rect(11,12,20,10,(241,233,208,255))
+    for k,rows in enumerate(((4,4,4,4,7),(5,5,5,5,7),(7,2,2,2,2))):
+        for y,bits in enumerate(rows):
+            for x in range(3):
+                if bits&(4>>x):rect(15+k*4+x,14+y,1,1,(36,49,51,255))
+    return bytes(pixels)
