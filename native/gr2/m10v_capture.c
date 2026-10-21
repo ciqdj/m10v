@@ -4,24 +4,67 @@
 _Static_assert(sizeof(m10v_gr2_frame)==128,"GR II inline frame ABI changed");
 static int valid(uint32_t p,uint32_t n){return p&&n&&n<=UINT32_MAX-p;}
 static int overlaps(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}
-static int hits(uint32_t p,uint32_t n,uint32_t y,uint32_t yn,uint32_t c,uint32_t cn){
-    return !valid(p,n)||overlaps(p,n,y,yn)||overlaps(p,n,c,cn);
+static int hits(uint32_t p,uint32_t n,uint32_t y,uint32_t yn,uint32_t u,uint32_t v,uint32_t cn){
+    return !valid(p,n)||overlaps(p,n,y,yn)||overlaps(p,n,u,cn)||overlaps(p,n,v,cn);
+}
+static int span(uint32_t,uint32_t *,uint32_t *,int);
+static int render_borrowed(const m10v_gr2_image *im,const m10v_library_state *state,uint32_t slot,
+                           const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t scratch_bytes,const uint8_t *record){
+    typedef uint32_t (*borrow_fn)(uint32_t,uint32_t,const char *,uint32_t);
+    typedef void (*release_fn)(uint32_t *,const char *,uint32_t);
+    static const char label[]="m10v-planar";
+    /* Tag2E is the original32MiB scratch lease, not the small C heap. Polling
+     * avoids waiting while the encoder retains its original output handle. */
+    uint32_t handle=((borrow_fn)(uintptr_t)0xA029A94Fu)(0x2e,0,label,1);
+    if(!handle)return -2;
+    uint32_t address=0,capacity=0,pixels=im->width*im->height,needed=pixels*2u;
+    int result=-2;
+    uint32_t y=(uint32_t)(uintptr_t)im->y,u=(uint32_t)(uintptr_t)im->u,v=(uint32_t)(uintptr_t)im->v;
+    if(!span(handle,&address,&capacity,0)||capacity<needed||
+       hits(address,needed,y,im->y_stride*im->height,u,v,im->chroma_stride*im->height)||
+       overlaps(address,needed,(uint32_t)(uintptr_t)im,sizeof(*im))||
+       overlaps(address,needed,(uint32_t)(uintptr_t)state,sizeof(*state))||
+       (date&&overlaps(address,needed,(uint32_t)(uintptr_t)date,sizeof(*date)))||
+       (scratch_bytes&&overlaps(address,needed,(uint32_t)(uintptr_t)scratch,scratch_bytes))||
+       (record&&overlaps(address,needed,(uint32_t)(uintptr_t)record,M10V_SD_RECORD_BYTES)))goto done;
+    uint8_t *work=(uint8_t *)(uintptr_t)address;
+    for(uint32_t row=0;row<im->height;row++)for(uint32_t x=0;x<im->width;x++)
+        work[row*im->width+x]=im->y[row*im->y_stride+x];
+    for(uint32_t row=0;row<im->height;row++)for(uint32_t x=0;x<im->width/2u;x++){
+        uint32_t to=pixels+row*im->width+2u*x,from=row*im->chroma_stride+x;
+        work[to]=im->u[from];work[to+1u]=im->v[from];
+    }
+    m10v_library_image paired={work,work+pixels,pixels,pixels,im->width,im->height,im->width};
+    result=record?m10v_library_render_custom(&paired,state,slot,date,seed,scratch,scratch_bytes,0,record+64,(const char *)(record+16)):
+                  m10v_library_render(&paired,state,slot,date,seed,scratch,scratch_bytes);
+    if(!result){
+        for(uint32_t row=0;row<im->height;row++)for(uint32_t x=0;x<im->width;x++)
+            im->y[row*im->y_stride+x]=work[row*im->width+x];
+        for(uint32_t row=0;row<im->height;row++)for(uint32_t x=0;x<im->width/2u;x++){
+            uint32_t from=pixels+row*im->width+2u*x,to=row*im->chroma_stride+x;
+            im->u[to]=work[from];im->v[to]=work[from+1u];
+        }
+    }
+done:
+    ((release_fn)(uintptr_t)0xA029AA1Bu)(&handle,label,2);return result;
 }
 static int render_planar(const m10v_gr2_image *im,const m10v_library_state *state,uint32_t slot,
                       const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t scratch_bytes,const uint8_t *record){
     if(!im||!m10v_library_valid(state)||slot>=5||im->format!=0x422||im->width<2||im->width>4928||
        im->height<2||im->height>3264||(im->width&1)||(im->height&1)||im->y_stride<im->width||
-       im->y_stride>16384||im->chroma_stride>8192||im->chroma_stride*2!=im->y_stride)return -1;
+       im->y_stride>16384||im->chroma_stride>8192||im->chroma_stride<im->width/2u)return -1;
     uint32_t yn=im->y_stride*im->height,cn=im->chroma_stride*im->height;
     uint32_t y=(uint32_t)(uintptr_t)im->y,u=(uint32_t)(uintptr_t)im->u,v=(uint32_t)(uintptr_t)im->v;
-    if(im->y_bytes<yn||im->u_bytes!=cn||im->v_bytes!=cn||!valid(y,yn)||!valid(u,2*cn)||u+cn!=v||overlaps(y,yn,u,2*cn))return -1;
-    if(hits((uint32_t)(uintptr_t)im,sizeof(*im),y,yn,u,2*cn)||
-       hits((uint32_t)(uintptr_t)state,sizeof(*state),y,yn,u,2*cn)||
-       (date&&hits((uint32_t)(uintptr_t)date,sizeof(*date),y,yn,u,2*cn))||
-       (scratch_bytes&&hits((uint32_t)(uintptr_t)scratch,scratch_bytes,y,yn,u,2*cn)))return -1;
+    if(im->y_bytes<yn||im->u_bytes!=cn||im->v_bytes!=cn||!valid(y,yn)||!valid(u,cn)||!valid(v,cn)||overlaps(y,yn,u,cn)||overlaps(y,yn,v,cn)||overlaps(u,cn,v,cn))return -1;
+    if(hits((uint32_t)(uintptr_t)im,sizeof(*im),y,yn,u,v,cn)||
+       hits((uint32_t)(uintptr_t)state,sizeof(*state),y,yn,u,v,cn)||
+       (date&&hits((uint32_t)(uintptr_t)date,sizeof(*date),y,yn,u,v,cn))||
+       (scratch_bytes&&hits((uint32_t)(uintptr_t)scratch,scratch_bytes,y,yn,u,v,cn)))return -1;
     uint32_t film=state->slots[slot].film;
     if((film>M10V_FILM_COUNT)!=!!record)return -1;
-    if(record&&(hits((uint32_t)(uintptr_t)record,M10V_SD_RECORD_BYTES,y,yn,u,2*cn)||m10v_sd_record(record,M10V_SD_RECORD_BYTES,film)!=film))return -1;
+    if(record&&(hits((uint32_t)(uintptr_t)record,M10V_SD_RECORD_BYTES,y,yn,u,v,cn)||m10v_sd_record(record,M10V_SD_RECORD_BYTES,film)!=film))return -1;
+    if(im->chroma_stride*2u!=im->y_stride||u+cn!=v)
+        return render_borrowed(im,state,slot,date,seed,scratch,scratch_bytes,record);
     m10v_library_image paired={im->y,im->u,yn,2*cn,im->width,im->height,im->y_stride};
     if(!gr2_chroma_shuffle(im->u,cn,0))return -1;
     int result=record?m10v_library_render_custom(&paired,state,slot,date,seed,scratch,scratch_bytes,0,record+64,(const char *)(record+16)):

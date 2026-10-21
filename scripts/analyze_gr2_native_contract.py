@@ -1076,7 +1076,7 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
-def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False,postprocess_effect:int|None=None)->dict:
+def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False,postprocess_effect:int|None=None,postprocess_original_prepare:bool=False,postprocess_render:bool=False,postprocess_handoff_clone:bool=False)->dict:
     """Actual system MPL -> BUFF -> IMG factories and kernel pool identities.
 
     Empty kernel tables and synchronization services are fixtures. Linear and
@@ -1107,13 +1107,15 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def memory(machine,access,address,size,value,unused):
         page=address&~4095
-        if not 0xA0900000<=page<0xBFDC0000 or len(pages)>=512:return False
+        physical=(page&0x1FFFFFFF)|0xA0000000
+        if not (0xA0900000<=page<0xBFDC0000 or postprocess_render and 0x20000000<=page<0x40000000 and 0xA0900000<=physical<0xBFDC0000) or len(pages)>=512:return False
         machine.mem_map(page,4096);pages.append(page);return True
     uc.hook_add(UC_HOOK_MEM_INVALID,memory)
     def run(entry,*args,thumb=True):
         nonlocal abi
         for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
         for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(reg,value)
+        for index,value in enumerate(args[4:]):uc.mem_write(0x50018000+4*index,struct.pack('>I',value))
         uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F000|int(thumb))
         try:uc.emu_start(entry|int(thumb),0x5001F000,count=1000000)
         except Exception as error:raise RuntimeError(f'ordered capture probe stopped at{uc.reg_read(r.UC_ARM_REG_PC):08x}, r0={uc.reg_read(r.UC_ARM_REG_R0):08x}, r1={uc.reg_read(r.UC_ARM_REG_R1):08x}') from error
@@ -1181,6 +1183,7 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
     if postprocess_effect is not None:
         if type(postprocess_effect) is not int or postprocess_effect not in (0,7,12,16,17,19):raise ValueError('audited original effect required')
         properties={};property_calls=[]
+        ring=word(0xA06BC708+20*word(0xA06BCC6C+4*0x2e));ring_before=bytes(uc.mem_read(ring,832))
         def property_boundary(machine,address,size,unused):
             key=machine.reg_read(r.UC_ARM_REG_R0);value=machine.reg_read(r.UC_ARM_REG_R1)
             property_calls.append([address,key,value]);result=0
@@ -1188,11 +1191,19 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
             elif address==0xA00E0C94:properties[key]=value
             machine.reg_write(r.UC_ARM_REG_R0,result);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
         for address in (0xA00E127A,0xA00E1286,0xA00E0E2E,0xA00E0C94):uc.hook_add(UC_HOOK_CODE,property_boundary,begin=address,end=address)
-        jpeg=run(0xA029A94E,0x17,0,0,0);jpeg_data=word(jpeg+4);packets=[]
-        uc.mem_write(source+0x1F0,struct.pack('>I',jpeg))
-        for offset,value in ((0x218,1),(0x21c,4928*3264),(0x220,4928*3264*3//2),(0x224,4928),(0x228,2464),(0x22c,3264),(0x258,0xcc01340),(0x418,1)):
-            uc.mem_write(source+offset,struct.pack('>I',value))
+        packets=[];raw_handle=0
         uc.mem_write(source+0x408,bytes([postprocess_effect]))
+        uc.mem_write(source+0x258,struct.pack('>I',0xcc01340));uc.mem_write(source+0x3e4,struct.pack('>I',0xcc01340))
+        if postprocess_original_prepare:
+            raw_handle=run(0xA029A94E,0x13,0,0,0);uc.mem_write(source+0x1e0,struct.pack('>I',raw_handle))
+            for address in (0xA02AB5F2,0xA02AB61C,0xA00361E0):uc.hook_add(UC_HOOK_CODE,property_boundary,begin=address,end=address)
+            run(0xA02AE7EA,source);jpeg=word(source+0x1f0)
+        else:
+            jpeg=run(0xA029A94E,0x17,0,0,0);uc.mem_write(source+0x1F0,struct.pack('>I',jpeg))
+            for offset,value in ((0x218,1),(0x21c,4928*3264),(0x220,4928*3264*3//2),(0x224,4928),(0x228,2464),(0x22c,3264)):
+                uc.mem_write(source+offset,struct.pack('>I',value))
+        jpeg_data=word(jpeg+4);jpeg_capacity=word(jpeg+20);uc.mem_write(source+0x418,struct.pack('>I',1))
+        plane_metadata=list(struct.unpack('>14I',uc.mem_read(source+0x218,56)));reserved_before=word(source+0x1f8)
         pending={}
         def engine_boundary(machine,address,size,unused):
             if address==0x5001E000:
@@ -1213,11 +1224,63 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         for packet in packets:
             packet['retired_workspace_bytes']=run(native_runtime['symbols']['gr2_hdf_workspace_bytes'],packet['scratch'][0],thumb=False)
             packet['scratch_retired']=[bytes(uc.mem_read(handle,4))!=b'BUFF' if handle else False for handle in packet['scratch_handles']]
-        primary_retained=word(source+0x1F0)==jpeg and bytes(uc.mem_read(jpeg,4))==b'BUFF'
+        rendered={}
+        if postprocess_render:
+            if not postprocess_original_prepare:raise ValueError('original padded preparation required')
+            for offset,value in ((0,jpeg_data),(4,0),(8,0)):uc.mem_write(0x50002800+offset,struct.pack('>I',value))
+            run(0xA02AD260,0x50002800,0x50002804,0x50002808,source,0xFFFFFFFF,3)
+            addresses=list(struct.unpack('>3I',uc.mem_read(0x50002800,12)));width,height=32,8
+            pitches=[plane_metadata[3],plane_metadata[4],plane_metadata[4]];before_planes=[]
+            for address,pitch in zip(addresses,pitches):
+                for page in range(address&~4095,(address+pitch*height+4095)&~4095,4096):
+                    if not any(lo<=page<=hi for lo,hi,perm in uc.mem_regions()):
+                        if not memory(uc,0,page,4096,0,None):raise RuntimeError('synthetic uncached pixel RAM outside original arena')
+                uc.mem_write(address,b'\xA5'*(pitch*height))
+            luma=bytes((i*31+9)%256 for i in range(width*height));chroma=bytes((i*7+83)%256 for i in range(width*height))
+            for row in range(height):
+                uc.mem_write(addresses[0]+row*pitches[0],luma[row*width:(row+1)*width])
+                uc.mem_write(addresses[1]+row*pitches[1],chroma[row*width:(row+1)*width:2])
+                uc.mem_write(addresses[2]+row*pitches[2],chroma[row*width+1:(row+1)*width:2])
+            before_planes=[bytes(uc.mem_read(address,pitch*height)) for address,pitch in zip(addresses,pitches)]
+            run(native_runtime['symbols']['m10v_library_init'],0x50003800,thumb=False)
+            uc.mem_write(0x50006000,luma+chroma)
+            uc.mem_write(0x50003100,struct.pack('>7I',0x50006000,0x50006100,256,256,width,height,width))
+            reference=run(native_runtime['symbols']['m10v_library_render'],0x50003100,0x50003800,0,0,1234,0,0,thumb=False)
+            expected_pixels=bytes(uc.mem_read(0x50006000,512))
+            uc.mem_write(0x50003000,struct.pack('>11I',*addresses,pitches[0]*height,pitches[1]*height,pitches[2]*height,width,height,pitches[0],pitches[1],0x422))
+            result=run(native_runtime['symbols']['gr2_render_planar'],0x50003000,0x50003800,0,0,1234,0,0,thumb=False)
+            expected=[bytearray(data) for data in before_planes]
+            for row in range(height):
+                expected[0][row*pitches[0]:row*pitches[0]+width]=expected_pixels[row*width:(row+1)*width]
+                expected[1][row*pitches[1]:row*pitches[1]+width//2]=expected_pixels[256+row*width:256+(row+1)*width:2]
+                expected[2][row*pitches[2]:row*pitches[2]+width//2]=expected_pixels[257+row*width:256+(row+1)*width:2]
+            rendered=dict(result=result,reference_result=reference,all_pixels_and_padding_match=all(bytes(uc.mem_read(address,pitch*height))==wanted for address,pitch,wanted in zip(addresses,pitches,expected)),
+                          scope='Small32x8 region in original full-resolution padded allocations, native adapter plus original tag2E SDK/ring allocation and release. Synthetic uncached RAM aliases are independent backing; no cache/DMA-coherence claim.')
+        primary_retained=word(source+0x1F0)==jpeg and bytes(uc.mem_read(jpeg,4))==b'BUFF';handoff={}
+        if postprocess_handoff_clone:
+            if not postprocess_original_prepare:raise ValueError('original padded preparation required for handoff clone')
+            frozen=run(native_runtime['symbols']['gr2_hdf_frame_freeze'],source,3,77,thumb=False)
+            run(0xA02AE0AE,source);clone=run(0xA00E1E9E,source);cloned_jpeg=word(clone+0x1f4)
+            read=run(native_runtime['symbols']['gr2_hdf_frame_read'],clone,0x50002900,thumb=False);guard_calls=[]
+            def observe_guard(machine,address,size,unused):guard_calls.append(address)
+            uc.hook_add(UC_HOOK_CODE,observe_guard,begin=0xA02AF6CE,end=0xA02AF6CE)
+            for begin,stop,base_register in ((0xA02AEDB8,0xA02AEDC4,r.UC_ARM_REG_R6),(0xA02AEF28,0xA02AEF34,r.UC_ARM_REG_R5)):
+                uc.reg_write(r.UC_ARM_REG_R4,clone);uc.reg_write(base_register,clone+0x1c0);uc.reg_write(r.UC_ARM_REG_SP,0x50018000)
+                uc.emu_start(begin|1,stop,count=1000)
+                if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=0x50018000:raise RuntimeError('original completed-clone postprocessor guard differs')
+            handoff=dict(source_primary_cleared=word(source+0x1f0)==0,clone_primary_cleared=word(clone+0x1f0)==0,
+                         distinct_shared_jpeg=cloned_jpeg!=jpeg and word(cloned_jpeg+4)==jpeg_data,
+                         hdf_freeze=frozen,hdf_read=read,hdf_values=list(struct.unpack('>2I',uc.mem_read(0x50002904,8))) if read else None,
+                         postprocessor_guard_calls=guard_calls)
+            for offset in (0x1f4,0x1e0):
+                if word(clone+offset):run(0xA029AA1A,clone+offset,0,0,0)
+            run(0xA00E2020,clone)
         uc.mem_write(0x50001000,struct.pack('>I',jpeg));run(0xA029AA1A,0x50001000,0,0,0)
-        uc.mem_write(source+0x1F0,bytes(4))
-        postprocessor=dict(effect=postprocess_effect,packets=packets,primary_retained=primary_retained,jpeg_data=jpeg_data,property_counters_balanced=all(value==0 for value in properties.values()),
-                           scope="Original complete postprocessor A02AF6CE, real pool/BUFF allocation-access-release and packet construction. Property bank/lock and OS synchronization are fixtures. ISP dispatcher is an explicit boundary; native workspace predicate executes there before synthetic engine return. No pixel processing, physical completion, clone scheduling or live pipeline proof.")
+        uc.mem_write(source+0x1F0,bytes(4));uc.mem_write(source+0x1f4,bytes(4))
+        if raw_handle:
+            uc.mem_write(0x50001000,struct.pack('>I',raw_handle));run(0xA029AA1A,0x50001000,0,0,0);uc.mem_write(source+0x1e0,bytes(4))
+        postprocessor=dict(handoff=handoff,rendered=rendered,ring_restored=bytes(uc.mem_read(ring,832))==ring_before,original_prepare=postprocess_original_prepare,reserved_before=reserved_before,reserved_after=word(source+0x1f8),jpeg_capacity=jpeg_capacity,plane_metadata=plane_metadata,effect=postprocess_effect,packets=packets,primary_retained=primary_retained,jpeg_data=jpeg_data,property_counters_balanced=all(value==0 for value in properties.values()),
+                           scope="Original complete postprocessor A02AF6CE, real pool/BUFF allocation-access-release and packet construction. Property bank/lock, progress/task notifications and OS synchronization are fixtures. Optional A02AE7EA original preparation owns RAW/primary/reserved scratch and constructs padded plane metadata. ISP dispatcher is an explicit boundary; native workspace predicate executes there before synthetic engine return. No pixel processing, physical completion, clone scheduling or live pipeline proof.")
     run(0xA00E2020,source);retired=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
     return dict(postprocessor=postprocessor,hdf_graph=graph,workspace_owner=workspace,image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
                 native_owner_bytes=owner,native_retired_owner=retired,image_after_pixel_arena=image_base>=pixel_end,

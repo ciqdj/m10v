@@ -429,3 +429,34 @@ class Gr2CaptureTests(unittest.TestCase):
                     self.assertEqual(packet['native_workspace_bytes'],0xe5800)
                     self.assertEqual(packet['scratch_capacities'],[0xe5800,0x2000000,0x1f0e020])
                     self.assertEqual(packet['scratch_live'],[True]*3);self.assertEqual(packet['scratch_retired'],[True]*3)
+
+    def test_original_capture_preparation_builds_independent_pitches_and_transfers_reserved_scratch(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build()
+        for effect in (0,16):
+            post=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,postprocess_effect=effect,postprocess_original_prepare=True,postprocess_render=True)['postprocessor']
+            self.assertEqual(post['plane_metadata'],[1,0xf7a320,0x1744140,4960,2496,3264,8,64,8,64,0,0,0,0])
+            self.assertTrue(post['property_counters_balanced']);self.assertTrue(post['primary_retained'])
+            self.assertEqual(post['rendered']['result'],0);self.assertEqual(post['rendered']['reference_result'],0)
+            self.assertTrue(post['rendered']['all_pixels_and_padding_match']);self.assertTrue(post['ring_restored'])
+            self.assertEqual(post['reserved_after'],0)
+            if effect==16:
+                self.assertNotEqual(post['reserved_before'],0)
+                packet=post['packets'][0];self.assertEqual(packet['scratch_handles'][2],post['reserved_before'])
+                expected=[post['jpeg_data']+8*4960+64,post['jpeg_data']+0xf7a320+8*2496+64,post['jpeg_data']+0x1744140+8*2496+64]
+                self.assertEqual(packet['core_request'][:3],expected)
+                self.assertTrue(all(pointer+stride*3264<=post['jpeg_data']+post['jpeg_capacity'] for pointer,stride in zip(expected,(4960,2496,2496))))
+            else:self.assertEqual(post['reserved_before'],0);self.assertEqual(post['packets'],[])
+
+    def test_original_completed_jpeg_handoff_and_clone_preserve_hdf_but_skip_both_postprocessor_guards(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build()
+        for effect in (0,16):
+            result=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,postprocess_effect=effect,
+                                                     postprocess_original_prepare=True,postprocess_handoff_clone=True)
+            post=result['postprocessor'];handoff=post['handoff']
+            self.assertTrue(handoff['source_primary_cleared']);self.assertTrue(handoff['clone_primary_cleared']);self.assertTrue(handoff['distinct_shared_jpeg'])
+            self.assertEqual(handoff['hdf_freeze'],1);self.assertEqual(handoff['hdf_read'],1);self.assertEqual(handoff['hdf_values'],[0x10003,77])
+            self.assertEqual(handoff['postprocessor_guard_calls'],[]);self.assertTrue(post['ring_restored']);self.assertTrue(post['property_counters_balanced'])
