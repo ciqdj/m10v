@@ -107,10 +107,12 @@ int gr2_settings_key(uint32_t key){
     p->overlay.dirty=1;return 1;
 }
 /* Run before stock state watchers can translate one raw key into a queued
- * SPEC key. Only the owned page consumes these exact official GR II events.
+ * SPEC key. Only the owned page or its two owned menu entries consumes them.
  * MENU/OK is SYS_KEY_OK; no fictitious independent raw MENU is accepted. */
+static int menu_key(const uint32_t *message);
 int gr2_settings_raw_event(const uint32_t *message){
-    if(!active||!message||((uintptr_t)message&3))return 0;
+    if(!message||((uintptr_t)message&3))return 0;
+    if(!active)return menu_key(message);
     uint32_t key;
     switch(message[0]){
         case 0x60001006u:key=M10V_KEY_UP;break;
@@ -157,4 +159,86 @@ int gr2_settings_peek(m10v_settings *out){
     page *p=active;uintptr_t o=(uintptr_t)out,b=(uintptr_t)p;
     if(!p||!out||(o&3)||sizeof(*out)>UINTPTR_MAX-o||(o<b+sizeof(*p)&&b<o+sizeof(*out)))return 0;
     copy(out,&p->state,sizeof(*out));return 1;
+}
+
+/* Called on the existing UI owner before public-route conversion. Consume a
+ * private route even on allocation/backend failure, so stock FSM never sees
+ * an unknown state. The preserved camera menu remains available for retry. */
+int gr2_settings_menu_route(uint32_t route){
+    if(route!=0x6d100001u&&route!=0x6d100003u)return 0;
+    typedef const uint32_t *(*root_fn)(void);
+    const uint32_t *root=((root_fn)(uintptr_t)0xA03989C9u)();
+    if(!root||root[1]!=0x17u)return 0;
+    gr2_settings_open(0,route==0x6d100001u?M10V_SETTINGS_FILMS:M10V_SETTINGS_STAMP);
+    return 1;
+}
+
+const uint16_t *gr2_menu_text(uint32_t id){
+    if(id==0x70068u)return labels[0];
+    if(id==0x70069u)return labels[1];
+    typedef const uint16_t *(*lookup)(uint32_t);
+    return ((lookup)(uintptr_t)0xA03A4AEFu)(id);
+}
+
+/* UI-owner-only extension. Stock refresh must see its original 47-entry
+ * source/definition mapping; two owned action rows are appended afterwards.
+ * Persistent storage also keeps already-cached widget pointers valid. */
+static uint32_t menu_rows[49][8];
+static uint32_t menu_entries_enabled;
+extern uint32_t *gr2_menu_categories_original(uint32_t);
+static int menu_contract(void){
+    const uint32_t *descriptor=(const uint32_t *)(uintptr_t)0xA0439790u;
+    const uint32_t *category=(const uint32_t *)(uintptr_t)(0xA0439718u+3u*24u);
+    if((descriptor[0]>>16)!=5u||descriptor[2]!=0xA0439718u)return 0;
+    return (category[3]==47u&&category[5]==0xA0438B38u)||
+           (menu_entries_enabled&&category[3]==49u&&category[5]==(uint32_t)(uintptr_t)menu_rows);
+}
+int gr2_menu_entries_enable(uint32_t enabled){
+    if(enabled>1u||!menu_contract())return 0;
+    uint32_t *category=(uint32_t *)(uintptr_t)(0xA0439718u+3u*24u);
+    if(!enabled&&category[5]==(uint32_t)(uintptr_t)menu_rows){category[3]=47;category[5]=0xA0438B38u;}
+    menu_entries_enabled=enabled;return 1;
+}
+uint32_t *gr2_menu_categories(uint32_t flags){
+    uint32_t *category=(uint32_t *)(uintptr_t)(0xA0439718u+3u*24u);
+    if(menu_entries_enabled){
+        if(!menu_contract())return (uint32_t *)(uintptr_t)0xA0439790u;
+        category[3]=47;category[5]=0xA0438B38u;
+    }
+    uint32_t *descriptor=gr2_menu_categories_original(flags);
+    if(!menu_entries_enabled||!menu_contract()||descriptor!=(uint32_t *)(uintptr_t)0xA0439790u)return descriptor;
+    const uint32_t *source=(const uint32_t *)(uintptr_t)0xA0438B38u;
+    for(uint32_t i=0;i<47u;i++)for(uint32_t j=0;j<8u;j++)menu_rows[i][j]=source[i*8u+j];
+    for(uint32_t i=0;i<2u;i++){
+        uint32_t *row=menu_rows[47u+i];
+        row[0]=0x70068u+i;row[1]=0;row[2]=0x01000000u;row[3]=i?0x6d100003u:0x6d100001u;
+        row[4]=2;row[5]=1;row[6]=1;row[7]=0;
+    }
+    category[3]=49;category[5]=(uint32_t)(uintptr_t)menu_rows;
+    return descriptor;
+}
+
+/* Stock setup rows use RIGHT for type1 activation and ordinary MENU/OK can
+ * close the camera menu. Add OK only for these two owned rows, before stock
+ * watchers; all stock rows retain their original physical-key behavior. */
+static int menu_key(const uint32_t *message){
+    if(!menu_entries_enabled||(message[0]!=0x6000100au&&message[0]!=0x60001016u)||!menu_contract())return 0;
+    typedef const uint8_t *(*root_fn)(void);
+    const uint8_t *root=((root_fn)(uintptr_t)0xA03989C9u)();
+    if(!root||((const uint32_t *)(const void *)root)[1]!=0x17u||root[0x3b0]!=1u||
+       ((const uint32_t *)(const void *)root)[0x170/4]!=(uint32_t)(uintptr_t)menu_rows)return 0;
+    uint32_t selected=*(const uint16_t *)(const void *)(root+0xb8);
+    if(selected<47u||selected>48u)return 0;
+    return gr2_settings_menu_route(selected==47u?0x6d100001u:0x6d100003u);
+}
+
+/* Resolve geometry/font metadata through a real stock setup-title contract,
+ * then replace only the resolved UTF-16 pointer for the private caption. */
+extern uint32_t gr2_menu_descriptor_original(uint32_t,uint32_t *);
+uint32_t gr2_menu_descriptor(uint32_t context,uint32_t *descriptor){
+    uint32_t id=descriptor[0],owned=id==0x70068u||id==0x70069u;
+    if(owned)descriptor[0]=670u;
+    uint32_t result=gr2_menu_descriptor_original(context,descriptor);
+    if(owned){descriptor[0]=id;descriptor[12]=(uint32_t)(uintptr_t)gr2_menu_text(id);}
+    return result;
 }

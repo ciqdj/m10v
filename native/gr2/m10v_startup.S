@@ -100,3 +100,73 @@ gr2_producer_chain:
     ldmia sp!,{r4-r7,lr}
     b gr2_producer_active
 .size gr2_producer_chain,.-gr2_producer_chain
+
+/* A03948C4 follows stock PUSH {r4-r6,lr}; r6 has already become zero.
+ * Private routes finish at the original caller; ordinary routes replay the
+ * displaced prelude and real tick getter before resuming stock conversion. */
+.arm
+.balign 4
+.global gr2_menu_route_chain
+.type gr2_menu_route_chain,%function
+gr2_menu_route_chain:
+    stmdb sp!,{r0-r3,ip,lr}
+    bl gr2_settings_menu_route
+    cmp r0,#0
+    ldmia sp!,{r0-r3,ip,lr}
+    beq 9f
+    mov r0,#0
+    ldmia sp!,{r4-r6,lr}
+    bx lr
+9:  mov r4,r0
+    sub sp,sp,#16
+    ldr ip,10f
+    adr lr,11f
+    bx ip
+11: ldr ip,12f
+    bx ip
+.balign 4
+10: .word 0xA0027D97
+12: .word 0xA03948CD
+.size gr2_menu_route_chain,.-gr2_menu_route_chain
+
+.thumb
+.balign 4
+.global gr2_menu_categories_original
+.type gr2_menu_categories_original,%function
+.thumb_func
+gr2_menu_categories_original:
+    push {r0,r4-r7,lr}
+    ldr r5,14f
+    movs r6,#1
+    sub sp,#16
+    ldr r3,15f
+    bx r3
+.balign 4
+14: .word 0xA0439790
+15: .word 0xA03C1389
+.size gr2_menu_categories_original,.-gr2_menu_categories_original
+
+.thumb
+.balign 4
+.global gr2_menu_descriptor_original
+.type gr2_menu_descriptor_original,%function
+.thumb_func
+gr2_menu_descriptor_original:
+    push {r4-r7,lr}
+    movs r7,r0
+    movs r5,r1
+    ldr r6,[r1,#20]
+    ldr r0,[r1,#16]
+    ldr r3,16f
+    bx r3
+.balign 4
+16: .word 0xA039D171
+.size gr2_menu_descriptor_original,.-gr2_menu_descriptor_original
+.arm
+.balign 4
+.global gr2_menu_descriptor_chain
+.type gr2_menu_descriptor_chain,%function
+gr2_menu_descriptor_chain:
+    ldmia sp!,{r4-r7,lr}
+    b gr2_menu_descriptor
+.size gr2_menu_descriptor_chain,.-gr2_menu_descriptor_chain

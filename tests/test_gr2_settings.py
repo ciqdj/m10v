@@ -25,6 +25,63 @@ class Gr2SettingsTests(unittest.TestCase):
         self.assertEqual(report['settings_closed'],[0,0]);self.assertEqual(report['settings_underlying_effect'],6)
         self.assertTrue(report['settings_raw_scope_restored']);self.assertEqual(report['settings_raw_double_deliveries'],0)
 
+    def test_private_menu_routes_are_consumed_before_stock_conversion_even_when_open_fails(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertTrue('menu_route_hook_patch_hex' in runtime)
+        result=native.probe_menu_route_hook(component('gr2','b01firm8'),native_runtime=runtime)
+        self.assertEqual(result['opened_screens'],[1,3])
+        self.assertEqual(result['private_stock_deliveries'],0)
+        self.assertTrue(result['ordinary_route_preserved']);self.assertTrue(result['stack_preserved'])
+        self.assertTrue(result['callee_saved_preserved']);self.assertTrue(result['wrong_root_preserved'])
+
+    def test_private_menu_captions_leave_stock_locale_and_dynamic_text_lookups_live(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertTrue('gr2_menu_text' in runtime['symbols'])
+        result=native.probe_menu_text_adapter(component('gr2','b01firm8'),native_runtime=runtime)
+        self.assertEqual(result['private_captions'],['胶卷库','时间水印'])
+        self.assertTrue(result['all_locales_preserved']);self.assertTrue(result['dynamic_updates_live'])
+        self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+
+    def test_owned_menu_rows_survive_original_refresh_without_extending_definition_indices(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertTrue('menu_categories_hook_patch_hex' in runtime)
+        result=native.probe_menu_entries(component('gr2','b01firm8'),native_runtime=runtime)
+        self.assertEqual(result['item_count'],49)
+        self.assertEqual(result['private_routes'],[0x6d100001,0x6d100003])
+        self.assertTrue(result['original_rows_preserved']);self.assertTrue(result['stable_rows'])
+        self.assertTrue(result['original_refresh_bounded']);self.assertTrue(result['restored'])
+        self.assertTrue(result['foreign_change_rejected']);self.assertTrue(result['stack_preserved'])
+
+    def test_original_menu_constructs_and_draws_with_owned_rows_and_private_captions(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build()
+        result=native.probe_effect_view_draw(component('gr2','b01firm8'),component('gr2','b01firm6'),native_runtime=runtime,attach=True,language=4,menu_entries_draw=True)
+        self.assertTrue(result['menu_root_active']);self.assertTrue(result['menu_rows_owned'])
+        self.assertEqual(result['menu_private_titles'],[0x70068,0x70069])
+        self.assertEqual(result['menu_selected_rows'][-1],47)
+        self.assertEqual(result['menu_open'],[[0,1]])
+        self.assertEqual(result['menu_raw_result'],1)
+        self.assertEqual(result['menu_raw_open'],[[0,1],[0,1],[0,3]])
+        self.assertTrue(result['menu_raw_scope_preserved'])
+        self.assertGreater(result['menu_caption_ink'],200)
+        self.assertTrue(result['guards_unchanged']);self.assertTrue(result['stack_preserved'])
+        self.assertGreater(result['menu_font_calls'],0)
+        self.assertIn('胶卷库',result['menu_resolved_titles'])
+        self.assertIn('时间水印',result['menu_resolved_titles'])
+
+    def test_descriptor_adapter_preserves_stock_values_and_uses_stock_private_font_metrics(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertTrue(hasattr(native,'probe_menu_descriptor'))
+        result=native.probe_menu_descriptor(component('gr2','b01firm8'),native_runtime=runtime)
+        self.assertTrue(result['all_stock_descriptors_preserved']);self.assertTrue(result['private_metrics_match_stock'])
+        self.assertEqual(result['private_captions'],['胶卷库','时间水印'])
+        self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+
     def test_five_slots_catalog_identity_and_all_stamp_fields_keep_confirm_cancel_semantics(self):
         from unicorn import UC_HOOK_CODE,arm_const as r
         report=self.build();self.assertTrue('m10v_settings_open' in report['symbols']);u=self.machine(report)

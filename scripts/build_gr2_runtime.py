@@ -178,6 +178,38 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
 
 
 
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA03948C4 and 0xA03948CC<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA03948C4-row['address'];break
+    else:raise ValueError('original menu route hook outside executable load ranges')
+    if official[source:source+8]!=bytes.fromhex('0004b084f493fa65'):raise ValueError('original menu route hook instructions differ')
+    report['menu_route_hook_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_menu_route_chain'])).hex()
+    report['menu_route_hook_source_offset']=source
+
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA03C1380 and 0xA03C1388<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA03C1380-row['address'];break
+    else:raise ValueError('original menu categories hook outside executable load ranges')
+    if official[source:source+8]!=bytes.fromhex('b5f14d872601b084'):raise ValueError('original menu categories hook instructions differ')
+    report['menu_categories_hook_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_menu_categories'])).hex()
+    report['menu_categories_hook_source_offset']=source
+
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA039D168 and 0xA039D170<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA039D168-row['address'];break
+    else:raise ValueError('original menu descriptor hook outside executable load ranges')
+    if official[source:source+8]!=bytes.fromhex('0007000d694e6908'):raise ValueError('original menu descriptor instructions differ')
+    report['menu_descriptor_hook_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_menu_descriptor_chain'])).hex()
+    report['menu_descriptor_hook_source_offset']=source
+
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA039D60E and 0xA039D610<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA039D60E-row['address'];break
+    else:raise ValueError('original menu raster classifier outside executable load ranges')
+    if official[source:source+2]!=bytes.fromhex('2d68'):raise ValueError('original menu raster classifier differs')
+    report['menu_raster_classifier_patch_hex']='2d6a'
+    report['menu_raster_classifier_source_offset']=source
+
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
                   effect_name_contract=text_contract,configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
                   configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),

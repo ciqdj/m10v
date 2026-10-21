@@ -1015,6 +1015,157 @@ def probe_sd_open_mode(code:bytes,flags:int)->dict:
                 helpers_intercepted=['filesystem readiness','media status','lock','unlock','fopen stop boundary'],
                 scope='Original H: mode-selection instructions and string comparison; no file creation or handle allocation.')
 
+def probe_menu_descriptor(code:bytes,*,native_runtime:dict)->dict:
+    """Compare actual metadata entry before/after its RAM-installed adapter."""
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x50002000,0x50003000,0x383))
+    uc.mem_write(0x50003000,struct.pack('>5I',0,0,0x383,0x5000D000,0))
+    context=0x50009000;descriptor=0x50008000;site=0xA039D168;original=bytes(uc.mem_read(site,8));checks=[]
+    uc.mem_write(context,struct.pack('>6H',0,0,0,0,720,480))
+    def run(identity,language,patched):
+        value=bytearray(84);struct.pack_into('>IHH',value,0,identity,100,350);struct.pack_into('>I',value,12,0x40000)
+        uc.mem_write(descriptor,bytes(value));uc.mem_write(0x5000D000+0x1e4*4,struct.pack('>I',language))
+        uc.mem_write(site,bytes.fromhex(native_runtime['menu_descriptor_hook_patch_hex']) if patched else original);uc.ctl_remove_cache(site,site+8)
+        saved=[0x66770000+index for index in range(8)]
+        for index,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+index,value)
+        uc.reg_write(r.UC_ARM_REG_R0,context);uc.reg_write(r.UC_ARM_REG_R1,descriptor)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001f001)
+        uc.emu_start(0xA039D167,0x5001f000,count=10000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('original descriptor adapter budget exceeded')
+        checks.append((uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,[uc.reg_read(r.UC_ARM_REG_R4+index) for index in range(8)]==saved))
+        return uc.reg_read(r.UC_ARM_REG_R0),bytes(uc.mem_read(descriptor,84))
+    same=True
+    for language in range(21):
+        for identity in (0,1,105,670,847,848,0x70000,0x70067,0x7006a):same=run(identity,language,False)==run(identity,language,True) and same
+    _,reference=run(670,4,False);metrics=True;captions=[]
+    for identity in (0x70068,0x70069):
+        _,value=run(identity,4,True);metrics=value[4:48]==reference[4:48] and value[52:]==reference[52:] and metrics
+        pointer=struct.unpack_from('>I',value,48)[0];wire=bytearray()
+        for index in range(16):
+            pair=bytes(uc.mem_read(pointer+index*2,2))
+            if pair==bytes(2):break
+            wire.extend(pair)
+        captions.append(wire.decode('utf-16-be'))
+    return dict(all_stock_descriptors_preserved=same,private_metrics_match_stock=metrics,private_captions=captions,
+                stack_preserved=all(v[0] for v in checks),callee_saved_preserved=all(v[1] for v in checks),helpers_intercepted=[],hardware_tested=False,
+                scope='Original metadata resolver entered through installed RAM adapter: all21 locales, complete84-byte descriptors/return for stock IDs, private captions retain stock setup-title geometry and font metadata. Synthetic context/property bank; no hardware display claim.')
+
+def probe_menu_entries(code:bytes,*,native_runtime:dict)->dict:
+    """Execute original category refresh before/after owned action-row append."""
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']));symbols=native_runtime['symbols']
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x50002000,0x50003000,0x383))
+    uc.mem_write(0x50003000,struct.pack('>5I',0,0,0x383,0x5000D000,0))
+    uc.mem_write(word(0xA0398DC4),struct.pack('>I',0x50008000));uc.mem_write(0x50008000,struct.pack('>2I',0,0x17))
+    category=0xA0439718+3*24;original_rows=0xA0438B38;stack_ok=[];refresh=[]
+    def observe(machine,address,size,context):refresh.append((word(category+12),word(category+20)))
+    uc.hook_add(UC_HOOK_CODE,observe,begin=0xA03C1388,end=0xA03C1388)
+    def run(entry,value,thumb=False):
+        uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001f001)
+        uc.emu_start(entry|1 if thumb else entry,0x5001f000,count=1000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('menu category refresh execution budget exceeded')
+        stack_ok.append(uc.reg_read(r.UC_ARM_REG_SP)==0x50018000);return uc.reg_read(r.UC_ARM_REG_R0)
+    run(0xA03C1380,3,True);before=bytes(uc.mem_read(original_rows,47*32))
+    if run(symbols['gr2_menu_entries_enable'],1)!=1:raise RuntimeError('native menu extension preimage rejected')
+    uc.mem_write(0xA03C1380,bytes.fromhex(native_runtime['menu_categories_hook_patch_hex']));uc.ctl_remove_cache(0xA03C1380,0xA03C1388)
+    run(0xA03C1380,3,True);owned=word(category+20);count=word(category+12)
+    private=[word(owned+(47+index)*32+12) for index in range(2)]
+    original_preserved=bytes(uc.mem_read(owned,47*32))==before and bytes(uc.mem_read(original_rows,47*32))==before
+    run(0xA03C1380,3,True);stable=word(category+20)==owned
+    uc.mem_write(category+12,struct.pack('>I',48));foreign=bytes(uc.mem_read(category,24))
+    rejected=run(symbols['gr2_menu_entries_enable'],0)==0 and bytes(uc.mem_read(category,24))==foreign
+    uc.mem_write(category+12,struct.pack('>I',49));disabled=run(symbols['gr2_menu_entries_enable'],0)
+    restored=disabled==1 and word(category+12)==47 and word(category+20)==original_rows
+    return dict(item_count=count,private_routes=private,original_rows_preserved=original_preserved,stable_rows=stable,
+                original_refresh_bounded=bool(refresh) and all(v==(47,original_rows) for v in refresh),
+                restored=restored,foreign_change_rejected=rejected,stack_preserved=all(stack_ok),
+                helpers_intercepted=[],hardware_tested=False,
+                scope='Compiled owned49-row extension around actual original47-row category refresh, synthetic property bank/active menu root. No extra definition indices, original rows preserved, cached owned pointers stable and disable restores source metadata. Drawing/navigation/joint page launch still require integration proof.')
+
+def probe_menu_text_adapter(code:bytes,*,native_runtime:dict)->dict:
+    """Native caption adapter delegates all stock IDs to the live accessor."""
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x50002000,0x50003000,0x383))
+    uc.mem_write(0x50003000,struct.pack('>5I',0,0,0x383,0x5000D000,0))
+    preserved=[]
+    def run(identity,language,patched=True):
+        uc.mem_write(0x5000D000+0x1e4*4,struct.pack('>I',language))
+        saved=[0x77880000+index for index in range(8)]
+        for index,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+index,value)
+        uc.reg_write(r.UC_ARM_REG_R0,identity);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001f001)
+        try:uc.emu_start(native_runtime['symbols']['gr2_menu_text'] if patched else 0xA03A4AEF,0x5001f000,count=10000)
+        except Exception as error:raise RuntimeError(f'text hook id={identity:x} lang={language} patched={patched} pc={uc.reg_read(r.UC_ARM_REG_PC):x} sp={uc.reg_read(r.UC_ARM_REG_SP):x}: {error}') from error
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('current locale private-ID hook budget exceeded')
+        preserved.append((uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,[uc.reg_read(r.UC_ARM_REG_R4+index) for index in range(8)]==saved))
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    same=True
+    for language in range(21):
+        for identity in (0,1,105,847,848,0x70000,0x70067,0x7006a):
+            same=run(identity,language,False)==run(identity,language) and same
+    captions=[]
+    for identity in (0x70068,0x70069):
+        pointer=run(identity,4);wire=bytearray()
+        for index in range(96):
+            pair=bytes(uc.mem_read(pointer+index*2,2))
+            if pair==bytes(2):break
+            wire.extend(pair)
+        else:raise RuntimeError('private caption is not bounded')
+        captions.append(wire.decode('utf-16-be'))
+    dynamic=word(0xA03A4C24);live=True
+    for pointer in (0x50006000,0x50006010):
+        uc.mem_write(dynamic+103*4,struct.pack('>I',pointer));live=run(0x70067,4)==pointer and live
+    return dict(private_captions=captions,all_locales_preserved=same,dynamic_updates_live=live,
+                stack_preserved=all(v[0] for v in preserved),callee_saved_preserved=all(v[1] for v in preserved),
+                helpers_intercepted=[],hardware_tested=False,
+                scope='Native two-caption adapter delegates stock IDs to the unmodified current-language accessor/property getter; all21 locales and live dynamic updates. No accessor hook or startup installation.')
+
+def probe_menu_route_hook(code:bytes,*,native_runtime:dict)->dict:
+    """Execute installed route veneer; page open and queue/timer are boundaries."""
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    symbols=native_runtime['symbols'];site=0xA03948C4;original=bytes(uc.mem_read(site,8));root=0x50008000
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    uc.mem_write(word(0xA0398DC4),struct.pack('>I',root))
+    provider=0x50009000;converter=0x5001D000
+    uc.mem_write(word(0xA0394B28),struct.pack('>I',provider))
+    uc.mem_write(provider+0x1c,struct.pack('>I',converter));calls=[];opened=[];preserved=[]
+    def boundary(machine,address,size,context):
+        a=machine.reg_read(r.UC_ARM_REG_R0);result=0
+        if address==symbols['gr2_settings_open']:
+            if a:raise ValueError('menu route must bind native backend')
+            opened.append(machine.reg_read(r.UC_ARM_REG_R1)) # Fail open deliberately.
+        elif address==0xA0027D96:result=0x11223344;calls.append(['tick'])
+        elif address==converter:result=0x60002001;calls.append(['convert',a])
+        else:
+            pointer=machine.reg_read(r.UC_ARM_REG_R1);calls.append(['queue',*struct.unpack('>3I',machine.mem_read(pointer,12))])
+        machine.reg_write(r.UC_ARM_REG_R0,result);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (symbols['gr2_settings_open'],0xA0027D96,converter,0xA00547C2):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def run(route,patched,kind=0x17):
+        uc.mem_write(root,struct.pack('>2I',0,kind));uc.mem_write(site,bytes.fromhex(native_runtime['menu_route_hook_patch_hex']) if patched else original)
+        uc.ctl_remove_cache(site,site+8);calls.clear();opened.clear()
+        saved=[0x44550000+index for index in range(8)]
+        for register,value in zip((r.UC_ARM_REG_R4,r.UC_ARM_REG_R5,r.UC_ARM_REG_R6,r.UC_ARM_REG_R7,r.UC_ARM_REG_R8,r.UC_ARM_REG_R9,r.UC_ARM_REG_R10,r.UC_ARM_REG_R11),saved):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_R0,route);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001f001)
+        uc.emu_start(0xA03948C1,0x5001f000,count=10000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('original menu route hook budget exceeded')
+        preserved.append((uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,[uc.reg_read(r.UC_ARM_REG_R4+index) for index in range(8)]==saved))
+        return list(calls),list(opened)
+    baseline=run(0x60004067,False);ordinary=run(0x60004067,True)
+    films=run(0x6D100001,True);stamp=run(0x6D100003,True)
+    wrong_original=run(0x6D100001,False,0x1a);wrong_hook=run(0x6D100001,True,0x1a)
+    return dict(opened_screens=films[1]+stamp[1],private_stock_deliveries=len(films[0])+len(stamp[0]),
+                ordinary_route_preserved=baseline==ordinary,wrong_root_preserved=wrong_original==wrong_hook,
+                stack_preserved=all(v[0] for v in preserved),callee_saved_preserved=all(v[1] for v in preserved),
+                helpers_intercepted=['page open failure','tick getter','public-route converter','queue send'],hardware_tested=False,
+                scope='Original route function entered through RAM-installed native veneer; private routes consume even when page allocation/open fails. Ordinary and wrong-root callback/queue traces match stock. Actual private page lifetime/render tested separately; no startup installation claim.')
+
 def probe_main_menu_root(code:bytes,*,activate:bool=False)->dict:
     """Identify the actual menu from stock shooting OK action and run CREATE.
 
@@ -1237,7 +1388,7 @@ def probe_osd_colors(code:bytes)->dict:
     return dict(colors=rows,helpers_intercepted=[],hardware_tested=False,
                 scope='Original palette lookup, fixed-point YUV to RGB and channel/alpha nibble packing. CPU format evidence, no display hardware or compositing proof.')
 
-def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False,settings_overlay:bool=False,language:int=1,settings_out_dir:Path|None=None,settings_raw_hook:bool=False)->dict:
+def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False,settings_overlay:bool=False,language:int=1,settings_out_dir:Path|None=None,settings_raw_hook:bool=False,menu_entries_draw:bool=False)->dict:
     """Original stock list/graphics/font bodies, with bounded ROM-file reads.
 
     All display planes, active geometry and property/kernel state are synthetic.
@@ -1247,6 +1398,7 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     import hashlib
     if (overlay or settings_overlay) and not attach:raise ValueError('overlay evidence requires the original active root transition')
     if settings_overlay and native_runtime is None:raise ValueError('native settings overlay requires compiled runtime')
+    if menu_entries_draw and (native_runtime is None or not attach):raise ValueError('menu entries require native runtime and active root')
     if settings_raw_hook and not settings_overlay:raise ValueError('raw hook evidence requires owned settings page')
     if not isinstance(language,int) or not 0<=language<=20:raise ValueError('official language index out of range')
     official_profile(code,'gr2')
@@ -1530,9 +1682,82 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
             native_card_outside_bounds=sum(a!=b for i,(a,b) in enumerate(zip(before_card,after_card)) if not (300<=(i//2)%720<420 and 106<=(i//2)//720<302)),
             native_card_matches_reference=actual==bytes(len(reference)) if native_card_allocation_failure else actual==reference,
             native_card_pool_restored=pool_free()==available)
+    menu_report={}
+    if menu_entries_draw:
+        menu_text_calls=[];menu_resolved_titles=[]
+        def observe_menu_text(machine,address,size,unused):
+            identity=machine.reg_read(r.UC_ARM_REG_R0)
+            if identity>=0x70000:menu_text_calls.append([hex(address),hex(identity)])
+        for address in (0xA03A4AEE,0xA03A4E84):uc.hook_add(UC_HOOK_CODE,observe_menu_text,begin=address,end=address)
+        def observe_descriptor(machine,address,size,unused):
+            descriptor=machine.reg_read(r.UC_ARM_REG_R1)
+            if word(descriptor) in (0x70068,0x70069):
+                pointer=word(descriptor+48);wire=bytearray()
+                for index in range(16):
+                    pair=bytes(machine.mem_read(pointer+2*index,2))
+                    if pair==bytes(2):break
+                    wire.extend(pair)
+                title=wire.decode('utf-16-be')
+                if title in ('胶卷库','时间水印'):menu_resolved_titles.append(title)
+        uc.hook_add(UC_HOOK_CODE,observe_descriptor,begin=0xA039D5F2,end=0xA039D5F2)
+
+        for address,key in ((0xA03C1380,'menu_categories_hook_patch_hex'),(0xA039D168,'menu_descriptor_hook_patch_hex')):
+            uc.mem_write(address,bytes.fromhex(native_runtime[key]));uc.ctl_remove_cache(address,address+8)
+        uc.mem_write(0xA039D60E,bytes.fromhex(native_runtime['menu_raster_classifier_patch_hex']));uc.ctl_remove_cache(0xA039D60E,0xA039D610)
+        if run(native_runtime['symbols']['gr2_menu_entries_enable'],1,thumb=False)!=1:raise RuntimeError('private menu row enable failed')
+        root=0x50008000;uc.mem_write(root-16,b'\xa5'*16);uc.mem_write(root,bytes(uc.mem_read(0xA040D494,64)));uc.mem_write(root+0x600,b'\xa5'*16)
+        run(0xA0398CD8,root,0);run(0xA0398F20)
+        rows=word(root+0x170)
+        selection=[]
+        for _ in range(64):
+            uc.mem_write(event,struct.pack('>3I',0x60002004,1,0));run(0xA0398E6C,event)
+            selection.append(struct.unpack('>H',uc.mem_read(root+0xB8,2))[0])
+            if selection[-1]==47:break
+        uc.mem_write(word(0xA00695FC),struct.pack('>2I',0,2000));run(0xA039C56A)
+        run(0xA0398F20)
+        menu_widget=bytes(uc.mem_read(root+0x78,0x100)).hex()
+        menu_open=[];menu_events=[]
+        def menu_observe(machine,address,size,unused):
+            menu_events.append([hex(address),word(machine.reg_read(r.UC_ARM_REG_R1)) if address==0xA03AB8EC else machine.reg_read(r.UC_ARM_REG_R0)])
+        for address in (0xA03AB8EC,0xA03948C0):uc.hook_add(UC_HOOK_CODE,menu_observe,begin=address,end=address)
+        menu_mode=bytes(uc.mem_read(root+0x3b0,1)).hex()
+        def observe_menu_open(machine,address,size,unused):
+            menu_open.append([machine.reg_read(r.UC_ARM_REG_R0),machine.reg_read(r.UC_ARM_REG_R1)])
+            machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        uc.hook_add(UC_HOOK_CODE,observe_menu_open,begin=native_runtime['symbols']['gr2_settings_open'],end=native_runtime['symbols']['gr2_settings_open'])
+        uc.mem_write(0xA03948C4,bytes.fromhex(native_runtime['menu_route_hook_patch_hex']));uc.ctl_remove_cache(0xA03948C4,0xA03948CC)
+        uc.mem_write(event,struct.pack('>3I',0x60002001,1,0));run(0xA0398E6C,event)
+        right_open=list(menu_open);menu_open.clear()
+        uc.mem_write(event,struct.pack('>3I',0x6000100a,1,0))
+        raw_result=run(native_runtime['symbols']['gr2_settings_raw_event'],event,thumb=False)
+        if raw_result:
+            uc.mem_write(0xA0394950,bytes.fromhex(native_runtime['ui_event_hook_patch_hex']));uc.ctl_remove_cache(0xA0394950,0xA0394958)
+            run(0xA039494E,0,event)
+            uc.mem_write(event,struct.pack('>3I',0x60002004,1,0));run(0xA0398E6C,event)
+            uc.mem_write(event,struct.pack('>3I',0x60001016,1,0));run(0xA039494E,0,event)
+        raw_scope=[];raw_before=list(menu_open)
+        for offset,replacement in ((0xb8,bytes(2)),(0x3b0,bytes(1)),(0x170,struct.pack('>I',0xA0438B38)),(4,struct.pack('>I',0x1a))):
+            prior=bytes(uc.mem_read(root+offset,len(replacement)));uc.mem_write(root+offset,replacement)
+            raw_scope.append(run(native_runtime['symbols']['gr2_settings_raw_event'],event,thumb=False))
+            uc.mem_write(root+offset,prior)
+        raw_scope_preserved=raw_scope==[0]*4 and menu_open==raw_before
+        menu_report=dict(menu_raw_scope_preserved=raw_scope_preserved,menu_resolved_titles=menu_resolved_titles,menu_text_calls=menu_text_calls,menu_widget=menu_widget,menu_raw_result=raw_result,menu_raw_open=list(menu_open),menu_events=menu_events,menu_mode=menu_mode,menu_open=right_open,menu_selected_rows=selection,menu_root_active=word(word(0xA0398DC4))==root,menu_rows_owned=rows!=0xA0438B38,
+                         menu_private_titles=[word(rows+index*32) for index in (47,48)],menu_font_calls=font_engine_calls)
     frame=bytes(uc.mem_read(0x68000000,720*480))
-    if frame_out is not None:Path(frame_out).write_bytes(frame)
-    return dict(**settings_report,**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
+    if menu_entries_draw:menu_report['menu_caption_ink']=sum(frame[y*720+x]==255 for y in range(360,388) for x in range(100,200))
+    if frame_out is not None:
+        Path(frame_out).write_bytes(frame)
+        if menu_entries_draw:
+            from PIL import Image
+            palette={row['index']:row['rgb4444'] for row in probe_osd_colors(code)['colors']}
+            rgb=bytes(uc.mem_read(0x68200000,720*480*2));pixels=bytearray(720*480*3)
+            for index,color in enumerate(frame):
+                base=int.from_bytes(rgb[2*index:2*index+2],'big');over=palette.get(color,0);alpha=(over&15)/15
+                for channel,shift in enumerate((12,8,4)):
+                    pixels[3*index+channel]=round(((over>>shift&15)*alpha+(base>>shift&15)*(1-alpha))*17)
+            target=Path(frame_out).with_suffix('.png');Image.frombytes('RGB',(720,480),bytes(pixels)).save(target)
+            menu_report['menu_composite_path']=str(target)
+    return dict(**menu_report,**settings_report,**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
                 page_returns=page_returns,navigation_effects=navigation,draw_returns=draw_returns,
                 display_nonzero_bytes=sum(value!=0 for value in frame),display_sha256=hashlib.sha256(frame).hexdigest(),
                 palette_backend_calls=palette_calls,guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,
