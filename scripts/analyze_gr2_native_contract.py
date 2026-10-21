@@ -516,6 +516,8 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     for address in (0xA0024E16,0xA0027270,0xA0027360,0xA00273A4,0xA0039F9C,0xA003A01A):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     if extra:uc.mem_write(0xA01137EC,struct.pack('>I',0xfb0c+extra))
     run(0xA00E1DF0)
+    linear_base=run(0xA00542D0);linear_limit=linear_base+run(0xA00542D4)-0x40000
+    linear_cursor=word(0xA00C2BA4)
     uc.mem_map(0x51000000,0x10000)
     uc.mem_write(0x51000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383)
     uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
@@ -570,7 +572,10 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     released=[run(0xA0067640,1,pointer,thumb=False) for pointer in allocated]
     again=run(0xA00674B0,1,0x50001000,thumb=False);again_pointer=word(0x50001000)
     final_release=run(0xA0067640,1,again_pointer,thumb=False) if again==0 else 0xffffffff
-    return dict(native_frame_clone=frame_clone,native_owner_live=owner_live,native_owner_rejected=owner_rejected,native_owner_retired=owner_retired,pool_counts=[row[1] for row in pool_creates],pool_block_bytes=[row[2] for row in pool_creates],
+    return dict(linear_region_base=linear_base,linear_region_limit=linear_limit,linear_cursor_after_pools=linear_cursor,
+                pools_within_linear_region=all(linear_base<=address and address+count*block<=linear_limit for address,count,block in pool_creates),
+                pools_exclude_runtime=all(address>=0xA0800000 or address+count*block<=0xA0798000 for address,count,block in pool_creates),
+                native_frame_clone=frame_clone,native_owner_live=owner_live,native_owner_rejected=owner_rejected,native_owner_retired=owner_retired,pool_counts=[row[1] for row in pool_creates],pool_block_bytes=[row[2] for row in pool_creates],
                 pool_data=[hex(row[0]) for row in pool_creates],inline_extra=extra,constructor_zeroed=constructor_zeroed,
                 header_magic=header[:4].decode('ascii'),object_kind=struct.unpack_from('>I',header,4)[0],
                 source=hex(source),clone=hex(clone),counter_after_construct=count_after,clone_matches=clone_matches,

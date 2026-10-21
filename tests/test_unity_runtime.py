@@ -110,6 +110,14 @@ class UnityRuntimeTests(unittest.TestCase):
                 self.assertEqual(report['module_indices'][-1],14)
                 self.assertEqual(report['events'][-5:-3],[['module',14],['post_load',0]])
 
+    def test_gr2_original_module_wrapper_skips_reloading_a_completed_record(self):
+        module=implementation();self.assertTrue(hasattr(module,'probe_gr2_module_guard'))
+        for loaded,calls in ((False,[[14,0]]),(True,[])):
+            with self.subTest(loaded=loaded):
+                result=module.probe_gr2_module_guard(component('gr2','b01firm8'),loaded=loaded)
+                self.assertEqual(result['indexed_load_requests'],calls)
+                self.assertTrue(result['reached_guard_continuation'])
+
     def test_gr2_original_rom_size_policy_keeps_exact_capacity_boundaries(self):
         if not (ROOT/'bin/rg2_v003.frm').exists():self.skipTest('official GR II sample missing')
         module=implementation();code=component('gr2','b01firm8')

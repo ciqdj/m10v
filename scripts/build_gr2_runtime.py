@@ -51,6 +51,33 @@ def audit_elf(data:bytes)->dict:
     if not required<=symbols.keys():raise ValueError('required GR II ABI exports missing')
     return dict(base=address,code_bytes=filesize,memory_bytes=memsize,runtime_hex=data[offset:offset+filesize].hex(),symbols=symbols,undefined_symbols=undefined,endianness='big',be8=False)
 
+def early_bootstrap(official:bytes)->dict:
+    """Identity-locked source contract: load record14 before module1 phases.
+
+    Fits original record0 alignment padding; never emits a flashable image.
+    """
+    official_profile(official,'gr2')
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    rows=parse_executable_load_map(official);row=rows[0];address=row['address']+row['length'];source=row['source_file_offset']+row['length']
+    def thumb_bl(at,target):
+        delta=target-at-4
+        if delta&1 or not -(1<<22)<=delta<(1<<22):raise ValueError('early bootstrap BL range/alignment differs')
+        return struct.pack('>2H',0xf000|((delta>>12)&0x7ff),0xf800|((delta>>1)&0x7ff))
+    old_native=rows[14]
+    if old_native['length']!=4 or old_native['zero_length']!=0:raise ValueError('original record14 stub contract differs')
+    old_word=official[old_native['source_file_offset']:old_native['source_file_offset']+4]
+    stub=(bytes.fromhex('b502200e2100')+thumb_bl(address+6,0xA0056722)+
+          bytes.fromhex('2800d10548054905600124010020bd02b002200043c0bd1046c0')+
+          struct.pack('>I',old_native['address'])+old_word)
+    if len(stub)!=44 or address&3 or source+len(stub)>rows[1]['source_file_offset'] or address+len(stub)>rows[1]['address']:
+        raise ValueError('early bootstrap exceeds original module0 padding')
+    if official[source:source+len(stub)]!=bytes(len(stub)):raise ValueError('early bootstrap padding preimage changed')
+    site=0xA002094C;offset=row['source_file_offset']+site-row['address']
+    if official[offset:offset+4]!=bytes.fromhex('24010020'):raise ValueError('early bootstrap startup prelude differs')
+    return dict(address=address,source_file_offset=source,stub_hex=stub.hex(),site=site,site_source_offset=offset,
+                site_patch_hex=thumb_bl(site,address).hex(),original_load_bytes=row['length'],extended_load_bytes=row['length']+len(stub),
+                load_length_source_offset=0x28,record_index=0,preserved_stub_address=old_native['address'],preserved_stub_hex=old_word.hex(),scope='Source-only audit contract; record0 extension fits existing zero padding, no other record moves. Original indexed loader and module1 continuation; original record14 stub retained at its old address; failure returns before phase1.')
+
 def memory_reservations(official:bytes)->list[dict]:
     """Describe source-literal edits required before the original allocators run.
 
@@ -148,6 +175,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())
     report['memory_reservations']=memory_reservations(official)
+    report['early_bootstrap']=early_bootstrap(official)
     if official[0xA0044F4C-0xA0020200:0xA0044F50-0xA0020200]!=bytes.fromhex('e12fff1e'):raise ValueError('original SVC callback identity mismatch')
     displacement=report['symbols']['gr2_cache_gateway']-0xA0044F54
     if displacement%4 or not -(1<<25)<=displacement<(1<<25):raise ValueError('cache callback ARM branch range invalid')

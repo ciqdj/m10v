@@ -172,6 +172,29 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
                 self.assertEqual(values[:3],(expected['y'],expected['u'],expected['v']))
                 self.assertEqual(values[8:11],(expected['y_stride'],expected['chroma_stride'],expected['input_format']))
 
+    def test_early_native_bootstrap_loads_before_phase_one_and_never_reloads_its_bss(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        report=self.build();self.assertTrue('early_bootstrap' in report)
+        result=probe_gr2_startup_order(component('gr2','b01firm8'),native_runtime=report,early_native=True)
+        self.assertLess(result['events'].index(['native_early_load',14]),result['events'].index(['phase',1]))
+        self.assertEqual(result['native_load_count'],1);self.assertEqual(result['native_bss_canary'],0x12345678)
+        self.assertTrue(result['original_stub_restored'])
+        self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+        self.assertEqual(result['native_boot_count'],1);self.assertEqual(result['returned'],0)
+        failed=probe_gr2_startup_order(component('gr2','b01firm8'),native_runtime=report,early_native=True,fail_native_read=True)
+        self.assertEqual(failed['returned'],0xffffffff);self.assertEqual(failed['module_indices'],[0])
+        self.assertFalse(any(event[0]=='phase' for event in failed['events']))
+        self.assertTrue(failed['stack_preserved']);self.assertTrue(failed['callee_saved_preserved'])
+
+    def test_original_loader_copies_the_extended_module_zero_bootstrap_and_preserves_neighbors(self):
+        from scripts import analyze_unity_runtime as native
+        report=self.build();self.assertTrue(hasattr(native,'probe_gr2_bootstrap_extension'))
+        result=native.probe_gr2_bootstrap_extension(component('gr2','b01firm8'),contract=report['early_bootstrap'])
+        self.assertEqual(result['returned'],0)
+        self.assertTrue(result['extended_payload_matches']);self.assertTrue(result['guard_preserved'])
+        self.assertTrue(result['next_module_preserved']);self.assertTrue(result['bss_zeroed'])
+        self.assertTrue(result['completion_flag_set'])
+
     def test_native_startup_chain_returns_to_stock_final_callbacks_after_record_14_load(self):
         from scripts.analyze_unity_runtime import probe_gr2_startup_order
         report=self.build()
