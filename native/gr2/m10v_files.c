@@ -10,7 +10,8 @@ static int custom_snapshot(const char *path){
 }
 static int owned(const char *path,int writing){
     if(!path)return 0;
-    if(same(path,"H:/M10V5A.bin")||same(path,"H:/M10V5B.bin")||custom_snapshot(path))return 1;
+    if(same(path,"H:/M10V5A.bin")||same(path,"H:/M10V5B.bin")||
+       same(path,"H:/M10VHD0.BIN")||same(path,"H:/M10VHD1.BIN")||custom_snapshot(path))return 1;
     return !writing&&same(path,"H:/M10V/FILMS.M10");
 }
 static int close_owned(uint32_t handle){
@@ -64,9 +65,9 @@ int gr2_file_size(const char *path,uint32_t *out){
 /* UI owner only. A failed fopen is not an absence proof: exact root-name
  * find-first runs the original mounted-volume/character/FAT search. Stock
  * FindClose frees its cursor and metadata without a separate SDK close. */
-int gr2_journals_absent(void){
+static int journals_absent(const char *const paths[2]){
     uint8_t *cursor=gr2_allocate(4096);if(!cursor)return -1;
-    const char *paths[2]={"H:/M10V5A.bin","H:/M10V5B.bin"};int result=1;
+    int result=1;
     typedef int32_t (*first_fn)(const char *,uint32_t,void *);
     typedef int32_t (*error_fn)(void);
     for(uint32_t i=0;i<2;i++){
@@ -74,6 +75,13 @@ int gr2_journals_absent(void){
         if(((error_fn)(uintptr_t)0xA00652CFu)()!=3){result=-1;break;}
     }
     gr2_release(cursor);return result;
+}
+
+int gr2_journals_absent(void){
+    const char *const paths[2]={"H:/M10V5A.bin","H:/M10V5B.bin"};return journals_absent(paths);
+}
+int gr2_hdf_journals_absent(void){
+    const char *const paths[2]={"H:/M10VHD0.BIN","H:/M10VHD1.BIN"};return journals_absent(paths);
 }
 
 /* Bootstrap may create one initial journal only after both exact root names

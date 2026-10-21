@@ -221,12 +221,13 @@ def probe_rtos_mutex(code:bytes)->dict:
     return dict(create_returned=created,returns=returns,owners=owners,stack_preserved=True,helpers_intercepted=[],hardware_tested=False,
                 scope='Original kernel mutex create, polling lock, owner chain and unlock on synthetic task records; no preemption, wait queues or camera thread timing proof.')
 
-def probe_fat_directory(code:bytes,*,entries:tuple[str,...]=(),read_error:int=0,short_read:bool=False,native_runtime:dict|None=None,ready:bool=True,cache_boundary:bool=False)->dict:
+def probe_fat_directory(code:bytes,*,entries:tuple[str,...]=(),read_error:int=0,short_read:bool=False,native_runtime:dict|None=None,ready:bool=True,cache_boundary:bool=False,hdf:bool=False)->dict:
     """Original PrFILE initializer, SDK find-first/next and FAT16 root decoder.
 
     Synthetic mounted H: geometry and raw directory records; RTOS semaphore/
     thread identity, removable-media state and record I/O are boundaries.
     """
+    if type(hdf) is not bool or hdf and native_runtime is None:raise ValueError('native HDF absence fixture required')
     import re
     if len(entries)>32 or any(not re.fullmatch(r'[A-Za-z0-9_]{1,8}\.[A-Za-z0-9_]{1,3}',name) for name in entries):raise ValueError('bounded synthetic ASCII 8.3 names required')
     if type(read_error) is not int or not 0<=read_error<=255 or type(short_read) is not bool or type(ready) is not bool or type(cache_boundary) is not bool:raise ValueError('bounded media boundary status required')
@@ -275,7 +276,7 @@ def probe_fat_directory(code:bytes,*,entries:tuple[str,...]=(),read_error:int=0,
     if native_runtime:
         word=lambda pointer:struct.unpack('>I',uc.mem_read(pointer,4))[0]
         free=lambda:word(word(0x50007004)+12)*word(0x50007014)
-        available=free();value=call(native_runtime['symbols']['gr2_journals_absent'],thumb=False)
+        available=free();value=call(native_runtime['symbols']['gr2_hdf_journals_absent' if hdf else 'gr2_journals_absent'],thumb=False)
         extra=dict(native_absent_return=struct.unpack('>i',struct.pack('>I',value))[0],pool_restored=free()==available)
     else:
         for index in range(34):
