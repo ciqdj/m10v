@@ -2,6 +2,7 @@
 """Identity-locked original GR II native ABI probes; no firmware writes or flash I/O."""
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -634,20 +635,38 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
     for base,size in arenas:
         uc.mem_map(base,(size+32+4095)&~4095);uc.mem_write(base+size,b'\x5a'*32)
     uc.mem_map(0x60000000,0x1000000);uc.mem_map(0x90000000,0x1000000);uc.mem_map(0xFFFB0000,4096)
+    hdf_reserved=bytes((i*17+93)&255 for i in range(0x16040));uc.mem_write(0x5100E000,hdf_reserved);hdf_reads=[]
+    def reserved_read(machine,access,address,size,value,unused):hdf_reads.append([address,size])
+    uc.hook_add(UC_HOOK_MEM_READ,reserved_read,begin=0x5100E000,end=0x5102403F)
     descriptor=bytearray(64)
     for offset,value in ((0,0x55000000),(0xc,geometry&65535),(0x28,geometry),(0x30,0x51000000),(0x34,0x52000000),(0x38,0x58000000),(0x3c,context)):struct.pack_into('>I',descriptor,offset,value)
     uc.mem_write(request,bytes(descriptor));uc.mem_write(context,b'\xa5'*0x500);uc.mem_write(context+0x418,struct.pack('>I',strength))
     before=bytes(uc.mem_read(context,0x500));saved=[0x74560000+i for i in range(8)]
     for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
-    acquired=[];released=[];events=[];stages=[];io=[];cpu_writes=[];svc=[];bands=[]
+    acquired=[];released=[];events=[];stages=[];io=[];cpu_writes=[];svc=[];bands=[];non_lut_io=[];curve_references=[];uploads=[];active_upload=None
     def boundary(machine,address,size,unused):
+        nonlocal active_upload
         args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        if address==0xA01032F4:
+            source=struct.unpack('>I',machine.mem_read(args[1]+8,4))[0]
+            active_upload=dict(mode=args[0],source=source,read_bytes=0,_hash=hashlib.sha256())
+            if 0x51000000<=source<0x51008000:uploads.append(active_upload)
+            return
+        if address==0xA0103BA4:
+            if active_upload is not None:
+                active_upload['source_sha256']=active_upload.pop('_hash').hexdigest()
+            active_upload=None;return
         if address==0xA014ACEC:
             level_context=machine.reg_read(r.UC_ARM_REG_R4)
-            bands.append(dict(level=struct.unpack('>I',machine.mem_read(level_context,4))[0],thresholds=list(machine.mem_read(level_context+0x5C,3)),selected_pointer=args[0]))
+            bands.append(dict(level=struct.unpack('>I',machine.mem_read(level_context,4))[0],geometry=struct.unpack('>I',machine.mem_read(level_context+0x30,4))[0],thresholds=list(machine.mem_read(level_context+0x5C,3)),selected_pointer=args[0]))
             return
         if address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE):
-            stages.append(address);return
+            stages.append(address)
+            if address==0xA01410F0:
+                curve=struct.unpack('>I',machine.mem_read(args[0]+0x1C,4))[0]
+                if 0x51000000<=curve<0x51008000:
+                    curve_references.append(dict(caller=machine.reg_read(r.UC_ARM_REG_LR)&~1,pointer=curve,descriptor_hex=bytes(machine.mem_read(args[0],76)).hex()))
+            return
         if address==0xA00688E8:acquired.append(args[0])
         elif address==0xA0068598:released.append(args[0])
         elif address==0xA00686C4:
@@ -665,19 +684,28 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
         old=struct.unpack('>H',machine.mem_read(address,2))[0];machine.mem_write(address,struct.pack('>H',(old&0x3FFF)|0x8000))
     uc.hook_add(UC_HOOK_MEM_READ,handshake,begin=0x600A0100,end=0x600A0101)
     def write(machine,access,address,size,value,unused):
-        if 0x60000000<=address<0x61000000:io.append([address,size,value])
+        if 0x60000000<=address<0x61000000:
+            io.append([address,size,value])
+            if active_upload is None:non_lut_io.append([address,size,value])
         elif 0x51000000<=address<0x5A000000:cpu_writes.append([address,size])
     uc.hook_add(UC_HOOK_MEM_WRITE,write)
+    def table_read(machine,access,address,size,value,unused):
+        if active_upload is not None:
+            active_upload['read_bytes']+=size
+            active_upload['_hash'].update(bytes(machine.mem_read(address,size)))
+    uc.hook_add(UC_HOOK_MEM_READ,table_read,begin=0x51000000,end=0x51007FFF)
+    for address in (0xA01032F4,0xA0103BA4):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     for reg,value in ((r.UC_ARM_REG_R0,request),(r.UC_ARM_REG_R1,int(hdr)),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):uc.reg_write(reg,value)
     uc.emu_start(0xA014ADEF,0x5001F000,count=3000000)
     if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original complete Clarity graph exceeded CPU budget')
     from collections import Counter
     return dict(returned_normally=True,resources_balanced=Counter(acquired)==Counter(released),resource_acquisitions=acquired,resource_releases=released,
-                event_waits=events,hardware_stage_count=len(stages),stages=stages,band_curves=bands,mmio_write_count=len(io),scheduler_svc_count=svc.count(12),
+                event_waits=events,hardware_stage_count=len(stages),stages=stages,band_curves=bands,stage_curve_references=curve_references,curve_uploads=uploads,non_lut_mmio_sha256=hashlib.sha256(json.dumps(non_lut_io,separators=(',',':')).encode()).hexdigest(),mmio_write_count=len(io),scheduler_svc_count=svc.count(12),
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
                 request_preserved=bytes(uc.mem_read(request,64))==descriptor,context_preserved=bytes(uc.mem_read(context,0x500))==before,
                 arena_guards_preserved=all(bytes(uc.mem_read(base+size,32))==b'\x5a'*32 for base,size in arenas),
                 cpu_pixel_writes_bounded=all(any(base<=address and address+length<=base+size for base,size in arenas) for address,length in cpu_writes),
+                hdf_reserved_region_preserved=bytes(uc.mem_read(0x5100E000,len(hdf_reserved)))==hdf_reserved,hdf_reserved_cpu_reads=len(hdf_reads),
                 pixel_processing_verified=False,hardware_tested=False,
                 scope='Original complete A014ADEE graph and nested stage/driver CPU instructions. Four synthetic image/work arenas, passive register banks, explicit600A0100 reset-ready response, kernel resource/event/SVC/peripheral-clock/power boundaries. Events synthesize success; DMA never produces pixels. Graph return/resource balance/CPU guards/HDR context restoration only; no real completion, DMA span/coherence or live capture proof.')
 
@@ -1020,7 +1048,7 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
-def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0)->dict:
+def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False)->dict:
     """Actual system MPL -> BUFF -> IMG factories and kernel pool identities.
 
     Empty kernel tables and synchronization services are fixtures. Linear and
@@ -1045,9 +1073,9 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         if address in (0xA0024E16,0xA0024B0C):created.append([address,*args[:3]]);return
         if address==0xA0024BC4:
             header=machine.reg_read(r.UC_ARM_REG_R4);linear.append([word(header+4),word(header+8)]);return
-        services.append(address);value=0 if address in (0xA0027360,0xA00273A4) else len(services)
+        services.append(address);value=0 if address in (0xA0027360,0xA00273A4,0xA0027188,0xA0026FBA) else len(services)
         machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0039F9C,0xA003A01A):
+    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0027188,0xA0026FBA,0xA0039F9C,0xA003A01A):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def memory(machine,access,address,size,value,unused):
         page=address&~4095
@@ -1070,8 +1098,58 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
     run(0xA00E1DF0);pool=word(0xA0129C54);identifier=struct.unpack('>H',uc.mem_read(pool+20,2))[0]
     table=word(0xA00B5BDC);record=table+24*(identifier-1);image_base=word(record+20)
     source=run(0xA00E1E3C,0);owner=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
+    workspace={};graph={}
+
+    if workspace_owner:
+        index=word(0xA06BCC6C+4*0x20);scratch_record=0xA06BC708+20*index
+        backing=word(scratch_record+4);data=(backing&0x1FFFFFFF)|0x20000000
+        check=lambda pointer:run(native_runtime['symbols']['gr2_hdf_workspace_bytes'],pointer,thumb=False)
+        before=check(data);handle=run(0xA029A94E,0x20,0,0,0)
+        if not handle or word(handle+4)!=data:raise RuntimeError('original tag20 allocation differs')
+        live=check(data);wrong=[check(data+32),check(backing),check(0)]
+        head=word(scratch_record);pool_id=struct.unpack('>H',uc.mem_read(head+20,2))[0]
+        kernel=word(0xA00B5BDC)+24*(pool_id-1)
+        rejected=[]
+        for address,replacement in ((0xA0129C20,b'\x05'),(0xA06BCC6C+4*0x20,struct.pack('>I',69)),
+                (scratch_record,struct.pack('>I',head+4)),(scratch_record+4,struct.pack('>I',backing+32)),
+                (head,b'bad!'),(head+4,b'\x00'),(head+8,struct.pack('>I',0xe5804)),
+                (head+20,struct.pack('>H',pool_id+1)),(kernel+4,struct.pack('>I',backing)),
+                (kernel+12,struct.pack('>I',0xe5804)),(kernel+20,struct.pack('>I',backing+32))):
+            previous=bytes(uc.mem_read(address,len(replacement)));uc.mem_write(address,replacement)
+            rejected.append(check(data));uc.mem_write(address,previous)
+        recovered=check(data)
+        if hdf_graph:
+            uc.mem_map(data&~4095,((data&4095)+0xe5800+4095)&~4095)
+            request=0x50002000;level_context=0x50002100
+            packet=bytearray(64)
+            for offset,value in ((0x28,0xcc01340),(0x30,data),(0x3c,source)):struct.pack_into('>I',packet,offset,value)
+            uc.mem_write(request,bytes(packet))
+            call=lambda name,*args:run(native_runtime['symbols'][name],*args,thumb=False)
+            frozen=call('gr2_hdf_frame_freeze',source,3,77)
+            prepared=call('gr2_hdf_graph_prepare',request,0)
+            curves=[]
+            for level in range(1,13):
+                uc.mem_write(level_context,struct.pack('>I',level));uc.mem_write(level_context+0x4c,struct.pack('>I',data))
+                curves.append(call('gr2_hdf_graph_curve',data+0x6000,level_context))
+            uc.mem_write(level_context,struct.pack('>I',1))
+            stock=call('gr2_hdf_graph_prepare',request,1)
+            stock_pointer=call('gr2_hdf_graph_curve',data+0x6000,level_context)
+            again=call('gr2_hdf_graph_prepare',request,0);header_faults=[]
+            for offset in range(0,28,4):
+                address=data+0xe000+offset;previous=bytes(uc.mem_read(address,4));uc.mem_write(address,struct.pack('>I',word(address)^1))
+                header_faults.append(call('gr2_hdf_graph_curve',data+0x6000,level_context));uc.mem_write(address,previous)
+            uc.mem_write(source+0x12b8c+12,bytes(4))
+            stale=call('gr2_hdf_graph_curve',data+0x6000,level_context)
+            invalid_prepare=call('gr2_hdf_graph_prepare',request,0)
+            uc.mem_write(source+0x12b8c,bytes(16));off_freeze=call('gr2_hdf_frame_freeze',source,0,78)
+            off_prepare=call('gr2_hdf_graph_prepare',request,0)
+            graph=dict(frozen=frozen,prepared=prepared,curves=curves,stock=stock,stock_pointer=stock_pointer,again=again,stale=stale,data=data,
+                       header_faults=header_faults,invalid_prepare=invalid_prepare,off_freeze=off_freeze,off_prepare=off_prepare,
+                       off_magic=word(data+0xe000),request_preserved=bytes(uc.mem_read(request,64))==packet)
+        uc.mem_write(0x50001000,struct.pack('>I',handle));run(0xA029AA1A,0x50001000,0,0,0)
+        workspace=dict(before=before,live=live,after=check(data),wrong=wrong,rejected=rejected,recovered=recovered,handle_cleared=word(0x50001000)==0)
     run(0xA00E2020,source);retired=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
-    return dict(image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
+    return dict(hdf_graph=graph,workspace_owner=workspace,image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
                 native_owner_bytes=owner,native_retired_owner=retired,image_after_pixel_arena=image_base>=pixel_end,
                 linear_allocations=linear,linear_cursor=word(0xA00C2BA4),sparse_ram_pages=len(pages),
                 all_linear_spans_disjoint=all(base+length<=other or other+other_length<=base for i,(base,length) in enumerate(linear) for other,other_length in linear[i+1:]),

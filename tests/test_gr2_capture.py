@@ -397,3 +397,13 @@ class Gr2CaptureTests(unittest.TestCase):
                 self.assertTrue(result['image_after_pixel_arena']);self.assertTrue(result['all_linear_spans_disjoint'])
                 self.assertTrue(result['all_linear_spans_bounded']);self.assertTrue(result['stack_preserved'])
                 self.assertTrue(result['callee_saved_preserved'])
+
+    def test_hdf_workspace_is_admitted_only_while_original_singleton_buffer_is_borrowed(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertIn('gr2_hdf_workspace_bytes',runtime['symbols'])
+        for prior in (0,3):
+            with self.subTest(prior=prior):
+                result=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,prior_fixed=prior,workspace_owner=True)
+                self.assertEqual(result['workspace_owner'],dict(before=0,live=0xe5800,after=0,wrong=[0,0,0],rejected=[0]*11,recovered=0xe5800,handle_cleared=True))
+                self.assertTrue(result['stack_preserved']);self.assertTrue(result['runtime_preserved'])

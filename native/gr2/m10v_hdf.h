@@ -15,4 +15,6 @@ int gr2_hdf_frame_read(const uint8_t *context,gr2_hdf_frame *out);
  * No frame admission, persistence, allocation, DMA or capture hook is installed.
  * Off returns0 without touching memory; invalid inputs return-1 before writes. */
 int gr2_hdf_prepare_bands(uint16_t *workspace,uint32_t bytes,uint32_t strength);
+/* Caller retains the original tag20 handle throughout the check/use. */
+uint32_t gr2_hdf_workspace_bytes(const void *data);
 #endif

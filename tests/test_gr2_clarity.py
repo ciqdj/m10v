@@ -114,6 +114,7 @@ class Gr2ClarityTests(unittest.TestCase):
                 self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
                 self.assertTrue(result['request_preserved']);self.assertTrue(result['context_preserved'])
                 self.assertTrue(result['arena_guards_preserved']);self.assertTrue(result['cpu_pixel_writes_bounded'])
+                self.assertTrue(result['hdf_reserved_region_preserved']);self.assertEqual(result['hdf_reserved_cpu_reads'],0)
                 self.assertGreater(result['hardware_stage_count'],8)
                 self.assertFalse(result['pixel_processing_verified'])
 
@@ -152,8 +153,14 @@ class Gr2ClarityTests(unittest.TestCase):
             result=native.probe_clarity_control_graph(component('gr2','b01firm8'),strength,0x0cc01340)
             self.assertIn('band_curves',result)
             bands=result['band_curves'];self.assertEqual([row['level'] for row in bands],list(range(11,0,-1)))
+            uploads=result['curve_uploads'];self.assertEqual(len(uploads),13)
+            self.assertEqual([entry['source'] for entry in uploads[:11]],[entry['selected_pointer'] for entry in bands])
+            self.assertEqual([(entry['mode'],entry['read_bytes']) for entry in uploads],[(1,8192)]*11+[(3,1024),(2,8192)])
+            self.assertEqual([entry['caller'] for entry in result['stage_curve_references'][-2:]],[0xa014b234,0xa014b364])
             for row in bands:
                 thresholds=row['thresholds'];level=row['level']
+                divisor=1<<level
+                self.assertEqual((row['geometry']&65535,row['geometry']>>16),((4928+divisor-1)//divisor,(3264+divisor-1)//divisor))
                 index=next((i for i,threshold in enumerate(thresholds) if level<threshold),3)
                 self.assertEqual(row['selected_pointer'],0x51000000+8192*index)
 
@@ -169,3 +176,14 @@ class Gr2ClarityTests(unittest.TestCase):
                 self.assertTrue(result['effect_property_preserved']);self.assertTrue(result['stack_preserved'])
         result=native.probe_buffer_layout_manager(component('gr2','b01firm8'),0,0,{0x344:1})
         self.assertEqual(result['transition_requests'],[]);self.assertEqual(result['final_layout'],0)
+
+    def test_negative_clarity_grades_change_detail_uploads_but_preserve_postband_tables_and_other_cpu_register_writes(self):
+        from scripts import analyze_gr2_native_contract as native
+        for geometry in (0x40020,0xcc01340):
+            results=[native.probe_clarity_control_graph(component('gr2','b01firm8'),strength,geometry) for strength in (1,2,3,4)]
+            self.assertEqual(len({row['non_lut_mmio_sha256'] for row in results}),1)
+            post=[[(entry['mode'],entry['read_bytes'],entry['source_sha256']) for entry in row['curve_uploads'][-2:]] for row in results]
+            self.assertTrue(all(row==post[0] for row in post))
+            self.assertEqual(post[0],[(3,1024,'588eb9934761a8508729c1ab59c25a89fb74138ef8d4964482ac73e23bb8a529'),
+                                     (2,8192,'85a821a3d487430c79a42f944b67db8b12a76a8a4f96c66c1c3c8f725bfb3444')])
+            self.assertGreater(len({tuple(entry['source_sha256'] for entry in row['curve_uploads'][:-2]) for row in results}),1)

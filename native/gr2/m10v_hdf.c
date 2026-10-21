@@ -63,3 +63,29 @@ int gr2_hdf_frame_read(const uint8_t *context,gr2_hdf_frame *out){
     next.crc!=m10v_sd_crc((const uint8_t *)&next,12))return 0;
  copy(out,&next,16);return 1;
 }
+
+static uint32_t word(uint32_t address){return *(const volatile uint32_t *)(uintptr_t)address;}
+/* A synchronous caller must retain the original tag20 BUFF handle. This
+ * verifies a live singleton MPF lease; it does not lock against its release. */
+uint32_t gr2_hdf_workspace_bytes(const void *data){
+ uint32_t pointer=(uint32_t)(uintptr_t)data;
+ if(!pointer||(pointer&31u)||word(0xa0129c20u)>>24>4u)return 0;
+ uint32_t index=word(0xa06bcc6cu+4u*0x20u);
+ if(index>=69u)return 0;
+ uint32_t definition=0xa0112048u+44u*index;
+ if(*(const volatile uint8_t *)(uintptr_t)definition!=0x20u||word(definition+4u)!=0xe5800u||word(definition+8u)!=32u)return 0;
+ uint32_t record=0xa06bc708u+20u*index,head=word(record),heads=0xa05fb0ccu;
+ uint32_t maximum=*(const volatile uint16_t *)(uintptr_t)0xa00b5bfcu;
+ if(!maximum||maximum>64u||head<heads+28u||head>heads+28u*maximum||(head-heads)%28u)return 0;
+ uint32_t id=(head-heads)/28u;
+ if(word(head)!=0x4d504c20u||*(const volatile uint8_t *)(uintptr_t)(head+4u)!=1u||
+    *(const volatile uint16_t *)(uintptr_t)(head+20u)!=id||word(head+8u)!=0xe5800u||word(head+12u)!=0xe5800u)return 0;
+ uint32_t table=word(0xa00b5bdcu);
+ if((table&3u)||!table||table>UINT32_MAX-24u*id)return 0;
+ uint32_t kernel=table+24u*(id-1u),base=word(record+4u),end=word(0xa0129c2cu);
+ if(base<0xa0900000u||end>0xbfdc0000u||base>end||0xe5800u>end-base||
+    pointer!=((base&0x1fffffffu)|0x20000000u))return 0;
+ if(*(const volatile uint16_t *)(uintptr_t)kernel!=0xffffu||word(kernel+4u)!=kernel+4u||
+    word(kernel+12u)!=0xe5800u||word(kernel+16u)!=0xe5800u||word(kernel+20u)!=base)return 0;
+ return 0xe5800u;
+}
