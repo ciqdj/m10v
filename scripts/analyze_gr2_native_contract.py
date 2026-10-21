@@ -27,6 +27,72 @@ def runtime_machine(code:bytes,*,cpu_model:int|None=None):
         start=row['source_file_offset'];uc.mem_write(row['address'],code[start:start+row['length']])
     return uc
 
+def probe_code_sync(code:bytes,*,native_runtime:dict)->dict:
+    """Run User SVC5 via its original data dispatch, with CP15 as boundary."""
+    from unicorn import UC_HOOK_CODE,UC_HOOK_INTR
+    from unicorn import arm_const as r
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    low=parse_executable_load_map(code)[15];uc.mem_map(0,0x10000)
+    uc.mem_write(low['address'],code[low['source_file_offset']:low['source_file_offset']+low['length']])
+    original_callback=bytes(uc.mem_read(0xA0044F4C,4));original_vector=bytes(uc.mem_read(0xA00AF884,4))
+    # Execute the original task-frame constructor with the actual startup entry
+    # found in the kernel's static initial-task configuration.
+    startup_entry=struct.unpack('>I',uc.mem_read(0xA00B5BB4,4))[0]
+    for register,value in ((r.UC_ARM_REG_R0,startup_entry),(r.UC_ARM_REG_R1,0),(r.UC_ARM_REG_R2,0x50004000),
+                           (r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001f000)):uc.reg_write(register,value)
+    uc.emu_start(0xA00AF7A8,0x5001f000,count=1000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('original startup task-frame construction failed')
+    task_frame=struct.unpack('>20I',uc.mem_read(0x50004000,80))
+
+    if original_vector!=struct.pack('>I',0xA00AF8A8):raise ValueError('original SVC5 data vector changed')
+    operations=[];operands=[];behavior={'bufferable':0};checks=[]
+    def cp15(machine,address,size,context):
+        value=struct.unpack('>I',machine.mem_read(address,4))[0]
+        if value&0x0f100f10==0x0e100f10:
+            if ((value>>16)&15,value&15)!=(3,0):raise ValueError('unexpected cache policy read')
+            machine.reg_write(r.UC_ARM_REG_R0+((value>>12)&15),behavior['bufferable']);machine.reg_write(r.UC_ARM_REG_PC,address+4)
+        elif value&0x0f100f10==0x0e000f10:
+            operations.append([(value>>16)&15,value&15,(value>>5)&7]);operands.append(machine.reg_read(r.UC_ARM_REG_R0+((value>>12)&15)));machine.reg_write(r.UC_ARM_REG_PC,address+4)
+    uc.hook_add(UC_HOOK_CODE,cp15,begin=native_runtime['base'],end=native_runtime['base']+native_runtime['memory_bytes']-1)
+    def interrupt(machine,number,context):
+        if number!=2:raise RuntimeError('unexpected code-sync exception')
+        previous=machine.reg_read(r.UC_ARM_REG_CPSR);resume=machine.reg_read(r.UC_ARM_REG_PC)
+        machine.reg_write(r.UC_ARM_REG_CPSR,(previous&~0x3f)|0x13);machine.reg_write(r.UC_ARM_REG_SP,0x50017000)
+        machine.reg_write(r.UC_ARM_REG_SPSR,previous);machine.reg_write(r.UC_ARM_REG_LR,resume);machine.reg_write(r.UC_ARM_REG_PC,0x844)
+    uc.hook_add(UC_HOOK_INTR,interrupt)
+    def run(entry,argument=0):
+        old=uc.reg_read(r.UC_ARM_REG_CPSR);uc.reg_write(r.UC_ARM_REG_CPSR,(old&~0xff)|0x10)
+        saved=[0x33550000+index for index in range(8)]
+        for index,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+index,value)
+        uc.reg_write(r.UC_ARM_REG_R0,argument);uc.reg_write(r.UC_ARM_REG_R1,0x12345678)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001f000)
+        uc.emu_start(entry,0x5001f000,count=10000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('User code-sync return budget exceeded')
+        checks.append((uc.reg_read(r.UC_ARM_REG_CPSR)&0xff==0x10 and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,
+                       [uc.reg_read(r.UC_ARM_REG_R4+index) for index in range(8)]==saved))
+        return uc.reg_read(r.UC_ARM_REG_R0),uc.reg_read(r.UC_ARM_REG_R1)
+    unrelated_original=run(0xA00AF75C,0x12345678)
+    missing=run(native_runtime['symbols']['gr2_code_sync'])[0]
+    uc.mem_write(0xA00AF884,bytes.fromhex(native_runtime['cache_svc_vector_patch_hex']))
+    good=run(native_runtime['symbols']['gr2_code_sync'])[0]
+    sync_operations=list(operations);sync_operands=list(operands)
+    operations.clear();operands.clear()
+    data_returns=[run(native_runtime['symbols'][name])[0] for name in ('gr2_cache_before','gr2_cache_after')]
+    data_operations=list(operations);data_operands=list(operands)
+    operations.clear();operands.clear()
+    unrelated_native=run(0xA00AF75C,0x12345678)
+    behavior['bufferable']=32;bad=run(native_runtime['symbols']['gr2_code_sync'])[0]
+    return dict(initial_task_entry=startup_entry,initial_task_mode=task_frame[1]&31,
+                returns=[missing,good,bad],operations=sync_operations,operands=sync_operands,
+                data_cache_vector_supported=data_returns==[1,1] and data_operations==[[7,6,0],[7,10,4]] and data_operands==[0,0],
+                rejected_policy_no_operations=not operations,
+                callback_code_unchanged=bytes(uc.mem_read(0xA0044F4C,4))==original_callback,
+                user_return_preserved=all(v[0] for v in checks),callee_saved_preserved=all(v[1] for v in checks),
+                unrelated_svc_preserved=unrelated_original==unrelated_native,
+                helpers_intercepted=['synthetic CP15 bufferable policy read','CP15 drain and instruction-cache invalidation observation'],hardware_tested=False,
+                scope='Original low SVC dispatch and exception return plus native replacement of its data-table entry only. User call refuses absent vector/unexpected bufferable policy. CP15 is observed rather than physically modeled; no automatic boot installation or hardware coherency proof.')
+
 def probe_image_pool_startup_phase(code:bytes)->dict:
     """Execute stock phase2 dispatch up to (not through) image-pool creation."""
     from unicorn import UC_HOOK_CODE

@@ -152,6 +152,15 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     displacement=report['symbols']['gr2_cache_gateway']-0xA0044F54
     if displacement%4 or not -(1<<25)<=displacement<(1<<25):raise ValueError('cache callback ARM branch range invalid')
     report['cache_gateway_patch_hex']=struct.pack('>I',0xea000000|((displacement>>2)&0xffffff)).hex()
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    for row in parse_executable_load_map(official)[:15]:
+        if row['address']<=0xA00AF884 and 0xA00AF888<=row['address']+row['length']:
+            source=row['source_file_offset']+0xA00AF884-row['address'];break
+    else:raise ValueError('original SVC5 data vector outside load ranges')
+    if official[source:source+4]!=struct.pack('>I',0xA00AF8A8):raise ValueError('original SVC5 data vector differs')
+    report['cache_svc_vector_patch_hex']=struct.pack('>I',report['symbols']['gr2_cache_svc_entry']).hex()
+    report['cache_svc_vector_source_offset']=source
+
     report['startup_patch_hex']=(bytes.fromhex('4b004718')+struct.pack('>I',report['symbols']['gr2_startup_chain'])).hex()
     from scripts.analyze_unity_runtime import parse_executable_load_map
     for row in parse_executable_load_map(official)[:15]:

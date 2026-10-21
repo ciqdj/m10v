@@ -1,6 +1,7 @@
 #include "m10v_model.h"
 _Static_assert(sizeof(m10v_gr2_image)==44,"GR II image ABI changed");
 volatile uint32_t gr2_boot_count;
+volatile uint32_t gr2_code_sync_status;
 /* Caller continuation must retain the original -1 result and final callbacks.
  * This foundation does not install capture/menu hooks or claim feature parity. */
 uint32_t gr2_post_load(void){gr2_boot_count++;return UINT32_MAX;}

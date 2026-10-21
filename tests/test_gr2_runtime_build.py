@@ -220,16 +220,30 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         invalid=probe_rtc_get_time(component('gr2','b01firm8'),(2100,2,29,0,0,0),native_runtime=report)
         self.assertEqual(invalid['returned'],0);self.assertEqual(invalid['output_hex'],'a5'*12)
 
+    def test_user_instruction_handoff_bootstraps_through_original_svc_data_vector(self):
+        from scripts import analyze_gr2_native_contract as native
+        report=self.build();self.assertTrue('gr2_code_sync' in report['symbols'])
+        result=native.probe_code_sync(component('gr2','b01firm8'),native_runtime=report)
+        self.assertEqual(result['returns'],[0,1,0])
+        self.assertEqual(result['initial_task_entry'],0xa0020945);self.assertEqual(result['initial_task_mode'],0x10)
+        self.assertEqual(result['operations'],[[7,10,4],[7,5,0]])
+        self.assertEqual(result['operands'],[0,0])
+        self.assertTrue(result['data_cache_vector_supported']);self.assertTrue(result['rejected_policy_no_operations'])
+        self.assertTrue(result['callback_code_unchanged']);self.assertTrue(result['user_return_preserved'])
+        self.assertTrue(result['callee_saved_preserved']);self.assertTrue(result['unrelated_svc_preserved'])
+
     def test_cache_bridge_rejects_user_irq_modes_and_emits_bounded_privileged_operations(self):
         from unicorn import UC_HOOK_CODE,arm_const as r
         report=self.build();self.assertIn('gr2_cache_before',report['symbols'])
         for name,expected in (('gr2_cache_before',(7,6,0)),('gr2_cache_after',(7,10,4))):
             for mode in (0x13,0x1f,0x10,0x12):
-                u=self.machine(report);u.mem_map(0xA0044000,0x1000);observed=[]
+                u=self.machine(report);u.mem_map(0xA0044000,0x1000);u.mem_map(0xA00AF000,0x1000)
+                u.mem_write(0xA00AF884,struct.pack('>I',0xA00AF8A8));observed=[]
                 u.reg_write(r.UC_ARM_REG_CPSR,(u.reg_read(r.UC_ARM_REG_CPSR)&~31)|mode)
                 def cp15(uc,address,size,context):
                     word=struct.unpack('>I',uc.mem_read(address,4))[0]
                     if word&0x0f100f10==0x0e000f10:
+                        self.assertEqual(uc.reg_read(r.UC_ARM_REG_R0+((word>>12)&15)),0)
                         observed.append(((word>>16)&15,word&15,(word>>5)&7));uc.reg_write(r.UC_ARM_REG_PC,address+4)
                 entry=report['symbols'][name];u.hook_add(UC_HOOK_CODE,cp15,begin=entry,end=report['symbols']['gr2_cache_gateway']-4)
                 with self.subTest(name=name,mode=mode):

@@ -16,4 +16,6 @@ int32_t gr2_release(void *);
 int gr2_read_clock(uint16_t output[6]);
 int gr2_cache_before(void);
 int gr2_cache_after(void);
+/* Installed SVC data vector, original nonbufferable code-region policy only. */
+int gr2_code_sync(void);
 #endif
