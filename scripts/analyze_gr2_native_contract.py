@@ -356,6 +356,208 @@ def probe_effect_names(code:bytes,*,native_runtime:dict)->dict:
                 unrelated_labels_preserved=unrelated,foreign_change_rejected=rejected,all_original_tables_restored=restored,pool_restored=free()==available,
                 helpers_intercepted=[],hardware_tested=False,scope='Original explicit-language stock accessor, 21 complete pointer tables, native label buffers and actual RTOS pool/mutex; no native screen pixels, hardware display or cached widget redraw proof.')
 
+def _buffer_pool_fixture(code:bytes,mode:int):
+    """Original BUFF arena sizing, pool routing and negative-count aliasing.
+
+    The initial layout argument, metadata/pool/semaphore constructors and linear
+    backing pointers are fixtures. No pixel arena or RTOS allocator is modeled.
+    """
+    official_profile(code,'gr2')
+    if type(mode) is not int or not 0<=mode<5:raise ValueError('original buffer layout0..4 required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);definitions=0xA0112048;records=0xA06BC708;control=0xA0129C20
+    original=bytes(uc.mem_read(definitions,69*44));uc.mem_write(0xA0112D69,bytes([mode]))
+    created=[];linear=[];services=[];metadata=[];selected=[]
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    def boundary(machine,address,size,unused):
+        if address==0xA00DF846:
+            selected.append(machine.reg_read(r.UC_ARM_REG_R0));machine.reg_write(r.UC_ARM_REG_R0,mode);return
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original buffer layout assertion')
+        if address==0xA0024B68:
+            value=0xA0900010 if not linear else 0xA0904020;linear.append([args[0],value])
+        elif address in (0xA0024E16,0xA0024B0C):
+            value=0x50008000+64*len(created);created.append(dict(factory=address,base=args[0],count=args[1],stride=args[2],identity=value))
+        elif address==0xA0024C3C:
+            value=0x50010000+1024*len(metadata);metadata.append([value,args[1]])
+            if args[1]>1024:raise RuntimeError('buffer metadata fixture capacity exceeded')
+        else:value=1+len(services);services.append(address)
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    hooks=[]
+    for address in (0xA00DF846,0xA0027270,0xA0024B68,0xA0024B0C,0xA0024E16,0xA0024C3C,0xA0027434,0xA0026EC6,0xA0039F9C,0xA003A01A):
+        hooks.append(uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address))
+    saved=[0x74560000+i for i in range(8)]
+    for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
+    uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+    uc.emu_start(0xA00DFC09,0x5001F000,count=500000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original buffer initializer exceeded CPU budget')
+    for hook in hooks:uc.hook_del(hook)
+    return uc,created,linear,metadata,selected,original,saved
+
+def probe_buffer_pool_layout(code:bytes,mode:int)->dict:
+    """Original complete pool layout, with explicit constructor fixtures."""
+    from unicorn import arm_const as r
+    uc,created,linear,metadata,selected,original,saved=_buffer_pool_fixture(code,mode)
+    definitions=0xA0112048;records=0xA06BC708;control=0xA0129C20
+    word=lambda address:struct.unpack(">I",uc.mem_read(address,4))[0]
+    order=list(struct.unpack('>69I',uc.mem_read(0xA06BC5F4,69*4)))
+    if sorted(order)!=list(range(69)) or selected!=[0] or len(linear)!=2:raise RuntimeError('original buffer ordering/arena contract differs')
+    prefix=word(control+4);last=None;aliases=[];owners={};matches=True
+    def identity(index):return tuple(word(records+20*index+offset) for offset in (0,8,12,16))
+    for position,index in enumerate(order):
+        if position==prefix:last=None
+        size=word(definitions+44*index+4);count=struct.unpack('>i',uc.mem_read(definitions+44*index+20+4*mode,4))[0]
+        if size and count>0:last=index;owners[index]=index
+        elif size and count<0:
+            match=last is not None and identity(index)==identity(last) and bool(identity(index)[0]);matches=matches and match
+            owners[index]=last;aliases.append(dict(index=index,owner=last,matches=match))
+    buffers={}
+    for tag in (0x17,0x20,0x2E):
+        index=word(0xA06BCC6C+4*tag);owner=owners.get(index)
+        buffers[str(tag)]=dict(index=index,declared_bytes=word(definitions+44*index+4),pool_identity=word(records+20*index),
+                               owner_index=owner,owner_tag=uc.mem_read(definitions+44*owner,1)[0] if owner is not None else None)
+    begin=linear[1][1];end=begin+linear[1][0]
+    spans=[(row['base'],row['count']*row['stride']) for row in created if row['factory']==0xA0024E16]
+    spans.extend((word(pointer+4),word(pointer+8)) for pointer,size in metadata)
+    return dict(mode=mode,final_layout=uc.mem_read(0xA0112D69,1)[0],arena_requested_bytes=linear[1][0],metadata_requested_bytes=linear[0][0],
+                all_aliases_match=matches,aliases=aliases,buffers=buffers,constant_prefix=prefix,pool_factories=created,
+                all_pool_spans_bounded=all(begin<=base and size<=end-base for base,size in spans),
+                definitions_preserved=bytes(uc.mem_read(definitions,len(original)))==original,
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,
+                callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,hardware_tested=False,
+                helpers_intercepted=['initial layout argument','linear backing pointers','metadata and pool constructors','mutex/semaphore/event constructors'],
+                scope='Original complete A00DFC08 initializer, five-layout arena maximum, ordering, A00DF6C2 population and A00DF846 inverse mapping. Each layout starts fresh; factories return opaque identities, not live kernel pools. No pixel backing, allocation/release, concurrent ownership or actual mode-transition proof.')
+
+def probe_buffer_lifetime(code:bytes,mode:int)->dict:
+    """Original BUFF allocation/access/release, with bounded RTOS boundaries.
+
+    Original ring arithmetic and delayed-free queue execute. Kernel MPF/MPL,
+    mutex, semaphore and event waits are synthetic, single-threaded boundaries.
+    No pixel backing, physical cache or live capture concurrency is exercised.
+    """
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc,created,linear,metadata,selected,original,saved=_buffer_pool_fixture(code,mode)
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    pools={row['identity']:row for row in created};occupied={identity:set() for identity in pools}
+    live={};serial=0;calls=[];abi=True
+    def boundary(machine,address,size,unused):
+        nonlocal serial
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        value=0
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original buffer lifetime assertion')
+        if address==0xA0024C3C:
+            pool=pools[args[0]]
+            if pool['factory']==0xA0024B0C:
+                if args[1]!=24 or serial>=64:raise RuntimeError('unexpected BUFF metadata allocation')
+                value=0x50012000+32*serial;serial+=1;live[value]=args[0]
+            else:
+                if args[1]>pool['stride']:raise RuntimeError('MPF block capacity exceeded')
+                available=set(range(pool['count']))-occupied[args[0]]
+                if available:
+                    index=min(available);occupied[args[0]].add(index);value=pool['base']+index*pool['stride']
+        elif address==0xA0024D76:
+            if args[1] in live:
+                if live[args[1]]!=args[0] or bytes(machine.mem_read(args[1],4))!=b'void':raise RuntimeError('invalid BUFF metadata reclamation')
+                del live[args[1]]
+            else:
+                pool=pools[args[0]];index=(args[1]-pool['base'])//pool['stride']
+                if pool['base']+index*pool['stride']!=args[1] or index not in occupied[args[0]]:raise RuntimeError('invalid MPF block reclamation')
+                occupied[args[0]].remove(index)
+        elif address==0xA0027188:
+            indices=[i for i in range(69) if word(0xA06BC708+20*i+8)==args[0]]
+            if not indices:raise RuntimeError('unknown pool semaphore')
+            identity=word(0xA06BC708+20*indices[0]);pool=pools.get(identity)
+            value=int(pool is not None and len(occupied[identity])>=pool['count'])
+        elif address==0xA0027700:
+            if word(machine.reg_read(r.UC_ARM_REG_SP))!=0:raise RuntimeError('expected nonblocking buffer wait')
+            value=1
+        calls.append(address)
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0024C3C,0xA0024D76,0xA0027360,0xA00273A4,0xA0027188,0xA0026FBA,0xA00276A2,0xA0027700,0xA0027526,0xA0039F9C,0xA003A01A):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def call(address,*args):
+        nonlocal abi
+        for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(reg,value)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+        uc.emu_start(address|1,0x5001F000,count=100000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original buffer operation exceeded CPU budget')
+        abi=abi and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000 and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    index=word(0xA06BCC6C+4*0x2E);record=0xA06BC708+20*index
+    ring=word(record) if word(record+12) else None
+    before=bytes(uc.mem_read(ring,832)) if ring else None
+    handles=[];spans=[];access=True
+    def acquire(tag):
+        nonlocal access
+        handle=call(0xA029A94E,tag,0,0,0)
+        if handle:
+            if bytes(uc.mem_read(handle,4))!=b'BUFF' or uc.mem_read(handle+16,1)[0]!=tag:raise RuntimeError('original BUFF descriptor mismatch')
+            data=word(handle+4);capacity=word(handle+20)
+            access=access and call(0xA029AB4C,handle,0,0,0)==data
+            physical=(data&0x1FFFFFFF)|0xA0000000
+            spans.append((physical,physical+capacity));handles.append(handle)
+        return handle
+    small=acquire(0x20)
+    if not small:raise RuntimeError('initial small scratch allocation failed')
+    small_exhausted=acquire(0x20)==0
+    large=[]
+    for unused in range(16):
+        handle=acquire(0x2E)
+        if not handle:break
+        large.append(handle)
+    else:raise RuntimeError('large scratch fixture failed to reach exhaustion')
+    if not large:raise RuntimeError('initial large scratch allocation failed')
+    exhausted=handle==0
+    cleared=True
+    def release(handle):
+        nonlocal cleared
+        uc.mem_write(0x50006000,struct.pack('>I',handle));call(0xA029AA1A,0x50006000,0,0,0)
+        cleared=cleared and word(0x50006000)==0 and bytes(uc.mem_read(handle,4))==b'void'
+    deferred=False
+    if ring:
+        if len(large)<2:raise RuntimeError('ring fixture cannot exercise delayed free')
+        free_before=word(ring+12);release(large.pop())
+        deferred=word(ring+12)==free_before and any(word(ring+32+8*i) for i in range(100))
+    for handle in large:release(handle)
+    release(small)
+    restored=bytes(uc.mem_read(ring,832))==before if ring else not any(occupied.values())
+    return dict(mode=mode,large_buffer_count=len(handles)-1,exhaustion_returned_null=small_exhausted and exhausted,
+                all_spans_disjoint=all(a1<=b0 or b1<=a0 for i,(a0,a1) in enumerate(spans) for b0,b1 in spans[i+1:]),
+                handles_cleared=cleared,metadata_reclaimed=not live,pool_restored=restored and not any(occupied.values()),
+                raw_access_matches=access,out_of_order_release_deferred=deferred,stack_preserved=abi,callee_saved_preserved=abi,
+                hardware_tested=False,rtos_boundary_calls=len(calls),
+                scope='Original A029A94E/A00DFE04/A00DF48C allocation, A029AB4C access and A029AA1A/A00E04A4 release. Synthetic RTOS block allocator and nonblocking timeout; original ring/free queue execute. No live concurrency, bank switching or pixel graph.')
+
+def probe_clarity_graph_admission(code:bytes,strength:int,geometry:int)->dict:
+    """Original table generation and first-stage descriptor, before execution."""
+    official_profile(code,'gr2')
+    if type(strength) is not int or not 1<=strength<=9 or strength==5:raise ValueError('nonneutral Clarity strength1..9 required')
+    if geometry not in (0x00040020,0x0CC01340):raise ValueError('audited tiny/full-resolution geometry required')
+    from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_WRITE,arm_const as r
+    uc=runtime_machine(code);request=0x50001000;context=0x50004000
+    arenas=((0x51000000,0xE5800),(0x52000000,0x2000000),(0x55000000,0x1F0E020),(0x58000000,0x1F0E020))
+    for base,size in arenas:uc.mem_map(base,(size+4095)&~4095);uc.mem_write(base+size-32,b'\x5a'*32)
+    uc.mem_write(context,b'\xa5'*0x500);uc.mem_write(context+0x418,struct.pack('>I',strength));before=bytes(uc.mem_read(context,0x500))
+    descriptor=bytearray(64)
+    for offset,value in ((0,0x55000000),(0xc,geometry&0xffff),(0x28,geometry),(0x30,0x51000000),(0x34,0x52000000),(0x38,0x58000000),(0x3c,context)):struct.pack_into('>I',descriptor,offset,value)
+    uc.mem_write(request,bytes(descriptor));observed={};writes=[]
+    def admission(machine,address,size,unused):
+        pointer=machine.reg_read(r.UC_ARM_REG_R0);observed.update(stage=address,descriptor=bytes(machine.mem_read(pointer,32)).hex());machine.emu_stop()
+    def write(machine,access,address,size,value,unused):
+        if any(base<=address<base+length for base,length in arenas):writes.append((address,size))
+    uc.hook_add(UC_HOOK_CODE,admission,begin=0xA013EA7C,end=0xA013EA7C);uc.hook_add(UC_HOOK_MEM_WRITE,write)
+    for reg,value in ((r.UC_ARM_REG_R0,request),(r.UC_ARM_REG_R1,0),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):uc.reg_write(reg,value)
+    uc.emu_start(0xA014ADEF,0x5001F000,count=3000000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0xA013EA7C:raise RuntimeError('original Clarity first-stage admission not reached')
+    data=bytes.fromhex(observed['descriptor']);small=arenas[0]
+    return dict(**observed,geometry=struct.unpack_from('>I',data,8)[0],input=struct.unpack_from('>I',data,0)[0],output=struct.unpack_from('>I',data,4)[0],
+                table_write_bytes=max(address+size for address,size in writes)-small[0] if writes else 0,
+                cpu_workspace_writes_bounded=bool(writes) and all(small[0]<=address and address+size<=small[0]+small[1]-32 for address,size in writes),
+                arena_guards_preserved=all(bytes(uc.mem_read(base+size-32,32))==b'\x5a'*32 for base,size in arenas),
+                request_preserved=bytes(uc.mem_read(request,64))==descriptor,context_preserved=bytes(uc.mem_read(context,0x500))==before,
+                hardware_tested=False,helpers_intercepted=['first stage admission only'],
+                scope='Complete original A014ADEE prelude, A014D460 expansion and extra tables, stopped at A013EA7C before its driver calls. Four distinct synthetic arenas sized like tag20/tag2E/input tag17/output tag17. Not actual pool/capture integration or pixel execution.')
+
 def probe_clarity_entry(code:bytes,strength:int,*,hdr:bool=False)->dict:
     """Original Clarity/HDR prelude through coefficient admission or bypass.
 

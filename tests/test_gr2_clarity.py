@@ -36,3 +36,42 @@ class Gr2ClarityTests(unittest.TestCase):
         hdr=native.probe_clarity_entry(code,1,hdr=True)
         self.assertFalse(hdr['returned_normally']);self.assertEqual(hdr['row'],4)
         self.assertEqual(hdr['effective_strength'],5)
+
+    def test_original_buffer_initializer_sizes_the_shared_arena_and_preserves_layout_alias_owners(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_buffer_pool_layout'))
+        for mode in range(5):
+            with self.subTest(mode=mode):
+                result=native.probe_buffer_pool_layout(component('gr2','b01firm8'),mode)
+                self.assertEqual(result['arena_requested_bytes'],0x1dcb02e0)
+                self.assertTrue(result['all_aliases_match']);self.assertTrue(result['all_pool_spans_bounded'])
+                self.assertTrue(result['definitions_preserved']);self.assertTrue(result['stack_preserved'])
+                self.assertTrue(result['callee_saved_preserved']);self.assertEqual(result['final_layout'],mode)
+                self.assertEqual(result['buffers']['32']['declared_bytes'],0xe5800)
+                self.assertEqual(result['buffers']['46']['declared_bytes'],0x2000000)
+                self.assertEqual(result['buffers']['46']['owner_tag'],46 if mode==3 else 38)
+
+    def test_original_scratch_buffers_exhaust_without_overlap_and_release_out_of_order_without_leaks(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_buffer_lifetime'))
+        for mode in range(5):
+            with self.subTest(mode=mode):
+                result=native.probe_buffer_lifetime(component('gr2','b01firm8'),mode)
+                self.assertTrue(result['exhaustion_returned_null']);self.assertTrue(result['all_spans_disjoint'])
+                self.assertTrue(result['handles_cleared']);self.assertTrue(result['metadata_reclaimed'])
+                self.assertTrue(result['pool_restored']);self.assertTrue(result['raw_access_matches'])
+                self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+                self.assertEqual(result['out_of_order_release_deferred'],mode!=3)
+                self.assertGreaterEqual(result['large_buffer_count'],1)
+
+    def test_original_clarity_preserves_full_resolution_geometry_and_bounds_pregraph_tables_to_small_scratch(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_clarity_graph_admission'))
+        for geometry in (0x00040020,0x0cc01340):
+            for strength in (1,4,6,9):
+                with self.subTest(geometry=geometry,strength=strength):
+                    result=native.probe_clarity_graph_admission(component('gr2','b01firm8'),strength,geometry)
+                    self.assertEqual(result['geometry'],geometry);self.assertEqual(result['stage'],0xa013ea7c)
+                    self.assertEqual(result['table_write_bytes'],0xe000)
+                    self.assertTrue(result['cpu_workspace_writes_bounded']);self.assertTrue(result['arena_guards_preserved'])
+                    self.assertTrue(result['request_preserved']);self.assertTrue(result['context_preserved'])
