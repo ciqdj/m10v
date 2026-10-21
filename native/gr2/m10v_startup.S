@@ -71,6 +71,8 @@ gr2_producer_original:
 gr2_ui_event_chain:
     stmdb sp!,{r0-r3,ip,lr}
     mov r0,r1
+    bl gr2_ui_bootstrap
+    ldr r0,[sp,#4]
     bl gr2_settings_raw_event
     cmp r0,#0
     ldmia sp!,{r0-r3,ip,lr}

@@ -7,4 +7,7 @@ extern volatile uint32_t gr2_startup_complete;
 int gr2_native_activate(void);
 int gr2_native_ready(void);
 uint32_t gr2_cpu_state(void);
+int gr2_ui_storage_ready(void);
+int gr2_ui_bootstrap(const uint32_t *message);
+extern volatile uint32_t gr2_ui_boot_state;
 #endif

@@ -74,6 +74,26 @@ class Gr2SdTests(unittest.TestCase):
         for i in range(2):u.mem_write(0x50006c00+14*i,struct.pack('>h',-2))
         u.mem_write(0xa06b6de0,b'\1');u.mem_write(0xa06b6de3,b'\1');u.mem_write(0xa00c22c0,struct.pack('>h',1))
         task=0xa05f5c28+68;u.mem_write(task+8,struct.pack('>2h',-1,-1));u.mem_write(task+24,struct.pack('>3h',20,0,20))
+        # Automatic UI restoration uses actual journal/custom-snapshot file
+        # wrappers, original RTOS allocation/mutex and caption/menu adapters.
+        # Only the mounted-service snapshot and disk/FILE metadata are fixtures.
+        self.assertTrue('gr2_ui_bootstrap' in report['symbols'])
+        metadata_pool=0xA05FA9CC+56
+        u.mem_write(metadata_pool,struct.pack('>5I2H',0x4d504c20,0,4096,4096,0,2,0))
+        u.mem_write(0xA00B5BFE,struct.pack('>H',2));u.mem_write(0xA00C2C6C+28,struct.pack('>I',metadata_pool))
+        u.mem_write(0xA00C2C6C+8,struct.pack('>I',0xA05FC940))
+        u.mem_write(0xA00C2C6C+0x20,bytes(8));u.mem_write(0xA061EAD0,struct.pack('>I',1))
+        u.mem_write(0xA06AA6A0+0x61A8,struct.pack('>I',3));u.mem_write(0xA06AA6A0+0x61AC,b'H')
+        for name in ('gr2_activation_ready','gr2_startup_complete'):u.mem_write(report['symbols'][name],struct.pack('>I',1))
+        message=0x50005F00;u.mem_write(message,struct.pack('>3I',0x60000001,0,0));count=len(writes)
+        self.assertEqual(self.call(u,report['symbols']['gr2_ui_bootstrap'],[message]),1)
+        self.assertEqual(word(report['symbols']['gr2_ui_boot_state']),3);self.assertEqual(len(writes),count)
+        self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
+        self.assertEqual(struct.unpack('>H',u.mem_read(0x5000500c,2))[0],79)
+        pointer=self.call(u,report['symbols']['gr2_original_text'],[112,4])
+        self.assertEqual(bytes(u.mem_read(pointer,192)).decode('utf-16-be').split('\0')[0],'Native LUT')
+        count=len(events);self.assertEqual(self.call(u,report['symbols']['gr2_ui_bootstrap'],[message]),1)
+        self.assertEqual(len(events),count);self.assertEqual(tokens,{})
         self.assertIn('gr2_settings_backend_bind',report['symbols'])
         u.mem_map(0x54000000,0x2000);ops=0x50004000;page=0x50003000
         self.assertEqual(self.call(u,report['symbols']['gr2_settings_backend_bind'],[0x54000000,ops]),1)

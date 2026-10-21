@@ -47,7 +47,7 @@ def audit_elf(data:bytes)->dict:
                 if not BASE<=value<BASE+memsize:raise ValueError('export outside runtime')
                 symbols[label]=value
     if undefined:raise ValueError('unresolved runtime helpers: '+','.join(undefined))
-    required={'gr2_post_load','gr2_boot_count','gr2_capture_decode','gr2_date_valid','gr2_startup_chain','gr2_native_activate','gr2_activation_ready','gr2_code_sync','gr2_cpu_state'}
+    required={'gr2_post_load','gr2_boot_count','gr2_capture_decode','gr2_date_valid','gr2_startup_chain','gr2_native_activate','gr2_activation_ready','gr2_code_sync','gr2_cpu_state','gr2_finalize_chain','gr2_startup_complete','gr2_ui_bootstrap','gr2_ui_storage_ready','gr2_ui_boot_state'}
     if not required<=symbols.keys():raise ValueError('required GR II ABI exports missing')
     return dict(base=address,code_bytes=filesize,memory_bytes=memsize,runtime_hex=data[offset:offset+filesize].hex(),symbols=symbols,undefined_symbols=undefined,endianness='big',be8=False)
 
@@ -147,6 +147,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_model.c'),'-o',str(obj)],check=True,capture_output=True)
     startup=out_dir/'startup.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_startup.S'),'-o',str(startup)],check=True,capture_output=True)
+    boot_ui=out_dir/'boot_ui.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_boot_ui.c'),'-o',str(boot_ui)],check=True,capture_output=True)
     boot=out_dir/'boot.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_boot.c'),'-o',str(boot)],check=True,capture_output=True)
     planar=out_dir/'planar.o'
@@ -179,7 +181,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_settings_page.c'),'-o',str(settings_page)],check=True,capture_output=True)
     artwork=out_dir/'artwork.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_artwork.c'),'-o',str(artwork)],check=True,capture_output=True)
-    render_objects=[str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
+    render_objects=[str(boot_ui),str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
@@ -265,7 +267,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
                   effect_name_contract=text_contract,configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
                   configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),
-                  limits=['Shared scalar renderer and ABI bridges; capture ownership/cache/mode lifecycle and menu/storage integration remain researching.','Reserved C-heap window needs original literal adjustment; no firmware patch or download is emitted.','ARMv4T soft-float subset avoids assuming a newer CPU or floating-point unit.'])
+                  limits=['GR II scalar renderer, owned capture/configuration and UI restoration have bounded CPU evidence; complete boot, physical caches and hardware capture remain researching.','Reserved C-heap window needs original literal adjustment; no firmware patch or download is emitted.','ARMv4T soft-float subset avoids assuming a newer CPU or floating-point unit.'])
     (out_dir/'runtime-audit.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
