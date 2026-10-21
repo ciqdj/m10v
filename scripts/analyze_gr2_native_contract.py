@@ -558,49 +558,123 @@ def probe_clarity_graph_admission(code:bytes,strength:int,geometry:int)->dict:
                 hardware_tested=False,helpers_intercepted=['first stage admission only'],
                 scope='Complete original A014ADEE prelude, A014D460 expansion and extra tables, stopped at A013EA7C before its driver calls. Four distinct synthetic arenas sized like tag20/tag2E/input tag17/output tag17. Not actual pool/capture integration or pixel execution.')
 
-def probe_clarity_stage_submit(code:bytes,geometry:int)->dict:
+def probe_clarity_stage_submit(code:bytes,geometry:int,*,event_result:int|None=None)->dict:
     """Execute first Clarity stage through original register/DMA submission.
 
     A passive register bank never produces pixels or a completion interrupt.
     Kernel lock/SVC and resource admission are explicit single-thread fixtures.
     """
+    if event_result is not None and (type(event_result) is not int or event_result not in (0,0xFFFFFFCE,0xFFFFFFFF)):raise ValueError('audited synthetic event status required')
     admission=probe_clarity_graph_admission(code,1,geometry)
     from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_WRITE,arm_const as r
     uc=runtime_machine(code);packet=0x50001000;payload=bytes.fromhex(admission['descriptor']);uc.mem_write(packet,payload)
-    uc.mem_map(0x90000000,4096);uc.mem_map(0x60070000,4096)
+    saved=[0x74560000+i for i in range(8)]
+    for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
+    uc.mem_map(0x90000000,4096);uc.mem_map(0x60070000,4096);uc.mem_map(0xFFFB0000,4096)
     word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
     half=lambda address:struct.unpack('>H',uc.mem_read(address,2))[0]
     clock_control=word(0xA014266C);uc.mem_write(clock_control,struct.pack('>I',0x77))
-    resources=[];clock=[];critical=[];observed={};io=[]
+    resources=[];clock=[];critical=[];observed={};io=[];released=[];waits=[]
     def boundary(machine,address,size,unused):
         args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]
         if address==0xA010DF3C:
             pointer=word(0x60070044);observed.update(wait_timeout=args[0],dma_descriptor=bytes(machine.mem_read(pointer,32)).hex())
-            machine.emu_stop();return
+            if event_result is None:machine.emu_stop()
+            return
+        if address==0xA013EB3C:observed['wait_result']=args[0];return
+        if address==0xA010DF9C:
+            if half(address)!=0xDF0C:raise RuntimeError('original scheduler SVC differs')
+            machine.reg_write(r.UC_ARM_REG_PC,(address+2)|1);return
         if address in (0xA0059F38,0xA0059F4E,0xA0059F5A,0xA0059F72):
             instruction=half(address)
             if instruction not in (0xDF06,0xDF07):raise RuntimeError('original critical-section SVC differs')
             critical.append(instruction&255);machine.reg_write(r.UC_ARM_REG_PC,(address+2)|1);return
         if address==0xA00688E8:resources.append(args[:2])
         elif address==0xA00CE994:clock.append(args)
-        machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0059F38,0xA0059F4E,0xA0059F5A,0xA0059F72,0xA010DF3C):
+        elif address==0xA0068598:released.append(args[0])
+        elif address==0xA00686C4:
+            waits.append([*args,word(machine.reg_read(r.UC_ARM_REG_SP))])
+            if event_result==0:machine.mem_write(machine.reg_read(r.UC_ARM_REG_R3),struct.pack('>I',1))
+        machine.reg_write(r.UC_ARM_REG_R0,event_result if address==0xA00686C4 else 0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0059F38,0xA0059F4E,0xA0059F5A,0xA0059F72,0xA010DF3C,0xA013EB3C,0xA0067F8C,0xA00686C4,0xA0068598,0xA010DF9C,0xA00F9888):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def write(machine,access,address,size,value,unused):io.append([address,size,value])
     uc.hook_add(UC_HOOK_MEM_WRITE,write,begin=0x60070000,end=0x60070FFF)
     for reg,value in ((r.UC_ARM_REG_R0,packet),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):uc.reg_write(reg,value)
-    uc.emu_start(0xA013EA7D,0x5001F000,count=100000)
-    if uc.reg_read(r.UC_ARM_REG_PC)!=0xA010DF3C:raise RuntimeError('original Clarity hardware wait not reached')
+    try:uc.emu_start(0xA013EA7D,0x5001F000,count=100000)
+    except Exception as error:raise RuntimeError(f'Clarity stage CPU {uc.reg_read(r.UC_ARM_REG_PC):08x}, observations {observed}, waits {waits}') from error
+    expected=0xA010DF3C if event_result is None else 0x5001F000
+    if uc.reg_read(r.UC_ARM_REG_PC)!=expected:raise RuntimeError('original Clarity stage wait/return not reached')
     dma=bytes.fromhex(observed['dma_descriptor']);depth=0;balanced=True
     for svc in critical:
         depth+=1 if svc==7 else -1;balanced=balanced and depth in (0,1)
-    return dict(**observed,resource_requests=resources,clock_requests=clock,input_address=word(0x60070010),
+    return dict(**observed,resource_requests=resources,clock_requests=clock,released_resources=released,event_waits=waits,stage_returned=event_result is not None,input_address=word(0x60070010),
                 input_width=half(0x60070016),input_height=half(0x60070018),input_stride=half(0x60070014),
                 output_address=word(0x60070020),output_stride=half(0x60070024),mmio_writes=io,
                 descriptor_matches_submission=dma[:16]==bytes.fromhex('00000080000000800200000000000200') and dma[20:24]==payload[16:18]+payload[14:16],
                 pixel_addresses_not_accessed=True,critical_sections_balanced=balanced and depth==0 and bool(critical),
                 completion_claimed=False,hardware_tested=False,
-                scope='Original A013EA7C, A01425EE, A010E01C/A010E07E/A010E87A plus critical-section register arithmetic; passive60070000/90000000 register banks. Mutex/resource/SVC/clock-peripheral boundaries are fixtures. Stops before A010DF3C wait; pixel addresses remain unmapped so any pixel access fails. No hardware completion, DMA execution, cleanup or cache-coherence claim.')
+                stack_preserved=event_result is not None and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,
+                callee_saved_preserved=event_result is not None and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
+                scope='Original A013EA7C, A01425EE, A010E01C/A010E07E/A010E87A plus critical-section register arithmetic; passive60070000/90000000 register banks. Mutex/resource/SVC/event/clock-peripheral and power-transition boundaries are fixtures. Stops before A010DF3C wait by default; optional synthetic event status executes original wait/error mapping and cleanup. Pixel addresses remain unmapped so any pixel access fails. No hardware completion, DMA execution, physical reset or cache-coherence claim.')
+
+def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=False)->dict:
+    """Original whole control graph with explicit passive DMA/event fixtures.
+
+    This is NOT a pixel emulator: events always report synthetic success and
+    only a reset-ready handshake is modeled. Original CPU graph/stages execute.
+    """
+    official_profile(code,'gr2')
+    if type(strength) is not int or not 1<=strength<=9 or type(hdr) is not bool:raise ValueError('audited Clarity strength/HDR required')
+    if geometry not in (0x40020,0x0CC01340):raise ValueError('audited tiny/full geometry required')
+    from unicorn import UC_HOOK_CODE,UC_HOOK_INTR,UC_HOOK_MEM_READ,UC_HOOK_MEM_WRITE,arm_const as r
+    uc=runtime_machine(code);request=0x50001000;context=0x50004000
+    arenas=((0x51000000,0xE5800),(0x52000000,0x2000000),(0x55000000,0x1F0E020),(0x58000000,0x1F0E020))
+    for base,size in arenas:
+        uc.mem_map(base,(size+32+4095)&~4095);uc.mem_write(base+size,b'\x5a'*32)
+    uc.mem_map(0x60000000,0x1000000);uc.mem_map(0x90000000,0x1000000);uc.mem_map(0xFFFB0000,4096)
+    descriptor=bytearray(64)
+    for offset,value in ((0,0x55000000),(0xc,geometry&65535),(0x28,geometry),(0x30,0x51000000),(0x34,0x52000000),(0x38,0x58000000),(0x3c,context)):struct.pack_into('>I',descriptor,offset,value)
+    uc.mem_write(request,bytes(descriptor));uc.mem_write(context,b'\xa5'*0x500);uc.mem_write(context+0x418,struct.pack('>I',strength))
+    before=bytes(uc.mem_read(context,0x500));saved=[0x74560000+i for i in range(8)]
+    for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
+    acquired=[];released=[];events=[];stages=[];io=[];cpu_writes=[];svc=[]
+    def boundary(machine,address,size,unused):
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        if address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE):
+            stages.append(address);return
+        if address==0xA00688E8:acquired.append(args[0])
+        elif address==0xA0068598:released.append(args[0])
+        elif address==0xA00686C4:
+            events.append(args[:3]);machine.mem_write(args[3],struct.pack('>I',args[1]))
+        machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE,0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0067F8C,0xA00686C4,0xA0068598,0xA00F9888):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def interrupt(machine,number,unused):
+        pc=machine.reg_read(r.UC_ARM_REG_PC);instruction=struct.unpack('>H',machine.mem_read(pc-2,2))[0]
+        if number!=2 or instruction not in (0xDF06,0xDF07,0xDF0C):raise RuntimeError('unexpected original Clarity graph exception')
+        svc.append(instruction&255)
+        if instruction==0xDF07:machine.reg_write(r.UC_ARM_REG_R0,0)
+    uc.hook_add(UC_HOOK_INTR,interrupt)
+    def handshake(machine,access,address,size,value,unused):
+        old=struct.unpack('>H',machine.mem_read(address,2))[0];machine.mem_write(address,struct.pack('>H',(old&0x3FFF)|0x8000))
+    uc.hook_add(UC_HOOK_MEM_READ,handshake,begin=0x600A0100,end=0x600A0101)
+    def write(machine,access,address,size,value,unused):
+        if 0x60000000<=address<0x61000000:io.append([address,size,value])
+        elif 0x51000000<=address<0x5A000000:cpu_writes.append([address,size])
+    uc.hook_add(UC_HOOK_MEM_WRITE,write)
+    for reg,value in ((r.UC_ARM_REG_R0,request),(r.UC_ARM_REG_R1,int(hdr)),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):uc.reg_write(reg,value)
+    uc.emu_start(0xA014ADEF,0x5001F000,count=3000000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original complete Clarity graph exceeded CPU budget')
+    from collections import Counter
+    return dict(returned_normally=True,resources_balanced=Counter(acquired)==Counter(released),resource_acquisitions=acquired,resource_releases=released,
+                event_waits=events,hardware_stage_count=len(stages),stages=stages,mmio_write_count=len(io),scheduler_svc_count=svc.count(12),
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
+                request_preserved=bytes(uc.mem_read(request,64))==descriptor,context_preserved=bytes(uc.mem_read(context,0x500))==before,
+                arena_guards_preserved=all(bytes(uc.mem_read(base+size,32))==b'\x5a'*32 for base,size in arenas),
+                cpu_pixel_writes_bounded=all(any(base<=address and address+length<=base+size for base,size in arenas) for address,length in cpu_writes),
+                pixel_processing_verified=False,hardware_tested=False,
+                scope='Original complete A014ADEE graph and nested stage/driver CPU instructions. Four synthetic image/work arenas, passive register banks, explicit600A0100 reset-ready response, kernel resource/event/SVC/peripheral-clock/power boundaries. Events synthesize success; DMA never produces pixels. Graph return/resource balance/CPU guards/HDR context restoration only; no real completion, DMA span/coherence or live capture proof.')
 
 def probe_clarity_entry(code:bytes,strength:int,*,hdr:bool=False)->dict:
     """Original Clarity/HDR prelude through coefficient admission or bypass.

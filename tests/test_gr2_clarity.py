@@ -91,3 +91,28 @@ class Gr2ClarityTests(unittest.TestCase):
                 self.assertTrue(result['descriptor_matches_submission'])
                 self.assertTrue(result['pixel_addresses_not_accessed']);self.assertTrue(result['critical_sections_balanced'])
                 self.assertFalse(result['completion_claimed'])
+
+    def test_original_clarity_wait_maps_event_status_and_releases_resource_even_after_timeout(self):
+        from scripts import analyze_gr2_native_contract as native
+        for event_result in (0,0xffffffce,0xffffffff):
+            with self.subTest(event_result=event_result):
+                result=native.probe_clarity_stage_submit(component('gr2','b01firm8'),0x00040020,event_result=event_result)
+                self.assertTrue(result['stage_returned']);self.assertEqual(result['released_resources'],[5])
+                self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+                self.assertEqual(result['event_waits'],[[11,1,1,0xffffffff]])
+                self.assertEqual(result['wait_result'],0 if event_result==0 else (0x0a000011 if event_result==0xffffffce else 0x0a000099))
+                self.assertEqual(result['clock_requests'][-2:],[[16,0,0],[17,0,0]])
+                self.assertTrue(result['critical_sections_balanced']);self.assertFalse(result['completion_claimed'])
+
+    def test_original_complete_clarity_control_graph_balances_resources_and_preserves_context_with_explicit_device_model(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_clarity_control_graph'))
+        for geometry,strength,hdr in ((0x40020,1,False),(0x40020,9,False),(0xcc01340,1,False),(0xcc01340,9,False),(0x40020,3,True)):
+            with self.subTest(geometry=geometry,strength=strength,hdr=hdr):
+                result=native.probe_clarity_control_graph(component('gr2','b01firm8'),strength,geometry,hdr=hdr)
+                self.assertTrue(result['returned_normally']);self.assertTrue(result['resources_balanced'])
+                self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+                self.assertTrue(result['request_preserved']);self.assertTrue(result['context_preserved'])
+                self.assertTrue(result['arena_guards_preserved']);self.assertTrue(result['cpu_pixel_writes_bounded'])
+                self.assertGreater(result['hardware_stage_count'],8)
+                self.assertFalse(result['pixel_processing_verified'])
