@@ -23,6 +23,32 @@ class Gr2NativeContractTests(unittest.TestCase):
         deep=module.probe_fat_directory(code,read_error=3,cache_boundary=True)
         self.assertEqual(deep['terminal_error'],17);self.assertIn('sector cache acquisition',deep['helpers_intercepted'])
 
+    def test_original_phase_two_initializes_image_pool_before_runtime_load(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_image_pool_startup_phase'))
+        result=module.probe_image_pool_startup_phase(component('gr2','b01firm8'))
+        self.assertEqual(result['phase'],2)
+        self.assertEqual(result['calls_before_pool'],['0xa00afda4','0xa00afdac','0xa00dfc08'])
+        self.assertEqual(result['pool_entry'],'0xa00e1df0')
+        self.assertEqual(result['pool_caller'],'0xa00c6474')
+        self.assertEqual(result['original_body_bytes'],0xfb0c)
+
+    def test_original_shooting_ok_action_and_menu_create_identify_the_actual_menu_root(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_main_menu_root'))
+        result=module.probe_main_menu_root(component('gr2','b01firm8'))
+        self.assertEqual(result['requested_state'],0x60028)
+        self.assertEqual(result['public_state'],0x60004019)
+        self.assertEqual(result['handler'],'0xa03abcd5')
+        self.assertEqual(result['child_offsets'],[0x30,0x78,0x174,0x324,0x1b4,0x2e8])
+        self.assertTrue(result['guards_unchanged']);self.assertTrue(result['stack_preserved'])
+        self.assertEqual(result['child_count'],6)
+        initialized=module.probe_main_menu_root(component('gr2','b01firm8'),activate=True)
+        self.assertEqual(initialized['category_count'],5)
+        self.assertEqual(initialized['category_item_counts'],[35,12,20,47,48])
+        self.assertEqual(initialized['category_titles'],[355,356,357,358,0])
+        self.assertEqual(initialized['private_confirmation_targets'],[0x6d100001,0x6d100003])
+        self.assertEqual(initialized['confirmation_boundary'],'0xa03948c0')
+        self.assertTrue(initialized['guards_unchanged']);self.assertTrue(initialized['stack_preserved'])
+
     def test_original_file_mode_parser_does_not_accept_assumed_exclusive_stdio_modes(self):
         module=self.implementation();self.assertTrue(hasattr(module,'probe_file_mode_flags'))
         result=module.probe_file_mode_flags(component('gr2','b01firm8'))

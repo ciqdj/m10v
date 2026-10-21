@@ -27,6 +27,18 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         self.assertEqual(u.reg_read(r.UC_ARM_REG_PC),0x5001f000)
         return u.reg_read(r.UC_ARM_REG_R0)
 
+    def test_memory_reservations_are_bound_to_original_preinitialization_load_records(self):
+        from scripts import build_gr2_runtime as module
+        self.assertTrue(hasattr(module,'memory_reservations'))
+        code=component('gr2','b01firm8');rows=module.memory_reservations(code)
+        self.assertEqual([(v['address'],v['record_index'],v['expected'],v['replacement']) for v in rows],
+                         [(0xa0023154,0,0xa0798000,0xa0800000),(0xa01137ec,1,0xfb0c,0x12b8c)])
+        for row in rows:
+            self.assertEqual(struct.unpack_from('>I',code,row['source_file_offset'])[0],row['expected'])
+            self.assertEqual(row['install_stage'],'before_original_module_load')
+        changed=bytearray(code);changed[rows[1]['source_file_offset']]^=1
+        with self.assertRaises(ValueError):module.memory_reservations(bytes(changed))
+
     def test_page_configuration_rejects_invalid_values_and_does_not_silently_drop_unwired_hdf(self):
         import copy
         from scripts.build_gr2_runtime import configuration_state

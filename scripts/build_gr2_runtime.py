@@ -51,6 +51,26 @@ def audit_elf(data:bytes)->dict:
     if not required<=symbols.keys():raise ValueError('required GR II ABI exports missing')
     return dict(base=address,code_bytes=filesize,memory_bytes=memsize,runtime_hex=data[offset:offset+filesize].hex(),symbols=symbols,undefined_symbols=undefined,endianness='big',be8=False)
 
+def memory_reservations(official:bytes)->list[dict]:
+    """Describe source-literal edits required before the original allocators run.
+
+    This is an identity-locked audit contract, not a firmware patch emitter.
+    Editing the live pool geometry after creation is expressly not equivalent.
+    """
+    official_profile(official,'gr2')
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    segments=parse_executable_load_map(official);result=[]
+    for address,record,expected,replacement,purpose in (
+        (0xA0023154,0,BASE,LIMIT,'exclude runtime window from original C heap'),
+        (0xA01137EC,1,0xFB0C,0xFB0C+128+12288,'reserve inline immutable capture state and custom record')):
+        row=segments[record]
+        if not row['address']<=address<=row['address']+row['length']-4:raise ValueError('reservation literal load owner changed')
+        offset=row['source_file_offset']+address-row['address']
+        if struct.unpack_from('>I',official,offset)[0]!=expected:raise ValueError('reservation literal preimage changed')
+        result.append(dict(address=address,record_index=record,source_file_offset=offset,expected=expected,
+                           replacement=replacement,install_stage='before_original_module_load',purpose=purpose))
+    return result
+
 def configuration_state(configuration:dict)->tuple[dict,bytes,bytes]:
     """Use the existing page normalizer; convert its LE wire value to BE32 ABI.
 
@@ -127,6 +147,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())
+    report['memory_reservations']=memory_reservations(official)
     if official[0xA0044F4C-0xA0020200:0xA0044F50-0xA0020200]!=bytes.fromhex('e12fff1e'):raise ValueError('original SVC callback identity mismatch')
     displacement=report['symbols']['gr2_cache_gateway']-0xA0044F54
     if displacement%4 or not -(1<<25)<=displacement<(1<<25):raise ValueError('cache callback ARM branch range invalid')

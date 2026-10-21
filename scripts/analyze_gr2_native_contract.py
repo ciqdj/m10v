@@ -27,6 +27,28 @@ def runtime_machine(code:bytes,*,cpu_model:int|None=None):
         start=row['source_file_offset'];uc.mem_write(row['address'],code[start:start+row['length']])
     return uc
 
+def probe_image_pool_startup_phase(code:bytes)->dict:
+    """Execute stock phase2 dispatch up to (not through) image-pool creation."""
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);calls=[];observed={};stack=0x50018000
+    def boundary(machine,address,size,context):
+        if address==0xA00E1DF0:
+            observed['pool_caller']=(machine.reg_read(r.UC_ARM_REG_LR)&~1)-4
+            observed['original_body_bytes']=struct.unpack('>I',machine.mem_read(0xA01137EC,4))[0]
+            machine.emu_stop();return
+        calls.append(hex(address));machine.reg_write(r.UC_ARM_REG_R0,0)
+        machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA00AFDA4,0xA00AFDAC,0xA00DFC08,0xA00E1DF0):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    uc.reg_write(r.UC_ARM_REG_R0,2);uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,0x5001f001)
+    uc.emu_start(0xA00C63A7,0x5001f000,count=1000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0xA00E1DF0 or not observed:raise RuntimeError('phase2 did not reach original image-pool initialization')
+    return dict(phase=2,calls_before_pool=calls,pool_entry='0xa00e1df0',
+                pool_caller=hex(observed['pool_caller']),original_body_bytes=observed['original_body_bytes'],
+                helpers_intercepted=calls,hardware_tested=False,
+                scope='Original phase2 dispatch through its actual pool call. Prior phase helpers are boundaries; pool body is covered separately. No task scheduling or boot installation claim.')
+
 def probe_c_heap_startup(code:bytes,*,reserved_end:int|None=None)->dict:
     """Execute stock stack/heap boundary getter and C heap initialization.
 
@@ -992,6 +1014,67 @@ def probe_sd_open_mode(code:bytes,flags:int)->dict:
     return dict(entry='0xa002c70e',flags=flags,**observed,opened=False,hardware_tested=False,
                 helpers_intercepted=['filesystem readiness','media status','lock','unlock','fopen stop boundary'],
                 scope='Original H: mode-selection instructions and string comparison; no file creation or handle allocation.')
+
+def probe_main_menu_root(code:bytes,*,activate:bool=False)->dict:
+    """Identify the actual menu from stock shooting OK action and run CREATE.
+
+    The action predicate and FSM transition are not substituted evidence for a
+    live key press. The push operation is observed at its explicit boundary.
+    """
+    from unicorn import UC_HOOK_CODE
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);root=0x50004000;event=0x50001000;stop=0x5001f000;stack=0x50018000;requests=[]
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    def push(machine,address,size,context):
+        requests.append([machine.reg_read(r.UC_ARM_REG_R0),machine.reg_read(r.UC_ARM_REG_R1)])
+        machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    def run(entry,*args):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1)
+        uc.emu_start(entry|1,stop,count=1000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=stack:raise RuntimeError('original menu action/create budget or stack failure')
+    uc.hook_add(UC_HOOK_CODE,push,begin=0xA003B8BA,end=0xA003B8BA)
+    run(0xA039242E)
+    if len(requests)!=1 or requests[0][1]!=0x60028:raise ValueError('stock shooting OK action target changed')
+    state=word(0xA040177C+(requests[0][1]&0xffff)*4);configuration=word(state+24);handler=word(configuration)
+    uc.mem_write(root-16,b'\xa5'*16);uc.mem_write(root,bytes(uc.mem_read(configuration,64)));uc.mem_write(root+0x600,b'\xa5'*16)
+    uc.mem_write(event,struct.pack('>3I',0x60000000,0,0));run(handler,root,event)
+    menu={}
+    if activate:
+        # Initialized no-observer property bank and active root are required by
+        # the stock category predicates; do not stub them to force eligibility.
+        uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x50002000,0x50003000,0x383))
+        uc.mem_write(0x50003000,struct.pack('>5I',0,0,0x383,0x5000D000,0))
+        uc.mem_write(word(0xA0398DC4),struct.pack('>I',root))
+        uc.mem_write(event,struct.pack('>3I',0x60000001,0,0));run(handler,root,event)
+        descriptor=word(root+0x3ac);categories=struct.unpack('>H',uc.mem_read(descriptor,2))[0];rows=word(descriptor+8)
+        if categories!=5:raise ValueError('stock menu category count changed')
+        menu=dict(category_count=categories,category_item_counts=[word(rows+index*24+12) for index in range(categories)],
+                  category_titles=[word(rows+index*24+4) for index in range(categories)])
+        routes=[]
+        def route(machine,address,size,context):
+            routes.append(machine.reg_read(r.UC_ARM_REG_R0));machine.reg_write(r.UC_ARM_REG_R0,0)
+            machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        uc.hook_add(UC_HOOK_CODE,route,begin=0xA03948C0,end=0xA03948C0)
+        # Detached private row in synthetic RAM. No original category storage
+        # is overwritten; this proves only the original type1 confirm route.
+        original_rows=word(root+0x170);private_rows=0x50008000
+        for target in (0x6D100001,0x6D100003):
+            uc.mem_write(private_rows,bytes(uc.mem_read(original_rows,32)))
+            uc.mem_write(private_rows+8,struct.pack('>2I',0x01000000,target))
+            uc.mem_write(root+0x170,struct.pack('>I',private_rows));uc.mem_write(root+0xB8,bytes(2));uc.mem_write(root+0x3B0,b'\x01')
+            uc.mem_write(event,struct.pack('>3I',0x60002001,0,0));run(word(root+0x10),root,event)
+        menu['private_confirmation_targets']=routes
+        menu['confirmation_boundary']='0xa03948c0'
+        uc.mem_write(root+0x170,struct.pack('>I',original_rows))
+
+    count=struct.unpack('>H',uc.mem_read(root+24,2))[0];children=word(root+20)
+    if count>32 or not root<=children<root+0x600-count*4:raise ValueError('menu child array exceeds private observation bounds')
+    return dict(**menu,requested_state=requests[0][1],public_state=word(state+32),configuration=hex(configuration),handler=hex(handler),
+                child_count=count,child_offsets=[word(children+index*4)-root for index in range(count)],
+                guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['FSM push observation']+(['menu route conversion observation'] if activate else []),hardware_tested=False,
+                scope='Stock shooting OK action and menu CREATE; optional INIT/category predicates plus type1 confirm on detached private rows. Synthetic active-root/property state; FSM push and route conversion are observation boundaries. Real eligibility, rendering and launcher installation remain under research.')
 
 def probe_ui_undo(code:bytes,*,commit:bool)->dict:
     """Execute stock UI preview capture/end and real system-pool allocation.

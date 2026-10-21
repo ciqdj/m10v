@@ -298,3 +298,19 @@ GR2 构建器现接受完整 M10V 五槽配置；复用现有页面 `normalizeCo
 21种语言的显式/当前语言原厂访问器都实际运行，七个别名与配置槽对应；换卷后地址保持、名称更新，原表逐字节恢复，真实系统 MPL 临时空间归还。刷新用可恢复的960字节 MPL 临时空间，避免与原生 UI 调用链叠加两份大栈数组；池耗尽时保留旧名称和所有指针，释放保留块后重试成功。低内存 fixture 从内核实际空闲单元计算，而非把2MiB区域总长当作可分配载荷：此合成初始池可用载荷为1747620字节，包含分配器粒度/元数据开销。设置后端仅在名称重定向已经明确安装时随 journal/config reload 刷新，尚未自动安装到启动流程。完整105项回归通过，没有据此声称原生控件重画或真机可视结果已验证。
 
 首次启动补充：原厂 stdio 模式解析器实际执行得到 r=2、w=1、a=4，`+` 加8，`wx`/`wbx`/`x` 均拒绝；这仅证明该解析器的拼写，不证明底层不存在独占创建接口。目录包装 `A002F354` 为 FIND 后续遍历，调用 SDK `A00653EE -> A0079DFC -> A0079124`，错误号3走无额外错误日志的结束分支，其他错误另行记录；`A00653BC` 是首项接口。继续向实际 FAT 目录遍历与错误传播逆向，尚未将错误号直接当作安全初始化依据。
+
+### First-boot journal absence and startup ordering
+
+The directory probe now executes the original PrFILE initializer, SDK FindFirst/FindNext, character conversion, FAT16 matching and entry decoder. Sector-cache acquisition is the explicit device boundary; original record reader A00941B2 executes. Empty directory returns3; media error9 is preserved; cache error3 and short records become17. An unready device returns9 without reading media. Native exact A/B-name checks release their private4096-byte cursor through the original MPL. Original FindClose has no additional directory-close operation.
+
+The UI initializes compiled defaults only when both journals are confirmed absent, using existing write/readback/arbitration. Repeated initialization does not write. Corrupt existing journals, failed reads and unready devices are preserved. This synthetic FAT16 evidence does not prove FAT32/exFAT, hot-swap or actual preemption. Full108 tests passed in199.683s; runtime code274956/memory275940, BE32, no undefined symbols/BE8, can_package:false.
+
+Original phase dispatcher A00C63A6 calls A00DFC08 then image-pool initializer A00E1DF0 in phase2, before module14 and post-load. Pool-size literal A01137EC must therefore be reserved before original pool initialization; changing it after allocation would invalidate ownership geometry. Startup auto-install remains disabled while its safe window is researched.
+
+### Actual native menu root (continued)
+
+The earlier84-widget candidate is not used as proof of the settings menu. Executing shooting-OK action A039242E observes its actual FSM push request60028; indexed record40 resolves to public60004019, configurationA040D494 and handlerA03ABCD5. Original CREATE initializes six embedded children at offsets30/78/174/324/1B4/2E8 with guards and stack preserved. Original INIT also returns with a synthetic initialized property bank and active root; category predicates execute without substitution. It exposes five categories with35/12/20/47/48 items and titles355/356/357/358/0. This does not yet prove live eligibility, drawing or a private launcher.
+
+The build audit now records both exact source-literal owners: C-heap reservation A0023154 belongs to load record0/source2F54, and image-body size A01137EC belongs to record1/sourceF35EC. Expected valuesA0798000/FB0C and proposed valuesA0800000/12B8C are identity locked and marked before_original_module_load; these are audit descriptions, not emitted firmware patches. Original phase2 dispatch execution reaches the pool call fromA00C6474 after its three preceding helper boundaries. Targeted3 tests passed; native-contract/build61 tests passed before the added menu-root regression.
+
+Original type1 confirmation additionally executes with a detached copied32-byte row and private target6D100001/6D100003. SPEC_OK60002001 reaches A03948C0 with each exact target, preserving stack/guards. Route conversion is an observation boundary, not an installed launcher or accepted FSM event. Full111 tests passed in201.641s; the strengthened INIT/confirm regression separately passed in0.799s.
