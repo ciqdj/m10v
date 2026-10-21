@@ -58,6 +58,7 @@ class Gr2ComponentTests(unittest.TestCase):
         official=component('gr2','b01firm8');candidate,_=module.build_gr2_component(official,runtime)
         proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True)
         self.assertEqual(proof['native_activation_ready'],1)
+        self.assertTrue(proof['low_record_loaded_by_original_indexed_loader'])
         self.assertEqual(proof['activation_syscalls'],[4,5,3])
         self.assertEqual(proof['activation_cache_operations'],[[7,10,4],[7,5,0]])
         self.assertTrue(proof['activation_callback_code_preserved']);self.assertTrue(proof['activation_user_return'])

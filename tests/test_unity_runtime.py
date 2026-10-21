@@ -136,3 +136,14 @@ class UnityRuntimeTests(unittest.TestCase):
         self.assertEqual(report['post_load_return'],0xffffffff)
         self.assertEqual(report['events'][-4:],[['post_load',0],['phase',0],['phase',0xffffffff],['finalize',0xffffffff]])
         self.assertNotIn('0xa0023234',report['helpers_intercepted'])
+
+    def test_gr2_indexed_low_record_copies_actual_vectors_and_zeroes_original_bss_without_touching_guards(self):
+        module=implementation();self.assertTrue(hasattr(module,'probe_gr2_low_record'))
+        code=component('gr2','b01firm8')
+        result=module.probe_gr2_low_record(code)
+        self.assertEqual(result['returned'],0);self.assertTrue(result['payload_matches']);self.assertTrue(result['bss_zeroed'])
+        self.assertTrue(result['guards_preserved']);self.assertTrue(result['loaded']);self.assertTrue(result['context_and_registers_restored'])
+        self.assertEqual(result['address'],0x400);self.assertEqual(result['zero_address'],0x4054)
+        failed=module.probe_gr2_low_record(code,fail_read=True)
+        self.assertEqual(failed['returned'],0xffffffff);self.assertFalse(failed['loaded']);self.assertFalse(failed['bss_zeroed'])
+        self.assertTrue(failed['target_unchanged']);self.assertTrue(failed['guards_preserved']);self.assertTrue(failed['context_and_registers_restored'])

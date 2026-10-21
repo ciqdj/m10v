@@ -97,6 +97,58 @@ def probe_gr2_bootstrap_extension(code:bytes,*,contract:dict)->dict:
                 helpers_intercepted=['component-header lookup','storage descriptor','bounded sector read'],hardware_tested=False,
                 scope='Full original module0 indexed-loader copy, tail, BSS zero and completion flag with extended44-byte bootstrap in existing source padding. Header/storage are synthetic; no boot-ROM, flash write or hardware cache claim.')
 
+def load_gr2_low_record(machine,code:bytes,*,fail_read:bool=False)->dict:
+    """CPU fixture: original indexed loader copies official low vectors/BSS.
+
+    Uses bounded header/storage/context fixtures, restoring caller CPU/context.
+    This proves a loader mechanism, not the external boot-ROM caller/sequence.
+    The caller must not have mapped the low64KiB before this operation.
+    """
+    official_profile(code,'gr2')
+    if type(fail_read) is not bool:raise ValueError('explicit read failure required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    row=parse_executable_load_map(code)[15];stream=code[512:]+bytes((-len(code[512:]))%512)
+    header=0x5001D000;context=0x5001D400;callback=0x5001E000;stop=0x5001F000
+    pointer=_context_pointer(code,'gr2');original_pointer=bytes(machine.mem_read(pointer,4))
+    scratch=bytes(machine.mem_read(header,0x1000));saved=machine.context_save()
+    registers=[r.UC_ARM_REG_R0+i for i in range(13)]+[r.UC_ARM_REG_SP,r.UC_ARM_REG_LR,r.UC_ARM_REG_PC,r.UC_ARM_REG_CPSR]
+    before=[machine.reg_read(reg) for reg in registers];reads=[];hooks=[]
+    machine.mem_map(0,0x10000);machine.mem_write(0,b'\xa5'*0x10000)
+    machine.mem_write(header,code[:512]);machine.mem_write(context,bytes(0x120));machine.mem_write(pointer,struct.pack('>I',context))
+    def boundary(uc,address,size,unused):
+        a,b,c=[uc.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]
+        if address==0xA00566BC:value=header
+        elif address==0xA005658E:
+            uc.mem_write(b,bytes(60));uc.mem_write(b+0x2C,struct.pack('>I',callback|1));value=0
+        else:
+            if (b+c)*512>len(stream):raise ValueError('official low-record read exceeds source')
+            reads.append([b,c,a]);value=int(fail_read)
+            if not fail_read:uc.mem_write(a,stream[b*512:(b+c)*512])
+        uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
+    try:
+        for address in (0xA00566BC,0xA005658E,callback):hooks.append(machine.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address))
+        machine.reg_write(r.UC_ARM_REG_R0,15);machine.reg_write(r.UC_ARM_REG_R1,0)
+        machine.reg_write(r.UC_ARM_REG_SP,0x50018000);machine.reg_write(r.UC_ARM_REG_LR,stop|1)
+        machine.emu_start(0xA0056723,stop,count=1000000)
+        if machine.reg_read(r.UC_ARM_REG_PC)!=stop:raise RuntimeError('original low-record loader exceeded CPU budget')
+        payload=bytes(machine.mem_read(row['address'],row['length']))
+        result=dict(returned=machine.reg_read(r.UC_ARM_REG_R0),address=row['address'],zero_address=row['zero_address'],read_requests=reads,
+                    payload_matches=payload==code[row['source_file_offset']:row['source_file_offset']+row['length']],
+                    target_unchanged=payload==b'\xa5'*row['length'],loaded=machine.mem_read(context+0x108+15,1)==b'\x01',
+                    bss_zeroed=bytes(machine.mem_read(row['zero_address'],row['zero_length']))==bytes(row['zero_length']),
+                    guards_preserved=bytes(machine.mem_read(0,0x400))==b'\xa5'*0x400 and bytes(machine.mem_read(0x7860,32))==b'\xa5'*32,
+                    deferred_commit_proved=False,hardware_tested=False,
+                    scope='Original indexed-loader record15 copy/tail/zero/completion using exact official source, synthetic header/storage/context. No generic deferred-buffer consumer, boot-ROM ordering, CPU remap or physical low-RAM proof.')
+    finally:
+        for hook in hooks:machine.hook_del(hook)
+        machine.mem_write(pointer,original_pointer);machine.mem_write(header,scratch);machine.context_restore(saved)
+    result['context_and_registers_restored']=bytes(machine.mem_read(pointer,4))==original_pointer and [machine.reg_read(reg) for reg in registers]==before
+    return result
+
+def probe_gr2_low_record(code:bytes,*,fail_read:bool=False)->dict:
+    from scripts.analyze_gr2_native_contract import runtime_machine
+    return load_gr2_low_record(runtime_machine(code),code,fail_read=fail_read)
+
 def probe_gr2_module_guard(code:bytes,*,loaded:bool)->dict:
     """Execute original record14 wrapper prefix through its load-status guard."""
     official_profile(code,'gr2')
@@ -177,8 +229,9 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     if activation_fixture:
         from unicorn import UC_HOOK_INTR
         from unicorn import arm_const as state_regs
-        low=candidate_rows[15];machine.mem_map(0,0x10000)
-        machine.mem_write(low['address'],candidate_component[low['source_file_offset']:low['source_file_offset']+low['length']])
+        low_load=load_gr2_low_record(machine,code)
+        if low_load['returned'] or not low_load['payload_matches'] or not low_load['bss_zeroed']:raise RuntimeError('original low-vector indexed load failed')
+        native_result['low_record_loaded_by_original_indexed_loader']=True
         def cp15(uc,address,size,unused):
             word=struct.unpack('>I',uc.mem_read(address,4))[0]
             if word&0x0f100f10==0x0e100f10:

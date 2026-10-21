@@ -33,8 +33,9 @@ def probe_code_sync(code:bytes,*,native_runtime:dict)->dict:
     from unicorn import arm_const as r
     from scripts.analyze_unity_runtime import parse_executable_load_map
     uc=runtime_machine(code);uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
-    low=parse_executable_load_map(code)[15];uc.mem_map(0,0x10000)
-    uc.mem_write(low['address'],code[low['source_file_offset']:low['source_file_offset']+low['length']])
+    from scripts.analyze_unity_runtime import load_gr2_low_record
+    low_load=load_gr2_low_record(uc,code)
+    if low_load['returned'] or not low_load['payload_matches'] or not low_load['bss_zeroed']:raise RuntimeError('original low-vector indexed load failed')
     original_callback=bytes(uc.mem_read(0xA0044F4C,4));original_vector=bytes(uc.mem_read(0xA00AF884,4))
     # Execute the original task-frame constructor with the actual startup entry
     # found in the kernel's static initial-task configuration.
@@ -83,7 +84,7 @@ def probe_code_sync(code:bytes,*,native_runtime:dict)->dict:
     operations.clear();operands.clear()
     unrelated_native=run(0xA00AF75C,0x12345678)
     behavior['bufferable']=32;bad=run(native_runtime['symbols']['gr2_code_sync'])[0]
-    return dict(initial_task_entry=startup_entry,initial_task_mode=task_frame[1]&31,
+    return dict(initial_task_entry=startup_entry,initial_task_mode=task_frame[1]&31,low_record_loader=low_load,
                 returns=[missing,good,bad],operations=sync_operations,operands=sync_operands,
                 data_cache_vector_supported=data_returns==[1,1] and data_operations==[[7,6,0],[7,10,4]] and data_operands==[0,0],
                 rejected_policy_no_operations=not operations,
@@ -91,7 +92,7 @@ def probe_code_sync(code:bytes,*,native_runtime:dict)->dict:
                 user_return_preserved=all(v[0] for v in checks),callee_saved_preserved=all(v[1] for v in checks),
                 unrelated_svc_preserved=unrelated_original==unrelated_native,
                 helpers_intercepted=['synthetic CP15 bufferable policy read','CP15 drain and instruction-cache invalidation observation'],hardware_tested=False,
-                scope='Original low SVC dispatch and exception return plus native replacement of its data-table entry only. User call refuses absent vector/unexpected bufferable policy. CP15 is observed rather than physically modeled; no automatic boot installation or hardware coherency proof.')
+                scope='Original indexed load of the complete low record, then its SVC dispatch and exception return plus native replacement of its data-table entry only. User call refuses absent vector/unexpected bufferable policy. CP15 is observed rather than physically modeled; no automatic boot installation or hardware coherency proof.')
 
 def probe_image_pool_startup_phase(code:bytes)->dict:
     """Execute stock phase2 dispatch up to (not through) image-pool creation."""

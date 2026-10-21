@@ -241,12 +241,19 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "implementation_files": [
+            "native/gr2/m10v_configuration.c",
+            "native/gr2/m10v_settings_page.c"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_configuration tests.test_gr2_settings"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },
@@ -484,12 +491,21 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "implementation_files": [
+            "native/gr2/m10v_boot_ui.c",
+            "native/gr2/m10v_settings_page.c",
+            "native/gr2/m10v_effect_names.c",
+            "native/gr2/m10v_startup.S"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_boot tests.test_gr2_settings tests.test_gr2_effect_names"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },
@@ -538,17 +554,24 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
+          "implementation_files": [
+            "native/gr2/m10v_boot_ui.c",
+            "native/gr2/m10v_files.c",
+            "native/gr2/m10v_storage.c",
+            "native/gr2/m10v_settings_backend.c"
+          ],
           "evidence_files": [
             "docs/research/gr2-checksum-loader-2026-10-20.md",
-            "scripts/analyze_gr2_native_contract.py"
+            "scripts/analyze_gr2_native_contract.py",
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
           ],
           "automated_checks": [
-            ".venv/bin/python -m unittest tests.test_gr2_native_contract"
+            ".venv/bin/python -m unittest tests.test_gr2_native_contract",
+            ".venv/bin/python -m unittest tests.test_gr2_boot tests.test_gr2_storage tests.test_gr2_sd"
           ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },
@@ -570,12 +593,22 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "implementation_files": [
+            "native/gr2/m10v_boot.c",
+            "native/gr2/m10v_startup.S",
+            "native/gr2/m10v_configuration.c",
+            "native/gr2/m10v_capture.c",
+            "scripts/build_gr2_component.py"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_component tests.test_gr2_capture tests.test_gr2_configuration"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },
@@ -624,12 +657,20 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "implementation_files": [
+            "native/gr2/m10v_sd.c",
+            "native/gr2/m10v_files.c",
+            "native/gr2/m10v_settings_backend.c"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_sd tests.test_gr2_storage"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },
@@ -651,17 +692,22 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
+          "implementation_files": [
+            "native/gr2/m10v_capture.c",
+            "native/gr2/m10v_services.c"
+          ],
           "evidence_files": [
             "docs/research/gr2-checksum-loader-2026-10-20.md",
-            "scripts/analyze_gr2_native_contract.py"
+            "scripts/analyze_gr2_native_contract.py",
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
           ],
           "automated_checks": [
-            ".venv/bin/python -m unittest tests.test_gr2_native_contract"
+            ".venv/bin/python -m unittest tests.test_gr2_native_contract",
+            ".venv/bin/python -m unittest tests.test_gr2_renderer tests.test_gr2_runtime_build"
           ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },
@@ -683,12 +729,19 @@
         },
         "gr2": {
           "status": "researching",
-          "implementation_files": [],
-          "evidence_files": [],
-          "automated_checks": [],
+          "implementation_files": [
+            "native/gr2/m10v_capture.c",
+            "native/gr2/m10v_configuration.c"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-native-memory-capture-2026-10-20.md"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_renderer tests.test_gr2_configuration"
+          ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": null
+          "limitation": "已实现原生适配并有明确边界的 CPU 测试；完整原厂启动到页面、真实缓存及相机拍摄链尚待闭环，整体功能仍保持研究中。"
         }
       }
     },

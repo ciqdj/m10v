@@ -248,6 +248,8 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         from scripts import analyze_gr2_native_contract as native
         report=self.build();self.assertTrue('gr2_code_sync' in report['symbols'])
         result=native.probe_code_sync(component('gr2','b01firm8'),native_runtime=report)
+        self.assertTrue(result['low_record_loader']['payload_matches']);self.assertTrue(result['low_record_loader']['bss_zeroed'])
+        self.assertTrue(result['low_record_loader']['context_and_registers_restored'])
         self.assertEqual(result['returns'],[0,1,0])
         self.assertEqual(result['initial_task_entry'],0xa0020945);self.assertEqual(result['initial_task_mode'],0x10)
         self.assertEqual(result['operations'],[[7,10,4],[7,5,0]])

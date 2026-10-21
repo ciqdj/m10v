@@ -108,3 +108,9 @@ CPU 探针分别验证源偏移 0、1、511、512，长度 1、512、513、1024�
 - 逐项补齐工作台功能与真机验收；校验算法通过不等于完整功能移植通过。
 
 后续原生内存、启动尾部修正、编译桥及平面契约见 [专项记录](gr2-native-memory-capture-2026-10-20.md)。
+
+## Exact original low-record indexed load (2026-10-21)
+
+The generic file-loader loop and the startup indexed loader are different paths. A0056722 accepts index15 directly and has no special defer branch. A new CPU probe supplies the complete exact official component/header to this original loader, which copies the3C54-byte source segment at5D5600 to400, handles its final partial sector, zeros4054..785F and sets record15's completion byte. The probe checks the complete original payload, the low400-byte prefix and upper guard, failure without marking completion/clearing BSS, and restoration of the caller's original CPU state, scratch area and context pointer. The standalone test passed in0.495s. The cache/SVC probe and candidate activation fixture now obtain their low code through this original indexed load, rather than directly writing the vector payload from the host; candidate startup and actual User SVC dispatch still execute afterward.
+
+This proves that indexed-loader mechanism with explicit storage/header/context fixtures. It does not identify the generic deferred-buffer consumer or establish that boot-ROM invokes this mechanism, and it does not emulate low-memory remapping or physical cache behavior. The complete deferred-commit flag remains false. Direct ARM/Thumb branch and literal-pointer searches found no consumers of the five public deferred-field getters in the supplied executable; this negative search does not prove that no external or indirect consumer exists.
