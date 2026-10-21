@@ -170,3 +170,21 @@ gr2_menu_descriptor_chain:
     ldmia sp!,{r4-r7,lr}
     b gr2_menu_descriptor
 .size gr2_menu_descriptor_chain,.-gr2_menu_descriptor_chain
+
+/* Tail of original startup: its finalizer has returned. Replay MOVS 0 and
+ * POP {r4,pc} while retaining ARM/Thumb interworking and the original flags. */
+.arm
+.balign 4
+.global gr2_finalize_chain
+.type gr2_finalize_chain,%function
+gr2_finalize_chain:
+    push {ip}
+    ldr ip,=gr2_startup_complete
+    mov r0,#1
+    str r0,[ip]
+    pop {ip}
+    movs r0,#0
+    ldmia sp!,{r4,lr}
+    bx lr
+.size gr2_finalize_chain,.-gr2_finalize_chain
+.ltorg

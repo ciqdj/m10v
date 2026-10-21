@@ -78,6 +78,17 @@ def early_bootstrap(official:bytes)->dict:
                 site_patch_hex=thumb_bl(site,address).hex(),original_load_bytes=row['length'],extended_load_bytes=row['length']+len(stub),
                 load_length_source_offset=0x28,record_index=0,preserved_stub_address=old_native['address'],preserved_stub_hex=old_word.hex(),scope='Source-only audit contract; record0 extension fits existing zero padding, no other record moves. Original indexed loader and module1 continuation; original record14 stub retained at its old address; failure returns before phase1.')
 
+def finalize_bridge(official:bytes,symbols:dict)->dict:
+    early=early_bootstrap(official);address=early['address']+44;source=early['source_file_offset']+44
+    site=0xA0020AD2;offset=early['site_source_offset']+site-early['site'];target=symbols['gr2_finalize_chain']
+    if target&3 or not BASE<=target<LIMIT:raise ValueError('finalize bridge target outside runtime')
+    delta=address-site-4
+    patch=struct.pack('>2H',0xf000|((delta>>12)&0x7ff),0xf800|((delta>>1)&0x7ff))
+    if official[offset:offset+4]!=bytes.fromhex('2000bd10') or official[source:source+8]!=bytes(8):
+        raise ValueError('final startup return/padding preimage differs')
+    return dict(address=address,source_file_offset=source,stub_hex='4b004718'+struct.pack('>I',target).hex(),
+                site=site,site_source_offset=offset,site_patch_hex=patch.hex(),extended_load_bytes=early['extended_load_bytes']+8)
+
 def memory_reservations(official:bytes)->list[dict]:
     """Describe source-literal edits required before the original allocators run.
 
@@ -178,6 +189,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     report=audit_elf(elf.read_bytes())
     report['memory_reservations']=memory_reservations(official)
     report['early_bootstrap']=early_bootstrap(official)
+    report['finalize_bridge']=finalize_bridge(official,report['symbols'])
     if official[0xA0044F4C-0xA0020200:0xA0044F50-0xA0020200]!=bytes.fromhex('e12fff1e'):raise ValueError('original SVC callback identity mismatch')
     displacement=report['symbols']['gr2_cache_gateway']-0xA0044F54
     if displacement%4 or not -(1<<25)<=displacement<(1<<25):raise ValueError('cache callback ARM branch range invalid')

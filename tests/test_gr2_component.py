@@ -23,7 +23,7 @@ class Gr2ComponentTests(unittest.TestCase):
         before=parse_executable_load_map(official);after=parse_executable_load_map(candidate)
         self.assertFalse(audit['can_package']);self.assertFalse(audit['activation_ready'])
         self.assertEqual(candidate[0x170:0x180],official[0x170:0x180]);self.assertEqual(after[15],before[15])
-        self.assertEqual(after[0]['length'],before[0]['length']+44)
+        self.assertEqual(after[0]['length'],before[0]['length']+52)
         self.assertEqual(after[14]['address'],runtime['base']);self.assertEqual(after[14]['length'],runtime['code_bytes'])
         self.assertEqual(after[14]['zero_length'],runtime['memory_bytes']-runtime['code_bytes'])
         for index in range(1,14):
@@ -81,6 +81,15 @@ class Gr2ComponentTests(unittest.TestCase):
                 self.assertEqual(proof['activation_vector_value'],vector);self.assertTrue(proof['activation_callback_code_preserved'])
                 self.assertTrue(proof['activation_user_return']);self.assertTrue(proof['stack_preserved']);self.assertTrue(proof['callee_saved_preserved'])
                 if not ready:self.assertEqual(proof['activation_cache_operations'],[])
+
+    def test_final_handoff_marks_completion_only_after_original_finalize_returns(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        module=self.implementation();runtime=self.build();self.assertTrue('gr2_startup_complete' in runtime['symbols'])
+        official=component('gr2','b01firm8');candidate,_=module.build_gr2_component(official,runtime)
+        proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True)
+        self.assertEqual(proof['startup_complete_before_finalize'],0);self.assertEqual(proof['startup_complete'],1)
+        self.assertTrue(proof['activation_user_return']);self.assertTrue(proof['stack_preserved']);self.assertTrue(proof['callee_saved_preserved'])
+        self.assertEqual(proof['returned'],0)
 
     def test_corrupt_or_wrong_model_inputs_and_unsafe_runtime_reports_are_rejected(self):
         module=self.implementation();runtime=self.build();official=component('gr2','b01firm8')

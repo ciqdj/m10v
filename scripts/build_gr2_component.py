@@ -10,7 +10,7 @@ import sys
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.analyze_unity_update import official_profile,compute_update_checksum
 from scripts.analyze_unity_runtime import parse_executable_load_map
-from scripts.build_gr2_runtime import BASE,LIMIT,early_bootstrap,memory_reservations
+from scripts.build_gr2_runtime import BASE,LIMIT,early_bootstrap,finalize_bridge,memory_reservations
 
 # Source edits take effect when their original module is loaded. No running
 # eight-byte Thumb instruction window is overwritten by this assembler.
@@ -35,7 +35,8 @@ def build_gr2_component(official:bytes,runtime_report:dict)->tuple[bytes,dict]:
                hashlib.sha256(runtime).hexdigest()==runtime_report['runtime_sha256'])
     except (KeyError,TypeError,ValueError) as error:raise ValueError('audited GR II BE32 runtime required') from error
     if not valid:raise ValueError('runtime identity, layout or research gate differs')
-    early=early_bootstrap(official)
+    early=early_bootstrap(official);final=finalize_bridge(official,symbols)
+    if runtime_report.get('finalize_bridge')!=final:raise ValueError('final return bridge contract differs')
     if runtime_report.get('early_bootstrap')!=early or runtime_report.get('memory_reservations')!=memory_reservations(official):
         raise ValueError('early-load or memory-reservation contract differs')
     source_field=(len(official)-512+511)&~511
@@ -56,7 +57,9 @@ def build_gr2_component(official:bytes,runtime_report:dict)->tuple[bytes,dict]:
         write(row['source_file_offset'],struct.pack('>I',row['expected']),struct.pack('>I',row['replacement']),row['purpose'],row['address'])
     write(early['source_file_offset'],bytes(len(bytes.fromhex(early['stub_hex']))),bytes.fromhex(early['stub_hex']),'early module14 bootstrap',early['address'])
     write(early['site_source_offset'],bytes.fromhex('24010020'),bytes.fromhex(early['site_patch_hex']),'early startup dispatch',early['site'])
-    write(early['load_length_source_offset'],struct.pack('>I',early['original_load_bytes']),struct.pack('>I',early['extended_load_bytes']),'module0 bootstrap load extent')
+    write(early['load_length_source_offset'],struct.pack('>I',early['original_load_bytes']),struct.pack('>I',final['extended_load_bytes']),'module0 bootstrap load extent')
+    write(final['source_file_offset'],bytes(8),bytes.fromhex(final['stub_hex']),'final return bridge',final['address'])
+    write(final['site_source_offset'],bytes.fromhex('2000bd10'),bytes.fromhex(final['site_patch_hex']),'startup completion dispatch',final['site'])
     for address,preimage,symbol,label in HOOKS:
         target=symbols.get(symbol)
         if type(target) is not int or target&3 or not BASE<=target<BASE+len(runtime):raise ValueError(label+' hook target is outside native code')
@@ -80,7 +83,7 @@ def build_gr2_component(official:bytes,runtime_report:dict)->tuple[bytes,dict]:
         if result[at:at+4]!=official[at:at+4]:raise ValueError('cache bootstrap was installed prematurely')
     return result,dict(schema='m10v-gr2-research-component/v1',official_sha256=profile['sha'],sha256=hashlib.sha256(result).hexdigest(),
                        file_bytes=len(result),data_bytes=len(result)-512,weighted_checksum=checksum,patches=patches,load_map=after,
-                       early_bootstrap=early,runtime_sha256=runtime_report['runtime_sha256'],can_package=False,activation_ready=False,
+                       early_bootstrap=early,finalize_bridge=final,runtime_sha256=runtime_report['runtime_sha256'],can_package=False,activation_ready=False,
                        post_load_cache_activation_compiled=True,
                        limits=['Research component only; UI-owned journal restoration, menu activation and capture configuration publication remain incomplete.',
                                'Original low/deferred payload and all verification switches are preserved; no hardware boot or flash proof.'])

@@ -3,6 +3,8 @@
 #define WORD(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define HALF(address) (*(volatile uint16_t *)(uintptr_t)(address))
 volatile uint32_t gr2_activation_ready;
+volatile uint32_t gr2_startup_complete;
+extern void gr2_finalize_chain(void);
 extern void gr2_startup_chain(void),gr2_producer_chain(void),gr2_jpeg_chain(void);
 extern void gr2_ui_event_chain(void),gr2_menu_route_chain(void),gr2_menu_descriptor_chain(void);
 extern uint32_t *gr2_menu_categories(uint32_t);
@@ -18,6 +20,9 @@ static const hook hooks[]={
     {0xA039D168u,(uintptr_t)gr2_menu_descriptor_chain}
 };
 static int prepared(void){
+    /* Unaligned Thumb BL at the original final-return pair; read halfwords. */
+    if(HALF(0xA0020AD2u)!=0xF0A4u||HALF(0xA0020AD4u)!=0xF80Du||
+       WORD(0xA00C4AF0u)!=0x4B004718u||WORD(0xA00C4AF4u)!=(uint32_t)(uintptr_t)gr2_finalize_chain)return 0;
     if(WORD(0xA0023154u)!=0xA0800000u||WORD(0xA01137ECu)!=0x12B8Cu||
        WORD(0xA05F5400u)!=0x47700000u||WORD(0xA0044F4Cu)!=0xE12FFF1Eu||
        HALF(0xA039D60Eu)!=0x2D6Au)return 0;

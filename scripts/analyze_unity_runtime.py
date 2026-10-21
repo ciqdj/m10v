@@ -140,7 +140,7 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
         machine.mem_write(row['zero_address'],bytes(row['zero_length']))
         for unloaded in candidate_rows[1:14]:machine.mem_write(unloaded['address'],b'\xa5'*unloaded['length'])
     else:machine=_machine(code)
-    modules=[];events=[];post_load_return=None
+    modules=[];events=[];post_load_return=None;startup_complete_before_finalize=None
     native_result={};native_load_count=0;native_stream=b'';context=0xA0020000 if candidate_mode else 0x50003000;header_address=0x50004000
     if native_runtime is not None:
         runtime=bytes.fromhex(native_runtime['runtime_hex']);base=native_runtime['base'];memory=native_runtime['memory_bytes']
@@ -198,7 +198,7 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     calls=(0xA002270C,0xA0022E28,0xA002323A,0xA002323C,0xA002323E,
            0xA0023240,0xA00AFD9C,0xA00C63A6,0xA015D458,0xA0296804,0xA039130A)
     def boundary(uc,address,size,ctx):
-        nonlocal post_load_return,native_load_count
+        nonlocal post_load_return,native_load_count,startup_complete_before_finalize
         if address==0xA0020ABC:
             post_load_return=uc.reg_read(UC_ARM_REG_R0);return
         if address==0xA0020AB4:
@@ -230,7 +230,9 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
                 else:uc.mem_write(first,native_stream[second*512:(second+count)*512]);result=0
             uc.reg_write(UC_ARM_REG_R0,result);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR));return
         if address==0xA0022E28:
-            if first==0xffffffff:events.append(['finalize',first])
+            if first==0xffffffff:
+                events.append(['finalize',first])
+                if candidate_mode:startup_complete_before_finalize=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_startup_complete'],4))[0]
             else:modules.append(first);events.append(['module',first])
             if native_runtime is not None and (first==14 or candidate_mode and 0<first<15):
                 # The original wrapper skips its indexed load when its context
@@ -269,6 +271,8 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
         native_result['native_bss_canary']=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_code_sync_status'],4))[0]
         native_result['native_boot_count']=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_boot_count'],4))[0]
         if candidate_mode:
+            native_result['startup_complete_before_finalize']=startup_complete_before_finalize
+            native_result['startup_complete']=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_startup_complete'],4))[0]
             native_result['candidate_loaded_records']=[i for i in range(15) if machine.mem_read(context+0x108+i,1)==b'\x01']
             native_result['candidate_reservations_loaded']=all(struct.unpack('>I',machine.mem_read(row['address'],4))[0]==row['replacement'] for row in native_runtime['memory_reservations'])
     if activation_fixture:
