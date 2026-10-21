@@ -41,7 +41,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['native/gr3/m10v_tone.h','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/m10v_tone.h','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
@@ -140,8 +140,8 @@ function checkRuntime(runtime, manifest) {
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,(manifest.sd_library?756:750)*4],[icons.descriptors,(manifest.sd_library?85:79)*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+(manifest.sd_library?756:750)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?85:79)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(const [address,length] of [[icons.table,(manifest.sd_library?761:755)*4],[icons.descriptors,(manifest.sd_library?90:84)*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+(manifest.sd_library?761:755)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?90:84)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
   for(let i=0;i<78;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
@@ -150,6 +150,17 @@ function checkRuntime(runtime, manifest) {
     const extra=readFileSync(new URL('../native/gr3/m10v_charmera.rgba',import.meta.url));
     const id=manifest.sd_library?755:749,descriptor=icons.descriptors+(manifest.sd_library?84:78)*8,at=descriptor-BASE,pixels=icons.pixels+(manifest.sd_library?79:78)*6400;
     need(extra.length===6400&&runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+6400).equals(extra),'native Charmera icon differs');
+  }
+  {
+    const artwork=readFileSync(new URL('../native/gr3/m10v_charmera_ui.rgba',import.meta.url));
+    let pixel=icons.pixels+(manifest.sd_library?80:79)*6400,offset=0;
+    for(let i=0;i<5;i++){
+      const id=(manifest.sd_library?756:750)+i,descriptor=icons.descriptors+((manifest.sd_library?85:79)+i)*8,at=descriptor-BASE;
+      const width=i<4?64:400,height=i<4?16:12,bytes=width*height*4;
+      need(runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor&&runtime.readUInt16LE(at)===width&&runtime.readUInt16LE(at+2)===height&&runtime.readUInt32LE(at+4)*4===pixel&&runtime.subarray(pixel-BASE,pixel-BASE+bytes).equals(artwork.subarray(offset,offset+bytes)),'native Charmera color artwork differs');
+      offset+=bytes;pixel+=bytes;
+    }
+    need(offset===artwork.length,'native Charmera color artwork extent differs');
   }
   if(manifest.sd_library){
     const custom=manifest.custom_film_display,icon=readFileSync(new URL('../native/gr3/m10v_custom_icon.rgba',import.meta.url));
@@ -228,11 +239,11 @@ function checkDetail(runtime,manifest,raw) {
   const maxima=[8,8,8,3,3,2,8,5,8,1,2,3],dispatch=read(d.slider_dispatch,25*4);
   for(let i=0;i<12;i++){
    need(dispatch.readUInt32LE(i*8)===(0xe35c0000|18+i)>>>0,'native detail slider selector differs');
-   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(i===10?d.entries.exposure_dispatch:d.sliders[maxima[i]]))&0x0fffffff),'native detail slider target differs');
+   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(i===11?d.charmera_colors.slider:i===10?d.entries.exposure_dispatch:d.sliders[maxima[i]]))&0x0fffffff),'native detail slider target differs');
   }
   need(dispatch.readUInt32LE(96)===branch(d.slider_dispatch+96,d.sliders[8]),'native detail slider fallback differs');
-  for(const maximum of [8,3,2,5,1]){
-   const target=d.sliders[maximum];
+  need(JSON.stringify(d.charmera_colors?.names)==='["RED","YELLOW","BLUE","GRAY"]'&&JSON.stringify(d.charmera_colors.value_icons)===JSON.stringify([0,1,2,3].map(i=>(manifest.sd_library?756:750)+i))&&d.charmera_colors.scale_icon===(manifest.sd_library?760:754),'native Charmera enum differs');
+  for(const [maximum,target,color] of [...[8,3,2,5,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true]]){
    const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
    for(let a=start;a<stop;a+=4){
     const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
@@ -241,6 +252,7 @@ function checkDetail(runtime,manifest,raw) {
     if(a===0x531ad020)word=branch(at,d.entries.default,true);
     if(a===0x531ad024)word=0xe1a00000;
     if(a===0x531ad03c&&maximum===3)word=0xe3a03039;
+    if(a===0x531ad03c&&color)word=movw(3,manifest.sd_library?760:754);
     if(a===0x531ad060)word=(0xe3a02000|maximum)>>>0;
     if(a===0x531ad064)word=movw(3,360/maximum);
     need(code.readUInt32LE(at-target)===word,'native detail slider relocation differs at '+a.toString(16)+' expected '+word.toString(16)+' got '+code.readUInt32LE(at-target).toString(16));
@@ -382,7 +394,7 @@ function patchList(manifest,runtime) {
       else p.replacement=0xe1a00000;
     }
   }
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?755:749),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?760:754),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){

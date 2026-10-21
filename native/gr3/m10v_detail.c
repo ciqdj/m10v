@@ -58,6 +58,8 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   uint32_t text=*(const uint32_t *)(uintptr_t)(row+0xf4);if(!ram(text,0x64))return 0;
   uint32_t rect[4]={50,10,(arg>>16)==28?60:40,40};
   ((void (*)(uint32_t,const uint32_t *))0x533ab548u)(text,rect);
+  uint32_t icon=*(const uint32_t *)(uintptr_t)(row+0xf0);
+  if(ram(icon,0xf0)){rect[2]=(arg>>16)==29?64:40;((void (*)(uint32_t,const uint32_t *))0x533ab548u)(icon,rect);}
   return 1;
  }
  m10v_library_state s;int target=load(ui,&s);if(target<0)return 0;
@@ -104,11 +106,13 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    * Its three-digit value alone gets 60px, still inside the native 120px rail. */
   static const uint16_t icons[12]={484,473,398,478,587,644,411,588,372,50,648,648};
   v=value(&s,(uint32_t)target,field);char text[4]={(char)('0'+v),0,0,0};
-  if(field==11){text[0]="RYBG"[v];}
   if(field==10){text[0]=v==1?'6':v==2?'2':'1';text[1]=v==1?'4':v==2?'5':'2';text[2]=v==1?0:v==2?'0':'5';}
   if(field==10&&film==67){text[0]=v?'1':'2';text[1]=v?'2':'0';text[2]='0';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x194);if(!ram(list,4))return 0;
   uint32_t row=((fn2)0x53394758u)(list,arg&65535);if(!ram(row,4))return 0;
+  if(field==11){
+   ((uint32_t (*)(uint32_t,uint32_t,uint32_t))0x5339e274u)(row,M10V_SD_LIBRARY?755:749,(M10V_SD_LIBRARY?756:750)+v);return 1;
+  }
   ((text_fn)0x5339e2f8u)(row,icons[field],text);return 1;
  }
  return 0;

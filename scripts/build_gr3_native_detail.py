@@ -70,7 +70,7 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False):
  # Slider clones retain the stock callback closure and stock cancel/return.
  default=stub(f'mov r1,r0;mov r0,#4;mov r2,#0;b {hex(control)}','factory default')
  entries['default']=default
- def clone(maximum):
+ def clone(maximum,color=False):
   image.extend(bytes(-len(image)&3));destination=base+len(image);start=0x531acfec;stop=0x531ad12c
   mapping={a:destination+a-start+(8 if a>=0x531ad0b4 else 0) for a in range(start,stop+4,4)}
   output=bytearray()
@@ -87,11 +87,13 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False):
    if a==0x531ad024:w=0xe1a00000
    # Match the stock grain slider: resource 57 and 120-pixel tick pitch.
    if a==0x531ad03c and maximum==3:w=0xe3a03039
+   if a==0x531ad03c and color:w=movw(3,760 if sd_library else 754)
    if a==0x531ad060:w=0xe3a02000|maximum
    if a==0x531ad064:w=movw(3,360//maximum)
    output+=struct.pack('<I',w)
   return data(output,'stock slider clone '+str(maximum))
  sliders={n:clone(n) for n in (8,3,2,5,1)}
+ color_slider=clone(3,color=True)
  # Private IDs keep stable meanings across the three visible lists.
  # Restore the original setup frame before dispatch; retain the selected ID
  # in ip because r0 must be the stock controller for the slider constructor.
@@ -100,10 +102,10 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False):
  dispatch=''
  for id in range(18,30):
   maximum=[8,8,8,3,3,2,8,5,8,1,2,3][id-18]
-  destination=exposure_dispatch if id==28 else sliders[maximum]
+  destination=color_slider if id==29 else exposure_dispatch if id==28 else sliders[maximum]
   dispatch+=f'cmp ip,#{id};beq {hex(destination)};'
  dispatch_stub=stub(dispatch+f'b {hex(sliders[8])}','slider dispatch')
  entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
  entries['reset']=stub('push {r4,lr};bl 0x532c282c;mov r1,r5;mov r0,#7;mov r2,#0;'+f'bl {hex(control)};pop {{r4,pc}}','preserve stock reset')
- return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(18,30)),'appended_slots':appended_slots,'variant_rows':41 if appended_slots else 36,'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,587,644,411,588,372,50,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}
+ return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(18,30)),'appended_slots':appended_slots,'variant_rows':41 if appended_slots else 36,'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,587,644,411,588,372,50,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'camera_tested':False}

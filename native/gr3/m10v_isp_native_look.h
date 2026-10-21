@@ -6,7 +6,8 @@
 enum { M10V_NATIVE_LOOK_EMPTY=0, M10V_NATIVE_LOOK_READY=1,
        M10V_NATIVE_LOOK_APPLIED=2, M10V_NATIVE_LOOK_REJECTED=3 };
 /* Per-recipe storage, never global. generation must identify the queued shot.
- * exposure: RED 0=EI125, 1=EI64, 2=EI250; zero for all other films.
+ * exposure: RED 0=EI125, 1=EI64, 2=EI250; Phoenix 0/1=EI200/120;
+ * Charmera live-only 0..3=red/yellow/blue/gray; zero for other films.
  * Profiles are new native creative looks, NOT old CPU LUT equivalence. */
 typedef struct {
  uint32_t magic,version,generation,film,exposure,status,applied_frame;

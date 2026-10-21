@@ -20,5 +20,9 @@ test('custom display resources preserve stock cards and independently reject LUT
    const changed=Buffer.from(runtime);changed[offset]^=1;
    assert.throws(()=>buildNativeLibrary(source,changed,{...manifest,code_sha256:createHash('sha256').update(changed).digest('hex')}),/custom LUT icon differs/);
   }
+  for(const offset of [manifest.icons.pixels+80*6400-manifest.base,manifest.icons.descriptors+85*8+4-manifest.base]){
+   const changed=Buffer.from(runtime);changed[offset]^=1;
+   assert.throws(()=>buildNativeLibrary(source,changed,{...manifest,code_sha256:createHash('sha256').update(changed).digest('hex')}),/Charmera color artwork differs/);
+  }
  }finally{await rm(dir,{recursive:true,force:true});}
 });

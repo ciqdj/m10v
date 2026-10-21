@@ -46,6 +46,15 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   self.assertEqual(observed,[(67,1)])
  def test_unsupported_3d_lut_and_wrong_si_leave_frame_stock(self):
   e,r,o,i,c,si=self.fixture();self.snapshot(e,r,state((67,)*5));self.callback(e,o,i,c);self.assertEqual(self.status(e,r),2)
+ def test_charmera_live_profile_never_authorizes_skipping_exact_still_color(self):
+  for color in range(4):
+   e,r,o,i,c,si=self.fixture();data=bytearray(state((289,)*5));data[63]=color
+   struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.assertEqual(self.snapshot(e,r,data)[0],1)
+   self.callback(e,o,i,c);self.assertNotEqual(self.status(e,r),2)
+   out=e.alloc(104);e.call(self.manifest['exports']['m10v_isp_frame_recipe_state'],r,out)
+   self.assertEqual(bytes(e.u.mem_read(out,104)),bytes(data))
+   e.call(self.manifest['exports']['m10v_isp_frame_recipe_completed'],r,si,12,out)
+   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0)&1,0)
  def test_installed_native_apply_has_exact_per_shot_completion_identity(self):
   for film in (33,35,58,59,60,66,67,68):
    for tone in (12,18,19,20,21):

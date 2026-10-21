@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.21.4",
+      "date": "2026-10-21",
+      "title": "修复 Charmera 颜色选择、胶卷库显示和实时取景",
+      "changes": [
+        "GR III／GR IIIx 将 Charmera 颜色参数的 R/Y/B/G 和颗粒 OFF 刻度替换为带完整颜色名的四色色块与专用刻度，保留红、黄、蓝、灰的原有存档值。",
+        "修复289号 Charmera 被胶卷库旧编号上限过滤的问题，恢复已装槽位与目录中的名称、胶卷卡片，并补齐内存分配失败时的小图标。",
+        "GR III 2.10 实时取景读取当前槽位已提交的四色配置，经原生 ISP 生成双色近似；切换颜色和切出胶卷重建参数，不新增逐帧文件访问。JPEG继续使用原有二值调色，RAW像素与其他胶卷路径保持不变。",
+        "按本轮明确授权完成离线回归后直接发布；本候选尚未相机实测，取景和成片阈值一致性、LCD显示与帧率仍待实机确认。GR IIIx 不开放本次GR III专用取景，GR IV目录不变。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.21.3",
       "date": "2026-10-21",
       "title": "GR III 在 Custom2 后新增独立五槽，保留全部原厂预设",
@@ -11,9 +25,9 @@
         "新增 tone 接通逐张配方冻结、原生色调、颗粒、HDF 和 EXIF；换卷激活使用普通拍摄 bank，保护 Custom1／Custom2 保存设置，A/B 配对兼容旧记录并扩展选择范围。",
         "网页默认采用独立五槽，构建预检与最终固件审计绑定布局；CLI 提供 --legacy-slots 保留旧布局。GR IIIx／GR IV 保持各自原有槽位与机型保护。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c20140e2cbc48a9f13e305fd70c3830712459d77",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39596852906"
     },
     {
       "version": "2026.10.21.2",

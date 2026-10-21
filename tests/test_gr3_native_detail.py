@@ -21,8 +21,8 @@ class NativeDetailTests(unittest.TestCase):
 
  def test_five_controls_integrated_with_unified_runtime(self):
   self.assertIn('detail',self.manifest,'native runtime has no stock five-control detail integration')
-  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure'])
-  self.assertEqual(self.manifest['detail']['ids'],list(range(18,29)))
+  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure','Charmera Color'])
+  self.assertEqual(self.manifest['detail']['ids'],list(range(18,30)))
   self.assertEqual(self.manifest['detail']['backend'],'m10v_camera_library_detail')
 
 
@@ -36,6 +36,12 @@ class NativeDetailTests(unittest.TestCase):
    length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
    labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
   self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','已停用','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Film Exposure'])
+ def test_charmera_has_dedicated_named_color_values_and_four_position_scale(self):
+  self.assertIn('charmera_colors',self.manifest['detail'])
+  display=self.manifest['detail']['charmera_colors']
+  self.assertEqual(display['names'],['RED','YELLOW','BLUE','GRAY'])
+  self.assertEqual(display['value_icons'],[750,751,752,753])
+  self.assertEqual(display['scale_icon'],754)
 
 class StockDetailArmTests(NativeDetailTests):
  @classmethod
@@ -70,6 +76,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   if real_row:
    u.mem_write(row+0xec,struct.pack('<III',row+0x200,row+0x400,row+0x600))
    u.mem_write(row+0x600,struct.pack('<I',0x53c09e80))
+   u.mem_write(row+0x400,self.rtos[0x39a98c:0x39a990])
    u.mem_write(row+0x620,struct.pack('<4I',50,10,40,40))
    u.mem_write(row+0x654,struct.pack('<4I',0,0,40,40))
   def hook(uc,a,n,data):
@@ -90,7 +97,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     # Match the real selected private list row, including each stock prefix.
     kind=uc.mem_read(ui+0x19a,1)[0];setting=uc.mem_read(ui+0x199,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
-    ids=[i for i in range(18,29 if film==67 else 28) if i!=22] if film in (33,67) else [i for i in range(21,29 if film==68 else 28) if i!=22]
+    ids=[21,23,24,25,26,27,29] if film==289 else [i for i in range(18,29 if film==67 else 28) if i!=22] if film in (33,67) else [i for i in range(21,29 if film==68 else 28) if i!=22]
     result=n+ids.index(18+field) if 18+field in ids else n
    elif real_row and a==0x536af31c:result=0x5500c000
    elif real_row and a==0x533ad3c0:calls.append(('visible',args[0],args[1]))
@@ -129,7 +136,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   # manifest. The visual selection was reviewed from these exact RGBA bytes.
   from hashlib import sha256
   ids=(484,473,398,478,587,644,411,588,372,50,648)
-  self.assertEqual(self.manifest['detail']['row_icons'],list(ids))
+  self.assertEqual(self.manifest['detail']['row_icons'][:11],list(ids))
   self.assertEqual(len(set(ids)),11)
   def offset(address):
    if 0x55000000<=address<0x5503a080:address=address-0x55000000+0x5407b540
@@ -143,6 +150,25 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    self.assertEqual(len(rgba),6400);self.assertTrue(any(rgba[3::4]))
    hashes.append(sha256(rgba).hexdigest())
   self.assertEqual(len(set(hashes)),11)
+ def test_charmera_uses_named_color_icon_instead_of_ascii_and_grain_scale(self):
+  from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_PC,UC_ARM_REG_LR
+  for color in range(4):
+   u,ui,slider,calls,state=self.machine(film=289,field=11)
+   for i in range(5):state[63+i*8]=color
+   # Exercise the installed C row renderer, with original row resource API.
+   from unicorn import UC_HOOK_CODE
+   values=[]
+   def observe(m,at,n,d):
+    if at==0x5339e274:
+     from unicorn.arm_const import UC_ARM_REG_R1,UC_ARM_REG_R2
+     values.append((m.reg_read(UC_ARM_REG_R1),m.reg_read(UC_ARM_REG_R2)))
+     m.reg_write(UC_ARM_REG_PC,m.reg_read(UC_ARM_REG_LR))
+   u.hook_add(UC_HOOK_CODE,observe)
+   u.reg_write(UC_ARM_REG_R3,29);u.reg_write(UC_ARM_REG_R4,0);u.reg_write(UC_ARM_REG_R5,ui)
+   u.emu_start(self.manifest['detail']['entries']['row'],0x531b0064,count=30000)
+   self.assertEqual(values,[(749,750+color)])
+   self.execute(u,0x531b05c4,ui)
+   self.assertIn(('range',0,3),calls);self.assertIn(('scale',120,754),calls)
 
  def test_real_detail_list_constructor_enumerates_all_settings_before_tone_selection(self):
   # FN constructs the page with stock tone11 before reading the actual tone.
@@ -162,7 +188,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
    u.hook_add(UC_HOOK_CODE,services)
    self.execute(u,0x531afbe0,ui)
-   expected=21
+   expected=22
    self.assertEqual(observed,[('allocate',expected),('rows',expected)])
 
  def test_visibility_index_uses_stock_lr_stride_in_all_three_settings(self):

@@ -1,8 +1,6 @@
-// Six stock LUTs (60,750 bytes), six icons (38,400 bytes), Phoenix EI120
-// (10,125 bytes) and its native controls extend the previous 744 KiB budget.
-// Measured worst configuration: 875,320 bytes growth, base 0x540ba000,
-// debug/live color/HDF/SD/native grain/NEON/all capture extensions enabled.
-// Its end is 0x5418b0f8; the ceiling leaves 42,184 bytes of headroom.
-// Construction and independent audits share this bounded 896 KiB ceiling;
-// every mapped section and non-target byte is still checked on fresh decode.
-export const MAX_NATIVE_RTOS_GROWTH=896*1024;
+// Charmera adds 35,584 bytes of immutable enum artwork and a bounded live
+// profile/slider adapter. Keep construction and independent audits on one
+// ceiling; do not remove section/preimage/tail or final decode checks.
+// 960 KiB reserves the former 896 KiB ceiling plus 64 KiB for this addition.
+// Measured build footprints are recorded with the C03 release evidence.
+export const MAX_NATIVE_RTOS_GROWTH=960*1024;

@@ -39,6 +39,19 @@ class LiveColorPreviewTests(unittest.TestCase):
   e.u.hook_add(UC_HOOK_CODE,lambda u,a,n,d:observed.append((u.reg_read(A.UC_ARM_REG_R1),u.reg_read(A.UC_ARM_REG_R2))) if a==prepare else None)
   e.call(self.entry,obj,f)
   self.assertEqual(observed,[(67,1)])
+ def test_charmera_four_colors_change_live_banks_without_accumulation_or_shooting_writes(self):
+  e,obj,f=self.fixture(289);si=struct.unpack('<I',e.u.mem_read(f+0x82d0,4))[0]
+  shooting=bytes(e.u.mem_read(si,0x80000));outputs=[]
+  for color in range(4):
+   data=bytearray(state((289,)*5));data[63]=color
+   struct.pack_into('<I',data,100,zlib.crc32(data[:100]));e.u.mem_write(0x550d1944,bytes(data))
+   e.call(self.entry,obj,f);outputs.append(bytes(e.u.mem_read(f,0x9000)))
+   e.call(self.entry,obj,f);self.assertEqual(bytes(e.u.mem_read(f,0x9000)),outputs[-1])
+   self.assertEqual(bytes(e.u.mem_read(si,0x80000)),shooting)
+  self.assertEqual(len(set(outputs)),4)
+  self.cache(e,35,version=4);e.call(self.entry,obj,f);other=bytes(e.u.mem_read(f,0x9000))
+  ref,o,i=self.fixture(35);ref.call(self.entry,o,i)
+  self.assertEqual(other,bytes(ref.u.mem_read(i,0x9000)))
  def test_empty_busy_or_destroyed_cache_keeps_stock_liveview(self):
   for ready,version in ((False,2),(True,1),(True,0)):
    e,obj,f=self.fixture();before=bytes(e.u.mem_read(f,0x9000));self.cache(e,35,ready,version)

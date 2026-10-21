@@ -100,6 +100,17 @@ class SettingsViewTests(unittest.TestCase):
   self.state(u);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)],[703,704,705,706,707])
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+ def test_charmera_is_visible_in_slot_catalog_and_small_icon_fallback(self):
+  for screen in (1,2):
+   for fail_cards in (False,True):
+    u=self.machine(fail_cards=fail_cards,catalog_ids={0:289});self.call(u,'create',0x10001000);w=self.widgets(u)
+    self.state(u,screen,0);u.mem_write(0x10002000+12,struct.pack('<H',289))
+    ops=0x10003000;u.mem_write(ops,struct.pack('<7I',0,0,0x540b0010,0,0,0,0))
+    self.call(u,'draw',0x10001000,0x10002000,ops)
+    self.assertEqual(struct.unpack('<H',u.mem_read(w[16]+0xea,2))[0],755 if fail_cards else 749)
+    text=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+    self.assertIn('PORTRA',bytes(u.mem_read(text,40)).decode('utf-16le').split('\0')[0])
+    self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
  def test_linked_runtime_owns_and_clears_the_actual_live_descriptors(self):
   from scripts.build_gr3_m10v_library import build
   with tempfile.TemporaryDirectory() as folder:
