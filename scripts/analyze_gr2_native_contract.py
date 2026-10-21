@@ -356,6 +356,90 @@ def probe_effect_names(code:bytes,*,native_runtime:dict)->dict:
                 unrelated_labels_preserved=unrelated,foreign_change_rejected=rejected,all_original_tables_restored=restored,pool_restored=free()==available,
                 helpers_intercepted=[],hardware_tested=False,scope='Original explicit-language stock accessor, 21 complete pointer tables, native label buffers and actual RTOS pool/mutex; no native screen pixels, hardware display or cached widget redraw proof.')
 
+def probe_clarity_entry(code:bytes,strength:int,*,hdr:bool=False)->dict:
+    """Original Clarity/HDR prelude through coefficient admission or bypass.
+
+    Stops before the actual expansion for nonneutral settings. It cannot claim
+    graph completion, HDR strength restoration, workspace ownership or pixels.
+    """
+    official_profile(code,'gr2')
+    if type(strength) is not int or not 0<=strength<=0xffffffff or type(hdr) is not bool:raise ValueError('u32 strength and explicit HDR selector required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);request=0x50001000;context=0x50004000;stop=0x5001F000
+    uc.mem_write(context,b'\xa5'*0x500);uc.mem_write(context+0x418,struct.pack('>I',strength))
+    descriptor=bytearray(64)
+    for offset,value in ((0x28,0x00040020),(0x30,0x51000000),(0x34,0x52000000),(0x38,0x53000000),(0x3c,context)):
+        struct.pack_into('>I',descriptor,offset,value)
+    uc.mem_write(request,bytes(descriptor));before=bytes(uc.mem_read(context,0x500));observed={};hardware=[]
+    def boundary(machine,address,size,unused):
+        if address==0xA014D460:
+            array=machine.reg_read(r.UC_ARM_REG_R0)
+            observed.update(row=machine.reg_read(r.UC_ARM_REG_R2),workspace_bases=list(struct.unpack('>4I',machine.mem_read(array,16))))
+            machine.emu_stop();return
+        hardware.append(hex(address));raise RuntimeError('Clarity prelude unexpectedly executed hardware')
+    for address in (0xA014D460,0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    for register,value in ((r.UC_ARM_REG_R0,request),(r.UC_ARM_REG_R1,int(hdr)),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,stop|1)):
+        uc.reg_write(register,value)
+    uc.emu_start(0xA014ADEF,stop,count=10000)
+    pc=uc.reg_read(r.UC_ARM_REG_PC)
+    if pc not in (stop,0xA014D460):raise RuntimeError('original Clarity prelude exceeded CPU budget')
+    after=bytes(uc.mem_read(context,0x500))
+    return dict(**observed,effective_strength=struct.unpack_from('>I',after,0x418)[0],returned_normally=pc==stop,
+                coefficient_entry_reached=pc==0xA014D460,request_preserved=bytes(uc.mem_read(request,64))==descriptor,
+                context_outside_strength_preserved=before[:0x418]+before[0x41c:]==after[:0x418]+after[0x41c:],
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,hardware_calls=hardware,hardware_tested=False,
+                scope='Original A014ADEE prelude, strength clamp/neutral bypass and four coefficient-workspace address calculations. Synthetic request/context/workspace addresses; nonneutral and HDR stop before expansion, not graph completion or final strength restoration.')
+
+def probe_clarity_tables(code:bytes,row:int)->dict:
+    """Execute original four-curve Clarity expansion without hardware or I/O.
+
+    Each stock row selects four257-node curves; eight-way interpolation emits
+    paired4096-entry signed/complement curves. Guarded workspaces are synthetic.
+    """
+    official_profile(code,'gr2')
+    if type(row) is not int or not 0<=row<=255:raise ValueError('original u8 Clarity row required')
+    import hashlib
+    from unicorn import arm_const as r
+    uc=runtime_machine(code);uc.mem_map(0x51000000,0x10000)
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    metadata=word(0xA014D500);directory=word(0xA014D504);effective=row if row<9 else 4
+    if metadata!=0xA015A414 or directory!=0xA015A384:raise ValueError('original Clarity table literals differ')
+    pointers=struct.unpack('>4I',uc.mem_read(directory+16*effective,16))
+    sources={metadata:bytes(uc.mem_read(metadata,27)),directory:bytes(uc.mem_read(directory,9*16))}
+    for pointer in pointers:sources[pointer]=bytes(uc.mem_read(pointer,257*2))
+    expected=[];buffers=[]
+    for index,pointer in enumerate(pointers):
+        nodes=struct.unpack('>257H',sources[pointer]);values=[]
+        for position in range(2048):
+            node,fraction=divmod(position,8)
+            weighted=(nodes[node]*(8-fraction)+nodes[node+1]*fraction)&0x7ffff
+            signed=weighted-(0x80000 if weighted&0x40000 else 0)
+            values.append(signed//8)
+        # Original center belongs to the forward curve. The copied endpoint
+        # duplicates reverse position2047 at the beginning of the buffer.
+        reverse=[(4096-value)&0xffff for value in values]
+        curve=[reverse[-1],*reversed(reverse[1:]),*[min(value,2047)&0xffff for value in values]]
+        expected.append(struct.pack('>4096H',*curve))
+        base=0x51000010+0x4000*index;buffers.append(base);uc.mem_write(base-16,b'\xa5'*(8192+32))
+    output=0x50002010;array=0x50001000;uc.mem_write(array,struct.pack('>4I',*buffers));uc.mem_write(output-16,b'\xa5'*35)
+    saved=[0x51670000+i for i in range(8)]
+    for index,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+index,value)
+    for register,value in ((r.UC_ARM_REG_R0,array),(r.UC_ARM_REG_R1,output),(r.UC_ARM_REG_R2,row),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):
+        uc.reg_write(register,value)
+    uc.emu_start(0xA014D461,0x5001F000,count=1000000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original Clarity curve expansion exceeded CPU budget')
+    curves=[bytes(uc.mem_read(base,8192)) for base in buffers]
+    return dict(row=row,effective_row=effective,metadata_hex=bytes(uc.mem_read(output,3)).hex(),curve_bytes=4*8192,
+                curve_sha256=[hashlib.sha256(curve).hexdigest() for curve in curves],curves_match=curves==expected,
+                metadata_matches=bytes(uc.mem_read(output,3))==sources[metadata][3*effective:3*effective+3],
+                guards_preserved=all(bytes(uc.mem_read(base-16,16))+bytes(uc.mem_read(base+8192,16))==b'\xa5'*32 for base in buffers) and
+                                 bytes(uc.mem_read(output-16,16))+bytes(uc.mem_read(output+3,16))==b'\xa5'*32,
+                source_tables_preserved=all(bytes(uc.mem_read(address,len(data)))==data for address,data in sources.items()),
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,
+                callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
+                helpers_intercepted=[],hardware_tested=False,
+                scope='Complete original A014D460 curve expansion and stock tables, compared with a fixed-point reference; no function substitution. Synthetic guarded buffers only; not native Clarity graph execution or HDF output proof.')
+
 def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False,active_configuration:bool=False)->dict:
     """Original IQ library constructor/parser and full capture producer body.
 
