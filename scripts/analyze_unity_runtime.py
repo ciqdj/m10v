@@ -117,7 +117,7 @@ def probe_gr2_module_guard(code:bytes,*,loaded:bool)->dict:
                 helpers_intercepted=['profiling initialize/start','module-load request observation'],
                 scope='Original wrapper prefix, boot-kind getter and loaded-byte getter/branch; actual loading and post-module actions are boundaries. Stops at guard continuation, not a full wrapper return.')
 
-def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None,early_native:bool=False,fail_native_read:bool=False)->dict:
+def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None,early_native:bool=False,fail_native_read:bool=False,candidate_component:bytes|None=None)->dict:
     """Run original startup orchestration; subsystem bodies are external boundaries."""
     official_profile(code,'gr2');phase_results=phase_results or {}
     if (early_native or fail_native_read) and native_runtime is None:raise ValueError('native runtime required for early bootstrap')
@@ -126,8 +126,20 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
         raise ValueError('invalid synthetic startup phase results')
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
-    machine=_machine(code);modules=[];events=[];post_load_return=None
-    native_result={};native_load_count=0;native_stream=b'';context=0x50003000;header_address=0x50004000
+    candidate_mode=candidate_component is not None
+    if candidate_mode:
+        if not early_native or native_runtime is None:raise ValueError('candidate startup requires early native runtime')
+        from scripts.build_gr2_component import build_gr2_component
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        expected,_=build_gr2_component(code,native_runtime)
+        if candidate_component!=expected:raise ValueError('candidate is not the audited source assembly')
+        machine=runtime_machine(code);candidate_rows=parse_executable_load_map(candidate_component);row=candidate_rows[0]
+        machine.mem_write(row['address'],candidate_component[row['source_file_offset']:row['source_file_offset']+row['length']])
+        machine.mem_write(row['zero_address'],bytes(row['zero_length']))
+        for unloaded in candidate_rows[1:14]:machine.mem_write(unloaded['address'],b'\xa5'*unloaded['length'])
+    else:machine=_machine(code)
+    modules=[];events=[];post_load_return=None
+    native_result={};native_load_count=0;native_stream=b'';context=0xA0020000 if candidate_mode else 0x50003000;header_address=0x50004000
     if native_runtime is not None:
         runtime=bytes.fromhex(native_runtime['runtime_hex']);base=native_runtime['base'];memory=native_runtime['memory_bytes']
         if base!=0xa0798000 or memory<len(runtime) or memory>0x68000 or len(runtime)%4:
@@ -136,18 +148,29 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
             raise ValueError('audited BE32 runtime required')
         patch=bytes.fromhex(native_runtime['startup_patch_hex'])
         if len(patch)!=8 or patch[:4]!=bytes.fromhex('4b004718'):raise ValueError('native startup veneer differs')
-        machine.mem_map(base,0x68000);machine.mem_write(base,b'\xa5'*memory)
-        machine.mem_write(0xA0020AB4,patch)
+        if not candidate_mode:machine.mem_map(base,0x68000)
+        machine.mem_write(base,b'\xa5'*memory)
+        if candidate_mode:
+            if bytes(machine.mem_read(0xA0020AB4,8))!=patch:raise ValueError('candidate post-load source differs')
+        else:machine.mem_write(0xA0020AB4,patch)
         if early_native:
             from scripts.build_gr2_runtime import early_bootstrap
             early=native_runtime['early_bootstrap']
             if early!=early_bootstrap(code):raise ValueError('early native bootstrap identity mismatch')
-            machine.mem_write(early['address'],bytes.fromhex(early['stub_hex']))
-            machine.mem_write(early['site'],bytes.fromhex(early['site_patch_hex']))
+            if candidate_mode:
+                if bytes(machine.mem_read(early['address'],len(bytes.fromhex(early['stub_hex']))))!=bytes.fromhex(early['stub_hex']):raise ValueError('candidate module0 extension differs')
+            else:
+                machine.mem_write(early['address'],bytes.fromhex(early['stub_hex']))
+                machine.mem_write(early['site'],bytes.fromhex(early['site_patch_hex']))
             machine.mem_write(early['preserved_stub_address'],b'\xa5'*4)
-        header=bytearray(code[:512]);struct.pack_into('>5I',header,0x20+14*20,0,base,len(runtime),base+len(runtime),memory-len(runtime))
+        if candidate_mode:
+            header=bytearray(candidate_component[:512]);native_stream=candidate_component[512:]
+            native_stream+=bytes((-len(native_stream))%512);machine.mem_write(context+0x108,b'\x01')
+        else:
+            header=bytearray(code[:512]);struct.pack_into('>5I',header,0x20+14*20,0,base,len(runtime),base+len(runtime),memory-len(runtime))
+            native_stream=runtime+bytes((-len(runtime))%512)
         machine.mem_write(header_address,bytes(header));machine.mem_write(_context_pointer(code,'gr2'),struct.pack('>I',context))
-        native_stream=runtime+bytes((-len(runtime))%512);machine.mem_map(0x54000000,4096)
+        machine.mem_map(0x54000000,4096)
     calls=(0xA002270C,0xA0022E28,0xA002323A,0xA002323C,0xA002323E,
            0xA0023240,0xA00AFD9C,0xA00C63A6,0xA015D458,0xA0296804,0xA039130A)
     def boundary(uc,address,size,ctx):
@@ -162,8 +185,10 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
             return
         first=uc.reg_read(UC_ARM_REG_R0)
         if early_native and address==0xA0056722:
-            if first!=14:raise ValueError('early bootstrap selected wrong native record')
-            events.append(['native_early_load',14]);native_load_count+=1;return
+            if first==14:events.append(['native_early_load',14]);native_load_count+=1
+            elif not candidate_mode:raise ValueError('early bootstrap selected wrong native record')
+            if candidate_mode:events.append(['indexed_load',first])
+            return
 
         if native_runtime is not None and address in (0xA00566BC,0xA005658E,0x54000000):
             from unicorn.arm_const import UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3
@@ -179,12 +204,13 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
         if address==0xA0022E28:
             if first==0xffffffff:events.append(['finalize',first])
             else:modules.append(first);events.append(['module',first])
-            if native_runtime is not None and first==14:
+            if native_runtime is not None and (first==14 or candidate_mode and 0<first<15):
                 # The original wrapper skips its indexed load when its context
                 # flag is already set; the guard is proved separately.
-                if not early_native or machine.mem_read(context+0x108+14,1)!=b'\x01':
+                if not early_native or machine.mem_read(context+0x108+first,1)!=b'\x01':
                     from unicorn.arm_const import UC_ARM_REG_R1
-                    native_load_count+=1;uc.reg_write(UC_ARM_REG_R1,0);uc.reg_write(UC_ARM_REG_PC,0xA0056723);return
+                    if not early_native and first==14:native_load_count+=1
+                    uc.reg_write(UC_ARM_REG_R1,0);uc.reg_write(UC_ARM_REG_PC,0xA0056723);return
             result=0
         elif address==0xA00C63A6:
             if early_native and first==1:machine.mem_write(native_runtime['symbols']['gr2_code_sync_status'],struct.pack('>I',0x12345678))
@@ -197,19 +223,22 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     saved=[0x33440000+index for index in range(8)]
     for index,value in enumerate(saved):machine.reg_write(registers.UC_ARM_REG_R4+index,value)
     machine.reg_write(UC_ARM_REG_SP,0x50018000);machine.reg_write(UC_ARM_REG_LR,0x5001f001)
-    machine.emu_start(0xA0020945,0x5001f000,count=10000)
+    machine.emu_start(0xA0020945,0x5001f000,count=8000000 if candidate_mode else 10000)
     if machine.reg_read(UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('startup orchestration exceeded execution budget')
     if native_runtime is not None:
         native_result['native_load_count']=native_load_count
         if early_native:native_result['original_stub_restored']=bytes(machine.mem_read(early['preserved_stub_address'],4))==bytes.fromhex(early['preserved_stub_hex'])
         native_result['native_bss_canary']=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_code_sync_status'],4))[0]
         native_result['native_boot_count']=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_boot_count'],4))[0]
+        if candidate_mode:
+            native_result['candidate_loaded_records']=[i for i in range(15) if machine.mem_read(context+0x108+i,1)==b'\x01']
+            native_result['candidate_reservations_loaded']=all(struct.unpack('>I',machine.mem_read(row['address'],4))[0]==row['replacement'] for row in native_runtime['memory_reservations'])
     return dict(**native_result,stack_preserved=machine.reg_read(UC_ARM_REG_SP)==0x50018000,
                 callee_saved_preserved=[machine.reg_read(registers.UC_ARM_REG_R4+index) for index in range(8)]==saved,entry='0xa0020944',module_indices=modules,events=events,returned=machine.reg_read(UC_ARM_REG_R0),
                 post_load_call='0xa0020ab4',post_load_original_target='0xa0023234',post_load_return=post_load_return,
                 post_load_original_bytes=code[0xA0020AB4-FILE_BASE:0xA0020AB8-FILE_BASE].hex(),
                 helpers_intercepted=[hex(a) for a in calls],
-                scope='Original startup branch/call order only; subsystem initialization and module reads are synthetic boundaries.')
+                scope='Original startup branch/call order with explicit subsystem/wrapper-postaction boundaries. Candidate mode uses its actual source header/complete NAND byte stream and original indexed copy/zero/flag routines for requested modules; initial module0 load is separately proved. Storage device remains synthetic; no full hardware boot claim.')
 
 def probe_gr2_indexed_loader(code:bytes,*,source_offset:int=0,length:int=513,
                              record_index:int=14,fail_read:int|None=None)->dict:
