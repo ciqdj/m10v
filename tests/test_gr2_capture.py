@@ -384,3 +384,16 @@ class Gr2CaptureTests(unittest.TestCase):
                         self.assertEqual(struct.unpack('>I',u.mem_read(context+0xfb0c+120,4))[0],5)
                     elif mode==0x13:rendered=pixels
                     self.assertNotEqual(bytes(u.mem_read(0x60000000,256)),y+chroma)
+
+    def test_native_owner_uses_the_actual_pool_after_original_pixel_buffers_and_earlier_fixed_owners(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertTrue(hasattr(native,'probe_ordered_capture_pools'))
+        for prior in (0,3):
+            with self.subTest(prior=prior):
+                result=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,prior_fixed=prior)
+                self.assertEqual(result['image_pool_id'],40+prior)
+                self.assertEqual(result['native_owner_bytes'],0x12b9c);self.assertEqual(result['native_retired_owner'],0)
+                self.assertTrue(result['image_after_pixel_arena']);self.assertTrue(result['all_linear_spans_disjoint'])
+                self.assertTrue(result['all_linear_spans_bounded']);self.assertTrue(result['stack_preserved'])
+                self.assertTrue(result['callee_saved_preserved'])

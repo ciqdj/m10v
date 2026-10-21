@@ -39,20 +39,23 @@ static uint32_t be32(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[
 uint32_t gr2_image_owner_bytes(const uint8_t *context){
     uint32_t owner=(uint32_t)(uintptr_t)context;
     if((owner&3)||owner<8)return 0;
-    const uint8_t *pool=(const uint8_t *)(uintptr_t)0xa05fb0e8u;
-    if(be32((const uint8_t *)(uintptr_t)0xa0129c54u)!=(uint32_t)(uintptr_t)pool||
-       be32(pool)!=0x4d504c20u)return 0;
+    const uint32_t heads=0xa05fb0ccu;
+    const uint8_t *maximum=(const uint8_t *)(uintptr_t)0xa00b5bfcu;
+    uint32_t max=((uint32_t)maximum[0]<<8)|maximum[1];
+    uint32_t address=be32((const uint8_t *)(uintptr_t)0xa0129c54u);
+    if(!max||max>64u||address<heads+28u||address>heads+28u*max||(address-heads)%28u)return 0;
+    const uint8_t *pool=(const uint8_t *)(uintptr_t)address;
+    uint32_t id=(address-heads)/28u;
+    if(be32(pool)!=0x4d504c20u||pool[4]!=1u||(((uint32_t)pool[20]<<8)|pool[21])!=id)return 0;
     uint32_t body=be32((const uint8_t *)(uintptr_t)0xa01137ecu),block=be32(pool+8);
     if((body!=0xfb0cu&&body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)||block!=body+8||be32(pool+12)!=60*block)return 0;
-    uint32_t id=((uint32_t)pool[20]<<8)|pool[21];
-    const uint8_t *maximum=(const uint8_t *)(uintptr_t)0xa00b5bfcu;
-    if(!id||id>(((uint32_t)maximum[0]<<8)|maximum[1]))return 0;
     uint32_t table=be32((const uint8_t *)(uintptr_t)0xa00b5bdcu);
     if((table&3)||!valid(table,24*id))return 0;
     const uint8_t *record=(const uint8_t *)(uintptr_t)(table+24*(id-1));
     if(record[0]!=255||record[1]!=255||be32(record+16)!=block||be32(record+12)!=60*block)return 0;
     uint32_t base=be32(record+20);
-    if(!valid(base,60*block)||owner-8<base)return 0;
+    uint32_t pixel_end=be32((const uint8_t *)(uintptr_t)0xa0129c2cu);
+    if(!valid(base,60*block)||owner-8<base||(pixel_end&&base<pixel_end))return 0;
     uint32_t candidate=base;
     for(uint32_t i=0;i<60;i++,candidate+=block){
         if(candidate==owner-8)return be32(context-8)==0x494d4720u&&!be32(context-4)?body:0;

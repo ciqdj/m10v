@@ -89,6 +89,19 @@ def finalize_bridge(official:bytes,symbols:dict)->dict:
     return dict(address=address,source_file_offset=source,stub_hex='4b004718'+struct.pack('>I',target).hex(),
                 site=site,site_source_offset=offset,site_patch_hex=patch.hex(),extended_load_bytes=early['extended_load_bytes']+8)
 
+def buffer_layout_hook(official:bytes,symbols:dict,code_bytes:int)->dict:
+    """Cold selector entry with the live incoming r3 saved before interworking."""
+    official_profile(official,'gr2')
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    address=0xA00E5D92;expected=bytes.fromhex('b5ff0005001fb081f7faf8300004')
+    target=symbols.get('gr2_hdf_layout_chain')
+    if type(target) is not int or target&3 or not BASE<=target<BASE+code_bytes:raise ValueError('HDF selector ARM entry outside native code')
+    rows=[row for row in parse_executable_load_map(official)[:15] if row['address']<=address and address+14<=row['address']+row['length']]
+    if len(rows)!=1:raise ValueError('original HDF selector has no unique source owner')
+    offset=rows[0]['source_file_offset']+address-rows[0]['address']
+    if official[offset:offset+14]!=expected:raise ValueError('original HDF selector prelude differs')
+    return dict(address=address,source_file_offset=offset,expected_hex=expected.hex(),patch_hex=(bytes.fromhex('b4084b01471846c046c0')+struct.pack('>I',target)).hex(),saved_register='r3',continuation=0xA00E5DA0)
+
 def memory_reservations(official:bytes)->list[dict]:
     """Describe source-literal edits required before the original allocators run.
 
@@ -151,6 +164,10 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_boot_ui.c'),'-o',str(boot_ui)],check=True,capture_output=True)
     boot=out_dir/'boot.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_boot.c'),'-o',str(boot)],check=True,capture_output=True)
+    hdf_layout=out_dir/'hdf_layout.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_layout.c'),'-o',str(hdf_layout)],check=True,capture_output=True)
+    hdf_hooks=out_dir/'hdf_hooks.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_hooks.S'),'-o',str(hdf_hooks)],check=True,capture_output=True)
     hdf_configuration=out_dir/'hdf_configuration.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_configuration.c'),'-o',str(hdf_configuration)],check=True,capture_output=True)
     hdf_storage=out_dir/'hdf_storage.o'
@@ -187,7 +204,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_settings_page.c'),'-o',str(settings_page)],check=True,capture_output=True)
     artwork=out_dir/'artwork.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_artwork.c'),'-o',str(artwork)],check=True,capture_output=True)
-    render_objects=[str(hdf_configuration),str(hdf_storage),str(hdf),str(boot_ui),str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
+    render_objects=[str(hdf_layout),str(hdf_hooks),str(hdf_configuration),str(hdf_storage),str(hdf),str(boot_ui),str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
@@ -195,6 +212,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())
+    report['buffer_layout_hook']=buffer_layout_hook(official,report['symbols'],report['code_bytes'])
+    report['buffer_layout_hook_patch_hex']=report['buffer_layout_hook']['patch_hex']
     report['memory_reservations']=memory_reservations(official)
     report['early_bootstrap']=early_bootstrap(official)
     report['finalize_bridge']=finalize_bridge(official,report['symbols'])

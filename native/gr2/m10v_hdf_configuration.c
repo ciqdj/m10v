@@ -3,6 +3,7 @@
 #include "m10v_capture.h"
 static struct {uint32_t magic,strength,sequence;} cache;
 static int32_t mutex_id;
+static volatile uint32_t needs_bank0;
 static int lock(void){return mutex_id>0&&((int32_t (*)(int32_t,int32_t))(uintptr_t)0xA0066D94u)(mutex_id,0)==0;}
 static void unlock(void){((int32_t (*)(int32_t))(uintptr_t)0xA00671B8u)(mutex_id);}
 static int create(void){
@@ -19,7 +20,7 @@ static int output(const uint32_t *pointer){
 }
 int gr2_hdf_configuration_publish(uint32_t strength,uint32_t sequence){
  if(strength>3u||(strength&&*(volatile const uint8_t *)(uintptr_t)0xA0129C20u!=0u)||!create()||!lock())return 0;
- cache.strength=strength;cache.sequence=sequence;cache.magic=0x47324843u;unlock();return 1;
+ cache.strength=strength;cache.sequence=sequence;cache.magic=0x47324843u;needs_bank0=strength!=0;unlock();return 1;
 }
 int gr2_hdf_configuration_read(uint32_t *strength,uint32_t *sequence){
  if(!output(strength)||!output(sequence)||!disjoint((uintptr_t)strength,4,(uintptr_t)sequence,4)||!lock())return 0;
@@ -39,5 +40,8 @@ int gr2_hdf_configuration_freeze(uint8_t *context){
 int gr2_hdf_configuration_clear(void){
  if(mutex_id<=0)return 1;
  if(!lock())return 0;
- cache.magic=0;cache.strength=0;cache.sequence=0;unlock();return 1;
+ cache.magic=0;cache.strength=0;cache.sequence=0;needs_bank0=0;unlock();return 1;
 }
+
+/* Conservative pool hint only; never used as the per-frame setting value. */
+uint32_t gr2_hdf_configuration_needs_bank0(void){return needs_bank0!=0;}

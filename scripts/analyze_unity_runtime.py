@@ -169,7 +169,7 @@ def probe_gr2_module_guard(code:bytes,*,loaded:bool)->dict:
                 helpers_intercepted=['profiling initialize/start','module-load request observation'],
                 scope='Original wrapper prefix, boot-kind getter and loaded-byte getter/branch; actual loading and post-module actions are boundaries. Stops at guard continuation, not a full wrapper return.')
 
-def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None,early_native:bool=False,fail_native_read:bool=False,candidate_component:bytes|None=None,activation_fixture:bool=False,activation_masks:int=0,activation_policy:int=0,activation_fault:str|None=None)->dict:
+def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None,early_native:bool=False,fail_native_read:bool=False,candidate_component:bytes|None=None,activation_fixture:bool=False,activation_masks:int=0,activation_policy:int=0,activation_fault:str|None=None,activation_pool_id:int=40)->dict:
     """Run original startup orchestration; subsystem bodies are external boundaries."""
     official_profile(code,'gr2');phase_results=phase_results or {}
     if (early_native or fail_native_read) and native_runtime is None:raise ValueError('native runtime required for early bootstrap')
@@ -180,7 +180,7 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
     candidate_mode=candidate_component is not None
     if activation_fixture and not candidate_mode:raise ValueError('activation fixture requires actual candidate source')
-    if activation_masks not in (0,0x40,0x80,0xc0) or activation_policy not in (0,32) or activation_fault not in (None,'pool','hook','vector'):raise ValueError('bounded activation CPU/cache policy required')
+    if activation_masks not in (0,0x40,0x80,0xc0) or activation_policy not in (0,32) or activation_fault not in (None,'pool','hook','vector','hdf_layout','pool_overlap') or activation_pool_id not in (40,43):raise ValueError('bounded activation CPU/cache policy required')
     if candidate_mode:
         if not early_native or native_runtime is None:raise ValueError('candidate startup requires early native runtime')
         from scripts.build_gr2_component import build_gr2_component
@@ -256,8 +256,12 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
             post_load_return=uc.reg_read(UC_ARM_REG_R0);return
         if address==0xA0020AB4:
             if activation_fixture:
-                if activation_fault=='pool':machine.mem_write(0xA05F8E30+16,struct.pack('>I',0x12b98))
+                if activation_fault in ('pool','pool_overlap'):
+                    pool=struct.unpack('>I',machine.mem_read(0xA0129C54,4))[0];identifier=struct.unpack('>H',machine.mem_read(pool+20,2))[0];table=struct.unpack('>I',machine.mem_read(0xA00B5BDC,4))[0];record=table+24*(identifier-1)
+                    if activation_fault=='pool':machine.mem_write(record+16,struct.pack('>I',0x12ba8))
+                    else:machine.mem_write(record+20,struct.pack('>I',struct.unpack('>I',machine.mem_read(0xA0129C2C,4))[0]-32))
                 elif activation_fault=='hook':machine.mem_write(0xA03948C8,struct.pack('>I',0x5001D000))
+                elif activation_fault=='hdf_layout':machine.mem_write(0xA00E5D9C,struct.pack('>I',0x5001D000))
                 elif activation_fault=='vector':machine.mem_write(0xA00AF884,struct.pack('>I',0x5001D000))
             events.append(['post_load',0])
             if native_runtime is not None:
@@ -299,10 +303,10 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
             if activation_fixture and first==2:
                 # Explicit pool geometry fixture; original factory/pool
                 # initialization is executed in its independent owner probes.
-                block=struct.unpack('>I',machine.mem_read(0xA01137EC,4))[0]+8;pool=0xA05FB0E8;pool_base=0xA0B00020
-                machine.mem_write(0xA0129C54,struct.pack('>I',pool))
-                machine.mem_write(pool,struct.pack('>5I2H',0x4d504c20,0x01000000,block,60*block,0,1,0))
-                machine.mem_write(0xA05F8E30,struct.pack('>6I',0xffffffff,pool_base,60,60*block,block,pool_base))
+                block=struct.unpack('>I',machine.mem_read(0xA01137EC,4))[0]+8;identifier=activation_pool_id;pool=0xA05FB0CC+28*identifier;delta=80*(identifier-40);pool_base=0xBE7B4320+delta
+                machine.mem_write(0xA0129C54,struct.pack('>I',pool));machine.mem_write(0xA0129C2C,struct.pack('>I',0xBE7B4300+delta))
+                machine.mem_write(pool,struct.pack('>5I2H',0x4d504c20,0x01000000,block,60*block,0,identifier,0))
+                machine.mem_write(0xA05F8E30+24*(identifier-1),struct.pack('>6I',0xffffffff,pool_base,0,60*block,block,pool_base))
             if early_native and first==1:machine.mem_write(native_runtime['symbols']['gr2_code_sync_status'],struct.pack('>I',0x12345678))
             events.append(['phase',first]);result=phase_results.get(first,0)
         else:result=0

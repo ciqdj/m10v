@@ -74,6 +74,7 @@ class Gr2ComponentTests(unittest.TestCase):
             ({'activation_masks':0x80},0,[],0xa00af8a8),
             ({'activation_policy':32},0,[4,5,3],0xa00af8a8),
             ({'activation_fault':'pool'},0,[],0xa00af8a8),
+            ({'activation_fault':'pool_overlap'},0,[],0xa00af8a8),
             ({'activation_fault':'hook'},0,[],0xa00af8a8),
             ({'activation_fault':'vector'},0,[],0x5001d000)):
             with self.subTest(options=options):
@@ -102,3 +103,35 @@ class Gr2ComponentTests(unittest.TestCase):
             else:bad['can_package']=True
             with self.subTest(change=change),self.assertRaises(ValueError):module.build_gr2_component(official,bad)
         with self.assertRaises(ValueError):module.build_gr2_component(component('gr1','b01firm8'),runtime)
+
+    def test_source_component_installs_exact_four_argument_hdf_selector_before_activation(self):
+        module=self.implementation();runtime=self.build();official=component('gr2','b01firm8')
+        contract=runtime['buffer_layout_hook'];candidate,audit=module.build_gr2_component(official,runtime)
+        at=contract['source_file_offset'];patch=bytes.fromhex(contract['patch_hex'])
+        self.assertEqual(candidate[at:at+14],patch)
+        self.assertEqual(official[at:at+14],bytes.fromhex(contract['expected_hex']))
+        self.assertTrue(any(row['address']==0xa00e5d92 and row['bytes']==14 for row in audit['patches']))
+        changed=copy.deepcopy(runtime);changed['buffer_layout_hook']['saved_register']='r2'
+        with self.assertRaisesRegex(ValueError,'selector'):module.build_gr2_component(official,changed)
+
+    def test_activation_refuses_a_changed_hdf_selector_literal_before_touching_svc_vector(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        from scripts.analyze_unity_update import compute_update_checksum
+        module=self.implementation();runtime=self.build();official=component('gr2','b01firm8')
+        candidate,_=module.build_gr2_component(official,runtime);changed=bytearray(candidate)
+        at=runtime['buffer_layout_hook']['source_file_offset']+10;struct.pack_into('>I',changed,at,0x5001d000)
+        struct.pack_into('>I',changed,0x16c,compute_update_checksum(bytes(changed[512:])))
+        with self.assertRaisesRegex(ValueError,'audited source assembly'):
+            probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=bytes(changed),activation_fixture=True)
+        proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,activation_fault='hdf_layout')
+        self.assertEqual(proof['native_activation_ready'],0);self.assertEqual(proof['activation_syscalls'],[])
+        self.assertEqual(proof['activation_vector_value'],0xa00af8a8);self.assertTrue(proof['activation_callback_code_preserved'])
+        self.assertTrue(proof['activation_user_return']);self.assertTrue(proof['stack_preserved'])
+
+    def test_activation_accepts_actual_image_pool_identity_after_other_original_fixed_pools(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        module=self.implementation();runtime=self.build();official=component('gr2','b01firm8')
+        candidate,_=module.build_gr2_component(official,runtime)
+        proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,activation_pool_id=43)
+        self.assertEqual(proof['native_activation_ready'],1);self.assertEqual(proof['activation_syscalls'],[4,5,3])
+        self.assertTrue(proof['stack_preserved']);self.assertTrue(proof['callee_saved_preserved'])

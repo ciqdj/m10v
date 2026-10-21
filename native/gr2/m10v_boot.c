@@ -2,10 +2,12 @@
 #include "m10v_model.h"
 #include "m10v_hdf.h"
 #define WORD(address) (*(volatile uint32_t *)(uintptr_t)(address))
+#define BYTE(address) (*(volatile uint8_t *)(uintptr_t)(address))
 #define HALF(address) (*(volatile uint16_t *)(uintptr_t)(address))
 volatile uint32_t gr2_activation_ready;
 volatile uint32_t gr2_startup_complete;
 extern void gr2_finalize_chain(void);
+extern void gr2_hdf_layout_chain(void);
 extern void gr2_startup_chain(void),gr2_producer_chain(void),gr2_jpeg_chain(void);
 extern void gr2_ui_event_chain(void),gr2_menu_route_chain(void),gr2_menu_descriptor_chain(void);
 extern uint32_t *gr2_menu_categories(uint32_t);
@@ -24,6 +26,8 @@ static int prepared(void){
     /* Unaligned Thumb BL at the original final-return pair; read halfwords. */
     if(HALF(0xA0020AD2u)!=0xF0A4u||HALF(0xA0020AD4u)!=0xF80Du||
        WORD(0xA00C4AF0u)!=0x4B004718u||WORD(0xA00C4AF4u)!=(uint32_t)(uintptr_t)gr2_finalize_chain)return 0;
+    if(HALF(0xA00E5D92u)!=0xB408u||HALF(0xA00E5D94u)!=0x4B01u||HALF(0xA00E5D96u)!=0x4718u||
+       WORD(0xA00E5D98u)!=0x46C046C0u||WORD(0xA00E5D9Cu)!=(uint32_t)(uintptr_t)gr2_hdf_layout_chain)return 0;
     if(WORD(0xA0023154u)!=0xA0800000u||WORD(0xA01137ECu)!=GR2_IMAGE_BODY_BYTES||
        WORD(0xA05F5400u)!=0x47700000u||WORD(0xA0044F4Cu)!=0xE12FFF1Eu||
        HALF(0xA039D60Eu)!=0x2D6Au)return 0;
@@ -32,13 +36,15 @@ static int prepared(void){
     static const uint8_t modules[]={0,1,4,2,3,5,10,11,8,9,6,12,13,14};
     typedef uint32_t (*loaded_fn)(uint32_t);
     for(uint32_t i=0;i<sizeof(modules);i++)if(!((loaded_fn)(uintptr_t)0xA0040DC1u)(modules[i]))return 0;
-    if(WORD(0xA0129C54u)!=0xA05FB0E8u||WORD(0xA05FB0E8u)!=0x4D504C20u||
-       WORD(0xA05FB0F0u)!=(GR2_IMAGE_BODY_BYTES+8u)||WORD(0xA05FB0F4u)!=60u*(GR2_IMAGE_BODY_BYTES+8u))return 0;
-    uint32_t id=HALF(0xA05FB0FCu),table=WORD(0xA00B5BDCu),total=60u*(GR2_IMAGE_BODY_BYTES+8u);
-    if(!id||id>HALF(0xA00B5BFCu)||table!=0xA05F8E30u)return 0;
-    uint32_t record=table+24u*(id-1u),base=WORD(record+20);
+    const uint32_t heads=0xA05FB0CCu,pool=WORD(0xA0129C54u),max=HALF(0xA00B5BFCu);
+    if(!max||max>64u||pool<heads+28u||pool>heads+28u*max||(pool-heads)%28u||
+       WORD(pool)!=0x4D504C20u||BYTE(pool+4)!=1u||HALF(pool+20)!=(pool-heads)/28u||
+       WORD(pool+8)!=(GR2_IMAGE_BODY_BYTES+8u)||WORD(pool+12)!=60u*(GR2_IMAGE_BODY_BYTES+8u))return 0;
+    uint32_t id=(pool-heads)/28u,table=WORD(0xA00B5BDCu),total=60u*(GR2_IMAGE_BODY_BYTES+8u);
+    if(table!=0xA05F8E30u)return 0;
+    uint32_t record=table+24u*(id-1u),base=WORD(record+20),pixel_end=WORD(0xA0129C2Cu);
     if(HALF(record)!=0xFFFFu||WORD(record+12)!=total||WORD(record+16)!=(GR2_IMAGE_BODY_BYTES+8u)||
-       base<0xA0900000u||base>0xBFDC0000u-total)return 0;
+       pixel_end<0xA0900000u||pixel_end>0xBFDC0000u||base<pixel_end||base>0xBFDC0000u-total)return 0;
     return 1;
 }
 int gr2_native_ready(void){return gr2_activation_ready==1u;}

@@ -704,16 +704,19 @@ def probe_buffer_layout_selection(code:bytes,camera_mode:int,arguments:tuple,cur
                 callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,hardware_tested=False,
                 scope='Complete original A00E5D92 selector and A00DFDFE current-bank getter. Property reads are synthetic, read-only values. No pool transition, capture-mode naming, frame admission or settings concurrency proof.')
 
-def probe_buffer_pool_transitions(code:bytes,sequence:tuple)->dict:
+def probe_buffer_pool_transitions(code:bytes,sequence:tuple,*,initial:int=0,native_runtime:dict|None=None)->dict:
     """Original idle bank transitions; never inject a transition mid-capture."""
     if not sequence or len(sequence)>8 or any(type(value) is not int or not 0<=value<5 for value in sequence):raise ValueError('one to eight original layout indices required')
+    if type(initial) is not int or not 0<=initial<5 or native_runtime is not None and (initial!=1 or tuple(sequence)!=(0,)):raise ValueError('bounded initial bank/native HDF admission fixture required')
     from unicorn import UC_HOOK_CODE,arm_const as r
-    uc,created,linear,metadata,selected,original,saved,constructor=_buffer_pool_fixture(code,0)
+    uc,created,linear,metadata,selected,original,saved,constructor=_buffer_pool_fixture(code,initial)
     word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
     order=list(struct.unpack('>69I',uc.mem_read(0xA06BC5F4,69*4)));prefix=word(0xA0129C24)
     constant={i:bytes(uc.mem_read(0xA06BC708+20*i,20)) for i in order[:prefix]}
-    alive={row['identity'] for row in created};rings={pointer for pointer,size in metadata};retired_rings=[];layouts=[0]
+    alive={row['identity'] for row in created};rings={pointer for pointer,size in metadata};retired_rings=[];layouts=[initial];properties={0:6,0x2D:0};native_return=None;native_hint=None
     constant_ok=True;identities_ok=True;spans_ok=True;stack_ok=True;callee_ok=True
+    if native_runtime is not None:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']));uc.mem_write(0xA00E5D92,bytes.fromhex(native_runtime['buffer_layout_hook_patch_hex']))
     def boundary(machine,address,size,unused):
         args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
         if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original idle transition assertion')
@@ -723,7 +726,10 @@ def probe_buffer_pool_transitions(code:bytes,sequence:tuple)->dict:
             elif address==0xA0024C3C:rings.add(value)
             return
         value=0
-        if address==0xA00271DA:
+        if native_runtime is not None and address==native_runtime['symbols']['gr2_ui_storage_ready']:value=1
+        elif address==0xA00E0E2E:value=properties.get(args[0],0)
+        elif address==0xA00E0C94:properties[args[0]]=args[1]
+        elif address==0xA00271DA:
             mode=uc.mem_read(0xA0129C20,1)[0]
             counts=[struct.unpack('>i',uc.mem_read(0xA0112048+44*i+20+4*mode,4))[0] for i in range(69) if word(0xA06BC708+20*i+8)==args[0]]
             if not counts:raise RuntimeError('unknown transition semaphore')
@@ -737,10 +743,13 @@ def probe_buffer_pool_transitions(code:bytes,sequence:tuple)->dict:
         machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
     for address in (0xA0027270,0xA0024B0C,0xA0024E16,0xA0024C3C,0xA0027434,0xA0026EC6,0xA00271DA,0xA0025160,0xA0024D76,0xA00274AC,0xA0026F40,0xA00272E4,0xA0027360,0xA00273A4,0xA0027526,0xA0039F9C,0xA003A01A):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    if native_runtime is not None:
+        for address in (0xA00E0E2E,0xA00E0C94,native_runtime['symbols']['gr2_ui_storage_ready']):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     begin=linear[1][1];end=begin+linear[1][0]
     for target in sequence:
-        uc.reg_write(r.UC_ARM_REG_R0,target);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
-        uc.emu_start(0xA00DF847,0x5001F000,count=200000)
+        uc.reg_write(r.UC_ARM_REG_R0,1 if native_runtime is not None else target);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+        uc.emu_start(native_runtime['symbols']['gr2_hdf_prepare_pool'] if native_runtime is not None else 0xA00DF847,0x5001F000,count=200000)
+        if native_runtime is not None:native_return=uc.reg_read(r.UC_ARM_REG_R0)
         if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original idle pool transition exceeded CPU budget')
         layouts.append(uc.mem_read(0xA0129C20,1)[0])
         if layouts[-1]!=target:raise RuntimeError('original pool transition selected unexpected layout')
@@ -753,10 +762,13 @@ def probe_buffer_pool_transitions(code:bytes,sequence:tuple)->dict:
         spans_ok=spans_ok and all(begin<=base and size<=end-base for base,size in spans)
         stack_ok=stack_ok and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000
         callee_ok=callee_ok and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved
-    return dict(layouts=layouts,linear_allocation_count=len(linear),constant_pools_preserved=constant_ok,live_pool_identities_match=identities_ok,
+    if native_runtime is not None:
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+        uc.emu_start(native_runtime['symbols']['gr2_hdf_configuration_needs_bank0'],0x5001F000,count=1000);native_hint=uc.reg_read(r.UC_ARM_REG_R0)
+    return dict(native_admission_return=native_return,native_effective_hint=native_hint,layouts=layouts,linear_allocation_count=len(linear),constant_pools_preserved=constant_ok,live_pool_identities_match=identities_ok,
                 ring_metadata_reclaimed=all(pointer not in rings for pointer in retired_rings),all_live_spans_bounded=spans_ok,
                 stack_preserved=stack_ok,callee_saved_preserved=callee_ok,hardware_tested=False,
-                scope='Original A00DF846 idle destruction/repopulation/inverse mapping across one arena; constructors/destructors, idle semaphore counts and locks are fixtures. No outstanding image blocks or live threads. Not transactional rejection, mid-capture admission or hardware lifecycle proof.')
+                scope='Optional native HDF staged admission runs the original manager, with read-only/no-observer property and UI readiness fixtures. Original A00DF846 idle destruction/repopulation/inverse mapping across one arena; constructors/destructors, idle semaphore counts and locks are fixtures. No outstanding image blocks or live threads. Not transactional rejection, mid-capture admission or hardware lifecycle proof.')
 
 def probe_buffer_layout_manager(code:bytes,current:int,hdf_strength:int,busy_properties:dict)->dict:
     """Original manager/phase guard, with modeled HDF decision and transition."""
@@ -1008,6 +1020,66 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
+def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0)->dict:
+    """Actual system MPL -> BUFF -> IMG factories and kernel pool identities.
+
+    Empty kernel tables and synchronization services are fixtures. Linear and
+    MPF/MPL constructors/allocators execute, including their real id selection.
+    Sparse page mapping supplies RAM without pretending to model pixels/DMA.
+    """
+    official_profile(code,'gr2')
+    if type(prior_fixed) is not int or not 0<=prior_fixed<=3:raise ValueError('zero to three prior fixed owners required')
+    from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_INVALID,arm_const as r
+    uc=runtime_machine(code);word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    for maximum,pointer,stride in ((0xA00B5BFE,0xA00B5BE0,32),(0xA00B5BFC,0xA00B5BDC,24)):
+        count=struct.unpack('>H',uc.mem_read(maximum,2))[0];table=word(pointer)
+        if count!=64:raise RuntimeError('original kernel pool maximum differs')
+        for index in range(count):uc.mem_write(table+index*stride,struct.pack('>h',-2))
+    uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+    body=next(row['replacement'] for row in native_runtime['memory_reservations'] if row['address']==0xA01137EC)
+    uc.mem_write(0xA01137EC,struct.pack('>I',body));created=[];services=[];pages=[];linear=[];abi=True
+    saved=[0x74560000+i for i in range(8)]
+    def boundary(machine,address,size,unused):
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError(f'original ordered-pool assertion, caller{machine.reg_read(r.UC_ARM_REG_LR):08x}')
+        if address in (0xA0024E16,0xA0024B0C):created.append([address,*args[:3]]);return
+        if address==0xA0024BC4:
+            header=machine.reg_read(r.UC_ARM_REG_R4);linear.append([word(header+4),word(header+8)]);return
+        services.append(address);value=0 if address in (0xA0027360,0xA00273A4) else len(services)
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0039F9C,0xA003A01A):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    def memory(machine,access,address,size,value,unused):
+        page=address&~4095
+        if not 0xA0900000<=page<0xBFDC0000 or len(pages)>=512:return False
+        machine.mem_map(page,4096);pages.append(page);return True
+    uc.hook_add(UC_HOOK_MEM_INVALID,memory)
+    def run(entry,*args,thumb=True):
+        nonlocal abi
+        for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
+        for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(reg,value)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F000|int(thumb))
+        uc.emu_start(entry|int(thumb),0x5001F000,count=1000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original ordered-pool CPU budget exceeded')
+        abi=abi and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000 and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    run(0xA0024BCA)
+    for unused in range(prior_fixed):
+        pointer=run(0xA0024B68,64,0);run(0xA0024E16,pointer,2,32,0)
+    run(0xA00DFC08);fixed_before=sum(row[0]==0xA0024E16 for row in created);pixel_end=word(0xA0129C2C)
+    run(0xA00E1DF0);pool=word(0xA0129C54);identifier=struct.unpack('>H',uc.mem_read(pool+20,2))[0]
+    table=word(0xA00B5BDC);record=table+24*(identifier-1);image_base=word(record+20)
+    source=run(0xA00E1E3C,0);owner=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
+    run(0xA00E2020,source);retired=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
+    return dict(image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
+                native_owner_bytes=owner,native_retired_owner=retired,image_after_pixel_arena=image_base>=pixel_end,
+                linear_allocations=linear,linear_cursor=word(0xA00C2BA4),sparse_ram_pages=len(pages),
+                all_linear_spans_disjoint=all(base+length<=other or other+other_length<=base for i,(base,length) in enumerate(linear) for other,other_length in linear[i+1:]),
+                all_linear_spans_bounded=all(0xA0900000<=base and base+length<=0xBFDC0000 for base,length in linear),
+                runtime_preserved=bytes(uc.mem_read(native_runtime['base'],native_runtime['code_bytes']))==bytes.fromhex(native_runtime['runtime_hex']),
+                stack_preserved=abi,callee_saved_preserved=abi,hardware_tested=False,
+                scope='Original system2MiB MPL, optional earlier fixed owners, complete BUFF initializer before IMG pool initializer, original linear/MPF/MPL factories and object allocate/retire. Synthetic empty kernel tables and OS synchronization only; sparse RAM backing. Not full phase1 initialization, scheduling, DMA, cache coherence or camera boot.')
+
 def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None,custom_record:bytes|None=None,hdf_snapshot:tuple|None=None)->dict:
     """Original fixed-block image pool/factory/clone/retirement CPU evidence.
 
@@ -1022,7 +1094,7 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     from unicorn import arm_const as r
     uc=runtime_machine(code);uc.mem_map(0xA1000000,0x400000);stop=0x5001f000;stack=0x50018000
     word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
-    for maximum,pointer,table,count,stride in ((0xA00B5BFE,0xA00B5BE0,0x50007000,1,28),(0xA00B5BFC,0xA00B5BDC,0x50008000,2,24)):
+    for maximum,pointer,table,count,stride in ((0xA00B5BFE,0xA00B5BE0,0x50007000,1,32),(0xA00B5BFC,0xA00B5BDC,0x50008000,2,24)):
         uc.mem_write(maximum,struct.pack('>H',count));uc.mem_write(pointer,struct.pack('>I',table))
         for index in range(count):uc.mem_write(table+index*stride,struct.pack('>h',-2))
     def run(entry,*args,thumb=True):

@@ -9,4 +9,5 @@ int gr2_hdf_configuration_publish(uint32_t strength,uint32_t sequence);
 int gr2_hdf_configuration_read(uint32_t *strength,uint32_t *sequence);
 int gr2_hdf_configuration_freeze(uint8_t *context);
 int gr2_hdf_configuration_clear(void);
+uint32_t gr2_hdf_configuration_needs_bank0(void);
 #endif
