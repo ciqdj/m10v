@@ -35,3 +35,14 @@
 - guide/changelog/部署HTTP控制：13/13通过；changelog针对完整基线SHA校验通过。独立只读审查未发现重要问题，核实本次没有覆盖成像producer。
 
 验证文件保存在忽略目录 `builds/gr3-ab-release-20261022/evidence/`；包括源比较、回放、初始与最终测试输出。发布由 main/develop普通原子推送触发既有 Deploy Baota，最终以本次完整SHA的 `DEPLOY_OK ... service=active` 和公网首页、工作台、guide、changelog核验为准，不以推送成功代替部署成功。
+
+
+## 发布中断与宿主限时修复（2026.10.22.2）
+
+初次提交 `394720ee2c5bc1b950dce4cd3e62ea0c83fbb944` 已推送 main/develop，Actions [39634307535](https://github.com/zhaoo/m10v/actions/runs/39634307535) 在 GR III 构建通过后，于 GR IIIx 兼容 Python build 失败。服务器 stage从00:26:35到00:29:43，调用器为固定180000ms；内核对应窗口无OOM记录，systemd exit-code1（不是OOM kill），峰值600.4MiB、swap194.3MiB。脚本自动回退到 `a895cda0e347a33c0a2db04a8cfa615dcd939161`，已通过只读管理连接确认源码HEAD与服务active。未改内存、swap、系统或SSH安全配置。
+
+追加修复仅在电脑端 `node/gr3-runtime.mjs`：prepare保留180秒，build最多300秒，正整数上限300000ms；保留AbortSignal、1MiB输出限制、临时文件清理与600秒整组外层上限。超时错误现在包含action和deadline；主动取消优先，输出超限不误报超时。新增测试用真实execFile执行短暂fake worker，先在旧代码出现Missing expected rejection，再覆盖短prepare超时、长build成功、build超时、取消与非法/无穷deadline拒绝。没有更换、删减或跳过IIIx构建/机型审计。
+
+宿主源码进入integration fingerprint，调试build ID随之更新，不能声称整个BIN逐字节相同。已核实124个相机源码指纹完全相同；925712字节runtime恰好只有6条MOVW/MOVT指令不同，均为3对相同寄存器加载诊断ID `b9b87b3a→69e84ed2`，把这6条编号装载指令归一后，所有runtime字节与前一集成包完全一致，SD包也逐字节相同。新BIN SHA256 `8b575745fd228d03cb85a498100b53252797c9c9e301db1b1a316efacb7c4ecd`，runtime `3ddd92a15fc583834556dc3d212368d2fd01ce8356a2c6800c9a1984e2749814`，身份核对记录在 `builds/gr3-ab-release-deadline-20261022/evidence/host-only-identity.json`。
+
+追加修复后完整Node 312项：304通过、0失败、8历史fixture跳过，206.106秒；最终新BIN的A/B真实按键回放和19项film-timing/追加槽/HDF再次通过。263项ARM结果绑定的相机源码保持完全相同。独立只读复核未发现重要问题。更新日志2026.10.22.2归档上一条为source而非deployment，不把首次失败算作上线；最终部署仍以新提交完整SHA的DEPLOY_OK与公网内容核验为准。

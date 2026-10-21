@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.2",
+      "date": "2026-10-22",
+      "title": "发布 A/B 快切修复，完善低内存构建时限",
+      "changes": [
+        "GR III 2.10 合入已获用户确认的 A/B 退出修复：完整移除取景控件及转换时同步日志，MENU／ADJ 沿用原厂路径，取景不再叠加 A/B 信息。",
+        "保留 DISP 直接选择 A／B 和取景正式切换、全部原厂风格及高对比度黑白、五独立胶卷槽、HDF、Fn 原功能，以及已发布的首张换卷和预览初始化修复。",
+        "修复低内存服务器 GR III／IIIx 兼容构建被统一180秒限时提前终止的问题：构建单独设为最多300秒，预检保留180秒，继续保留取消、内存、机型审计和服务器600秒整组上限；失败信息明确显示超时。",
+        "上一提交在 GR IIIx 构建阶段退出并已自动恢复旧版服务；本次只调整电脑端构建时限和诊断，不修改已验收的相机运行时代码或成像参数。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.1",
       "date": "2026-10-22",
       "title": "完善 A/B 快切退出，移除取景提示",
@@ -11,9 +25,9 @@
         "本次仅合入已验收 A/B 源码与回归，保留线上已发布的首张换卷与实时取景初始化修复，不回退成像、RAW、连拍或回放路径。",
         "用户已确认 GR III 测试候选 d6709de3… 整体通过并授权发布；其他机型、全部配置组合及性能指标不扩大为本次真机验收范围。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "394720ee2c5bc1b950dce4cd3e62ea0c83fbb944",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/394720ee2c5bc1b950dce4cd3e62ea0c83fbb944"
     },
     {
       "version": "2026.10.21.5",

@@ -36,10 +36,16 @@ export async function runtimeAvailable(runtimeDir = currentRuntime) {
   } catch { return false; }
 }
 
-export async function runGr3Runtime(source, plan, action, runtimeDir, { signal } = {}) {
+export async function runGr3Runtime(source, plan, action, runtimeDir, { signal, timeoutMs = 180_000, buildTimeoutMs = 300_000 } = {}) {
   if(signal?.aborted) throw new Error("操作已取消");
   inspectOfficial(source);
   if (!['prepare', 'build'].includes(action)) throw new Error('invalid runtime action');
+  // Low-memory deployment throttles CPU and swaps: a valid IIIx feature build
+  // can exceed three minutes. Keep both operations bounded, without changing
+  // the worker input or firmware output; the deployment unit also caps 600s.
+  const deadlineMs = action === 'build' ? buildTimeoutMs : timeoutMs;
+  if (!Number.isInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 300_000)
+    throw new Error('invalid runtime timeout');
   runtimeDir??=currentRuntime;
   if (!await runtimeAvailable(runtimeDir)) throw new Error('GRLife 兼容运行时未安装在本机');
   const folder = await mkdtemp(path.join(os.tmpdir(), 'm10v-gr3-build-'));
@@ -53,10 +59,12 @@ export async function runGr3Runtime(source, plan, action, runtimeDir, { signal }
     try {
       ({ stdout } = await execFileAsync(process.env.M10V_PYTHON || '/opt/homebrew/bin/python3.12',
         [worker, action, sourcePath, planPath, outputPath], {
-          signal, env: { ...process.env, PYTHONPATH: runtimeDir }, timeout: 180000, maxBuffer: 1024 * 1024,
+          signal, env: { ...process.env, PYTHONPATH: runtimeDir }, timeout: deadlineMs, maxBuffer: 1024 * 1024,
         }));
     } catch (error) {
       if(signal?.aborted) throw new Error('操作已取消');
+      if (error.killed && error.signal === 'SIGTERM' && error.code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER')
+        throw new Error(`GR III runtime ${action} timed out after ${deadlineMs}ms`);
       throw new Error((error.stderr || error.message || 'GR III runtime failed').trim().slice(-1200));
     }
     const receipt = JSON.parse(stdout);
