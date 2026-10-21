@@ -30,6 +30,7 @@ SCREEN=SAVED_STATE+104
 class ControllerLifetimeTests(unittest.TestCase):
  debug=False
  native_host=False
+ appended_slots=False
  @classmethod
  def setUpClass(cls):
   p=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/tmp/m10v-sd-research/rtos.bin'))
@@ -49,7 +50,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    blobs=[]
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
-    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
     blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',additional_exports=AB_CONTROLLER_EXPORTS if 'controller' in file else ())
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs
@@ -73,6 +74,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    name=reverse.get(a)
    if name:
     self.events.append((name,*r,*([self.word(m,m.reg_read(UC_ARM_REG_SP))] if name=='m10v_debug_log' else [])))
+    if name=='m10v_ab_live_event_original' and getattr(self,'native_event_callback',None):self.native_event_callback(m)
     result=0
     if name=='m10v_debug_batch':
      for i in range(r[1]):self.events.append(('m10v_debug_log',*struct.unpack('<5I',m.mem_read(r[0]+20*i,20))))
@@ -90,7 +92,7 @@ class ControllerLifetimeTests(unittest.TestCase):
     elif name=='m10v_camera_library_load':
      result=0xffffffff if self.load_fail else 0
      state=bytearray(104)
-     for i in range(5):struct.pack_into('<H',state,12+8*i,33+i)
+     for i in range(5):struct.pack_into('<H',state,12+8*i,getattr(self,'fresh_films',[33,34,35,36,37])[i])
      m.mem_write(r[0],bytes(state))
     elif name=='m10v_sd_camera_item':result=33+r[0]*8+r[1]
     elif name=='m10v_sd_camera_install':result=0xffffffff if self.install_fail else 0
@@ -102,7 +104,8 @@ class ControllerLifetimeTests(unittest.TestCase):
    elif a==0x532c26c0:
     self.assertEqual(bytes(m.mem_read(r[0]+0x1b,1)),b'\0','Setup must activate shooting context, regardless of stale ImageControl context')
     self.events.append(('activate_tone',*r))
-    self.ab_tone=r[1]
+    if not getattr(self,'ab_set_fail',False):self.ab_tone=r[1]
+   elif a==0x532bd61c:self.events.append(('negative.clear',*r));m.reg_write(UC_ARM_REG_R0,0)
    elif a==0x532bd6b4:m.reg_write(UC_ARM_REG_R0,self.ab_tone)
    elif a==0x53050b7c:
     m.mem_write(r[0],struct.pack('<II',self.ab_clock//1000,(self.ab_clock%1000)*1000));m.reg_write(UC_ARM_REG_R0,0)
@@ -124,7 +127,9 @@ class ControllerLifetimeTests(unittest.TestCase):
     self.events.append(('register',*r));self.assertEqual(self.word(m,r[0]+4),0)
     m.mem_write(r[0]+4,struct.pack('<I',r[2]))
    elif a==0x533abc5c:self.events.append(('unregister',r[0]))
-   elif a==0x5316c9d8:self.events.append(('dispatch',*r))
+   elif a==0x5316c9d8:
+    self.events.append(('dispatch',*r))
+    if getattr(self,'real_navigation',False):return
    elif a==0x53228c4c:m.reg_write(UC_ARM_REG_R0,self.route)
    elif a in (0x536af2e4,0x536af358):self.fail('unexpected free of embedded controller/object '+hex(r[0]))
    elif a in (0x536b93d0,0x53820074):self.fail('original assertion '+hex(a))
@@ -170,7 +175,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    self.assertEqual(self.events[-1][:3],('m10v_settings_factory_original',0x55123400,route))
 
  def test_independent_install_binds_catalog_id_and_activates_exact_slot_tone(self):
-  for slot,tone in enumerate((12,18,19,20,21)):
+  for slot,tone in enumerate((25,26,27,28,29) if self.appended_slots else (12,18,19,20,21)):
    u=self.machine();self.setup_owner(u);p=PAGE
    self.call(u,'ready',p,0x0200f100)
    u.mem_write(p+SCREEN+4,struct.pack('<I',slot))

@@ -13,6 +13,13 @@ class SharedHdfTests(prior.HdfExecutionTests):
   start=cls.manifest['base']-0x53000000
   cls.runtime=rom[start:start+cls.manifest['code_bytes']]
   assert hashlib.sha256(cls.runtime).hexdigest()==cls.manifest['code_sha256']
+ def machine(self,strength=0):
+  e=super().machine(strength)
+  # This fixture requests film-slot grain. In appended builds tone12 is the
+  # restored factory Vivid; use the delivered first film carrier instead.
+  if self.manifest.get('appended_slots'):
+   e['u'].mem_write(e['si']+0x77c,bytes([self.manifest['appended_slots']['tones'][0]]))
+  return e
  def test_official_preimage_and_native_hdf_are_installed_together(self):
   h=self.manifest['digital_hdf'];self.assertTrue(h['shared_recipe'])
   self.assertEqual(h['shared_offset'],0x50e4);self.assertEqual(len(h['patches']),3)

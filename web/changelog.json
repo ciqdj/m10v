@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.21.5",
+      "date": "2026-10-21",
+      "title": "修复换卷首张滞后一张及实时取景滤镜偶尔缺失",
+      "changes": [
+        "GR III 2.10 将胶卷配方冻结从预留下一张缓冲移到本张 recipe 提交前，避免换卷后首张仍使用上一卷；提交后的照片继续保留各自独立快照。",
+        "GR III 进入正常实时取景时在 UI 生命周期内准备并恢复已保存胶卷缓存，解决需要进入胶卷库才恢复滤镜的问题；缓存有效时不重复读盘，ISP 回调不新增文件访问。",
+        "发布构建保留已验收测试包中的独立五槽、原生 A/B 选择与退出适配、Charmera、HDF、颗粒与水印依赖，按配置重建并核对验收 BIN 哈希，不重排胶卷 ID、不清空存档。",
+        "用户已在 GR III 真机确认换卷首张和实时取景正常，验收候选为 m10v-gr3-film-timing-r1-20261021；其他机型、A/B 操作及全部效果组合不扩大为本次真机验证通过。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.21.4",
       "date": "2026-10-21",
       "title": "修复 Charmera 颜色选择、胶卷库显示和实时取景",
@@ -11,9 +25,9 @@
         "GR III 2.10 实时取景读取当前槽位已提交的四色配置，经原生 ISP 生成双色近似；切换颜色和切出胶卷重建参数，不新增逐帧文件访问。JPEG继续使用原有二值调色，RAW像素与其他胶卷路径保持不变。",
         "按本轮明确授权完成离线回归后直接发布；本候选尚未相机实测，取景和成片阈值一致性、LCD显示与帧率仍待实机确认。GR IIIx 不开放本次GR III专用取景，GR IV目录不变。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a5742282b66516405cfe984b4d0974d1e06ae6f4",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39613472663"
     },
     {
       "version": "2026.10.21.3",

@@ -76,6 +76,35 @@ class SlotSwitchTests(unittest.TestCase):
   e.u.mem_write(data+0x1c0,bytes([bank]))
   e.u.mem_write(data+0x1c2+bank*2,bytes([tone]))
   return data
+ def test_reserved_next_recipe_does_not_freeze_the_previous_exposures_film(self):
+  # Native5351ae2c retires owner+f0, then acquires/reserves the NEXT recipe.
+  # Replay the real acquisition site, change film, then enter the real
+  # submission routine through its first pre-mutex block. No helper-only test
+  # can detect accidentally freezing the selection at reservation time.
+  for reserve in (0x5351aed4,0x5351b068):
+   e=StockISP(self.candidate);self.cache(e,33)
+   for patch in self.snapshot['patches']:
+    e.u.mem_write(patch['address'],bytes.fromhex(patch['replacement_hex']))
+   recipe=e.alloc(0x50f0);owner=e.alloc(0xb00)
+   e.w32(recipe,0x53d0fc90);e.w32(recipe+0x4778,0x31545653)
+   e.w32(owner+0xf0,recipe);ui=self.ui_selection(e,12)
+   e.u.reg_write(A.UC_ARM_REG_R4,owner)
+   e.u.reg_write(A.UC_ARM_REG_SP,0x5effff00)
+   e.u.emu_start(reserve,reserve+4,count=100000)
+   self.cache(e,66,version=4);e.u.mem_write(ui+0x1c2,b'\x12')
+   e.u.reg_write(A.UC_ARM_REG_R0,owner)
+   e.u.reg_write(A.UC_ARM_REG_SP,0x5effff00)
+   e.u.emu_start(0x5351ae2c,0x5351ae64,count=100000)
+   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_PC),0x5351ae64)
+   out=e.alloc(104);e.call(self.snapshot['exports']['m10v_isp_frame_recipe_state'],recipe,out)
+   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
+   self.assertEqual(struct.unpack('<H',e.u.mem_read(out+12,2))[0],66)
+   self.assertEqual(struct.unpack('<H',e.u.mem_read(recipe+0x4a08+22,2))[0],18)
+   frozen=bytes(e.u.mem_read(recipe+0x4a08,1716))
+   self.cache(e,68,version=6);e.u.mem_write(ui+0x1c2,b'\x14')
+   e.u.reg_write(A.UC_ARM_REG_R0,owner)
+   e.u.emu_start(0x5351ae44,0x5351ae48,count=100000)
+   self.assertEqual(bytes(e.u.mem_read(recipe+0x4a08,1716)),frozen)
  def test_first_shot_uses_ui_commit_when_backend_is_one_film_behind(self):
   for previous,current in ((19,20),(20,21),(12,18),(21,12)):
    for bank in (0,1,2):

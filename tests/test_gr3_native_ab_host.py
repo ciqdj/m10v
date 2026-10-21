@@ -13,17 +13,23 @@ class NativeHostTests(adapter.ControllerLifetimeTests):
   self.call(u,'top_ctor',self.owner)
   u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',self.owner))
   u.mem_write(0x55008000+0x1b,bytes(5))
-  self.controller=0x55050000;self.list=0x55060000;self.ui=[]
+  self.controller=0x55050000;self.list=0x55060000;self.ui=[];self.list_cursor=0;self.row_texts=[]
   u.mem_write(self.controller,struct.pack('<I',0x53b394e0))
   for off,value in [(0x124,0x02000000),(4,0x55061000),(0x15c,0x55061000),(0x160,0x55062000),(0x164,0x55063000),(0x168,0x55064000),(0x1ac,0x55065000),(0x1f0,self.list),(0x150,0x02000012)]:u.mem_write(self.controller+off,struct.pack('<I',value))
+  u.mem_write(self.list+0xf4,struct.pack('<II',0x55074000,0x55074000+24*4))
   u.mem_write(self.list,struct.pack('<I',0x55066000));u.mem_write(0x55066018,struct.pack('<I',0x55067000));u.mem_write(0x55067000,bytes.fromhex('1eff2fe1'))
   def boundary(m,a,n,_):
    r=[m.reg_read(v) for v in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2)]
    if a==0x533947f0:m.mem_write(r[1],struct.pack('<I',7));m.mem_write(r[2],struct.pack('<I',9));v=0
    elif a==0x53394758:v=0x55070000+r[1]*0x200
-   elif a==0x533948c4:v=300
-   elif a in (0x53394e8c,0x533a1808,0x533a1734,0x533a18e0,0x533a19b4,0x53395430,0x53395260,0x53396f80,0x533ad3c0,0x533ad308,0x53395224):self.ui.append((a,*r));v=0
+   elif a==0x533948c4:v=360
+   elif a==0x53394820:v=self.list_cursor
+   elif a in (0x53394e8c,0x533a1808,0x533a1734,0x533a18e0,0x533a19b4,0x53395430,0x53395260,0x53396f80,0x533ad3c0,0x533ad308,0x53395224):
+    self.ui.append((a,*r));v=0
+    if a==0x53395430:self.list_cursor=r[1]
+    if a==0x533a18e0 and r[1]:self.row_texts.append(bytes(m.mem_read(r[1],80)).split(b'\0')[0])
    elif a==0x531a2820:v=getattr(self,'adj_type',12)
+   elif a==0x532a9988:v=0x224+r[1] # stock translator boundary; real captions/icons have separate ARM coverage
    else:return
    m.reg_write(UC_ARM_REG_R0,v);m.reg_write(UC_ARM_REG_PC,m.reg_read(UC_ARM_REG_LR))
   u.hook_add(UC_HOOK_CODE,boundary);self.route=0x02000000
@@ -34,7 +40,7 @@ class NativeHostTests(adapter.ControllerLifetimeTests):
  def test_adj_activates_existing_list_without_navigation_or_tone_change(self):
   u=self.begin();self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
   self.assertFalse(self.count('dispatch'))
-  self.assertTrue(any(e[0]==0x53394e8c and e[1:3]==(self.list,3) for e in self.ui))
+  self.assertTrue(any(e[0]==0x53394e8c and e[1:3]==(self.list,5 if self.appended_slots else 6) for e in self.ui))
   self.assertFalse(self.count('activate_tone'))
  def test_menu_uses_native_adj_route_and_original_parent(self):
   u=self.begin();self.route=0x02000012;source=0x55051000
@@ -116,6 +122,7 @@ class NativeHostTests(adapter.ControllerLifetimeTests):
   def services(m,a,n,_):
    if a==0x5323bc4c:self.physical_gate.append((m.reg_read(UC_ARM_REG_R1),bytes(m.mem_read(keyboard+0x520,1))[0]));return
    if a==0x5320b1fc:v=keyboard
+   elif a==0x5320addc and getattr(self,'physical_mapper',0):v=self.physical_mapper
    elif a in getters:v=other
    elif a in callbacks:v=0
    else:return

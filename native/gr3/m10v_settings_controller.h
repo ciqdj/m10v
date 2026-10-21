@@ -9,6 +9,7 @@
  * this stores cursor/lifetime state, never a second canvas or controller. */
 typedef struct {
  uint32_t controller,mode,origin,source,position,offset,rebuilding,back_pending;
+ uint32_t level,focus,a,b,error,films[5];
 } m10v_native_ab_host;
 /* Two instances are embedded after the original TopMenu object, never placed
  * in undocumented RAM or freed independently from their owner. */

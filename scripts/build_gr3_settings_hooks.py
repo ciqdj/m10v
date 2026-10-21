@@ -9,7 +9,7 @@ BASE_VTABLE=[0x5316c7e0,0x5316c774,0x5316c7bc,0x5316c740,0x5316c748,
  0x5316dfa8,0x5316c74c,0x5316c750,0x5316c754,0x5316c758,
  0x5316c760,0x5316c768,0x5316d0f0,0x5316c76c,0x5316cec8]
 
-def build_settings_hooks(base,symbols,live_color=False):
+def build_settings_hooks(base,symbols,live_color=False,appended_slots=False):
  image=bytearray();exports={};patches=[];rows=[]
  def data(raw):
   image.extend(bytes(-len(image)&3));a=base+len(image);image.extend(raw);return a
@@ -47,4 +47,4 @@ def build_settings_hooks(base,symbols,live_color=False):
   word(0x53b36c88+i*4,0x10000000,[0x0200f100,0x0200f101,0x0200f103][i],'Setup independent destination')
  return bytes(image),dict(exports=exports,vtable=vt,rows=rows,patches=patches,owner_bytes=0x19bc if live_color else 0x193c,
    private_routes=[0x0200f100,0x0200f101,0x0200f103,0x0200f104],ab_hooks=ab_hooks,
-   ab_host={'stage':'read-only','route':0x02000000,'menu_parent':0x02000012,'custom_root':False,'tone_changes':False},camera_tested=False)
+   ab_host={'stage':'compare','route':0x02000000,'menu_parent':0x02000012,'custom_root':False,'tone_changes':True,'root_rows':0,'direct_pair':True,'picker_page_rows':6,'choices':17 if appended_slots else 12},camera_tested=False)

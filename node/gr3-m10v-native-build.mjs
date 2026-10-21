@@ -178,7 +178,7 @@ function checkRuntime(runtime, manifest) {
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?232:167;
+  const resourceCount=manifest.sd_library?237:167;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -317,15 +317,20 @@ function lifecyclePatches(manifest,runtime){
   expected.push({address:0x53521e18,expected:0xe58d5008,replacement:branch(0x53521e18,target),name:'raw pool dispatch return'});
  }
  if(m.snapshot){
-  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1716&&m.snapshot.patches?.length===(m.snapshot.live_color?4:3),'invalid frame snapshot contract');
-  for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351aed4,0xe59420f0,false],[2,0x5351b068,0xe59420f0,false]]){
+  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1716&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
+  need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ae44,'snapshot must freeze current recipe at submission');
+  for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351ae44,0xe59000f0,false],...(m.snapshot.shared_hdf?[[2,0x5351aed4,0xe59420f0,false],[3,0x5351b068,0xe59420f0,false]]:[])]){
    const row=m.snapshot.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid snapshot hook');
    expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'per-frame snapshot '+address.toString(16)});
   }
+  const at=m.snapshot.patches[1].entry,helper=m.snapshot.exports.m10v_isp_frame_recipe_producer;
+  need(inRuntime(helper),'snapshot submission helper outside runtime');
+  const words=[0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20,0xe59000f0,branch(at+28,helper,true),0xecfd0b20,0xecbd0b20,0xe8bd5000,0xeee1ea10,0xe128f00c,0xe8bd5fff,0xe59000f0,branch(at+60,0x5351ae48)];
+  words.forEach((word,i)=>need(runtime.readUInt32LE(at-manifest.base+i*4)===(word>>>0),'snapshot submission wrapper instruction differs'));
  }
  if(m.snapshot?.live_color){
   need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x19bc,'preview requires owned parameter cache');
-  const row=m.snapshot.patches[3];need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
+  const row=m.snapshot.patches.at(-1);need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
   expected.push({address:0x53dbd954,expected:0x536ddecc,replacement:row.entry,name:'native Live Make color'});
   const at=row.entry,ex=m.snapshot.exports;
   const words=[0xe92d500f,branch(at+4,ex.m10v_isp_frame_live_prepare,true),0xe8bd500f,0xe92d4070,0xe1a04000,0xe1a05001,branch(at+24,0x536ddecc,true),0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20,0xe1a00004,0xe1a01005,branch(at+60,ex.m10v_isp_frame_live_color,true),0xecfd0b20,0xecbd0b20,0xe8bd5000,0xeee1ea10,0xe128f00c,0xe8bd5fff,0xe8bd8070];
@@ -509,5 +514,5 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
-    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color after first settings initialization; preview excludes grain/halo/leak; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
+    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color initialized at normal UI live entry; preview excludes grain/halo/leak; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }

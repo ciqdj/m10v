@@ -139,14 +139,16 @@ class SettingsViewTests(unittest.TestCase):
   u.mem_write(page,struct.pack('<I',adapter.STUB+0x800))
   u.mem_write(ab,struct.pack('<11I',1,5,1,0,1,34,0,0,0,0,0))
   u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner))
-  u.mem_write(live+0x15c,struct.pack('<I',root));clock=[1000]
+  u.mem_write(live+0x15c,struct.pack('<I',root));clock=[1000];tone=[12]
   reverse={addr:name for name,addr in a.externals.items() if adapter.STUB<=addr<adapter.STUB+0x100}
   def hook(m,at,n,_):
    name=reverse.get(at)
    if name=='m10v_settings_controller_vtable':m.reg_write(UC_ARM_REG_R0,adapter.STUB+0x800)
    elif name=='m10v_library_name':m.reg_write(UC_ARM_REG_R0,0x10000800)
+   elif name=='m10v_camera_library_load':
+    fresh=bytearray(104);struct.pack_into('<H',fresh,12,34);m.mem_write(m.reg_read(UC_ARM_REG_R0),bytes(fresh));m.reg_write(UC_ARM_REG_R0,0)
    elif name and name.startswith('m10v_ab_'):m.reg_write(UC_ARM_REG_R0,0)
-   elif at==0x532bd6b4:m.reg_write(UC_ARM_REG_R0,12)
+   elif at==0x532bd6b4:m.reg_write(UC_ARM_REG_R0,tone[0])
    elif at==0x53050b7c:
     m.mem_write(m.reg_read(UC_ARM_REG_R0),struct.pack('<II',clock[0]//1000,(clock[0]%1000)*1000));m.reg_write(UC_ARM_REG_R0,0)
    else:return
@@ -162,13 +164,32 @@ class SettingsViewTests(unittest.TestCase):
   widget=struct.unpack('<I',u.mem_read(ab+28,4))[0]
   self.assertNotEqual(widget,0);self.assertEqual(struct.unpack('<I',u.mem_read(widget+4,4))[0],root)
   text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(text,20)),'A  PORTRA\0'.encode('utf-16le'))
+  self.assertEqual(bytes(u.mem_read(text,12)),'A/B:A\0'.encode('utf-16le'))
   clock[0]=2600;call('live_event',live,0x10000100)
   text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(text,4)),'A\0'.encode('utf-16le'))
+  self.assertEqual(bytes(u.mem_read(text,12)),'A/B:A\0'.encode('utf-16le'))
+  # A late model notification hides, but cannot free a child while original
+  # dispatch/drawing may hold its iterator. Destruction belongs to leave.
+  allocated=dict(self.live);tone[0]=16;call('live_event',live,0x10000100)
+  self.assertEqual(self.live,allocated)
+  self.assertEqual(struct.unpack('<I',u.mem_read(ab+8,4))[0],0)
+  self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],widget)
   call('live_leave',live)
   self.assertEqual(self.live,baseline)
   self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],0)
+  # Ordinary native ImageControl can change the tone outside our ADJ hook
+  # (MENU, custom bank, etc). Re-entering LiveView must reconcile before any
+  # old-session widget is constructed, not wait for its first event to free it.
+  u.mem_write(ab+8,struct.pack('<I',1));tone[0]=16;call('live_enter',live,0x08000000,0)
+  self.assertEqual(struct.unpack('<I',u.mem_read(ab+8,4))[0],0)
+  self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],0)
+  self.assertEqual(self.live,baseline)
+  u.mem_write(ab+8,struct.pack('<I',1));u.mem_write(ab+16,struct.pack('<I',5))
+  call('live_enter',live,0x08000000,0)
+  widget=struct.unpack('<I',u.mem_read(ab+28,4))[0]
+  text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,12)),'A/B:B\0'.encode('utf-16le'))
+  call('live_leave',live);self.assertEqual(self.live,baseline)
  def test_ab_choices_include_actual_stock_high_contrast_black_and_white(self):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u)
   self.state(u,6,1)

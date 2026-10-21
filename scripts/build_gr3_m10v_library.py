@@ -408,7 +408,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
-            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=live_color)
+            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=live_color,appended_slots=appended_slots)
             code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
@@ -492,6 +492,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts+=['页面验证（只读）','原厂页面显示验证','返回与重复进入验证','请检查正常关机','未启用滤镜切换']
             texts+=['Custom LUT']*5
         texts+=['Kodak Charmera','颜色','红','黄','蓝','灰']
+        if sd_library:texts+=['A/B 请选择不同风格','OK选定 MENU返回 DISP退出快切','上下选项 左右换风格 OK进入','A/B 已启用 · DISP切换','A/B 未启用']
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []

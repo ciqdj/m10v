@@ -175,30 +175,38 @@ class ObserverProducerTests(unittest.TestCase):
         def load(u,at,size,userdata):
             if at==self.libsymbols['m10v_camera_library_load']:
                 calls.append(at);u.mem_write(u.reg_read(A.UC_ARM_REG_R0),data)
+                for n in range(32):u.reg_write(getattr(A,'UC_ARM_REG_D'+str(n)),n)
+                u.reg_write(A.UC_ARM_REG_FPSCR,0)
                 u.reg_write(A.UC_ARM_REG_R0,0);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
         hook=e.u.hook_add(UC_HOOK_CODE,load)
         u=e.u
         for r in range(13):u.reg_write(getattr(A,'UC_ARM_REG_R'+str(r)),0x12340000+r)
-        u.reg_write(A.UC_ARM_REG_R4,owner);u.reg_write(A.UC_ARM_REG_SP,0x5effff00);u.reg_write(A.UC_ARM_REG_LR,0x5e000000)
+        u.reg_write(A.UC_ARM_REG_R0,owner);u.reg_write(A.UC_ARM_REG_SP,0x5effff00);u.reg_write(A.UC_ARM_REG_LR,0x5e000000)
         u.reg_write(A.UC_ARM_REG_CPSR,0xa80f0013)
         regs=[getattr(A,'UC_ARM_REG_R'+str(r)) for r in range(13)]+[A.UC_ARM_REG_SP,A.UC_ARM_REG_LR,A.UC_ARM_REG_CPSR]
-        expected=[u.reg_read(r) for r in regs];expected[2]=recipe
-        for n in range(8,16):u.reg_write(getattr(A,'UC_ARM_REG_D'+str(n)),0x1122334455667788+n)
+        expected=[u.reg_read(r) for r in regs];expected[0]=recipe
+        for n in range(32):u.reg_write(getattr(A,'UC_ARM_REG_D'+str(n)),0x1122334455667788+n)
+        u.reg_write(A.UC_ARM_REG_FPSCR,0x01000000)
         u.emu_start(site,site+4,count=100000)
         self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),site+4)
         self.assertEqual([u.reg_read(r) for r in regs],expected)
-        self.assertEqual([u.reg_read(getattr(A,'UC_ARM_REG_D'+str(n))) for n in range(8,16)],[0x1122334455667788+n for n in range(8,16)])
+        self.assertEqual([u.reg_read(getattr(A,'UC_ARM_REG_D'+str(n))) for n in range(32)],[0x1122334455667788+n for n in range(32)])
+        self.assertEqual(u.reg_read(A.UC_ARM_REG_FPSCR),0x01000000)
         u.hook_del(hook)
         return calls
 
-    def test_both_post_mutex_producers_snapshot_once_and_preserve_original_abi(self):
-        for site in (0x5351aed4,0x5351b068):
+    def test_current_recipe_submission_snapshots_once_and_preserves_original_abi(self):
+        for site in (0x5351ae44,):
             with self.subTest(site=hex(site)):
                 e,r,o,i,c,si=self.fixture();initial=state((66,67,68,33,34))
                 self.assertEqual(len(self.producer(e,r,site,initial)),1)
                 self.assertEqual(len(self.producer(e,r,site,state())),0)
                 out=e.alloc(104);e.call(self.manifest['exports']['m10v_isp_frame_recipe_state'],r,out)
                 self.assertEqual(bytes(e.u.mem_read(out,104)),initial)
+
+    def test_startup_without_current_recipe_performs_no_library_read(self):
+        e,r,o,i,c,si=self.fixture()
+        self.assertEqual(self.producer(e,0,0x5351ae44,state()),[])
 
     def test_source_recipe_is_followed_and_foreign_destination_is_not_marked_observed(self):
         e,source,o,i,c,si=self.fixture()
@@ -218,13 +226,13 @@ class ObserverProducerTests(unittest.TestCase):
     def test_observer_all_slots_and_3d_lut_remain_byte_identical_to_stock(self):
         for tone in (12,18,19,20,21):
             e,r,o,i,c,si=self.fixture(tone)
-            self.assertEqual(len(self.producer(e,r,0x5351b068,state((66,67,68,33,34)))),1)
+            self.assertEqual(len(self.producer(e,r,0x5351ae44,state((66,67,68,33,34)))),1)
             before=bytes(e.u.mem_read(i,0x9000))
             for n in range(8,16):e.u.reg_write(getattr(A,'UC_ARM_REG_D'+str(n)),0x1122334455667788+n)
             self.callback(e,o,i,c)
             self.assertEqual(self.status(e,r),7)
             self.assertEqual(bytes(e.u.mem_read(i,0x9000)),before)
             self.assertEqual([e.u.reg_read(getattr(A,'UC_ARM_REG_D'+str(n))) for n in range(8,16)],[0x1122334455667788+n for n in range(8,16)])
-        self.assertEqual(len(self.manifest['patches']),3)
+        self.assertEqual(len(self.manifest['patches']),2)
         self.assertTrue(self.manifest['observer'])
         self.assertTrue(self.manifest['snapshot_ingress_installed'])

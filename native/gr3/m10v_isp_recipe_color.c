@@ -109,8 +109,10 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     m10v_isp_recipe_color *s=owned(recipe);
     if(!s)return 0;
     if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC)return 1;
-    /* Only called by the two post-mutex producer adapters, before queueing.
-     * Never called from factory/ISP/encoder callbacks. */
+    /* Called at current-recipe submission BEFORE both producer mutexes.
+     * Reservation of the next raw buffer is too early: the user can switch
+     * film while it is waiting for an exposure. Never called from allocation,
+     * factory, ISP or encoder callbacks. Re-entry keeps a queued shot frozen. */
     m10v_library_state state;
     /* A validated owner cache is published only after journal readback. Avoid
      * two AppData reads per exposure; unavailable/busy caches retain the

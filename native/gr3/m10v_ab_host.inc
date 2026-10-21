@@ -1,6 +1,5 @@
-/* Native ADJ host, stage one: read-only. No tone setter, capture hook, custom
- * controller, root allocation or shutdown navigation. See pinned GRKit's
- * enter/leave/exit ordering; firmware APIs remain owned by this adapter. */
+/* Native ADJ host. Draft selection is isolated from the formal setter; only
+ * Start/Exit enters native LiveView. Keep the validated r3 lifecycle. */
 extern uint32_t m10v_ab_adj_refresh_original(uint32_t);
 extern uint32_t m10v_ab_adj_exit_original(uint32_t);
 extern uint32_t m10v_ab_adj_destroy_original(uint32_t);
@@ -10,21 +9,53 @@ static m10v_native_ab_host *ab_host(m10v_settings_controller *p){return p&&p->pa
 static int ab_host_owned(m10v_native_ab_host *h,uint32_t c){return h&&h->mode==2&&h->controller==c;}
 static uint32_t ab_host_word(uint32_t c,uint32_t off){return *(const uint32_t *)(uintptr_t)(c+off);}
 static void ab_host_caption(uint32_t w,uint32_t id){((fn3)0x53396f80u)(w,id,0);}
-static void ab_host_render(m10v_native_ab_host *h){
- uint32_t c=h->controller,list=ab_host_word(c,0x1f0);h->rebuilding=1;
- ((fn2)0x53394e8cu)(list,3);
- for(uint32_t i=0;i<3;i++){
-  uint32_t row=((fn2)0x53394758u)(list,i);
-  ((fn2)0x533a1734u)(row,0);((fn2)0x533a18e0u)(row,0);
-  ((fn2)0x533a1808u)(row,1003+i);((fn2)0x533a19b4u)(row,0);
+/* Native list capacity is fixed by its constructor. Page within that vector;
+ * six 60px rows fit y60..420, as in the pinned GRKit/native layout. */
+static uint32_t ab_host_page_size(m10v_native_ab_host *h){
+ uint32_t list=ab_host_word(h->controller,0x1f0),first=ab_host_word(list,0xf4),end=ab_host_word(list,0xf8);
+ return end>=first&&end-first>=24?6:3;
+}
+static uint32_t ab_host_start_row(uint32_t focus,uint32_t size){if(size==6)return focus<6?0:focus<12?6:12;
+ return focus<3?0:focus<6?3:focus<9?6:focus<12?9:focus<15?12:15;}
+static uint32_t ab_host_film(m10v_native_ab_host *h,uint32_t choice){uint32_t slot=m10v_ab_slot(choice);return slot<5?h->films[slot]:0;}
+static uint32_t ab_host_icon(m10v_native_ab_host *h,uint32_t choice){
+ uint32_t id=ab_host_film(h,choice);
+ if(m10v_ab_slot(choice)<5)return M10V_CUSTOM(id)?754:id==M10V_CHAR_ID?755:id>=1&&id<=78?670+id:0;
+ return ((fn2)0x532a9988u)(0,m10v_ab_tone(choice));
+}
+static void ab_host_name(m10v_native_ab_host *h,uint32_t choice,char *out,uint32_t prefix){
+ const char *name=m10v_ab_stock_name(choice);char custom[24];m10v_library_state fresh;
+ uint32_t slot=m10v_ab_slot(choice),id=ab_host_film(h,choice),n=0;
+ if(slot<5){
+  name=m10v_library_name(id);
+  if(M10V_CUSTOM(id)&&m10v_camera_library_load(&fresh)>=0&&fresh.slots[slot].film==id&&
+     m10v_sd_camera_custom_name(&fresh,slot,custom,sizeof(custom)))name=custom;
  }
- uint32_t width=((fn1)0x533948c4u)(list),rect[4]={720-width,240,width,180};
+ if(prefix){out[n++]=(char)prefix;out[n++]=':';out[n++]=' ';}
+ if(!name)name="Film";
+ for(uint32_t i=0;name[i]&&n<76;i++)out[n++]=name[i];out[n]=0;
+}
+static void ab_host_render(m10v_settings_controller *p){
+ m10v_native_ab_host *h=&p->host;uint32_t c=h->controller,list=ab_host_word(c,0x1f0);
+ uint32_t size=ab_host_page_size(h),start=ab_host_start_row(h->focus,size);
+ uint32_t rows=M10V_TONE_CHOICES-start;if(rows>size)rows=size;
+ h->rebuilding=1;((fn2)0x53394e8cu)(list,rows);
+ for(uint32_t i=0;i<rows;i++){
+  uint32_t row=((fn2)0x53394758u)(list,i),choice=start+i;
+  ((fn2)0x533a1734u)(row,ab_host_icon(h,choice));((fn2)0x533a18e0u)(row,0);
+  if(M10V_CUSTOM(ab_host_film(h,choice))){
+   char text[80];ab_host_name(h,choice,text,0);
+   ((fn2)0x533a1808u)(row,0);((fn2)0x533a18e0u)(row,(uint32_t)(uintptr_t)text);
+  }else ((fn2)0x533a1808u)(row,m10v_ab_caption(choice,ab_host_film(h,choice)));
+  ((fn2)0x533a19b4u)(row,h->level==2&&choice==h->a);
+ }
+ uint32_t width=((fn1)0x533948c4u)(list),rect[4]={720-width,420-60*rows,width,60*rows};
  uint32_t vt=*(const uint32_t *)(uintptr_t)list;
  ((fn2)(uintptr_t)*(const uint32_t *)(uintptr_t)(vt+0x18))(list,(uint32_t)(uintptr_t)rect);
- ((fn2)0x53395430u)(list,0);
- ab_host_caption(ab_host_word(c,0x160),1002);ab_host_caption(ab_host_word(c,0x164),1006);
- ((fn2)0x533ad3c0u)(ab_host_word(c,0x168),0);
- ((fn2)0x533ad3c0u)(ab_host_word(c,0x1ac),0);
+ ((fn2)0x53395430u)(list,h->focus-start);
+ ab_host_caption(ab_host_word(c,0x160),h->level==1?992:993);
+ ab_host_caption(ab_host_word(c,0x164),h->error?h->error:1019);
+ ((fn2)0x533ad3c0u)(ab_host_word(c,0x168),0);((fn2)0x533ad3c0u)(ab_host_word(c,0x1ac),0);
  ((fn1)0x533ad308u)(ab_host_word(c,0x15c));h->rebuilding=0;
  M10V_LOG(97,20,c,list,h->origin);
 }
@@ -43,7 +74,7 @@ static void ab_host_attach(m10v_settings_controller *p,uint32_t c){
  uint32_t list=ab_host_word(c,0x1f0);
  h->controller=c;h->rebuilding=1;
  ((fn3)0x533947f0u)(list,(uint32_t)(uintptr_t)&h->position,(uint32_t)(uintptr_t)&h->offset);
- h->mode=2;ab_host_render(h);
+ h->mode=2;ab_host_render(p);
 }
 static void ab_host_restore(m10v_settings_controller *p,uint32_t c){
  m10v_native_ab_host *h=ab_host(p);if(!ab_host_owned(h,c))return;
@@ -53,10 +84,15 @@ static void ab_host_restore(m10v_settings_controller *p,uint32_t c){
  h->controller=0;h->rebuilding=0;M10V_LOG(97,21,c,h->origin,0);
 }
 #if M10V_AB_NATIVE_HOST
+static uint32_t ab_host_wrap(uint32_t value,uint32_t count){while(value>=count)value-=count;return value;}
 static void ab_host_open(m10v_settings_controller *p,uint32_t c,uint32_t origin){
  p->page=AB_HOST_PAGE;m10v_native_ab_host *h=&p->host;
  for(uint32_t i=0;i<sizeof(*h);i++)((uint8_t *)h)[i]=0;
  h->mode=1;h->origin=origin;h->source=c;p->pending_source=c;
+ if(!p->ab.enabled)ab_pair(&p->ab);h->a=p->ab.a;h->b=p->ab.b;
+ h->level=1;h->focus=h->a;
+ m10v_library_state fresh;if(m10v_camera_library_load(&fresh)<0)h->error=945;
+ else for(uint32_t i=0;i<5;i++)h->films[i]=fresh.slots[i].film;
  if(origin==0x02000000u)ab_host_attach(p,c);
  else ((fn3)0x5316c9d8u)(c,0x02000000u,0x02000012u);
 }
@@ -66,21 +102,56 @@ static int ab_host_followup(m10v_settings_controller *p,uint32_t c,uint32_t key,
  if(key==8){h->back_pending=0;return 0;}
  if(key==0xd8){h->back_pending=0;return 1;}return 0;
 }
+static void ab_host_live(m10v_settings_controller *p,uint32_t c){
+ ab_host_restore(p,c);((fn3)0x5316c9d8u)(c,0x08000000u,0x10000000u);
+}
+static void ab_host_start(m10v_settings_controller *p,uint32_t c){
+ m10v_native_ab_host *h=&p->host;m10v_library_state fresh;
+ if(h->a==h->b){h->error=1018;ab_host_render(p);return;}
+ if(h->a>=M10V_TONE_CHOICES||h->b>=M10V_TONE_CHOICES||m10v_camera_library_load(&fresh)<0){h->error=945;ab_host_render(p);return;}
+ uint32_t sa=m10v_ab_slot(h->a),sb=m10v_ab_slot(h->b);
+ if((sa<5&&(!fresh.slots[sa].film||fresh.slots[sa].film!=h->films[sa]))||
+    (sb<5&&(!fresh.slots[sb].film||fresh.slots[sb].film!=h->films[sb]))||ab_save(h->a,h->b)||ab_apply(h->a)){
+  h->error=945;ab_host_render(p);return;
+ }
+ ab_clear(&p->ab);
+ m10v_ab_start(&p->ab,h->a,h->b,h->a,sa<5?fresh.slots[sa].film:0,sb<5?fresh.slots[sb].film:0);
+ ab_host_live(p,c);
+}
 static int ab_host_event(m10v_settings_controller *p,uint32_t c,uint32_t event){
  m10v_native_ab_host *h=ab_host(p);if(!ab_host_owned(h,c))return 0;
  uint32_t key=ab_event_key(event);
+ /* Native MENU switch packets include press/repeat/release. Follow GRKit's
+  * phase2/repeat0 action boundary so a picker cancellation cannot also close
+  * the root on the second packet of the same physical press. */
+ if(key==5){uint32_t packet=ab_host_word(event,4);
+  if(ab_ram(packet,8)&&(*(const uint8_t *)(uintptr_t)packet!=2||ab_host_word(packet,4)!=0))return 1;
+ }
  if(key==0x36){p->ab.down=0;return 1;}
- if(key==0x37||key==0x38||key==0x30)return 1;
+ if(key==0x37){if(!p->ab.down){ab_stop(&p->ab);p->ab.down=1;ab_host_live(p,c);}return 1;}
+ if(key==0x38||key==0x30)return 1;
+ if(key==8){h->back_pending=0;return 0;}
+ if(key==0xd8&&h->back_pending){h->back_pending=0;return 1;}
  if(key==0xd0||key==0xd4||key==0xd1||key==0xd5){
-  ((fn3)0x53395260u)(ab_host_word(c,0x1f0),(key==0xd0||key==0xd4)?0xffffffffu:1,1);return 1;
+  uint32_t count=M10V_TONE_CHOICES;
+  h->focus=(key==0xd0||key==0xd4)?(h->focus?h->focus-1:count-1):ab_host_wrap(h->focus+1,count);
+  h->error=0;ab_host_render(p);return 1;
  }
- /* Main/power and unrecognized events remain entirely native. */
- if(key==0xd8||key==5||key==0x89||key==0xaa||key==0xce||key==0xcf||key==0x1b){
-  uint32_t origin=h->origin;ab_host_restore(p,c);
-  if(origin==0x02000012u&&(key==0xd8||key==5||key==0x89||key==0xaa)){
-   h->back_pending=key==5;((fn1)0x5316ca28u)(c);return 1;
-  }
+ if(key==0xce||key==0xcf){
+  uint32_t n=ab_host_page_size(h);h->focus=ab_host_wrap(h->focus+M10V_TONE_CHOICES+(key==0xce?M10V_TONE_CHOICES-n:n),M10V_TONE_CHOICES);
+  h->error=0;ab_host_render(p);return 1;
  }
+ if(key==0xd8){
+  if(h->level==1){h->a=h->focus;h->level=2;h->focus=h->b;h->error=0;ab_host_render(p);}
+  else {h->b=h->focus;ab_host_start(p,c);}return 1;
+ }
+ if(key==5||key==0x89||key==0xaa){
+  if(h->level==2){h->focus=h->a;h->level=1;h->error=0;h->back_pending=key==5;ab_host_render(p);return 1;}
+  uint32_t origin=h->origin;h->back_pending=key==5;ab_host_restore(p,c);
+  if(origin==0x02000012u){((fn1)0x5316ca28u)(c);return 1;}
+ }
+ if(key==0x1b)ab_host_restore(p,c);
+ /* Power/main and unknown events remain entirely native. */
  return 0;
 }
 #endif
@@ -91,13 +162,18 @@ uint32_t m10v_settings_controller_ab_adj_refresh(uint32_t c){
  if(render){h->controller=c;h->rebuilding=1;}
  uint32_t r=m10v_ab_adj_refresh_original(c);
  if(render){
-  if(ab_host_valid(c)){if(h->mode==1)ab_host_attach(p,c);else ab_host_render(h);}
+  if(ab_host_valid(c)){if(h->mode==1)ab_host_attach(p,c);else ab_host_render(p);}
   else ab_host_cancel(p,c);
  }return r;
 }
 uint32_t m10v_settings_controller_ab_adj_changed(uint32_t c){
  m10v_native_ab_host *h=ab_host(ab_owner());
- if(h&&h->controller==c&&(h->rebuilding||ab_host_owned(h,c)))return 0;
+ if(h&&h->controller==c&&h->rebuilding)return 0;
+ if(ab_host_owned(h,c)){
+  uint32_t cursor=((fn1)0x53394820u)(ab_host_word(c,0x1f0)),size=ab_host_page_size(h);
+  uint32_t next=ab_host_start_row(h->focus,size)+cursor;
+  if(next<M10V_TONE_CHOICES){h->focus=next;h->error=0;ab_host_render(ab_owner());}return 0;
+ }
  return m10v_ab_adj_changed_original(c);
 }
 uint32_t m10v_settings_controller_ab_adj_exit(uint32_t c){

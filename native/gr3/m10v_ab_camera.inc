@@ -68,33 +68,32 @@ static void ab_pair(m10v_ab *s){
   if(M10V_APPENDED_SLOTS&&r.version<3){s->a=s->a==1?12:s->a>=8?s->a+5:s->a;s->b=s->b==1?12:s->b>=8?s->b+5:s->b;}
  }
 }
-static uint32_t ab_now(void){uint32_t t[2]={0,0};if(((int (*)(uint32_t *))0x53050b7cu)(t))return 0;return t[0]*1000u+t[1]/1000u;}
 static void ab_text(m10v_settings_controller *p){
  m10v_ab *s=&p->ab;if(!s->widget)return;
- char label[80],custom[24];uint32_t n=0;label[n++]=s->selected==s->a?'A':'B';
- if(!s->compact){
-  label[n++]=' ';label[n++]=' ';uint32_t slot=m10v_ab_slot(s->selected);
-  uint32_t id=s->selected==s->a?s->film_a:s->film_b;
-  const char *name=slot<5?m10v_library_name(id):m10v_ab_stock_name(s->selected);
-  if(slot<5&&M10V_CUSTOM(id)&&m10v_sd_camera_custom_name(&p->state.saved,slot,custom,sizeof(custom)))name=custom;
-  if(name)for(uint32_t i=0;name[i]&&n<sizeof(label)-1;i++)label[n++]=name[i];
- }
- label[n]=0;((fn2)0x53390ef8u)(s->widget,(uint32_t)(uintptr_t)label);
+ char label[]="A/B:A";label[4]=s->selected==s->a?'A':'B';
+ ((fn2)0x53390ef8u)(s->widget,(uint32_t)(uintptr_t)label);
  ((fn2)0x533ad3c0u)(s->widget,s->enabled);((fn1)0x533ad308u)(s->root);
 }
 static void ab_clear(m10v_ab *s){
  if(s->widget){uint32_t w=s->widget;s->widget=0;((fn3)0x5316cde8u)(0,(uint32_t)(uintptr_t)&w,1);}
  s->root=0;s->down=0;
 }
+/* A model notification may arrive while native UI dispatch/drawing still
+ * holds view iterators. End the mode by hiding its marker; detach/free only
+ * at the LiveView leave/destroy boundary, before the native canvas goes away. */
+static void ab_stop(m10v_ab *s){
+ s->enabled=0;s->down=0;
+ if(s->widget)((fn2)0x533ad3c0u)(s->widget,0);
+}
 static void ab_overlay(m10v_settings_controller *p,uint32_t live){
  m10v_ab *s=&p->ab;if(!s->enabled||s->widget||!ab_ram(live,0x160))return;
  uint32_t root=*(const uint32_t *)(uintptr_t)(live+0x15c);if(!ab_ram(root,0xf8))return;
  uint32_t w=((fn1)0x536af2a8u)(0x110);if(!w)return;
- ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))0x53390ca0u)(w,358,20,342,42);
+ ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))0x53390ca0u)(w,600,20,100,42);
  ((fn2)0x533aba64u)(root,w);s->widget=w;s->root=root;
  uint32_t *vt=(uint32_t *)(uintptr_t)*(uint32_t *)(uintptr_t)w;
  ((fn1)(uintptr_t)vt[0x28/4])(w);((fn1)(uintptr_t)vt[0x34/4])(w);
- s->notice_ms=ab_now();s->compact=0;ab_text(p);
+ s->compact=1;ab_text(p);
 }
 /* UI controllers receive both raw switch packets and logical key events.
  * The global mapper is not on every device dispatch path. */
@@ -159,8 +158,20 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
  uint32_t key=ab_event_key(event);
  if(key==0xa1&&m10v_settings_controller_ab_setup(controller,event,0x02000000u))return 1;
 #if M10V_AB_NATIVE_HOST
+ if(ab_host_followup(ab_owner(),controller,key,0x02000000u))return 1;
  if(ab_host_event(ab_owner(),controller,event))return 1;
 #endif
+ /* A normal ImageControl confirmation is an explicit exit from A/B, even
+  * when the same look is confirmed. Do this before native OK queues 0x86;
+  * otherwise LiveView re-entry constructs a stale-session marker and only
+  * a later event notices the changed tone and deletes it during dispatch. */
+ m10v_settings_controller *p=ab_owner();
+ if(key==0xd8&&p&&p->ab.enabled&&ab_route()==0x02000000u&&
+    ab_ram(controller,0x274)&&ab_host_word(controller,0)==0x53b394e0u&&
+    *(const uint8_t *)(uintptr_t)(controller+0x270)!=1&&
+    ((fn2)0x531a2820u)(controller,*(const uint8_t *)(uintptr_t)(controller+0x1f4))==12){
+  M10V_LOG(97,23,controller,p->ab.selected,ab_current());ab_stop(&p->ab);
+ }
  if(key>=0x36&&key<=0x38)M10V_LOG(91,key,ab_route(),*(const uint32_t *)(uintptr_t)controller,*(const uint8_t *)(uintptr_t)(controller+0x270));
  if(key>=0x36&&key<=0x38&&ab_route()==0x02000000u&&
     *(const uint32_t *)(uintptr_t)controller==0x53b394e0u&&
@@ -169,7 +180,9 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
     m10v_settings_controller_ab_setup(controller,event,0x02000000u))return 1;
  return m10v_ab_adj_event_original(controller,event);
 }
+static uint32_t ab_live_key(m10v_settings_controller *,uint32_t);
 uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
+ if(ab_live_key(ab_owner(),key))return 1;
  /* ImageControl ignores stock DISP. Use its real controller as the navigation
   * owner, preserving the native parent/return route and all detail controls. */
  if(key==0x37)M10V_LOG(85,key,ab_route(),*(const volatile uint32_t *)0x55063910u,0);
@@ -180,14 +193,21 @@ uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
  }
  return m10v_ab_selector_original(mapper,key);
 }
+static int ab_films_match(m10v_ab *s){
+ uint32_t a=m10v_ab_slot(s->a),b=m10v_ab_slot(s->b);if(a>=5&&b>=5)return 1;
+ m10v_library_state fresh;if(m10v_camera_library_load(&fresh)<0)return 0;
+ return (a>=5||fresh.slots[a].film==s->film_a)&&(b>=5||fresh.slots[b].film==s->film_b);
+}
 static uint32_t ab_live_key(m10v_settings_controller *p,uint32_t key){
  if(!p||!p->ab.enabled||key<0x36||key>0x38)return 0;
  if(ab_route()!=0x08000000u){p->ab.down=0;return 0;}
- m10v_ab *s=&p->ab;uint32_t current=ab_current();
+ m10v_ab *s=&p->ab;
+ if(key==0x37&&!s->down&&!ab_films_match(s)){ab_stop(s);return 0;}
+ uint32_t current=ab_current();
  uint32_t dest=m10v_ab_key(s,key,current);
- if(!s->enabled){ab_clear(s);return 0;}
+ if(!s->enabled){ab_stop(s);return 0;}
  if(dest){int result=ab_apply(dest-1);M10V_LOG(87,key,current,dest-1,(uint32_t)result);
-  if(!result){m10v_ab_commit(s,dest-1);s->notice_ms=ab_now();ab_text(p);}
+  if(!result){m10v_ab_commit(s,dest-1);ab_text(p);}
  }
  return 1;
 }
@@ -195,7 +215,24 @@ uint32_t m10v_settings_controller_ab_mapper(uint32_t mapper,uint32_t key){
  return ab_live_key(ab_owner(),key)?1:m10v_ab_mapper_original(mapper,key);
 }
 uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uint32_t flags){
- uint32_t r=m10v_ab_live_enter_original(live,route,flags);m10v_settings_controller *p=ab_owner();if(p&&route==0x08000000u)ab_overlay(p,live);return r;
+ uint32_t r=m10v_ab_live_enter_original(live,route,flags);
+#if M10V_LIVE_COLOR
+ if(route==0x08000000u){
+  /* Live Make must never initialize a UI singleton or read AppData. Prepare
+   * its owner/cache here on the UI lifecycle, including boot and returns
+   * after TopMenu destruction. The constructor itself remains IO-free. */
+  m10v_library_state preview;
+  if(!m10v_camera_library_preview(&preview)){
+   m10v_settings_factory_original(0x55063914u,0x0200004au);
+   m10v_camera_library_load(&preview);
+  }
+ }
+#endif
+ m10v_settings_controller *p=ab_owner();
+ if(p&&route==0x08000000u){
+  if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_films_match(&p->ab)))ab_stop(&p->ab);
+  M10V_LOG(97,24,live,p->ab.enabled,p->ab.selected);ab_overlay(p,live);
+ }return r;
 }
 uint32_t m10v_settings_controller_ab_live_leave(uint32_t live){
  m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);return m10v_ab_live_leave_original(live);
@@ -205,11 +242,13 @@ uint32_t m10v_settings_controller_ab_live_destroy(uint32_t live){
 }
 uint32_t m10v_settings_controller_ab_live_event(uint32_t live,uint32_t event){
  m10v_settings_controller *p=ab_owner();
- if(ab_live_key(p,ab_event_key(event)))return 0;
- uint32_t r=m10v_ab_live_event_original(live,event);if(!p)return r;
+ if(ab_live_key(p,ab_event_key(event)))return 1;
+ uint32_t r=m10v_ab_live_event_original(live,event);
+ /* Native dispatch can change controller ownership. Never retain the old
+  * settings pointer across it. */
+ p=ab_owner();if(!p)return r;
  m10v_ab *s=&p->ab;
- if(s->enabled&&ab_current()!=s->selected){s->enabled=0;ab_clear(s);}
- if(s->widget&&s->enabled&&!s->compact&&(uint32_t)(ab_now()-s->notice_ms)>=1500u){s->compact=1;ab_text(p);}
+ if(s->enabled&&ab_current()!=s->selected)ab_stop(s);
  return r;
 }
 
