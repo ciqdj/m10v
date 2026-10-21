@@ -1,5 +1,6 @@
 #include "m10v_configuration.h"
 #include "m10v_hdf.h"
+#include "m10v_hdf_configuration.h"
 #include "m10v_sd.h"
 #include "m10v_storage.h"
 #include "../gr3/m10v_sd_library.h"
@@ -86,6 +87,7 @@ int gr2_configuration_clear(void){
 
 extern uint32_t gr2_producer_original(uint8_t *,uint32_t);
 uint32_t gr2_producer_active(uint8_t *context,uint32_t argument){
+    gr2_hdf_configuration_freeze(context);
     if(gr2_configuration_freeze(context,0))return gr2_producer_run(context,argument,0,0);
     return gr2_producer_original(context,argument);
 }

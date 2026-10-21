@@ -31,3 +31,11 @@ test('parity gate requires real implementation evidence and hardware acceptance'
   row.status='hardware_verified';
   assert.throws(()=>checkParity(ledger),/hardware/);
 });
+test('full parity includes global HDF separately from legacy per-slot soft',()=>{
+  const ledger=manifest();
+  assert.ok(ledger.baseline.required_ids.includes('camera.hdf'),'independent HDF baseline is omitted');
+  const hdf=ledger.features.find(f=>f.id==='camera.hdf');
+  assert.ok(hdf?.baseline_files.includes('native/gr3/m10v_digital_hdf.c'));
+  assert.ok(hdf.baseline_files.includes('native/gr3/m10v_hdf_menu.c'));
+  assert.ok(ledger.features.some(f=>f.id==='film.soft'));
+});

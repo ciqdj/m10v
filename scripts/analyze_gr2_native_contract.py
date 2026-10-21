@@ -871,7 +871,7 @@ def probe_clarity_tables(code:bytes,row:int)->dict:
                 helpers_intercepted=[],hardware_tested=False,
                 scope='Complete original A014D460 curve expansion and stock tables, compared with a fixed-point reference; no function substitution. Synthetic guarded buffers only; not native Clarity graph execution or HDF output proof.')
 
-def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False,active_configuration:bool=False)->dict:
+def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone:int=0,deep:bool=False,active_configuration:bool=False,hdf_configuration:tuple|None=None)->dict:
     """Original IQ library constructor/parser and full capture producer body.
 
     Only ISP engine completion is substituted. The complete official IQ and
@@ -881,6 +881,7 @@ def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone
     if hashlib.sha256(disk).hexdigest()!='9e0d291f5b9b74f76a2dd269c4b23fe8f524b5db92b86bf82150d5dc3096abf8':raise ValueError('exact GR II official resource component identity required')
     if type(tone) is not int or not 0<=tone<=20:raise ValueError('stock frame color mode required')
     if active_configuration and (native_runtime is None or deep):raise ValueError('active configuration fixture requires native runtime and unmixed mutex evidence')
+    if hdf_configuration is not None and (not active_configuration or len(hdf_configuration)!=2 or type(hdf_configuration[0]) is not int or not 0<=hdf_configuration[0]<=3 or type(hdf_configuration[1]) is not int or not 0<=hdf_configuration[1]<=0xffffffff):raise ValueError('active original producer and HDF snapshot values required')
     resources={}
     for index in range(121):
         at=0x786000+index*64;name=disk[at:at+32].split(b'\0',1)[0].decode('ascii');offset,size=struct.unpack_from('>2I',disk,at+32)
@@ -892,6 +893,7 @@ def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone
     from unicorn import UC_HOOK_CODE
     from unicorn import arm_const as r
     uc=runtime_machine(code)
+    if hdf_configuration is not None:uc.mem_map(0x51010000,0x10000)
     for address,size in ((0x51000000,0x10000),(0x52000000,0x10000),(0x53000000,0x100000),(0x54000000,0x40000),(0x55000000,4096)):uc.mem_map(address,size)
     uc.mem_write(0x52000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383);uc.mem_write(0x52006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
     uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x52000000,0x50005000,0x383));uc.mem_write(0x50005000,struct.pack('>6I',0,0x52006000,0x383,0x5000D000,0,0))
@@ -922,10 +924,10 @@ def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone
     for offset,handle,data in ((0x1e0,0x5000A000,0x68000000),(0x1f0,0x5000A100,0x60000000)):
         uc.mem_write(context+offset,struct.pack('>I',handle));uc.mem_write(handle,b'BUFF'+struct.pack('>5I',data,256,0,0,256))
     for offset,value in ((0x258,(4<<16)|32),(0x3e4,(4<<16)|32),(0x2b8,32),(0x2bc,4)):uc.mem_write(context+offset,struct.pack('>I',value))
-    uc.mem_write(context+0x408,bytes([tone]));snapshot_valid=None
+    uc.mem_write(context+0x408,bytes([tone]));snapshot_valid=None;hdf_valid=None;hdf_values=None;hdf_files=[]
     if native_runtime:
         uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
-        block=0xfb94
+        block=0x12ba4 if hdf_configuration is not None else 0xfb94
         uc.mem_write(context-8,b'IMG '+bytes(4));uc.mem_write(0xA0129C54,struct.pack('>I',0xA05FB0E8));uc.mem_write(0xA01137EC,struct.pack('>I',block-8))
         uc.mem_write(0xA05FB0E8,b'MPL '+struct.pack('>4I',0x01000000,block,60*block,0)+struct.pack('>2H',1,0))
         uc.mem_write(0xA00B5BFC,struct.pack('>H',1));uc.mem_write(0xA00B5BDC,struct.pack('>I',0x50008000))
@@ -938,14 +940,21 @@ def probe_producer_iq(code:bytes,disk:bytes,*,native_runtime:dict|None=None,tone
             uc.mem_write(0xA06B6DE0,b'\x01');uc.mem_write(0xA06B6DE3,b'\x01');uc.mem_write(0xA00C22C0,struct.pack('>h',1))
             task=0xA05F5C28+68;uc.mem_write(task+8,struct.pack('>2h',-1,-1));uc.mem_write(task+24,struct.pack('>3h',20,0,20))
             if run(native_runtime['symbols']['gr2_configuration_publish'],0x50006000,0x50006200,thumb=False)!=1:raise RuntimeError('native initial configuration publication failed')
+            if hdf_configuration is not None:
+                def no_hdf_files(machine,address,size,unused):hdf_files.append(hex(address));raise RuntimeError('HDF producer attempted filesystem I/O')
+                for name in ('gr2_file_read','gr2_file_write','gr2_hdf_load_state','gr2_hdf_save_state'):uc.hook_add(UC_HOOK_CODE,no_hdf_files,begin=native_runtime['symbols'][name],end=native_runtime['symbols'][name])
+                if run(native_runtime['symbols']['gr2_hdf_configuration_publish'],*hdf_configuration,thumb=False)!=1:raise RuntimeError('native HDF configuration publication failed')
             uc.mem_write(0xA02AD48C,bytes.fromhex(native_runtime['producer_hook_patch_hex']))
             result=run(0xA02AD48A,context,0)
         else:result=run(native_runtime['symbols']['gr2_producer_run'],context,0,0x50006000,1234,thumb=False)
         snapshot_valid=run(native_runtime['symbols']['gr2_frame_read'],context,0x50006080,thumb=False)
+        if hdf_configuration is not None:
+            hdf_valid=run(native_runtime['symbols']['gr2_hdf_frame_read'],context,0x50006180,thumb=False)
+            if hdf_valid:hdf_values=[struct.unpack('>I',uc.mem_read(0x50006184,4))[0]&3,struct.unpack('>I',uc.mem_read(0x50006188,4))[0]]
     else:result=run(0xA02AD48A,context,0)
     if len(captured)!=1 or len(responses)!=1 or (deep and len(hardware)!=1):raise RuntimeError('original producer engine request/response count differs')
     raw,yuv=struct.unpack_from('>2I',captured[0]);frame=struct.unpack_from('>I',captured[0],0x48)[0]
-    return dict(hardware_mode=hardware[0][0] if hardware else None,hardware_raw_address=struct.unpack_from('>I',hardware[0],4)[0] if hardware else None,hardware_yuv_address=struct.unpack_from('>I',hardware[0],8)[0] if hardware else None,computed_response_nonzero=any(responses[0]),mutex_boundaries=len(mutex_calls),engine_mode=engine_modes[0],restored_mode=bytes(uc.mem_read(context+0x408,1))[0],snapshot_valid=snapshot_valid,iq_bytes=len(iq),common_bytes=len(common),constructor_return=constructor,load_return=loaded,
+    return dict(hdf_snapshot_valid=hdf_valid,hdf_snapshot_values=hdf_values,hdf_filesystem_calls=hdf_files,hardware_mode=hardware[0][0] if hardware else None,hardware_raw_address=struct.unpack_from('>I',hardware[0],4)[0] if hardware else None,hardware_yuv_address=struct.unpack_from('>I',hardware[0],8)[0] if hardware else None,computed_response_nonzero=any(responses[0]),mutex_boundaries=len(mutex_calls),engine_mode=engine_modes[0],restored_mode=bytes(uc.mem_read(context+0x408,1))[0],snapshot_valid=snapshot_valid,iq_bytes=len(iq),common_bytes=len(common),constructor_return=constructor,load_return=loaded,
                 library_ready=struct.unpack('>I',uc.mem_read(arena,4))[0],raw_address=raw,yuv_address=yuv,frame_address=frame,
                 producer_return=result,request_hex=captured[0].hex(),response_copied=bytes(uc.mem_read(context+0xf730,66))==responses[0],
                 source_resources_unchanged=bytes(uc.mem_read(0x54000000,len(iq)))==iq and bytes(uc.mem_read(0x55000000,len(common)))==common,

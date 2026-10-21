@@ -40,7 +40,8 @@
       "web.config",
       "web.build",
       "web.navigation",
-      "web.debug"
+      "web.debug",
+      "camera.hdf"
     ],
     "selectable_films": 46,
     "active_slots": 5
@@ -1174,6 +1175,45 @@
           "browser_evidence": [],
           "hardware_status": "pending",
           "limitation": null
+        }
+      }
+    },
+    {
+      "id": "camera.hdf",
+      "label": "独立全局HDF、三档与相机菜单/持久化",
+      "baseline_files": [
+        "native/gr3/m10v_digital_hdf.c",
+        "native/gr3/m10v_hdf_menu.c",
+        "web/gr3/native-library-state.mjs"
+      ],
+      "models": {
+        "gr1": {
+          "status": "researching",
+          "implementation_files": [],
+          "evidence_files": [],
+          "automated_checks": [],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": null
+        },
+        "gr2": {
+          "status": "researching",
+          "implementation_files": [
+            "native/gr2/m10v_hdf.c",
+            "native/gr2/m10v_hdf_storage.c",
+            "native/gr2/m10v_hdf_configuration.c",
+            "native/gr2/m10v_configuration.c"
+          ],
+          "evidence_files": [
+            "docs/research/gr2-clarity-hdf-2026-10-21.md",
+            "scripts/analyze_gr2_native_contract.py"
+          ],
+          "automated_checks": [
+            ".venv/bin/python -m unittest tests.test_gr2_clarity tests.test_gr2_hdf tests.test_gr2_hdf_storage tests.test_gr2_hdf_configuration"
+          ],
+          "browser_evidence": [],
+          "hardware_status": "pending",
+          "limitation": "已实现独立存档、每帧快照、三档逐频段系数和无SD读取的producer交接；原厂处理链注入、完整相机/网页操作及真机成像仍在研究，尚未启用HDF配置导出。"
         }
       }
     }
