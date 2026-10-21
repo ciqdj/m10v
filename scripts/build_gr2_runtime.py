@@ -47,7 +47,7 @@ def audit_elf(data:bytes)->dict:
                 if not BASE<=value<BASE+memsize:raise ValueError('export outside runtime')
                 symbols[label]=value
     if undefined:raise ValueError('unresolved runtime helpers: '+','.join(undefined))
-    required={'gr2_post_load','gr2_boot_count','gr2_capture_decode','gr2_date_valid','gr2_startup_chain'}
+    required={'gr2_post_load','gr2_boot_count','gr2_capture_decode','gr2_date_valid','gr2_startup_chain','gr2_native_activate','gr2_activation_ready','gr2_code_sync','gr2_cpu_state'}
     if not required<=symbols.keys():raise ValueError('required GR II ABI exports missing')
     return dict(base=address,code_bytes=filesize,memory_bytes=memsize,runtime_hex=data[offset:offset+filesize].hex(),symbols=symbols,undefined_symbols=undefined,endianness='big',be8=False)
 
@@ -136,6 +136,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_model.c'),'-o',str(obj)],check=True,capture_output=True)
     startup=out_dir/'startup.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_startup.S'),'-o',str(startup)],check=True,capture_output=True)
+    boot=out_dir/'boot.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_boot.c'),'-o',str(boot)],check=True,capture_output=True)
     planar=out_dir/'planar.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_planar.c'),'-o',str(planar)],check=True,capture_output=True)
     capture=out_dir/'capture.o'
@@ -166,7 +168,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_settings_page.c'),'-o',str(settings_page)],check=True,capture_output=True)
     artwork=out_dir/'artwork.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_artwork.c'),'-o',str(artwork)],check=True,capture_output=True)
-    render_objects=[str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
+    render_objects=[str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []

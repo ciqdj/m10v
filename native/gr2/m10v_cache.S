@@ -152,3 +152,10 @@ gr2_code_sync:
     str r2,[r1]
     bx lr
 .ltorg
+
+.global gr2_cpu_state
+.type gr2_cpu_state,%function
+gr2_cpu_state:
+    mrs r0,cpsr
+    bx lr
+.size gr2_cpu_state,.-gr2_cpu_state

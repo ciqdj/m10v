@@ -52,6 +52,36 @@ class Gr2ComponentTests(unittest.TestCase):
         self.assertEqual(proof['candidate_loaded_records'],sorted(set(proof['module_indices'])))
         self.assertLess(proof['events'].index(['native_early_load',14]),proof['events'].index(['phase',1]))
 
+    def test_candidate_postload_installs_only_the_svc_data_vector_after_pool_validation(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        module=self.implementation();runtime=self.build();self.assertTrue('gr2_native_activate' in runtime['symbols'])
+        official=component('gr2','b01firm8');candidate,_=module.build_gr2_component(official,runtime)
+        proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True)
+        self.assertEqual(proof['native_activation_ready'],1)
+        self.assertEqual(proof['activation_syscalls'],[4,5,3])
+        self.assertEqual(proof['activation_cache_operations'],[[7,10,4],[7,5,0]])
+        self.assertTrue(proof['activation_callback_code_preserved']);self.assertTrue(proof['activation_user_return'])
+        self.assertEqual(proof['returned'],0);self.assertTrue(proof['callee_saved_preserved'])
+        self.assertEqual(proof['activation_repeat_result'],1)
+
+    def test_native_activation_preserves_locked_state_and_rejects_unprepared_or_changed_owners(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        module=self.implementation();runtime=self.build();official=component('gr2','b01firm8')
+        candidate,_=module.build_gr2_component(official,runtime)
+        for options,ready,calls,vector in (
+            ({'activation_masks':0xc0},1,[5],runtime['symbols']['gr2_cache_svc_entry']),
+            ({'activation_masks':0x80},0,[],0xa00af8a8),
+            ({'activation_policy':32},0,[4,5,3],0xa00af8a8),
+            ({'activation_fault':'pool'},0,[],0xa00af8a8),
+            ({'activation_fault':'hook'},0,[],0xa00af8a8),
+            ({'activation_fault':'vector'},0,[],0x5001d000)):
+            with self.subTest(options=options):
+                proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,**options)
+                self.assertEqual(proof['native_activation_ready'],ready);self.assertEqual(proof['activation_syscalls'],calls)
+                self.assertEqual(proof['activation_vector_value'],vector);self.assertTrue(proof['activation_callback_code_preserved'])
+                self.assertTrue(proof['activation_user_return']);self.assertTrue(proof['stack_preserved']);self.assertTrue(proof['callee_saved_preserved'])
+                if not ready:self.assertEqual(proof['activation_cache_operations'],[])
+
     def test_corrupt_or_wrong_model_inputs_and_unsafe_runtime_reports_are_rejected(self):
         module=self.implementation();runtime=self.build();official=component('gr2','b01firm8')
         for change in ('digest','base','endianness','gate'):

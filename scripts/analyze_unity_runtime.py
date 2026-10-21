@@ -117,7 +117,7 @@ def probe_gr2_module_guard(code:bytes,*,loaded:bool)->dict:
                 helpers_intercepted=['profiling initialize/start','module-load request observation'],
                 scope='Original wrapper prefix, boot-kind getter and loaded-byte getter/branch; actual loading and post-module actions are boundaries. Stops at guard continuation, not a full wrapper return.')
 
-def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None,early_native:bool=False,fail_native_read:bool=False,candidate_component:bytes|None=None)->dict:
+def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,native_runtime:dict|None=None,early_native:bool=False,fail_native_read:bool=False,candidate_component:bytes|None=None,activation_fixture:bool=False,activation_masks:int=0,activation_policy:int=0,activation_fault:str|None=None)->dict:
     """Run original startup orchestration; subsystem bodies are external boundaries."""
     official_profile(code,'gr2');phase_results=phase_results or {}
     if (early_native or fail_native_read) and native_runtime is None:raise ValueError('native runtime required for early bootstrap')
@@ -127,6 +127,8 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
     candidate_mode=candidate_component is not None
+    if activation_fixture and not candidate_mode:raise ValueError('activation fixture requires actual candidate source')
+    if activation_masks not in (0,0x40,0x80,0xc0) or activation_policy not in (0,32) or activation_fault not in (None,'pool','hook','vector'):raise ValueError('bounded activation CPU/cache policy required')
     if candidate_mode:
         if not early_native or native_runtime is None:raise ValueError('candidate startup requires early native runtime')
         from scripts.build_gr2_component import build_gr2_component
@@ -171,6 +173,28 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
             native_stream=runtime+bytes((-len(runtime))%512)
         machine.mem_write(header_address,bytes(header));machine.mem_write(_context_pointer(code,'gr2'),struct.pack('>I',context))
         machine.mem_map(0x54000000,4096)
+    activation_syscalls=[];activation_cache=[]
+    if activation_fixture:
+        from unicorn import UC_HOOK_INTR
+        from unicorn import arm_const as state_regs
+        low=candidate_rows[15];machine.mem_map(0,0x10000)
+        machine.mem_write(low['address'],candidate_component[low['source_file_offset']:low['source_file_offset']+low['length']])
+        def cp15(uc,address,size,unused):
+            word=struct.unpack('>I',uc.mem_read(address,4))[0]
+            if word&0x0f100f10==0x0e100f10:
+                if ((word>>16)&15,word&15)!=(3,0):raise ValueError('unexpected activation cache policy read')
+                uc.reg_write(state_regs.UC_ARM_REG_R0+((word>>12)&15),activation_policy);uc.reg_write(UC_ARM_REG_PC,address+4)
+            elif word&0x0f100f10==0x0e000f10:
+                if uc.reg_read(state_regs.UC_ARM_REG_R0+((word>>12)&15))!=0:raise ValueError('nonzero activation cache-maintenance operand')
+                activation_cache.append([(word>>16)&15,word&15,(word>>5)&7]);uc.reg_write(UC_ARM_REG_PC,address+4)
+        machine.hook_add(UC_HOOK_CODE,cp15,begin=base,end=base+memory-1)
+        def interrupt(uc,number,unused):
+            if number!=2:raise RuntimeError('unexpected activation exception')
+            previous=uc.reg_read(state_regs.UC_ARM_REG_CPSR);resume=uc.reg_read(UC_ARM_REG_PC)
+            activation_syscalls.append(struct.unpack('>I',uc.mem_read(resume-4,4))[0]&0xffffff)
+            uc.reg_write(state_regs.UC_ARM_REG_CPSR,(previous&~0x3f)|0x13);uc.reg_write(UC_ARM_REG_SP,0x50017000)
+            uc.reg_write(state_regs.UC_ARM_REG_SPSR,previous);uc.reg_write(UC_ARM_REG_LR,resume);uc.reg_write(UC_ARM_REG_PC,0x844)
+        machine.hook_add(UC_HOOK_INTR,interrupt)
     calls=(0xA002270C,0xA0022E28,0xA002323A,0xA002323C,0xA002323E,
            0xA0023240,0xA00AFD9C,0xA00C63A6,0xA015D458,0xA0296804,0xA039130A)
     def boundary(uc,address,size,ctx):
@@ -178,6 +202,10 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
         if address==0xA0020ABC:
             post_load_return=uc.reg_read(UC_ARM_REG_R0);return
         if address==0xA0020AB4:
+            if activation_fixture:
+                if activation_fault=='pool':machine.mem_write(0xA05F8E30+16,struct.pack('>I',0x12b98))
+                elif activation_fault=='hook':machine.mem_write(0xA03948C8,struct.pack('>I',0x5001D000))
+                elif activation_fault=='vector':machine.mem_write(0xA00AF884,struct.pack('>I',0x5001D000))
             events.append(['post_load',0])
             if native_runtime is not None:
                 native_result['native_loaded_by_original_indexed_loader']=(machine.mem_read(context+0x108+14,1)==b'\x01' and bytes(machine.mem_read(base,len(runtime)))==runtime)
@@ -213,6 +241,13 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
                     uc.reg_write(UC_ARM_REG_R1,0);uc.reg_write(UC_ARM_REG_PC,0xA0056723);return
             result=0
         elif address==0xA00C63A6:
+            if activation_fixture and first==2:
+                # Explicit pool geometry fixture; original factory/pool
+                # initialization is executed in its independent owner probes.
+                block=0x12b94;pool=0xA05FB0E8;pool_base=0xA0B00020
+                machine.mem_write(0xA0129C54,struct.pack('>I',pool))
+                machine.mem_write(pool,struct.pack('>5I2H',0x4d504c20,0x01000000,block,60*block,0,1,0))
+                machine.mem_write(0xA05F8E30,struct.pack('>6I',0xffffffff,pool_base,60,60*block,block,pool_base))
             if early_native and first==1:machine.mem_write(native_runtime['symbols']['gr2_code_sync_status'],struct.pack('>I',0x12345678))
             events.append(['phase',first]);result=phase_results.get(first,0)
         else:result=0
@@ -222,9 +257,12 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     from unicorn import arm_const as registers
     saved=[0x33440000+index for index in range(8)]
     for index,value in enumerate(saved):machine.reg_write(registers.UC_ARM_REG_R4+index,value)
+    if activation_fixture:machine.reg_write(state_regs.UC_ARM_REG_CPSR,(machine.reg_read(state_regs.UC_ARM_REG_CPSR)&~0xff)|0x10|activation_masks)
     machine.reg_write(UC_ARM_REG_SP,0x50018000);machine.reg_write(UC_ARM_REG_LR,0x5001f001)
     machine.emu_start(0xA0020945,0x5001f000,count=8000000 if candidate_mode else 10000)
     if machine.reg_read(UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('startup orchestration exceeded execution budget')
+    startup_return=machine.reg_read(UC_ARM_REG_R0)
+    main_cpu_state=machine.reg_read(registers.UC_ARM_REG_CPSR)
     if native_runtime is not None:
         native_result['native_load_count']=native_load_count
         if early_native:native_result['original_stub_restored']=bytes(machine.mem_read(early['preserved_stub_address'],4))==bytes.fromhex(early['preserved_stub_hex'])
@@ -233,8 +271,21 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
         if candidate_mode:
             native_result['candidate_loaded_records']=[i for i in range(15) if machine.mem_read(context+0x108+i,1)==b'\x01']
             native_result['candidate_reservations_loaded']=all(struct.unpack('>I',machine.mem_read(row['address'],4))[0]==row['replacement'] for row in native_runtime['memory_reservations'])
+    if activation_fixture:
+        ready=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_activation_ready'],4))[0]
+        repeat=None
+        if ready:
+            machine.reg_write(UC_ARM_REG_LR,0x5001f000)
+            machine.emu_start(native_runtime['symbols']['gr2_native_activate'],0x5001f000,count=100000)
+            if machine.reg_read(UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('idempotent activation failed return')
+            repeat=machine.reg_read(UC_ARM_REG_R0)
+        native_result.update(activation_repeat_result=repeat,activation_vector_value=struct.unpack('>I',machine.mem_read(0xA00AF884,4))[0],
+                             native_activation_ready=struct.unpack('>I',machine.mem_read(native_runtime['symbols']['gr2_activation_ready'],4))[0],
+                             activation_syscalls=activation_syscalls,activation_cache_operations=activation_cache,
+                             activation_callback_code_preserved=bytes(machine.mem_read(0xA0044F4C,4))==bytes.fromhex('e12fff1e'),
+                             activation_user_return=main_cpu_state&0xff==0x30|activation_masks)
     return dict(**native_result,stack_preserved=machine.reg_read(UC_ARM_REG_SP)==0x50018000,
-                callee_saved_preserved=[machine.reg_read(registers.UC_ARM_REG_R4+index) for index in range(8)]==saved,entry='0xa0020944',module_indices=modules,events=events,returned=machine.reg_read(UC_ARM_REG_R0),
+                callee_saved_preserved=[machine.reg_read(registers.UC_ARM_REG_R4+index) for index in range(8)]==saved,entry='0xa0020944',module_indices=modules,events=events,returned=startup_return,
                 post_load_call='0xa0020ab4',post_load_original_target='0xa0023234',post_load_return=post_load_return,
                 post_load_original_bytes=code[0xA0020AB4-FILE_BASE:0xA0020AB8-FILE_BASE].hex(),
                 helpers_intercepted=[hex(a) for a in calls],

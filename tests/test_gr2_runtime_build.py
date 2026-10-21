@@ -135,7 +135,8 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
     def test_be32_runtime_preserves_original_post_load_result_and_audits_all_sections(self):
         report=self.build();self.assertEqual(report['endianness'],'big');self.assertFalse(report['be8'])
         self.assertFalse(report['can_package']);self.assertLess(report['memory_bytes'],0x68000)
-        u=self.machine(report)
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        u=runtime_machine(component('gr2','b01firm8'));u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']))
         self.assertEqual(self.call(u,report['symbols']['gr2_post_load'],[]),0xffffffff)
         self.assertEqual(self.call(u,report['symbols']['gr2_post_load'],[]),0xffffffff)
         self.assertEqual(struct.unpack('>I',u.mem_read(report['symbols']['gr2_boot_count'],4))[0],2)

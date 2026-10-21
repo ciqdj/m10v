@@ -81,7 +81,8 @@ def build_gr2_component(official:bytes,runtime_report:dict)->tuple[bytes,dict]:
     return result,dict(schema='m10v-gr2-research-component/v1',official_sha256=profile['sha'],sha256=hashlib.sha256(result).hexdigest(),
                        file_bytes=len(result),data_bytes=len(result)-512,weighted_checksum=checksum,patches=patches,load_map=after,
                        early_bootstrap=early,runtime_sha256=runtime_report['runtime_sha256'],can_package=False,activation_ready=False,
-                       limits=['Research component only; native post-load activation and UI-owned journal restoration remain incomplete.',
+                       post_load_cache_activation_compiled=True,
+                       limits=['Research component only; UI-owned journal restoration, menu activation and capture configuration publication remain incomplete.',
                                'Original low/deferred payload and all verification switches are preserved; no hardware boot or flash proof.'])
 
 def main():

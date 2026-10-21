@@ -1,0 +1,56 @@
+#include "m10v_boot.h"
+#include "m10v_model.h"
+#define WORD(address) (*(volatile uint32_t *)(uintptr_t)(address))
+#define HALF(address) (*(volatile uint16_t *)(uintptr_t)(address))
+volatile uint32_t gr2_activation_ready;
+extern void gr2_startup_chain(void),gr2_producer_chain(void),gr2_jpeg_chain(void);
+extern void gr2_ui_event_chain(void),gr2_menu_route_chain(void),gr2_menu_descriptor_chain(void);
+extern uint32_t *gr2_menu_categories(uint32_t);
+extern void gr2_cache_svc_entry(void);
+typedef struct {uint32_t address;uintptr_t target;} hook;
+static const hook hooks[]={
+    {0xA0020AB4u,(uintptr_t)gr2_startup_chain},
+    {0xA02AD48Cu,(uintptr_t)gr2_producer_chain},
+    {0xA02ADC98u,(uintptr_t)gr2_jpeg_chain},
+    {0xA0394950u,(uintptr_t)gr2_ui_event_chain},
+    {0xA03948C4u,(uintptr_t)gr2_menu_route_chain},
+    {0xA03C1380u,(uintptr_t)gr2_menu_categories},
+    {0xA039D168u,(uintptr_t)gr2_menu_descriptor_chain}
+};
+static int prepared(void){
+    if(WORD(0xA0023154u)!=0xA0800000u||WORD(0xA01137ECu)!=0x12B8Cu||
+       WORD(0xA05F5400u)!=0x47700000u||WORD(0xA0044F4Cu)!=0xE12FFF1Eu||
+       HALF(0xA039D60Eu)!=0x2D6Au)return 0;
+    for(uint32_t i=0;i<sizeof(hooks)/sizeof(hooks[0]);i++)
+        if(WORD(hooks[i].address)!=0x4B004718u||WORD(hooks[i].address+4)!=(uint32_t)hooks[i].target)return 0;
+    static const uint8_t modules[]={0,1,4,2,3,5,10,11,8,9,6,12,13,14};
+    typedef uint32_t (*loaded_fn)(uint32_t);
+    for(uint32_t i=0;i<sizeof(modules);i++)if(!((loaded_fn)(uintptr_t)0xA0040DC1u)(modules[i]))return 0;
+    if(WORD(0xA0129C54u)!=0xA05FB0E8u||WORD(0xA05FB0E8u)!=0x4D504C20u||
+       WORD(0xA05FB0F0u)!=0x12B94u||WORD(0xA05FB0F4u)!=60u*0x12B94u)return 0;
+    uint32_t id=HALF(0xA05FB0FCu),table=WORD(0xA00B5BDCu),total=60u*0x12B94u;
+    if(!id||id>HALF(0xA00B5BFCu)||table!=0xA05F8E30u)return 0;
+    uint32_t record=table+24u*(id-1u),base=WORD(record+20);
+    if(HALF(record)!=0xFFFFu||WORD(record+12)!=total||WORD(record+16)!=0x12B94u||
+       base<0xA0900000u||base>0xBFDC0000u-total)return 0;
+    return 1;
+}
+int gr2_native_ready(void){return gr2_activation_ready==1u;}
+int gr2_native_activate(void){
+    if(!prepared())return 0;
+    uint32_t state=gr2_cpu_state(),mode=state&31u,masks=state&0xC0u;
+    if((mode!=0x10u&&mode!=0x13u&&mode!=0x1Fu)||(masks!=0u&&masks!=0xC0u))return 0;
+    uint32_t previous=WORD(0xA00AF884u),owned=(uint32_t)(uintptr_t)gr2_cache_svc_entry;
+    if(previous!=0xA00AF8A8u&&previous!=owned)return 0;
+    if(gr2_activation_ready)return previous==owned;
+    typedef void (*cpu_fn)(void);
+    if(!masks)((cpu_fn)(uintptr_t)0xA00AF6F4u)();
+    if((gr2_cpu_state()&0xC0u)!=0xC0u){if(!masks)((cpu_fn)(uintptr_t)0xA00AF728u)();return 0;}
+    if(WORD(0xA00AF884u)!=previous){if(!masks)((cpu_fn)(uintptr_t)0xA00AF728u)();return 0;}
+    WORD(0xA00AF884u)=owned;
+    int synchronized=gr2_code_sync();
+    if(synchronized)gr2_activation_ready=1;
+    else WORD(0xA00AF884u)=previous;
+    if(!masks)((cpu_fn)(uintptr_t)0xA00AF728u)();
+    return synchronized;
+}

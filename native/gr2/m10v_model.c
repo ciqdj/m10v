@@ -1,10 +1,11 @@
 #include "m10v_model.h"
+#include "m10v_boot.h"
 _Static_assert(sizeof(m10v_gr2_image)==44,"GR II image ABI changed");
 volatile uint32_t gr2_boot_count;
 volatile uint32_t gr2_code_sync_status;
 /* Caller continuation must retain the original -1 result and final callbacks.
- * This foundation does not install capture/menu hooks or claim feature parity. */
-uint32_t gr2_post_load(void){gr2_boot_count++;return UINT32_MAX;}
+ * Activate only already-loaded source hooks and their validated data gateway. */
+uint32_t gr2_post_load(void){gr2_boot_count++;gr2_native_activate();return UINT32_MAX;}
 int gr2_date_valid(const uint16_t f[6]){
     static const uint8_t days[12]={31,28,31,30,31,30,31,31,30,31,30,31};
     if(!f||f[0]<2000||f[0]>2127||!f[1]||f[1]>12||!f[2]||f[3]>23||f[4]>59||f[5]>59)return 0;
