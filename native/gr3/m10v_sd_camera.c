@@ -82,6 +82,7 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
+ if(id==M10V_CHAR_ID)id=0; /* dedicated M10VS00 snapshot; legacy 33..78 unchanged */
  name[5]=primary[8]=(char)('0'+id/10);name[6]=primary[9]=(char)('0'+id%10);
  if(snapshot_read(fs,primary,record))return 1;
  typedef int (*write_fn)(uint32_t,const char *,uint32_t,const void *);
@@ -130,13 +131,13 @@ int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,ui
  ((free_fn)0x536af2e4u)(memory);return ok;
 }
 int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if(page>=32||row>=8||expected_id<33||expected_id>M10V_CUSTOM_MAX_ID||slot>=5)return -1;
+ if(page>=32||row>=8||expected_id<33||(expected_id>M10V_CUSTOM_MAX_ID&&expected_id!=M10V_CHAR_ID)||slot>=5)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){
   m10v_library_state state;
   if(m10v_camera_library_load(&state)>=0){
-   if(id<=M10V_FILM_COUNT){if(persist(memory+4096,id))result=m10v_camera_library_select(&state,slot,id);}
+   if(M10V_BUILTIN(id)){if(persist(memory+4096,id))result=m10v_camera_library_select(&state,slot,id);}
    else {uint32_t current=state.effects[slot].reserved[0],bank=current?2-current:0;
     if(persist_custom(memory+4096,slot,bank))result=m10v_camera_library_select_custom(&state,slot,id,bank);}
   }

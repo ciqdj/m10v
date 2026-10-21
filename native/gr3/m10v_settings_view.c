@@ -102,10 +102,10 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
   if(id){
-   uint32_t icon=id>M10V_FILM_COUNT?754:670+id;
+   uint32_t icon=M10V_CUSTOM(id)?754:id==M10V_CHAR_ID?755:670+id;
    if(v->widgets[39]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
-    if(id>M10V_FILM_COUNT){
+    if(M10V_CUSTOM(id)){
      char name[24];uint32_t index=(s->index/5)*5+i;
      int ok=s->screen==M10V_SETTINGS_CATALOG?
       m10v_sd_camera_catalog_name(index,id,name,sizeof(name)):
@@ -123,7 +123,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  if(films){
   uint32_t id=focus<5?film(s,o,focus):0;
   const char *name=id?m10v_library_name(id):0;char custom_name[24];
-  if(id>M10V_FILM_COUNT){
+  if(M10V_CUSTOM(id)){
    int ok=s->screen==M10V_SETTINGS_CATALOG?
      m10v_sd_camera_catalog_name(s->index,id,custom_name,sizeof(custom_name)):
      m10v_sd_camera_custom_name(&s->saved,focus,custom_name,sizeof(custom_name));

@@ -3,7 +3,7 @@
  * semantics; journal failure restores the visible slider to committed state. */
 #include "m10v_library.h"
 #include "m10v_debug.h"
-extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables, m10v_detail_phoenix_tables;
+extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables, m10v_detail_phoenix_tables, m10v_detail_charmera_tables;
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef void (*text_fn)(uint32_t,uint32_t,const char *);
@@ -25,22 +25,23 @@ uint32_t m10v_detail_table(uint32_t ui){
  m10v_library_state s;
  int i=load(ui,&s);if(i<0)return 0x53b3488cu;
  uint32_t film=s.slots[i].film;
- return (uint32_t)(uintptr_t)(film==67?&m10v_detail_phoenix_tables:film==33?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
+ return (uint32_t)(uintptr_t)(film==M10V_CHAR_ID?&m10v_detail_charmera_tables:film==67?&m10v_detail_phoenix_tables:film==33?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
 }
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
+ if(field==11)return s->effects[target].reserved[1];
  if(field==0)return v->halo_gain;if(field==1)return v->halo_spread;
  if(field==2)return v->halo_threshold;if(field==3)return v->grain;if(field==4)return 0;
  return ((const uint8_t *)&s->effects[target])[field-5];
 }
 static uint32_t limit(uint32_t field){
- static const uint8_t limits[11]={8,8,8,3,3,2,8,5,8,1,2};return limits[field];
+ static const uint8_t limits[12]={8,8,8,3,3,2,8,5,8,1,2,3};return limits[field];
 }
 static void defaults(m10v_library_state *s,uint32_t target,uint32_t film){
  m10v_library_init(s);
  if(s->slots[target].film==film)return;
  m10v_slot *v=&s->slots[target];v->film=(uint16_t)film;
- v->grain=film==72?0:film==68||film==71?2:film>=66?1:0;v->soft=0;
+ v->grain=film==M10V_CHAR_ID?0:film==72?0:film==68||film==71?2:film>=66?1:0;v->soft=0;
  v->halo_gain=film==33?3:film==67?2:0;v->halo_spread=3;v->halo_threshold=5;
  m10v_film_effects e={film==67||film==69||film==70||film==72||film==74||film==75||film==77||film==78?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
 }
@@ -65,7 +66,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==4)field=((fn1)0x531b01d0u)(ui)-18;
  uint32_t film=s.slots[target].film;
  if(op==9)return film==67?1:2;
- if(op!=7&&(field>10||field==4||(field<3&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
+ if(op!=7&&(field>11||(field==11&&film!=M10V_CHAR_ID)||field==4||(field<3&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
  if(op==4){if(field==4)return 0;m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
  const m10v_slot *old=&s.slots[target];
  if(op==1)return value(&s,(uint32_t)target,field);
@@ -74,7 +75,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   uint32_t previous=op==2?value(&s,(uint32_t)target,field):0;
   int result;
   if(op==7)result=m10v_camera_library_reset(&s,(uint32_t)target);
-  else if(op==2&&field>=5)result=m10v_camera_library_effects(&s,(uint32_t)target,field==10?6:field-5,v);
+  else if(op==2&&field>=5)result=m10v_camera_library_effects(&s,(uint32_t)target,field==11?7:field==10?6:field-5,v);
   else {
    uint32_t gain=old->halo_gain,spread=old->halo_spread,threshold=old->halo_threshold,grain=old->grain,soft=old->soft;
    if(field==0)gain=v;else if(field==1)spread=v;else if(field==2)threshold=v;else if(field==3)grain=v;else soft=v;
@@ -100,8 +101,9 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    * shuffle, and exposure compensation. No resource directory is modified.
    * Enum values retain the slider's exact 0-based range; RED uses EI125/64/250.
    * Its three-digit value alone gets 60px, still inside the native 120px rail. */
-  static const uint16_t icons[11]={484,473,398,478,587,644,411,588,372,50,648};
+  static const uint16_t icons[12]={484,473,398,478,587,644,411,588,372,50,648,648};
   v=value(&s,(uint32_t)target,field);char text[4]={(char)('0'+v),0,0,0};
+  if(field==11){text[0]="RYBG"[v];}
   if(field==10){text[0]=v==1?'6':v==2?'2':'1';text[1]=v==1?'4':v==2?'5':'2';text[2]=v==1?0:v==2?'0':'5';}
   if(field==10&&film==67){text[0]=v?'1':'2';text[1]=v?'2':'0';text[2]='0';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x194);if(!ram(list,4))return 0;

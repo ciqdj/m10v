@@ -125,15 +125,15 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
     # not required. Override the base class's inherited skip marker.
     __unittest_skip__ = not OFFICIAL.exists()
     __unittest_skip_why__ = 'official firmware unavailable'
-    visible_film_count = 46
+    visible_film_count = 47
     choose_slot_index = 3
     slot_five_film_index = 0
-    slot_one_film_index = 14
+    slot_one_film_index = 15
 
     def test_reopening_legacy_stock_focuses_its_actual_row_after_curated_stocks(self):
         self.call('m10v_library_init',0x55009000)
         initial=bytes(self.u.mem_read(0x55009000,104))
-        for film,want in [(34,14),(50,30),(65,45)]:
+        for film,want in [(34,15),(50,31),(65,46)]:
             with self.subTest(film=film):
                 payload=bytearray(initial);struct.pack_into('<H',payload,20,film)
                 struct.pack_into('<I',payload,100,zlib.crc32(payload[:100]))
@@ -144,7 +144,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.assertEqual(self.call(0x53394820,redraw.VIEW),want)
 
     def test_curated_first_and_last_rows_confirm_into_real_stock_slot(self):
-        for index,film,tone in ((0,33,213),(1,66,288),(2,67,289),(3,68,290),(4,69,344),(13,78,353),(14,34,256),(45,65,287)):
+        for index,film,tone in ((0,33,213),(1,66,288),(2,67,289),(3,68,290),(4,69,344),(13,78,353),(14,289,354),(15,34,256),(46,65,287)):
             with self.subTest(index=index):
                 self.files.clear()
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
@@ -173,7 +173,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
                 self.call(0x531ac074,redraw.CONTROLLER)
                 self.focus(0);self.call('m10v_menu_confirm',redraw.CONTROLLER)
-                self.assertEqual(self.call(0x53394820,redraw.VIEW),film-20 if film>=34 else 0)
+                self.assertEqual(self.call(0x53394820,redraw.VIEW),film-19 if film>=34 else 0)
                 self.assertEqual(self.files,before)
                 self.assertEqual(self.tone,18)
 

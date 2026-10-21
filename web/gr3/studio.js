@@ -441,7 +441,7 @@ function renderFilmDetail(target) {
     const label=textNode('label',`槽位 ${index+1}`),select=document.createElement('select');select.className='shared-slot-select';select.dataset.sharedSlot=String(index);select.setAttribute('aria-label',`槽位 ${index+1} 胶卷`);
     const missing=state.unresolvedSlots.find(v=>v.slot===index);
     if(missing){const option=textNode('option','需重选 · '+missing.id);option.value='';option.disabled=true;select.append(option);}
-    for(const film of state.nativeCatalog){const option=textNode('option',film.name);option.value=String(film.id);option.dataset.icon=film.icon_url;option.dataset.group=film.group;select.append(option);}
+    for(const film of state.nativeCatalog){const option=textNode('option',`${film.number??state.nativeCatalog.indexOf(film)+1}. ${film.name}`);option.value=String(film.id);option.dataset.icon=film.icon_url;option.dataset.group=film.group;select.append(option);}
     select.value=missing?'':String(slot.film);select.onchange=()=>nativeEditor.setFilm(Number(select.value),index);
     const film=state.nativeCatalog.find(f=>f.id===slot.film);
     if(!missing&&film?.icon_url){const icon=document.createElement('img');icon.className='film-icon';icon.src=film.icon_url;icon.alt='';icon.width=40;icon.height=40;label.append(icon);}

@@ -259,7 +259,7 @@ int m10v_capture_library(uint32_t context) {
     if(use_halo)
         required=(((state.slots[slot].film==33||state.slots[slot].film==67)?6:2)*cells+3)&~3u;
     scratch_bytes=required;
-    if(state.slots[slot].film>M10V_FILM_COUNT){
+    if(M10V_CUSTOM(state.slots[slot].film)){
 #if M10V_SD_LIBRARY
         required=M10V_SD_RECORD_BYTES;
         scratch_bytes=required;
@@ -292,7 +292,7 @@ int m10v_capture_library(uint32_t context) {
         }
     }
 #if M10V_SD_LIBRARY
-    if(state.slots[slot].film>M10V_FILM_COUNT &&
+    if(M10V_CUSTOM(state.slots[slot].film) &&
        (!scratch||!m10v_sd_camera_custom_record(&state,slot,scratch,scratch_bytes))){
         if(scratch)((free_fn)0x536af2e4u)(scratch);
         REJECT(-5,19,state.slots[slot].film,slot);
@@ -318,7 +318,7 @@ int m10v_capture_library(uint32_t context) {
 #endif
     int result;
 #if M10V_SD_LIBRARY
-    if(state.slots[slot].film>M10V_FILM_COUNT)
+    if(M10V_CUSTOM(state.slots[slot].film))
         result=m10v_library_render_custom(&image,&state,slot,(const m10v_library_date *)time,
                                            seed,0,0,completed,scratch+64,(const char *)(scratch+16));
     else

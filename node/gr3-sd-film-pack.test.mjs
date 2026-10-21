@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {buildSdFilmPack,auditSdFilmPack,sdFilmRecord,SD_RECORD_BYTES,sdCrc,sdExpectedHeader} from './gr3-sd-film-pack.mjs';
 import {parseCustomCube} from './gr3-custom-lut.mjs';
 test('SD pack contains every current platform recipe, independent of five active slots',()=>{
- const b=buildSdFilmPack();const a=auditSdFilmPack(b);assert.equal(a.count,46);assert.deepEqual(a.ids,[33,66,67,68,69,70,71,72,73,74,75,76,77,78,...Array.from({length:32},(_,i)=>34+i)]);
- assert.equal(b.length,4096+46*SD_RECORD_BYTES);
+ const b=buildSdFilmPack();const a=auditSdFilmPack(b);assert.equal(a.count,47);assert.deepEqual(a.ids,[33,66,67,68,69,70,71,72,73,74,75,76,77,78,289,...Array.from({length:32},(_,i)=>34+i)]);
+ assert.equal(b.length,4096+47*SD_RECORD_BYTES);
 });
 test('arbitrary subsets prioritize curated stocks and preserve group order, full payloads and identity',()=>{
  for(const ids of [[66,67,68],[68], [65],[50,33,42,60,34,35],[65,64,63,62,61,60,59,58,57]]){
@@ -30,7 +30,7 @@ test('new builtin LUT records retain names icons and source contract identity',(
   assert.ok(r.subarray(64,96).some(v=>v));assert.ok(r.subarray(2048,8448).some(v=>v));
  }
  assert.notDeepEqual(sdFilmRecord(67).subarray(64,96),sdFilmRecord(68).subarray(64,96));
- assert.match(sdExpectedHeader(),/m10v_sd_hashes\[46\]\[32\]/);
+ assert.match(sdExpectedHeader(),/m10v_sd_hashes\[47\]\[32\]/);
 });
 test('CRC-repaired new LUT identities and renderer contracts fail closed',()=>{
  for(const id of [66,67,68])for(const offset of [64,2048,8448]){

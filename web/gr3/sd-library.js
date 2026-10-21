@@ -43,11 +43,12 @@ try{
  if(responses.some(r=>!r.ok))throw Error('胶卷目录读取失败，请刷新重试');
  const [session,catalog]=await Promise.all(responses.map(r=>r.json()));token=session.session_token;films=catalog.films;
  if(!token||!Array.isArray(films)||!films.length)throw Error('胶卷目录不可用');
+ for(const node of document.querySelectorAll('[data-film-count-copy]'))for(const child of node.childNodes)if(child.nodeType===3)child.textContent=child.textContent.replace(/[0-9]+(?=\s*[套款])/g,String(films.length));
  const groups=new Map();for(const film of films){selected.add(film.id);const group=film.group||'胶卷';if(!groups.has(group))groups.set(group,[]);groups.get(group).push(film);}
  for(const [name,rows] of groups){
   const section=document.createElement('fieldset'),legend=document.createElement('legend'),grid=document.createElement('div');legend.textContent=`${name} · ${rows.length} 款`;grid.className='sd-grid';section.append(legend,grid);
   for(const f of rows){const label=document.createElement('label'),check=document.createElement('input'),icon=document.createElement('img'),text=document.createElement('span');
-   label.className='sd-film';check.type='checkbox';check.value=f.id;check.checked=true;check.onchange=()=>{check.checked?selected.add(f.id):selected.delete(f.id);update();};icon.src=f.icon_url;icon.alt='';icon.width=40;icon.height=40;text.textContent=f.name;label.append(check,icon,text);grid.append(label);}
+   label.className='sd-film';check.type='checkbox';check.value=f.id;check.checked=true;check.onchange=()=>{check.checked?selected.add(f.id):selected.delete(f.id);update();};icon.src=f.icon_url;icon.alt='';icon.width=40;icon.height=40;text.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;label.append(check,icon,text);grid.append(label);}
   $('sd-films').append(section);
  }
  $('sd-films').setAttribute('aria-busy','false');update();status('可全选或多选，不改变固件工作台的五槽配置。');

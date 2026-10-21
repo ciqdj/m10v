@@ -88,6 +88,13 @@ def generate():
   meta.append({'id':i,'name':name,'title':title,'code':code,'color':color,'icon_url':f'/gr3/film-icons/{i:02d}.png','sha256':hashlib.sha256(rgba).hexdigest()})
   big=im.resize((120,120),Image.Resampling.NEAREST);sheet.alpha_composite(big,((i-1)%10*120,(i-1)//10*130))
  (ROOT/'native/gr3/m10v_icons.rgba').write_bytes(pixels)
+ # Append the noncontiguous Charmera identity without moving historical pixels.
+ im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
+ d.rounded_rectangle((8,3,32,36),radius=4,fill='#141414');d.rectangle((10,8,30,31),fill='#fad84e')
+ d.rectangle((10,15,30,23),fill='#ff0000');d.rectangle((17,0,23,3),fill='#aaaaaa')
+ text(d,12,10,'KODA','#000000');text(d,12,25,'PIXEL','#000000')
+ raw=im.tobytes();im.save(out/'289.png');(ROOT/'native/gr3/m10v_charmera.rgba').write_bytes(raw)
+ meta.append({'id':289,'name':'Kodak Charmera','title':'KODA','code':'PIXEL','color':'#fad84e','icon_url':'/gr3/film-icons/289.png','sha256':hashlib.sha256(raw).hexdigest()})
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  sheet.save(ROOT/'docs/previews/m10v-film-icons.png')
  return meta

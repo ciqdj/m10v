@@ -65,6 +65,14 @@ function previewRgbLutPixels(source,lut,table){
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise;
 export async function renderPreviewPixels(source, look) {
   const film=look.film??look.id;
+  if(film===289){
+    const color=look.effects?.charmeraColor??0,palette=[[253,1,0],[249,211,78],[1,0,249],[224,224,224]];
+    if(!Number.isInteger(color)||color<0||color>3)throw new RangeError('Charmera 颜色无效');
+    const out=new Uint8ClampedArray(source.length);
+    for(let i=0;i<source.length;i+=4){const on=((77*source[i]+150*source[i+1]+29*source[i+2]+128)>>8)>=128;
+      for(let c=0;c<3;c++)out[i+c]=on?palette[color][c]:0;out[i+3]=source[i+3];}
+    return out;
+  }
   if(Number.isInteger(film)&&film>=73&&film<=78){
     newstocksTablesPromise??=fetch(new URL('./newstocks-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('新增胶卷预览色表载入失败');return r.json();}).catch(error=>{newstocksTablesPromise=undefined;throw error;});
     return previewNewStocksPixels(source,await newstocksTablesPromise,film);

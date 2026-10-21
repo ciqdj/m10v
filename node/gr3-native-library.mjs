@@ -27,11 +27,13 @@ export async function nativeCatalog(){
  films.push({id:67,key:'harman-phoenix-ii-200',name:'蓝凤凰',stock:'PhoenixII200',group:'M10V精选',camera_calibrated:false,film_calibrated:false},{id:68,key:'harman-red-125',name:'哈曼 RED',stock:'RED125',group:'M10V精选',camera_calibrated:false,film_calibrated:false});
  films.push(...[{id:69,key:'portra-160',name:'Portra 160'},{id:70,key:'fuji-industrial-100',name:'富士业务用 100'},{id:71,key:'lucky-c200-new',name:'乐凯 C200'},{id:72,key:'ccd-classic',name:'CCD Classic'}].map(f=>({...f,group:'M10V精选',camera_calibrated:false,film_calibrated:false})));
  films.push(...JSON.parse(readFileSync(path.join(root,'web/gr3/newstocks-luts.json'),'utf8')).stocks.map(({values,...f})=>({...f,group:'M10V精选',camera_calibrated:false,film_calibrated:false})));
+ films.push({id:289,key:'kodak-charmera',name:'Kodak Charmera',group:'M10V精选',camera_calibrated:false,approximation:true,colors:['红','黄','蓝','灰']});
  const icons=JSON.parse(await readFile(path.join(root,'web/gr3/film-icons/catalog.json'),'utf8'));
  if(icons.length!==films.length||icons.some((v,i)=>v.id!==films[i].id||v.name!==films[i].name))throw Error('M10V 图标目录与胶卷不同步');
  films.forEach((f,i)=>Object.assign(f,{icon_url:icons[i].icon_url,icon_color:icons[i].color}));
  let available=false;try{available=hash(await readFile(path.join(root,'fwdc239b-offical.bin')))===officialHash;}catch{}
- return {local_sources:['gr3','gr3x'],films:films.filter(f=>f.id>=33).sort((a,b)=>(a.group==='M10V精选'?0:1)-(b.group==='M10V精选'?0:1)),external_film_pack:true,camera_tested:false,local_source_available:available,
+ const visibleFilms=films.filter(f=>f.id>=33).sort((a,b)=>(a.group==='M10V精选'?0:1)-(b.group==='M10V精选'?0:1)).map((f,i)=>({...f,number:i+1}));
+ return {film_count:visibleFilms.length,local_sources:['gr3','gr3x'],films:visibleFilms,external_film_pack:true,camera_tested:false,local_source_available:available,
   scope:'保存的静态 JPEG 胶卷效果；取景使用 Standard 基底，尚无实时胶卷色彩；机内 RAW 再开发未接入',slot_tone_ids:[12,18,19,20,21]};
 }
 export async function readNativeOfficial(model='gr3'){
@@ -41,7 +43,7 @@ export async function readNativeOfficial(model='gr3'){
 }
 export function initialState(configuration){
  const c=normalizeConfiguration(configuration),b=Buffer.alloc(104);b.writeUInt32LE(0x5630314d);b.writeUInt16LE(4,4);b.writeUInt16LE(104,6);
- c.slots.forEach((s,i)=>{b.writeUInt16LE(s.film,12+i*8);b[14+i*8]=s.grain;b[15+i*8]=s.soft;b[16+i*8]=s.halo.gain;b[17+i*8]=s.halo.spread;b[18+i*8]=s.halo.threshold;b[19+i*8]=s.halo.profile;const e=s.effects;b[56+i*8]=e.grainSize;b[57+i*8]=e.leakGain;b[58+i*8]=e.leakPosition;b[59+i*8]=e.leakSpread;b[60+i*8]=e.leakVariation;b[61+i*8]=e.filmExposure;});
+ c.slots.forEach((s,i)=>{b.writeUInt16LE(s.film,12+i*8);b[14+i*8]=s.grain;b[15+i*8]=s.soft;b[16+i*8]=s.halo.gain;b[17+i*8]=s.halo.spread;b[18+i*8]=s.halo.threshold;b[19+i*8]=s.halo.profile;const e=s.effects;b[56+i*8]=e.grainSize;b[57+i*8]=e.leakGain;b[58+i*8]=e.leakPosition;b[59+i*8]=e.leakSpread;b[60+i*8]=e.leakVariation;b[61+i*8]=e.filmExposure;b[63+i*8]=e.charmeraColor??0;});
  b[52]=c.stamp;b[53]=c.format;b[54]=c.corner;b[55]=c.color;
  b.writeUInt32LE(c.filmNameStamp?1:0,96);
  let crc=0xffffffff;for(const byte of b.subarray(0,100)){crc^=byte;for(let k=0;k<8;k++)crc=(crc>>>1)^(0xedb88320&-(crc&1));}
@@ -64,8 +66,8 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
  const runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,film_library,hdf_enabled,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256,capture_pipeline}));
  return {schema:'m10v-native-library-plan/v1',ready:true,extensions,version_unlock,integration_source_sha256,film_library,hdf_enabled,features:[...(film_library?['film','800t','5207','phoenix-ii-200','harman-red-125','grain','timestamp']:[]),...(hdf_enabled?['digitalHdf']:[]),...activeExtensions(extensions)],source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
   capture_pipeline,live_color,debug_mode,debug_log:debug_mode?{schema:'m10v-gr3-sd-debug/v1',build_id:configuration_sha256.slice(0,8),files:['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'],page_bytes:4096,records_per_channel:63}:null,
-  stock_detail:{ids:Array.from({length:11},(_,i)=>18+i),fields:['gain','spread','threshold','grain','retiredSoft','grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'],films:'all',halation_films:[33,67],film_exposure:{films:{67:[200,120],68:[125,64,250]}},slots:5,lifecycle:'stock immediate callback'},
-  initial_state_hex:initialState(configuration).toString('hex'),film_5207_reference:{table_sha256:reference.table_sha256,table_size:reference.table_size,table_bits:reference.table_bits,input:reference.input,camera_calibrated:false,film_calibrated:false,halation:false},film_count:film_library?78:0,active_slots:film_library?5:0,camera_tested:false,external_film_pack:film_library,
+  stock_detail:{ids:Array.from({length:12},(_,i)=>18+i),fields:['gain','spread','threshold','grain','retiredSoft','grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure','charmeraColor'],films:'all',halation_films:[33,67],charmera_color:{film:289,colors:['红','黄','蓝','灰']},film_exposure:{films:{67:[200,120],68:[125,64,250]}},slots:5,lifecycle:'stock immediate callback'},
+  initial_state_hex:initialState(configuration).toString('hex'),film_5207_reference:{table_sha256:reference.table_sha256,table_size:reference.table_size,table_bits:reference.table_bits,input:reference.input,camera_calibrated:false,film_calibrated:false,halation:false},visible_film_count:film_library?47:0,film_count:film_library?79:0,active_slots:film_library?5:0,camera_tested:false,external_film_pack:film_library,
   scope:film_library&&live_color?'原厂 ISP 胶卷色彩、取景色调预览、颗粒与静态照片效果；光晕与 HDF 不提供实时取景。':film_library?(hdf_enabled?'静态 JPEG 胶卷、颗粒与时间戳；HDF 使用独立机内菜单。取景与 RAW 再开发未接入。':'静态 JPEG 胶卷、颗粒与时间戳；取景与 RAW 再开发未接入。'):'独立数字 HDF 菜单与静态 JPEG 柔焦；原厂影像控制、名称、图标及 RAW 像素保持原样。',
   initial_settings_policy:'首次无有效 M10V 记录时使用网页默认值；已有机内 M10V 记录优先。'};
 }

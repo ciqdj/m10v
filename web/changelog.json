@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.21.2",
+      "date": "2026-10-21",
+      "title": "新增 Kodak Charmera 四色胶卷，统一胶卷编号与数量",
+      "changes": [
+        "GR III／GR IIIx 精选胶卷新增 Kodak Charmera，机内影像控制提供红、黄、蓝、灰四种颜色，按槽位保存并作用于静态 JPEG。",
+        "胶卷目录增至47款，网页目录与SD列表连续编号；历史内建胶卷和自定义LUT身份不变，保留旧配置与上一版合法资源包兼容。",
+        "新增独立高反差双色处理与统一颜色预览；重置公共质感保留颜色，完整重置恢复默认红色，保存失败保留原值。",
+        "保持线上自定义胶卷卡片修复及HDF、时间水印、画幅、水平仪等组合能力；GR IV 保留现有46款目录。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.21.1",
       "date": "2026-10-21",
       "title": "修复自定义 LUT 的机内胶卷卡片、名称和图标",
@@ -11,9 +25,9 @@
         "保持旧 FILMS.M10、五槽存档、双 bank 快照、胶卷 ID 和 LUT 调色数值兼容，补充名称生命周期、图标篡改拒绝、目录翻页与原厂控件回归。",
         "按用户本轮明确指令直接发布；尚未完成本候选相机实测。此次发布不包含本地 A/B 实验及其他未提交改动。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "9ad99b0e999fb5dd041acb26994281c9cca31b18",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39555466597"
     },
     {
       "version": "2026.10.20.9",

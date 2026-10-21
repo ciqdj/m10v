@@ -4,6 +4,10 @@
 
 #define M10V_FILM_COUNT 78u
 #define M10V_CUSTOM_MAX_ID 288u
+/* 79..288 are existing custom identities. Never reuse them. */
+#define M10V_CHAR_ID 289u
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID))
+#define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0
 #define M10V_LIBRARY_INVALID -1

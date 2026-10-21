@@ -700,5 +700,14 @@
     "color": "#bfaa4c",
     "icon_url": "/gr3/film-icons/78.png",
     "sha256": "861f2a071357ee0468adb83f407851485077b7f5d6472472be20efee0554b647"
+  },
+  {
+    "id": 289,
+    "name": "Kodak Charmera",
+    "title": "KODA",
+    "code": "PIXEL",
+    "color": "#fad84e",
+    "icon_url": "/gr3/film-icons/289.png",
+    "sha256": "e3eaf78ac8bcc94dc4d151df50f7c9bc111af2652bbf453dedfa750aab830779"
   }
 ]

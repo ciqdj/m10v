@@ -59,6 +59,26 @@ class NativeFilmLibraryTests(unittest.TestCase):
         cls.lib.m10v_library_tables.argtypes=[C.c_uint32,C.POINTER(C.c_int16),C.POINTER(C.c_int16),C.POINTER(C.c_uint16),C.POINTER(C.c_uint16)]
         cls.lib.m10v_library_name.argtypes = [C.c_uint32]; cls.lib.m10v_library_name.restype = C.c_char_p
 
+    def test_charmera_colors_are_atomic_per_slot_and_render_preserves_padding(self):
+        state=self.state();ok=STORE(lambda ctx,next:0);bad=STORE(lambda ctx,next:-1)
+        self.lib.m10v_library_effects.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,289,ok,None),0)
+        self.assertEqual(state.slots[0].grain,0)
+        other=bytes(state.slots[1]);self.assertEqual(self.lib.m10v_library_name(289),b'Kodak Charmera')
+        for color,(light,cb,cr) in enumerate([(77,85,254),(207,55,158),(29,252,108),(224,128,128)]):
+            before=bytes(state)
+            self.assertEqual(self.lib.m10v_library_effects(C.byref(state),0,7,color,bad,None),-2)
+            self.assertEqual(bytes(state),before)
+            self.assertEqual(self.lib.m10v_library_effects(C.byref(state),0,7,color,ok,None),0)
+            self.assertEqual(state.effects[0][7],color);self.assertEqual(bytes(state.slots[1]),other)
+            y=(C.c_uint8*8)(127,127,128,128,91,92,93,94);uv=(C.c_uint8*8)(0,255,50,200,81,82,83,84)
+            image=Image(y,uv,8,8,4,1,8)
+            self.assertEqual(self.lib.m10v_library_render(C.byref(image),C.byref(state),0,None,0,None,0),0)
+            self.assertEqual(list(y),[0,0,light,light,91,92,93,94])
+            self.assertEqual(list(uv),[128,128,cb,cr,81,82,83,84])
+        before=bytes(state);self.assertEqual(self.lib.m10v_library_effects(C.byref(state),0,7,4,ok,None),-1);self.assertEqual(bytes(state),before)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,33,ok,None),0);self.assertEqual(state.effects[0][7],0)
+
     def test_short_display_names_are_shared_with_lut_metadata(self):
         import json
         expected={74:'ProImage 100',76:'Aerochrome',77:'2460',78:'5203'}
