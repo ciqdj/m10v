@@ -39,3 +39,17 @@ uint32_t gr2_hdf_graph_curve(uint32_t original,const uint32_t *level){
     frame.control!=header->control||frame.sequence!=header->sequence||!(frame.control&3u))return original;
  return workspace+GR2_HDF_CURVE_OFFSET+(level[0]-1u)*GR2_HDF_CURVE_BYTES;
 }
+
+extern uint32_t gr2_clarity_original(const uint32_t *,uint32_t);
+uint32_t gr2_hdf_core(const uint32_t *request,uint32_t hdr){
+ int prepared=gr2_hdf_graph_prepare(request,hdr);
+ volatile uint32_t *strength=0;uint32_t previous=0;
+ if(prepared){
+  strength=(volatile uint32_t *)(uintptr_t)(request[15]+0x418u);
+  previous=*strength;*strength=1;
+ }
+ uint32_t result=gr2_clarity_original(request,hdr);
+ if(prepared)*strength=previous;
+ gr2_hdf_graph_prepare(request,1); /* Retire the synchronous workspace header. */
+ return result;
+}

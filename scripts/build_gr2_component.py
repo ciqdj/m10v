@@ -10,7 +10,7 @@ import sys
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.analyze_unity_update import official_profile,compute_update_checksum
 from scripts.analyze_unity_runtime import parse_executable_load_map
-from scripts.build_gr2_runtime import BASE,LIMIT,early_bootstrap,finalize_bridge,memory_reservations,buffer_layout_hook
+from scripts.build_gr2_runtime import BASE,LIMIT,early_bootstrap,finalize_bridge,memory_reservations,buffer_layout_hook,hdf_graph_hooks
 
 # Source edits take effect when their original module is loaded. No running
 # eight-byte Thumb instruction window is overwritten by this assembler.
@@ -70,6 +70,9 @@ def build_gr2_component(official:bytes,runtime_report:dict)->tuple[bytes,dict]:
     layout=buffer_layout_hook(official,symbols,len(runtime))
     if runtime_report.get('buffer_layout_hook')!=layout or runtime_report.get('buffer_layout_hook_patch_hex')!=layout['patch_hex']:raise ValueError('HDF selector source contract differs')
     write(layout['source_file_offset'],bytes.fromhex(layout['expected_hex']),bytes.fromhex(layout['patch_hex']),'HDF selector source hook',layout['address'])
+    graph=hdf_graph_hooks(official,symbols,len(runtime))
+    if runtime_report.get('hdf_graph_hooks')!=graph:raise ValueError('HDF graph source contract differs')
+    for row in graph:write(row['source_file_offset'],bytes.fromhex(row['expected_hex']),bytes.fromhex(row['patch_hex']),row['name']+' source hook',row['address'])
     if runtime_report.get('menu_raster_classifier_patch_hex')!='2d6a':raise ValueError('private raster classifier contract differs')
     write(offset(0xA039D60E,2),bytes.fromhex('2d68'),bytes.fromhex('2d6a'),'two private caption raster classes',0xA039D60E)
     at=0x20+14*20

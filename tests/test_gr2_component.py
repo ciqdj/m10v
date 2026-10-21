@@ -135,3 +135,16 @@ class Gr2ComponentTests(unittest.TestCase):
         proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,activation_pool_id=43)
         self.assertEqual(proof['native_activation_ready'],1);self.assertEqual(proof['activation_syscalls'],[4,5,3])
         self.assertTrue(proof['stack_preserved']);self.assertTrue(proof['callee_saved_preserved'])
+
+    def test_graph_source_hooks_are_cold_audited_and_rejected_if_the_contract_or_loaded_target_changes(self):
+        from scripts.analyze_unity_runtime import probe_gr2_startup_order
+        runtime=self.build();official=component('gr2','b01firm8');module=self.implementation()
+        candidate,_=module.build_gr2_component(official,runtime)
+        for row in runtime['hdf_graph_hooks']:
+            offset=row['source_file_offset'];expected=bytes.fromhex(row['patch_hex'])
+            self.assertEqual(candidate[offset:offset+len(expected)],expected)
+        changed=copy.deepcopy(runtime);changed['hdf_graph_hooks'][0]['target']+=4
+        with self.assertRaisesRegex(ValueError,'HDF graph source contract'):module.build_gr2_component(official,changed)
+        for fault in ('hdf_core','hdf_band'):
+            proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,activation_fault=fault)
+            self.assertEqual(proof['native_activation_ready'],0);self.assertEqual(proof['activation_syscalls'],[])

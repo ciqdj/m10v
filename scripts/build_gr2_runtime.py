@@ -102,6 +102,21 @@ def buffer_layout_hook(official:bytes,symbols:dict,code_bytes:int)->dict:
     if official[offset:offset+14]!=expected:raise ValueError('original HDF selector prelude differs')
     return dict(address=address,source_file_offset=offset,expected_hex=expected.hex(),patch_hex=(bytes.fromhex('b4084b01471846c046c0')+struct.pack('>I',target)).hex(),saved_register='r3',continuation=0xA00E5DA0)
 
+def hdf_graph_hooks(official:bytes,symbols:dict,code_bytes:int)->list:
+    from scripts.analyze_unity_runtime import parse_executable_load_map
+    official_profile(official,'gr2');rows=[]
+    for address,expected,name,veneer in (
+            (0xA014ADEE,'b5f300042000b0b79036','gr2_hdf_core_chain','4b01471846c0'),
+            (0xA014ACEC,'a928902820017388a9208608','gr2_hdf_band_chain','b4084b01471846c0')):
+        target=symbols.get(name)
+        if type(target) is not int or target&3 or not BASE<=target<BASE+code_bytes:raise ValueError('native HDF graph ARM target differs')
+        owners=[row for row in parse_executable_load_map(official)[:15] if row['address']<=address and address+len(bytes.fromhex(expected))<=row['address']+row['length']]
+        if len(owners)!=1:raise ValueError('native HDF graph source owner differs')
+        offset=owners[0]['source_file_offset']+address-owners[0]['address']
+        if official[offset:offset+len(bytes.fromhex(expected))]!=bytes.fromhex(expected):raise ValueError('native HDF graph source preimage differs')
+        rows.append(dict(address=address,source_file_offset=offset,expected_hex=expected,patch_hex=veneer+struct.pack('>I',target).hex(),target=target,name=name))
+    return rows
+
 def memory_reservations(official:bytes)->list[dict]:
     """Describe source-literal edits required before the original allocators run.
 
@@ -214,6 +229,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())
+    report['hdf_graph_hooks']=hdf_graph_hooks(official,report['symbols'],report['code_bytes'])
     report['buffer_layout_hook']=buffer_layout_hook(official,report['symbols'],report['code_bytes'])
     report['buffer_layout_hook_patch_hex']=report['buffer_layout_hook']['patch_hex']
     report['memory_reservations']=memory_reservations(official)
@@ -291,7 +307,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     report['menu_raster_classifier_source_offset']=source
 
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
-                  hdf_graph_preparation_compiled=True,hdf_coefficients_compiled=True,hdf_journal_compiled=True,hdf_configuration_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,hdf_frame_bytes=16,
+                  hdf_graph_hooks_compiled=True,hdf_graph_preparation_compiled=True,hdf_coefficients_compiled=True,hdf_journal_compiled=True,hdf_configuration_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,hdf_frame_bytes=16,
                   effect_name_contract=text_contract,configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
                   configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),

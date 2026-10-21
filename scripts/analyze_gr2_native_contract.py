@@ -620,7 +620,7 @@ def probe_clarity_stage_submit(code:bytes,geometry:int,*,event_result:int|None=N
                 callee_saved_preserved=event_result is not None and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
                 scope='Original A013EA7C, A01425EE, A010E01C/A010E07E/A010E87A plus critical-section register arithmetic; passive60070000/90000000 register banks. Mutex/resource/SVC/event/clock-peripheral and power-transition boundaries are fixtures. Stops before A010DF3C wait by default; optional synthetic event status executes original wait/error mapping and cleanup. Pixel addresses remain unmapped so any pixel access fails. No hardware completion, DMA execution, physical reset or cache-coherence claim.')
 
-def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=False)->dict:
+def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=False,native_runtime:dict|None=None,hdf_strength:int=3)->dict:
     """Original whole control graph with explicit passive DMA/event fixtures.
 
     This is NOT a pixel emulator: events always report synthetic success and
@@ -630,18 +630,39 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
     if type(strength) is not int or not 1<=strength<=9 or type(hdr) is not bool:raise ValueError('audited Clarity strength/HDR required')
     if geometry not in (0x40020,0x0CC01340):raise ValueError('audited tiny/full geometry required')
     from unicorn import UC_HOOK_CODE,UC_HOOK_INTR,UC_HOOK_MEM_READ,UC_HOOK_MEM_WRITE,arm_const as r
-    uc=runtime_machine(code);request=0x50001000;context=0x50004000
-    arenas=((0x51000000,0xE5800),(0x52000000,0x2000000),(0x55000000,0x1F0E020),(0x58000000,0x1F0E020))
+    uc=runtime_machine(code);request=0x50001000;context=0xBE7B4328 if native_runtime else 0x50004000
+    workspace=0x2706FA00 if native_runtime else 0x51000000
+    arenas=((workspace,0xE5800),(0x52000000,0x2000000),(0x55000000,0x1F0E020),(0x58000000,0x1F0E020))
     for base,size in arenas:
-        uc.mem_map(base,(size+32+4095)&~4095);uc.mem_write(base+size,b'\x5a'*32)
+        uc.mem_map(base&~4095,((base&4095)+size+32+4095)&~4095);uc.mem_write(base+size,b'\x5a'*32)
     uc.mem_map(0x60000000,0x1000000);uc.mem_map(0x90000000,0x1000000);uc.mem_map(0xFFFB0000,4096)
-    hdf_reserved=bytes((i*17+93)&255 for i in range(0x16040));uc.mem_write(0x5100E000,hdf_reserved);hdf_reads=[]
+    hdf_reserved=bytes((i*17+93)&255 for i in range(0x16040));uc.mem_write(workspace+0xE000,hdf_reserved);hdf_reads=[]
     def reserved_read(machine,access,address,size,value,unused):hdf_reads.append([address,size])
-    uc.hook_add(UC_HOOK_MEM_READ,reserved_read,begin=0x5100E000,end=0x5102403F)
+    uc.hook_add(UC_HOOK_MEM_READ,reserved_read,begin=workspace+0xE000,end=workspace+0x2403F)
     descriptor=bytearray(64)
-    for offset,value in ((0,0x55000000),(0xc,geometry&65535),(0x28,geometry),(0x30,0x51000000),(0x34,0x52000000),(0x38,0x58000000),(0x3c,context)):struct.pack_into('>I',descriptor,offset,value)
+    for offset,value in ((0,0x55000000),(0xc,geometry&65535),(0x28,geometry),(0x30,workspace),(0x34,0x52000000),(0x38,0x58000000),(0x3c,context)):struct.pack_into('>I',descriptor,offset,value)
+    if native_runtime:
+        if type(hdf_strength) is not int or not 0<=hdf_strength<=3:raise ValueError('HDF grade required')
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        uc.mem_map(0xBE7B4000,0x14000);uc.mem_write(context-8,b'IMG '+bytes(4))
+        uc.mem_write(0xA01137EC,struct.pack('>I',0x12B9C));uc.mem_write(0xA0129C54,struct.pack('>I',0xA05FB52C))
+        kernel_table=struct.unpack('>I',uc.mem_read(0xA00B5BDC,4))[0]
+        for pool_id,base,stride,count in ((40,0xBE7B4320,0x12BA4,60),(31,0xA706FA00,0xE5800,1)):
+            head=0xA05FB0CC+28*pool_id;header=bytearray(28)
+            header[:4]=b'MPL ';header[4]=1;struct.pack_into('>II',header,8,stride,stride*count);struct.pack_into('>H',header,20,pool_id)
+            uc.mem_write(head,bytes(header));kernel=kernel_table+24*(pool_id-1)
+            uc.mem_write(kernel,struct.pack('>6I',0xFFFFFFFF,kernel+4,0,stride*count,stride,base))
+        uc.mem_write(0xA0129C20,b'\x00');uc.mem_write(0xA0129C2C,struct.pack('>I',0xBE7B4300))
+        uc.mem_write(0xA06BCC6C+4*0x20,struct.pack('>I',32))
+        uc.mem_write(0xA06BC708+20*32,struct.pack('>5I',0xA05FB430,0xA706FA00,1,0,0))
+        for row in native_runtime['hdf_graph_hooks']:uc.mem_write(row['address'],bytes.fromhex(row['patch_hex']))
     uc.mem_write(request,bytes(descriptor));uc.mem_write(context,b'\xa5'*0x500);uc.mem_write(context+0x418,struct.pack('>I',strength))
-    before=bytes(uc.mem_read(context,0x500));saved=[0x74560000+i for i in range(8)]
+    if native_runtime:
+        for reg,value in ((r.UC_ARM_REG_R0,context),(r.UC_ARM_REG_R1,hdf_strength),(r.UC_ARM_REG_R2,77),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F000)):uc.reg_write(reg,value)
+        uc.emu_start(native_runtime['symbols']['gr2_hdf_frame_freeze'],0x5001F000,count=100000)
+        if uc.reg_read(r.UC_ARM_REG_R0)!=1:raise RuntimeError('native graph fixture image snapshot failed')
+    context_bytes=0x12b9c if native_runtime else 0x500
+    before=bytes(uc.mem_read(context,context_bytes));saved=[0x74560000+i for i in range(8)]
     for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
     acquired=[];released=[];events=[];stages=[];io=[];cpu_writes=[];svc=[];bands=[];non_lut_io=[];curve_references=[];uploads=[];active_upload=None
     def boundary(machine,address,size,unused):
@@ -650,21 +671,27 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
         if address==0xA01032F4:
             source=struct.unpack('>I',machine.mem_read(args[1]+8,4))[0]
             active_upload=dict(mode=args[0],source=source,read_bytes=0,_hash=hashlib.sha256())
-            if 0x51000000<=source<0x51008000:uploads.append(active_upload)
+            if workspace<=source<workspace+0x24040:uploads.append(active_upload)
             return
         if address==0xA0103BA4:
             if active_upload is not None:
                 active_upload['source_sha256']=active_upload.pop('_hash').hexdigest()
             active_upload=None;return
+        if address==0xA014ACF8:
+            if bands:
+                row=bands[-1];sp=machine.reg_read(r.UC_ARM_REG_SP)
+                row['effective_pointer']=struct.unpack('>I',machine.mem_read(sp+0xA0,4))[0]
+                row['replay_abi_preserved']=row.pop('_regs')==[machine.reg_read(r.UC_ARM_REG_R2+i) for i in range(11)] and row.pop('_sp')==sp and machine.reg_read(r.UC_ARM_REG_R0)==1 and machine.reg_read(r.UC_ARM_REG_R1)==sp+0x80 and (machine.reg_read(r.UC_ARM_REG_CPSR)&0xF0000000)==row.pop('_flags')
+            return
         if address==0xA014ACEC:
             level_context=machine.reg_read(r.UC_ARM_REG_R4)
-            bands.append(dict(level=struct.unpack('>I',machine.mem_read(level_context,4))[0],geometry=struct.unpack('>I',machine.mem_read(level_context+0x30,4))[0],thresholds=list(machine.mem_read(level_context+0x5C,3)),selected_pointer=args[0]))
+            bands.append(dict(level=struct.unpack('>I',machine.mem_read(level_context,4))[0],geometry=struct.unpack('>I',machine.mem_read(level_context+0x30,4))[0],thresholds=list(machine.mem_read(level_context+0x5C,3)),selected_pointer=args[0],_regs=[machine.reg_read(r.UC_ARM_REG_R2+i) for i in range(11)],_sp=machine.reg_read(r.UC_ARM_REG_SP),_flags=machine.reg_read(r.UC_ARM_REG_CPSR)&0x30000000))
             return
         if address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE):
             stages.append(address)
             if address==0xA01410F0:
                 curve=struct.unpack('>I',machine.mem_read(args[0]+0x1C,4))[0]
-                if 0x51000000<=curve<0x51008000:
+                if workspace<=curve<workspace+0x24040:
                     curve_references.append(dict(caller=machine.reg_read(r.UC_ARM_REG_LR)&~1,pointer=curve,descriptor_hex=bytes(machine.mem_read(args[0],76)).hex()))
             return
         if address==0xA00688E8:acquired.append(args[0])
@@ -672,7 +699,7 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
         elif address==0xA00686C4:
             events.append(args[:3]);machine.mem_write(args[3],struct.pack('>I',args[1]))
         machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE,0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0067F8C,0xA00686C4,0xA0068598,0xA00F9888,0xA014ACEC):
+    for address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE,0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0067F8C,0xA00686C4,0xA0068598,0xA00F9888,0xA014ACEC,0xA014ACF8):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def interrupt(machine,number,unused):
         pc=machine.reg_read(r.UC_ARM_REG_PC);instruction=struct.unpack('>H',machine.mem_read(pc-2,2))[0]
@@ -687,13 +714,13 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
         if 0x60000000<=address<0x61000000:
             io.append([address,size,value])
             if active_upload is None:non_lut_io.append([address,size,value])
-        elif 0x51000000<=address<0x5A000000:cpu_writes.append([address,size])
+        elif any((base&~4095)<=address<((base+length+32+4095)&~4095) for base,length in arenas):cpu_writes.append([address,size])
     uc.hook_add(UC_HOOK_MEM_WRITE,write)
     def table_read(machine,access,address,size,value,unused):
         if active_upload is not None:
             active_upload['read_bytes']+=size
             active_upload['_hash'].update(bytes(machine.mem_read(address,size)))
-    uc.hook_add(UC_HOOK_MEM_READ,table_read,begin=0x51000000,end=0x51007FFF)
+    uc.hook_add(UC_HOOK_MEM_READ,table_read,begin=workspace,end=workspace+0x2403F)
     for address in (0xA01032F4,0xA0103BA4):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     for reg,value in ((r.UC_ARM_REG_R0,request),(r.UC_ARM_REG_R1,int(hdr)),(r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001F001)):uc.reg_write(reg,value)
     uc.emu_start(0xA014ADEF,0x5001F000,count=3000000)
@@ -702,10 +729,11 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
     return dict(returned_normally=True,resources_balanced=Counter(acquired)==Counter(released),resource_acquisitions=acquired,resource_releases=released,
                 event_waits=events,hardware_stage_count=len(stages),stages=stages,band_curves=bands,stage_curve_references=curve_references,curve_uploads=uploads,non_lut_mmio_sha256=hashlib.sha256(json.dumps(non_lut_io,separators=(',',':')).encode()).hexdigest(),mmio_write_count=len(io),scheduler_svc_count=svc.count(12),
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
-                request_preserved=bytes(uc.mem_read(request,64))==descriptor,context_preserved=bytes(uc.mem_read(context,0x500))==before,
+                request_preserved=bytes(uc.mem_read(request,64))==descriptor,context_preserved=bytes(uc.mem_read(context,context_bytes))==before,
                 arena_guards_preserved=all(bytes(uc.mem_read(base+size,32))==b'\x5a'*32 for base,size in arenas),
                 cpu_pixel_writes_bounded=all(any(base<=address and address+length<=base+size for base,size in arenas) for address,length in cpu_writes),
-                hdf_reserved_region_preserved=bytes(uc.mem_read(0x5100E000,len(hdf_reserved)))==hdf_reserved,hdf_reserved_cpu_reads=len(hdf_reads),
+                hdf_reserved_region_preserved=bytes(uc.mem_read(workspace+0xE000,len(hdf_reserved)))==hdf_reserved,hdf_reserved_cpu_reads=len(hdf_reads),hdf_curve_region_preserved=bytes(uc.mem_read(workspace+0xE040,len(hdf_reserved)-64))==hdf_reserved[64:],
+                native_header_magic=struct.unpack('>I',uc.mem_read(workspace+0xE000,4))[0] if native_runtime else None,
                 pixel_processing_verified=False,hardware_tested=False,
                 scope='Original complete A014ADEE graph and nested stage/driver CPU instructions. Four synthetic image/work arenas, passive register banks, explicit600A0100 reset-ready response, kernel resource/event/SVC/peripheral-clock/power boundaries. Events synthesize success; DMA never produces pixels. Graph return/resource balance/CPU guards/HDR context restoration only; no real completion, DMA span/coherence or live capture proof.')
 
@@ -1048,7 +1076,7 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
-def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False)->dict:
+def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False,postprocess_effect:int|None=None)->dict:
     """Actual system MPL -> BUFF -> IMG factories and kernel pool identities.
 
     Empty kernel tables and synchronization services are fixtures. Linear and
@@ -1073,9 +1101,9 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         if address in (0xA0024E16,0xA0024B0C):created.append([address,*args[:3]]);return
         if address==0xA0024BC4:
             header=machine.reg_read(r.UC_ARM_REG_R4);linear.append([word(header+4),word(header+8)]);return
-        services.append(address);value=0 if address in (0xA0027360,0xA00273A4,0xA0027188,0xA0026FBA) else len(services)
+        services.append(address);value=0 if address in (0xA0027360,0xA00273A4,0xA0027188,0xA0026FBA,0xA0027526,0xA00276A2) else len(services)
         machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0027188,0xA0026FBA,0xA0039F9C,0xA003A01A):
+    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0027188,0xA0026FBA,0xA0027526,0xA00276A2,0xA0039F9C,0xA003A01A):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def memory(machine,access,address,size,value,unused):
         page=address&~4095
@@ -1087,7 +1115,8 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
         for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(reg,value)
         uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F000|int(thumb))
-        uc.emu_start(entry|int(thumb),0x5001F000,count=1000000)
+        try:uc.emu_start(entry|int(thumb),0x5001F000,count=1000000)
+        except Exception as error:raise RuntimeError(f'ordered capture probe stopped at{uc.reg_read(r.UC_ARM_REG_PC):08x}, r0={uc.reg_read(r.UC_ARM_REG_R0):08x}, r1={uc.reg_read(r.UC_ARM_REG_R1):08x}') from error
         if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original ordered-pool CPU budget exceeded')
         abi=abi and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000 and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved
         return uc.reg_read(r.UC_ARM_REG_R0)
@@ -1148,8 +1177,49 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
                        off_magic=word(data+0xe000),request_preserved=bytes(uc.mem_read(request,64))==packet)
         uc.mem_write(0x50001000,struct.pack('>I',handle));run(0xA029AA1A,0x50001000,0,0,0)
         workspace=dict(before=before,live=live,after=check(data),wrong=wrong,rejected=rejected,recovered=recovered,handle_cleared=word(0x50001000)==0)
+    postprocessor={}
+    if postprocess_effect is not None:
+        if type(postprocess_effect) is not int or postprocess_effect not in (0,7,12,16,17,19):raise ValueError('audited original effect required')
+        properties={};property_calls=[]
+        def property_boundary(machine,address,size,unused):
+            key=machine.reg_read(r.UC_ARM_REG_R0);value=machine.reg_read(r.UC_ARM_REG_R1)
+            property_calls.append([address,key,value]);result=0
+            if address==0xA00E0E2E:result=properties.get(key,0)
+            elif address==0xA00E0C94:properties[key]=value
+            machine.reg_write(r.UC_ARM_REG_R0,result);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        for address in (0xA00E127A,0xA00E1286,0xA00E0E2E,0xA00E0C94):uc.hook_add(UC_HOOK_CODE,property_boundary,begin=address,end=address)
+        jpeg=run(0xA029A94E,0x17,0,0,0);jpeg_data=word(jpeg+4);packets=[]
+        uc.mem_write(source+0x1F0,struct.pack('>I',jpeg))
+        for offset,value in ((0x218,1),(0x21c,4928*3264),(0x220,4928*3264*3//2),(0x224,4928),(0x228,2464),(0x22c,3264),(0x258,0xcc01340),(0x418,1)):
+            uc.mem_write(source+offset,struct.pack('>I',value))
+        uc.mem_write(source+0x408,bytes([postprocess_effect]))
+        pending={}
+        def engine_boundary(machine,address,size,unused):
+            if address==0x5001E000:
+                packets[-1]['native_workspace_bytes']=machine.reg_read(r.UC_ARM_REG_R0)
+                for register,value in pending.items():machine.reg_write(register,value)
+                machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,pending[r.UC_ARM_REG_LR]);return
+            root=machine.reg_read(r.UC_ARM_REG_R0);raw=bytes(machine.mem_read(root,76))
+            scratch=struct.unpack_from('>3I',raw,0x34)
+            handles=[word(root+offset) for offset in (0x60,0x58,0x4c)]
+            packets.append(dict(operation=raw[0],core_request=list(struct.unpack_from('>16I',raw,4)),scratch=list(scratch),scratch_handles=handles,
+                                scratch_live=[bytes(machine.mem_read(handle,4))==b'BUFF' if handle else False for handle in handles],
+                                scratch_capacities=[word(handle+20) if handle else 0 for handle in handles]))
+            pending.update({register:machine.reg_read(register) for register in [*(r.UC_ARM_REG_R0+i for i in range(13)),r.UC_ARM_REG_SP,r.UC_ARM_REG_LR,r.UC_ARM_REG_CPSR]})
+            machine.reg_write(r.UC_ARM_REG_R0,scratch[0]);machine.reg_write(r.UC_ARM_REG_LR,0x5001E000)
+            machine.reg_write(r.UC_ARM_REG_PC,native_runtime['symbols']['gr2_hdf_workspace_bytes'])
+        for address in (0xA0131280,0x5001E000):uc.hook_add(UC_HOOK_CODE,engine_boundary,begin=address,end=address)
+        run(0xA02AF6CE,source)
+        for packet in packets:
+            packet['retired_workspace_bytes']=run(native_runtime['symbols']['gr2_hdf_workspace_bytes'],packet['scratch'][0],thumb=False)
+            packet['scratch_retired']=[bytes(uc.mem_read(handle,4))!=b'BUFF' if handle else False for handle in packet['scratch_handles']]
+        primary_retained=word(source+0x1F0)==jpeg and bytes(uc.mem_read(jpeg,4))==b'BUFF'
+        uc.mem_write(0x50001000,struct.pack('>I',jpeg));run(0xA029AA1A,0x50001000,0,0,0)
+        uc.mem_write(source+0x1F0,bytes(4))
+        postprocessor=dict(effect=postprocess_effect,packets=packets,primary_retained=primary_retained,jpeg_data=jpeg_data,property_counters_balanced=all(value==0 for value in properties.values()),
+                           scope="Original complete postprocessor A02AF6CE, real pool/BUFF allocation-access-release and packet construction. Property bank/lock and OS synchronization are fixtures. ISP dispatcher is an explicit boundary; native workspace predicate executes there before synthetic engine return. No pixel processing, physical completion, clone scheduling or live pipeline proof.")
     run(0xA00E2020,source);retired=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
-    return dict(hdf_graph=graph,workspace_owner=workspace,image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
+    return dict(postprocessor=postprocessor,hdf_graph=graph,workspace_owner=workspace,image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
                 native_owner_bytes=owner,native_retired_owner=retired,image_after_pixel_arena=image_base>=pixel_end,
                 linear_allocations=linear,linear_cursor=word(0xA00C2BA4),sparse_ram_pages=len(pages),
                 all_linear_spans_disjoint=all(base+length<=other or other+other_length<=base for i,(base,length) in enumerate(linear) for other,other_length in linear[i+1:]),

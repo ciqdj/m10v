@@ -407,3 +407,25 @@ class Gr2CaptureTests(unittest.TestCase):
                 result=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,prior_fixed=prior,workspace_owner=True)
                 self.assertEqual(result['workspace_owner'],dict(before=0,live=0xe5800,after=0,wrong=[0,0,0],rejected=[0]*11,recovered=0xe5800,handle_cleared=True))
                 self.assertTrue(result['stack_preserved']);self.assertTrue(result['runtime_preserved'])
+
+    def test_original_postprocessor_retains_jpeg_and_owns_all_scratch_until_the_engine_returns(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build()
+        for effect,operation in ((0,None),(7,4),(12,5),(16,13),(17,14),(19,15)):
+            with self.subTest(effect=effect):
+                result=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,postprocess_effect=effect)
+                post=result['postprocessor'];self.assertTrue(post['primary_retained']);self.assertTrue(post['property_counters_balanced'])
+                self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+                if operation is None:self.assertEqual(post['packets'],[]);continue
+                self.assertEqual(len(post['packets']),1);packet=post['packets'][0];self.assertEqual(packet['operation'],operation)
+                request=packet['core_request'];self.assertEqual(request[:3],[post['jpeg_data'],post['jpeg_data']+4928*3264,post['jpeg_data']+4928*3264*3//2])
+                self.assertEqual(request[3:5],[4928,2464]);self.assertEqual(request[5:8],request[:3])
+                self.assertEqual(request[10],0xcc01340);self.assertEqual(request[15],result['image_base']+8)
+                self.assertEqual(packet['retired_workspace_bytes'],0)
+                if operation==4:
+                    self.assertEqual(packet['scratch'],[0,0,0]);self.assertEqual(packet['native_workspace_bytes'],0)
+                else:
+                    self.assertEqual(packet['native_workspace_bytes'],0xe5800)
+                    self.assertEqual(packet['scratch_capacities'],[0xe5800,0x2000000,0x1f0e020])
+                    self.assertEqual(packet['scratch_live'],[True]*3);self.assertEqual(packet['scratch_retired'],[True]*3)
