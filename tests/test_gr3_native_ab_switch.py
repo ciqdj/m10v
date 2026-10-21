@@ -66,6 +66,11 @@ class NativeSwitchTests(NativeHostTests):
   # OK must end the session before native OK queues its return to LiveView,
   # even when the user confirms the same tone. No setter may be substituted.
   before=self.count('activate_tone');native=self.count('m10v_ab_adj_event_original')
+  from unicorn import UC_HOOK_CODE
+  diagnostic={self.externals[n] for n in ('m10v_debug_log','m10v_debug_batch')}
+  def no_diagnostic(m,at,n,data):
+   if at in diagnostic:self.fail('Ordinary ImageControl exit performed synchronous diagnostic IO')
+  u.hook_add(UC_HOOK_CODE,no_diagnostic)
   self.key(u,0xd8)
   self.assertEqual(self.word(u,self.page+0x284+8),0)
   self.assertEqual(self.count('m10v_ab_adj_event_original'),native+1)
@@ -73,6 +78,30 @@ class NativeSwitchTests(NativeHostTests):
  def test_other_adj_slot_ok_does_not_end_ab(self):
   u=self.begin();self.open(u);self.choose_a(u,0);self.start(u);self.adj_type=8
   self.key(u,0xd8);self.assertEqual(self.word(u,self.page+0x284+8),1)
+ def test_live_menu_adj_leave_destroy_never_access_live_widgets(self):
+  from unicorn import UC_HOOK_CODE
+  u=self.begin();self.open(u);self.choose_a(u,0);self.start(u);self.route=0x08000000
+  # Reserved legacy overlay words must never be used as pointers. No A/B
+  # allocation, drawing, hiding or deletion is permitted on the live path.
+  u.mem_write(self.page+0x284+28,struct.pack('<4I',0x59000000,0x59010000,0,0))
+  forbidden={0x536af2a8,0x536af2e4,0x53390ca0,0x53390ef8,0x533aba64,0x533ad3c0,0x533ad308,0x5316cde8}
+  # Debug logging allocates and performs synchronous SD IO. It is also
+  # forbidden in these lifecycle/navigation hooks, even when stubbed by the
+  # harness: accepting the stub would hide precisely that blocking work.
+  forbidden.update(self.externals[n] for n in ('m10v_debug_log','m10v_debug_batch'))
+  def no_ui(m,at,n,data):
+   if at in forbidden:self.fail('A/B live path touched UI/SD diagnostic API '+hex(at))
+  u.hook_add(UC_HOOK_CODE,no_ui)
+  self.call(u,'ab_live_enter',self.controller,0x08000000,0)
+  for key in (5,26): # verified native names: MENU and ADJP
+   for phase,repeats in ((1,1),(2,0)):
+    e=self.physical(u,phase,repeats);u.mem_write(e,struct.pack('<H',key))
+    before=self.count('m10v_ab_live_event_original');self.call(u,'ab_live_event',self.controller,e)
+    self.assertEqual(self.count('m10v_ab_live_event_original'),before+1)
+   self.call(u,'ab_live_leave',self.controller)
+   self.call(u,'ab_live_enter',self.controller,0x08000000,0)
+  self.call(u,'ab_live_destroy',self.controller)
+  self.assertEqual(self.ab_tone,11)
  def test_native_event_can_replace_owner_without_old_tail_access(self):
   from unicorn import UC_PROT_ALL
   u=self.begin();old=self.owner;new=0x55045000;tail=new+0x13bc

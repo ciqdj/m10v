@@ -68,33 +68,13 @@ static void ab_pair(m10v_ab *s){
   if(M10V_APPENDED_SLOTS&&r.version<3){s->a=s->a==1?12:s->a>=8?s->a+5:s->a;s->b=s->b==1?12:s->b>=8?s->b+5:s->b;}
  }
 }
-static void ab_text(m10v_settings_controller *p){
- m10v_ab *s=&p->ab;if(!s->widget)return;
- char label[]="A/B:A";label[4]=s->selected==s->a?'A':'B';
- ((fn2)0x53390ef8u)(s->widget,(uint32_t)(uintptr_t)label);
- ((fn2)0x533ad3c0u)(s->widget,s->enabled);((fn1)0x533ad308u)(s->root);
-}
+/* No A/B views are added to the native LiveView tree. These legacy words
+ * remain reserved solely to preserve the controller ABI. Navigation, capture
+ * and power may clear debounce state without touching any UI object. */
 static void ab_clear(m10v_ab *s){
- if(s->widget){uint32_t w=s->widget;s->widget=0;((fn3)0x5316cde8u)(0,(uint32_t)(uintptr_t)&w,1);}
- s->root=0;s->down=0;
+ s->down=0;for(uint32_t i=0;i<4;i++)s->reserved[i]=0;
 }
-/* A model notification may arrive while native UI dispatch/drawing still
- * holds view iterators. End the mode by hiding its marker; detach/free only
- * at the LiveView leave/destroy boundary, before the native canvas goes away. */
-static void ab_stop(m10v_ab *s){
- s->enabled=0;s->down=0;
- if(s->widget)((fn2)0x533ad3c0u)(s->widget,0);
-}
-static void ab_overlay(m10v_settings_controller *p,uint32_t live){
- m10v_ab *s=&p->ab;if(!s->enabled||s->widget||!ab_ram(live,0x160))return;
- uint32_t root=*(const uint32_t *)(uintptr_t)(live+0x15c);if(!ab_ram(root,0xf8))return;
- uint32_t w=((fn1)0x536af2a8u)(0x110);if(!w)return;
- ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))0x53390ca0u)(w,600,20,100,42);
- ((fn2)0x533aba64u)(root,w);s->widget=w;s->root=root;
- uint32_t *vt=(uint32_t *)(uintptr_t)*(uint32_t *)(uintptr_t)w;
- ((fn1)(uintptr_t)vt[0x28/4])(w);((fn1)(uintptr_t)vt[0x34/4])(w);
- s->compact=1;ab_text(p);
-}
+static void ab_stop(m10v_ab *s){s->enabled=0;ab_clear(s);}
 /* UI controllers receive both raw switch packets and logical key events.
  * The global mapper is not on every device dispatch path. */
 static uint32_t ab_event_key(uint32_t event){
@@ -163,14 +143,14 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
 #endif
  /* A normal ImageControl confirmation is an explicit exit from A/B, even
   * when the same look is confirmed. Do this before native OK queues 0x86;
-  * otherwise LiveView re-entry constructs a stale-session marker and only
-  * a later event notices the changed tone and deletes it during dispatch. */
+  * the transition must not carry stale session state into LiveView. No
+  * widget cleanup or synchronous diagnostics belong on this exit path. */
  m10v_settings_controller *p=ab_owner();
  if(key==0xd8&&p&&p->ab.enabled&&ab_route()==0x02000000u&&
     ab_ram(controller,0x274)&&ab_host_word(controller,0)==0x53b394e0u&&
     *(const uint8_t *)(uintptr_t)(controller+0x270)!=1&&
     ((fn2)0x531a2820u)(controller,*(const uint8_t *)(uintptr_t)(controller+0x1f4))==12){
-  M10V_LOG(97,23,controller,p->ab.selected,ab_current());ab_stop(&p->ab);
+  ab_stop(&p->ab);
  }
  if(key>=0x36&&key<=0x38)M10V_LOG(91,key,ab_route(),*(const uint32_t *)(uintptr_t)controller,*(const uint8_t *)(uintptr_t)(controller+0x270));
  if(key>=0x36&&key<=0x38&&ab_route()==0x02000000u&&
@@ -207,7 +187,7 @@ static uint32_t ab_live_key(m10v_settings_controller *p,uint32_t key){
  uint32_t dest=m10v_ab_key(s,key,current);
  if(!s->enabled){ab_stop(s);return 0;}
  if(dest){int result=ab_apply(dest-1);M10V_LOG(87,key,current,dest-1,(uint32_t)result);
-  if(!result){m10v_ab_commit(s,dest-1);ab_text(p);}
+  if(!result)m10v_ab_commit(s,dest-1);
  }
  return 1;
 }
@@ -231,18 +211,21 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
  m10v_settings_controller *p=ab_owner();
  if(p&&route==0x08000000u){
   if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_films_match(&p->ab)))ab_stop(&p->ab);
-  M10V_LOG(97,24,live,p->ab.enabled,p->ab.selected);ab_overlay(p,live);
  }return r;
 }
 uint32_t m10v_settings_controller_ab_live_leave(uint32_t live){
- m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);return m10v_ab_live_leave_original(live);
+ m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);
+ /* No A/B widgets or synchronous SD diagnostics on native transitions. */
+ return m10v_ab_live_leave_original(live);
 }
 uint32_t m10v_settings_controller_ab_live_destroy(uint32_t live){
- m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);return m10v_ab_live_destroy_original(live);
+ m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);
+ return m10v_ab_live_destroy_original(live);
 }
 uint32_t m10v_settings_controller_ab_live_event(uint32_t live,uint32_t event){
  m10v_settings_controller *p=ab_owner();
- if(ab_live_key(p,ab_event_key(event)))return 1;
+ uint32_t key=ab_event_key(event);
+ if(ab_live_key(p,key))return 1;
  uint32_t r=m10v_ab_live_event_original(live,event);
  /* Native dispatch can change controller ownership. Never retain the old
   * settings pointer across it. */

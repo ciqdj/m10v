@@ -127,7 +127,7 @@ class SettingsViewTests(unittest.TestCase):
    self.assertIn(p,range(0x10100000,self.heap))
    self.call(u,'destroy',0x10001000)
    self.assertEqual(bytes(u.mem_read(0x10001000,164)),bytes(164));self.assertFalse(self.live)
- def test_ab_overlay_uses_original_text_tree_and_detaches_without_leaking(self):
+ def test_ab_live_paths_never_allocate_attach_or_destroy_native_views(self):
   from tests import test_gr3_settings_controller as adapter
   adapter.ControllerLifetimeTests.setUpClass()
   a=adapter.ControllerLifetimeTests
@@ -160,36 +160,27 @@ class SettingsViewTests(unittest.TestCase):
    try:u.emu_start(a.externals['m10v_settings_controller_ab_'+name],0x10000000,count=1000000)
    except Exception as e:raise AssertionError((hex(u.reg_read(UC_ARM_REG_PC)),hex(u.reg_read(UC_ARM_REG_LR)),hex(u.reg_read(UC_ARM_REG_R0)))) from e
    self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x10000000)
-  call('live_enter',live,0x08000000,0)
-  widget=struct.unpack('<I',u.mem_read(ab+28,4))[0]
-  self.assertNotEqual(widget,0);self.assertEqual(struct.unpack('<I',u.mem_read(widget+4,4))[0],root)
-  text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(text,12)),'A/B:A\0'.encode('utf-16le'))
-  clock[0]=2600;call('live_event',live,0x10000100)
-  text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(text,12)),'A/B:A\0'.encode('utf-16le'))
-  # A late model notification hides, but cannot free a child while original
-  # dispatch/drawing may hold its iterator. Destruction belongs to leave.
-  allocated=dict(self.live);tone[0]=16;call('live_event',live,0x10000100)
-  self.assertEqual(self.live,allocated)
+  canvas=bytes(u.mem_read(root,0xf8));heap=self.heap
+  for key in (5,26):
+   call('live_enter',live,0x08000000,0)
+   self.assertEqual(self.live,baseline);self.assertEqual(self.heap,heap)
+   self.assertEqual(bytes(u.mem_read(root,0xf8)),canvas)
+   for phase,repeats in ((1,1),(2,0)):
+    u.mem_write(0x10000100,struct.pack('<HHI',key,0,0x55000120))
+    u.mem_write(0x55000120,struct.pack('<II',phase,repeats))
+    call('live_event',live,0x10000100)
+   # Even if legacy words contain a real native canvas address, they are
+   # retired state, never owned pointers to detach/hide/delete.
+   u.mem_write(ab+28,struct.pack('<4I',root,root,0,0));call('live_leave',live)
+   self.assertEqual(bytes(u.mem_read(ab+28,16)),bytes(16))
+   self.assertEqual(self.live,baseline);self.assertEqual(self.heap,heap)
+   self.assertEqual(bytes(u.mem_read(root,0xf8)),canvas)
+  tone[0]=16;call('live_enter',live,0x08000000,0)
   self.assertEqual(struct.unpack('<I',u.mem_read(ab+8,4))[0],0)
-  self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],widget)
-  call('live_leave',live)
-  self.assertEqual(self.live,baseline)
-  self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],0)
-  # Ordinary native ImageControl can change the tone outside our ADJ hook
-  # (MENU, custom bank, etc). Re-entering LiveView must reconcile before any
-  # old-session widget is constructed, not wait for its first event to free it.
-  u.mem_write(ab+8,struct.pack('<I',1));tone[0]=16;call('live_enter',live,0x08000000,0)
-  self.assertEqual(struct.unpack('<I',u.mem_read(ab+8,4))[0],0)
-  self.assertEqual(struct.unpack('<I',u.mem_read(ab+28,4))[0],0)
-  self.assertEqual(self.live,baseline)
   u.mem_write(ab+8,struct.pack('<I',1));u.mem_write(ab+16,struct.pack('<I',5))
-  call('live_enter',live,0x08000000,0)
-  widget=struct.unpack('<I',u.mem_read(ab+28,4))[0]
-  text=struct.unpack('<I',u.mem_read(widget+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(text,12)),'A/B:B\0'.encode('utf-16le'))
-  call('live_leave',live);self.assertEqual(self.live,baseline)
+  call('live_enter',live,0x08000000,0);call('live_destroy',live)
+  self.assertEqual(self.live,baseline);self.assertEqual(self.heap,heap)
+  self.assertEqual(bytes(u.mem_read(root,0xf8)),canvas)
  def test_ab_choices_include_actual_stock_high_contrast_black_and_white(self):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u)
   self.state(u,6,1)

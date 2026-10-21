@@ -35,7 +35,7 @@ export function abPatches(m){
  const d=m.settings_menu,s=m.symbols;
  const sites=[['selector',0x53221a1c],['mapper',0x5320c844],['live_enter',0x5317696c],['live_leave',0x53176de4],['live_destroy',0x53170b50],['live_event',0x531771c0],['adj_event',0x531a4db8],['adj_refresh',0x531a4114],['adj_exit',0x531a3e88],['adj_destroy',0x5319ff24],['adj_changed',0x531a4cfc],['dispatch',0x5316d5dc]];
  need(d?.ab_hooks?.length===12,'missing A/B hooks');
- need(d.ab_host?.stage==='compare'&&d.ab_host.route===0x02000000&&d.ab_host.menu_parent===0x02000012&&d.ab_host.custom_root===false&&d.ab_host.tone_changes===true&&d.ab_host.root_rows===0&&d.ab_host.direct_pair===true&&d.ab_host.picker_page_rows===6&&d.ab_host.choices===(m.appended_slots?17:12),'native comparison host contract');
+ need(d.ab_host?.stage==='compare'&&d.ab_host.route===0x02000000&&d.ab_host.menu_parent===0x02000012&&d.ab_host.custom_root===false&&d.ab_host.tone_changes===true&&d.ab_host.root_rows===0&&d.ab_host.direct_pair===true&&d.ab_host.live_ui===false&&d.ab_host.picker_page_rows===6&&d.ab_host.choices===(m.appended_slots?17:12),'native comparison host contract');
  return sites.map(([name,address],i)=>{
   const p={address,expected:name==='adj_event'?0xe1d130b0:name==='adj_exit'?0xe5d02270:0xe1a0c00d,replacement:branch(address,s['m10v_settings_controller_ab_'+name]),name:'A/B '+name};
   need(['address','expected','replacement'].every(k=>p[k]===d.ab_hooks[i][k]),'A/B hook differs');return p;

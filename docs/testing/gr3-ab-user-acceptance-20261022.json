@@ -1,0 +1,19 @@
+{
+  "status": "USER_VALIDATED",
+  "date": "2026-10-22",
+  "model": "GR III",
+  "firmware": "2.10",
+  "user_feedback": "完美，合入 master 并推送 github和宝塔",
+  "candidate": "gr3-ab-no-live-ui-20261021",
+  "bin_sha256": "d6709de38d5283321b8ab23fad80bf1f83bbd1c9433faf27ff75c248d435ee0b",
+  "zip_sha256": "e735004db3b5447f3732c7072da9f350e1d071e7546c0c228e0c5dae62ca85d8",
+  "approved_ab_source_hashes": {
+    "native/gr3/m10v_ab.h": "eb2264557690c8759dc8ad8cc54735bae9c4e667b66ccc608989bd47951290ae",
+    "native/gr3/m10v_ab_camera.inc": "01b72e1c1f8678f8a321a92a2948b7ab2045ca59ab9ef5fa3799ff7b7863a355",
+    "scripts/build_gr3_settings_hooks.py": "a89f5c5e112db8a0a6e415975244d407e1a7faa1721d1ec381f650a87b228017",
+    "node/gr3-settings-menu.mjs": "628a3b11ff312a07ee93bcb8bdc7e173c333762cfe39acccd6d24b5197d44b6d"
+  },
+  "scope": "User accepted delivered GR III A/B candidate after MENU/ADJ freeze repair and removal of all A/B LiveView UI; no invented measurements or per-format camera results.",
+  "integration_base": "a895cda0e347a33c0a2db04a8cfa615dcd939161",
+  "integration_policy": "Keep the four approved A/B runtime sources exact, preserve already released/validated first-shot recipe submission and preview initialization; no rollback of current main imaging sources. Integrated firmware differs from standalone A/B package in those retained production dependencies; run both delivered AB and film timing replay."
+}

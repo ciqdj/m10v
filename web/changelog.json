@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.1",
+      "date": "2026-10-22",
+      "title": "完善 A/B 快切退出，移除取景提示",
+      "changes": [
+        "GR III 2.10 修复开启 A/B 后通过 MENU／ADJ 返回原厂页面时的控件生命周期问题；完整移除 A/B 取景控件及相关退出清理，转换与普通影像控制确认路径不再同步写入诊断日志。",
+        "取景不再叠加滤镜名、图标、A/B: 或 A/B 字母；保留影像控制 DISP 直接选择 A、B，取景 DISP 正式切换，高对比度黑白等原厂风格、独立五槽、HDF 与 Fn 原功能。",
+        "本次仅合入已验收 A/B 源码与回归，保留线上已发布的首张换卷与实时取景初始化修复，不回退成像、RAW、连拍或回放路径。",
+        "用户已确认 GR III 测试候选 d6709de3… 整体通过并授权发布；其他机型、全部配置组合及性能指标不扩大为本次真机验收范围。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.21.5",
       "date": "2026-10-21",
       "title": "修复换卷首张滞后一张及实时取景滤镜偶尔缺失",
@@ -11,9 +25,9 @@
         "发布构建保留已验收测试包中的独立五槽、原生 A/B 选择与退出适配、Charmera、HDF、颗粒与水印依赖，按配置重建并核对验收 BIN 哈希，不重排胶卷 ID、不清空存档。",
         "用户已在 GR III 真机确认换卷首张和实时取景正常，验收候选为 m10v-gr3-film-timing-r1-20261021；其他机型、A/B 操作及全部效果组合不扩大为本次真机验证通过。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a895cda0e347a33c0a2db04a8cfa615dcd939161",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39627538376"
     },
     {
       "version": "2026.10.21.4",

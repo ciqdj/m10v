@@ -4,10 +4,10 @@
 #include <stdint.h>
 #include "m10v_library.h"
 /* Lives in the first explicitly owned settings controller, UI thread only.
- * Pair persists separately; enabled and all widget pointers never persist. */
+ * Pair persists separately; enabled never persists. LiveView owns no A/B UI. */
 typedef struct {
  uint32_t a,b,enabled,down,selected,film_a,film_b;
- uint32_t widget,root,notice_ms,compact;
+ uint32_t reserved[4]; /* Retired overlay fields: keep the 44-byte ABI. */
 } m10v_ab;
 /* Exact stock ImageControl ordering, including stock Hi-Contrast BW (tone16).
  * The five installed films occupy their existing real carrier positions. */
@@ -54,5 +54,5 @@ static inline uint32_t m10v_ab_key(m10v_ab *s,uint32_t key,uint32_t current){
  if(key!=0x37||s->down)return 0;
  s->down=1;return (s->selected==s->a?s->b:s->a)+1;
 }
-static inline void m10v_ab_commit(m10v_ab *s,uint32_t slot){s->selected=slot;s->compact=0;}
+static inline void m10v_ab_commit(m10v_ab *s,uint32_t slot){s->selected=slot;}
 #endif
