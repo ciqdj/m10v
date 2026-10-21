@@ -20,12 +20,15 @@ class Gr2SdTests(unittest.TestCase):
         word=lambda p:struct.unpack('>I',u.mem_read(p,4))[0]
         free=lambda:word(word(table+4)+12)*word(table+20)
         before=free();metadata_pool=0x5000c000;u.mem_write(0xa00c2c6c+28,struct.pack('>I',metadata_pool))
-        files={'H:/M10V/FILMS.M10':pack};tokens={};metadata=[];closed=[];freed=[];writes=[];events=[]
+        files={'H:/M10V/FILMS.M10':pack};tokens={};metadata=[];closed=[];freed=[];writes=[];events=[];directory={'fault':None,'error':3}
         def string(uc,p):return bytes(uc.mem_read(p,32)).split(b'\0',1)[0].decode()
         def boundary(uc,address,size,unused):
             a,b,c,d=[uc.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)];value=0
             events.append((hex(address),hex(a),hex(b),c,hex(d)))
-            if address==0xa0065324:
+            if address==0xa00653bc:
+                path=string(uc,a);self.assertIn(path,('H:/M10V5A.bin','H:/M10V5B.bin'));self.assertEqual(b,0x77)
+                value=0 if directory['fault'] is None and path in files else 0xffffffff;directory['error']=directory['fault'] or 3
+            elif address==0xa0065324:
                 path,mode=string(uc,a),string(uc,b);self.assertIn(mode,('r','w'))
                 if mode=='w' or path in files:
                     value=0x55000000+len(closed)*32;tokens[value]=[path,0]
@@ -43,12 +46,22 @@ class Gr2SdTests(unittest.TestCase):
                 self.assertEqual(c,1);path,position=tokens[d];data=bytes(uc.mem_read(a,b));files[path]=files[path][:position]+data+files[path][position+b:];tokens[d][1]+=b;value=1
             elif address==0xa00652f0:value=int(tokens[a][1]>=len(files[tokens[a][0]]))
             elif address==0xa00652e2:self.assertIn(a,tokens);tokens.pop(a);closed.append(a)
-            elif address==0xa00652ce:value=31
+            elif address==0xa00652ce:value=directory['error']
             elif address==0xa00267ba:value=1
             elif address in (0xa002b0ee,0xa0027360,0xa00273a4,0xa00a2058,0xa0039de4):value=0
             else:self.fail('original file/pool assertion')
             uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
-        for address in (0xa0065324,0xa0024c3c,0xa0024d76,0xa00653a0,0xa0065318,0xa0065386,0xa0065428,0xa00652f0,0xa00652e2,0xa00652ce,0xa002b0ee,0xa0027360,0xa00273a4,0xa00a2058,0xa00267ba,0xa0039de4,0xa0039f9c,0xa003a01a):u.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+        for address in (0xa00653bc,0xa0065324,0xa0024c3c,0xa0024d76,0xa00653a0,0xa0065318,0xa0065386,0xa0065428,0xa00652f0,0xa00652e2,0xa00652ce,0xa002b0ee,0xa0027360,0xa00273a4,0xa00a2058,0xa00267ba,0xa0039de4,0xa0039f9c,0xa003a01a):u.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+        self.assertIn('gr2_initialize_state',report['symbols'])
+        directory['fault']=9
+        self.assertEqual(self.call(u,report['symbols']['gr2_initialize_state'],[]),0);self.assertEqual(writes,[])
+        directory['fault']=None
+        self.assertEqual(self.call(u,report['symbols']['gr2_initialize_state'],[]),1)
+        self.assertEqual(writes,['H:/M10V5A.bin']);initial_journal=files['H:/M10V5A.bin'];self.assertEqual(initial_journal.hex(),report['initial_state_wire_hex'])
+        self.assertEqual(self.call(u,report['symbols']['gr2_initialize_state'],[]),1);self.assertEqual(writes,['H:/M10V5A.bin'])
+        files['H:/M10V5A.bin']=b'corrupt existing journal'
+        self.assertEqual(self.call(u,report['symbols']['gr2_initialize_state'],[]),0);self.assertEqual(writes,['H:/M10V5A.bin'])
+        files['H:/M10V5A.bin']=initial_journal;writes.clear()
         self.call(u,report['symbols']['m10v_library_init'],[0x50001000]);state=bytearray(u.mem_read(0x50001000,104));struct.pack_into('>I',state,8,10);struct.pack_into('>I',state,100,zlib.crc32(state[:100]));u.mem_write(0x50001000,bytes(state));self.call(u,report['symbols']['gr2_state_encode'],[0x50001000,0x50002000]);files['H:/M10V5A.bin']=bytes(u.mem_read(0x50002000,104))
         self.assertEqual(self.call(u,report['symbols']['gr2_sd_catalog_open'],[0x52000000]),1,str(events))
         self.assertEqual(self.call(u,report['symbols']['gr2_sd_install'],[0x52000000,0,79,0]),0,str((writes,[(path,len(data)) for path,data in files.items()],events[-15:])))

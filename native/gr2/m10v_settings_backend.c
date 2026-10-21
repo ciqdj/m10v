@@ -4,7 +4,7 @@
 #include "../gr3/m10v_sd_library.h"
 _Static_assert(sizeof(gr2_settings_backend)==4112,"GR II settings backend ABI");
 static int activate(void){
-    return gr2_configuration_reload()&&(!gr2_effect_names_enabled()||gr2_effect_names_refresh());
+    return gr2_initialize_state()&&gr2_configuration_reload()&&(!gr2_effect_names_enabled()||gr2_effect_names_refresh());
 }
 static int load(void *context,m10v_library_state *state){
     (void)context;return activate()&&gr2_configuration_read(state)?0:-1;

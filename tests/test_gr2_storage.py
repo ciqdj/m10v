@@ -5,6 +5,17 @@ import zlib
 from tests import test_gr2_runtime_build as runtime_tests
 
 class Gr2StorageTests(unittest.TestCase):
+    def test_native_empty_journal_proof_uses_original_sdk_and_never_accepts_media_or_short_read_failures(self):
+        from scripts.analyze_gr2_native_contract import probe_fat_directory
+        from tests.test_unity_update import component
+        runtime=self.build();self.assertIn('gr2_journals_absent',runtime['symbols'])
+        for entries,error,short,expected in (((),0,False,1),(('M10V5A.bin',),0,False,0),(('M10V5B.bin',),0,False,0),(('M10V5C.bin','OTHER.bin'),0,False,1),((),9,False,-1),((),3,False,-1),((),0,True,-1)):
+            with self.subTest(entries=entries,error=error,short=short):
+                report=probe_fat_directory(component('gr2','b01firm8'),entries=entries,read_error=error,short_read=short,native_runtime=runtime,cache_boundary=True)
+                self.assertEqual(report['native_absent_return'],expected);self.assertTrue(report['pool_restored']);self.assertTrue(report['stack_preserved'])
+        unready=probe_fat_directory(component('gr2','b01firm8'),native_runtime=runtime,ready=False,cache_boundary=True)
+        self.assertEqual(unready['native_absent_return'],-1);self.assertEqual(unready['record_reads'],[]);self.assertTrue(unready['pool_restored'])
+
     build=runtime_tests.Gr2RuntimeBuildTests.build
     machine=runtime_tests.Gr2RuntimeBuildTests.machine
     call=runtime_tests.Gr2RuntimeBuildTests.call

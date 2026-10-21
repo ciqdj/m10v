@@ -132,6 +132,73 @@ def probe_rtos_mutex(code:bytes)->dict:
     return dict(create_returned=created,returns=returns,owners=owners,stack_preserved=True,helpers_intercepted=[],hardware_tested=False,
                 scope='Original kernel mutex create, polling lock, owner chain and unlock on synthetic task records; no preemption, wait queues or camera thread timing proof.')
 
+def probe_fat_directory(code:bytes,*,entries:tuple[str,...]=(),read_error:int=0,short_read:bool=False,native_runtime:dict|None=None,ready:bool=True,cache_boundary:bool=False)->dict:
+    """Original PrFILE initializer, SDK find-first/next and FAT16 root decoder.
+
+    Synthetic mounted H: geometry and raw directory records; RTOS semaphore/
+    thread identity, removable-media state and record I/O are boundaries.
+    """
+    import re
+    if len(entries)>32 or any(not re.fullmatch(r'[A-Za-z0-9_]{1,8}\.[A-Za-z0-9_]{1,3}',name) for name in entries):raise ValueError('bounded synthetic ASCII 8.3 names required')
+    if type(read_error) is not int or not 0<=read_error<=255 or type(short_read) is not bool or type(ready) is not bool or type(cache_boundary) is not bool:raise ValueError('bounded media boundary status required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);sdk=0x50004000;volume=0xA06AA6A0;stop=0x5001f000;reads=[];found=[];semaphores=[]
+    def call(entry,*args,thumb=True):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,stop|int(thumb))
+        uc.emu_start(entry|int(thumb),stop,count=3000000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop or uc.reg_read(r.UC_ARM_REG_SP)!=0x50018000:raise RuntimeError('original PrFILE operation budget/stack failure')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    def os_boundary(machine,address,size,unused):
+        value=0
+        if address==0xA0067E90:semaphores.append(address);value=len(semaphores)
+        elif address==0xA0068D74:machine.mem_write(machine.reg_read(r.UC_ARM_REG_R0),struct.pack('>H',1))
+        elif address==0xA008A5AE:value=int(ready)
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0067E90,0xA0068C4C,0xA0068598,0xA0068D74,0xA008A5AE,0xA008A5D0):uc.hook_add(UC_HOOK_CODE,os_boundary,begin=address,end=address)
+    if native_runtime:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        uc.mem_write(0xA00B5BFE,struct.pack('>H',1));uc.mem_write(0xA00B5BE0,struct.pack('>I',0x50007000));uc.mem_write(0x50007000,struct.pack('>h',-2));call(0xA0024BCA)
+    if call(0xA0083C42,0,0)!=0:raise RuntimeError('original PrFILE initialization failed')
+    uc.mem_write(volume,struct.pack('>H',512));uc.mem_write(volume+0xC,struct.pack('>I',1));uc.mem_write(volume+0x29,bytes([1,9,0]));uc.mem_write(volume+0x2E,struct.pack('>H',32));uc.mem_write(volume+0x38,struct.pack('>I',100))
+    uc.mem_write(volume+0x61AC,b'H');uc.mem_write(volume+0x61A8,struct.pack('>I',3 if ready else 1));uc.mem_write(0x50001000,b'H:/*\0')
+    media=bytearray(16384)
+    for index,name in enumerate(entries):
+        base,extension=name.upper().split('.');at=32*index
+        media[at:at+11]=base.ljust(8).encode()+extension.ljust(3).encode();media[at+11]=0x20;struct.pack_into('<I',media,at+28,104+index)
+    def record_read(machine,address,size,unused):
+        a,b,c,d=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        count,out,flags=struct.unpack('>3I',machine.mem_read(machine.reg_read(r.UC_ARM_REG_SP),12))
+        if a!=volume or count!=32 or not 100<=c<132 or d>=512 or d%32 or flags:raise RuntimeError('original FAT root record extent differs')
+        reads.append([c,d]);at=(c-100)*512+d;n=count-int(short_read)
+        machine.mem_write(b,bytes(media[at:at+n]));machine.mem_write(out,struct.pack('>I',n));machine.reg_write(r.UC_ARM_REG_R0,read_error);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    if cache_boundary:
+        uc.mem_map(0x52000000,4096)
+        def cache_read(machine,address,size,unused):
+            a,b,c,d=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+            if a!=volume or not 100<=b<132 or d:raise RuntimeError('original root sector cache request differs')
+            reads.append([b,d]);at=(b-100)*512
+            machine.mem_write(0x52000000,bytes(media[at:at+512]));machine.mem_write(0x5000B008,struct.pack('>I',0x52000000));machine.mem_write(c,struct.pack('>I',0x5000B000))
+            machine.reg_write(r.UC_ARM_REG_R0,17 if short_read else read_error);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        uc.hook_add(UC_HOOK_CODE,cache_read,begin=0xA008BB8C,end=0xA008BB8C)
+    else:uc.hook_add(UC_HOOK_CODE,record_read,begin=0xA00941B2,end=0xA00941B2)
+    extra={};terminal=None
+    if native_runtime:
+        word=lambda pointer:struct.unpack('>I',uc.mem_read(pointer,4))[0]
+        free=lambda:word(word(0x50007004)+12)*word(0x50007014)
+        available=free();value=call(native_runtime['symbols']['gr2_journals_absent'],thumb=False)
+        extra=dict(native_absent_return=struct.unpack('>i',struct.pack('>I',value))[0],pool_restored=free()==available)
+    else:
+        for index in range(34):
+            result=call(0xA00653BC,0x50001000,0x77,sdk) if index==0 else call(0xA00653EE,sdk)
+            if result:terminal=call(0xA00652CE);break
+            name=bytes(uc.mem_read(sdk+0x472,13)).split(b'\0',1)[0].decode('ascii');size=struct.unpack('>I',uc.mem_read(sdk+0x46C,4))[0]
+            found.append(dict(name=name,size=size))
+        else:raise RuntimeError('original directory enumeration exceeded synthetic entry bound')
+    return dict(**extra,entries=found,terminal_error=terminal,record_reads=reads,initializer_semaphores=len(semaphores),stack_preserved=True,
+                helpers_intercepted=['RTOS semaphore and task identity','removable media readiness/change','sector cache acquisition' if cache_boundary else 'directory record media read'],hardware_tested=False,
+                scope='Original PrFILE initialization/default character callbacks, SDK first/next/errno, root-sector arithmetic, FAT16 entries and wildcard/name conversion. Mounted geometry/records and OS/device boundaries are synthetic; no FAT32/exFAT, actual card, hot-swap or simultaneous writers proof.')
+
 def probe_file_mode_flags(code:bytes)->dict:
     """Execute the stock stdio mode parser, without opening any files."""
     from unicorn import arm_const as r

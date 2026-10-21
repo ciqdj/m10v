@@ -18,6 +18,10 @@ int32_t gr2_file_read(const char *,uint8_t *,uint32_t);
 int gr2_file_size(const char *,uint32_t *);
 int32_t gr2_file_read_at(const char *,uint32_t offset,uint8_t *,uint32_t capacity);
 int32_t gr2_file_write(const char *,const uint8_t *,uint32_t);
+/* 1 proven absent, 0 at least one exists, -1 search/allocation error. UI only. */
+int gr2_journals_absent(void);
+/* UI owner only: existing valid journal or proven-empty first initialization. */
+int gr2_initialize_state(void);
 int gr2_load_state(m10v_library_state *);
 int gr2_save_state(const m10v_library_state *);
 #endif

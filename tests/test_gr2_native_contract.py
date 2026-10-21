@@ -10,6 +10,19 @@ class Gr2NativeContractTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('gr2_native_contract',source)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
+    def test_original_fat_directory_and_sdk_preserve_entries_eod_media_error_and_short_read(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_fat_directory'))
+        code=component('gr2','b01firm8')
+        present=module.probe_fat_directory(code,entries=('M10V5A.bin','M10V5B.bin'))
+        self.assertEqual(present['entries'],[{'name':'M10V5A.BIN','size':104},{'name':'M10V5B.BIN','size':105}])
+        self.assertEqual(present['terminal_error'],3);self.assertTrue(present['stack_preserved'])
+        empty=module.probe_fat_directory(code);self.assertEqual(empty['entries'],[]);self.assertEqual(empty['terminal_error'],3)
+        failure=module.probe_fat_directory(code,read_error=9);self.assertEqual(failure['terminal_error'],9)
+        short=module.probe_fat_directory(code,short_read=True);self.assertEqual(short['terminal_error'],17)
+        self.assertIn('directory record media read',present['helpers_intercepted'])
+        deep=module.probe_fat_directory(code,read_error=3,cache_boundary=True)
+        self.assertEqual(deep['terminal_error'],17);self.assertIn('sector cache acquisition',deep['helpers_intercepted'])
+
     def test_original_file_mode_parser_does_not_accept_assumed_exclusive_stdio_modes(self):
         module=self.implementation();self.assertTrue(hasattr(module,'probe_file_mode_flags'))
         result=module.probe_file_mode_flags(component('gr2','b01firm8'))

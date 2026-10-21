@@ -1,4 +1,5 @@
 #include "m10v_storage.h"
+#include "m10v_model.h"
 typedef uint32_t (*open_fn)(const char *,uint32_t);
 typedef int32_t (*transfer_fn)(uint32_t,void *,uint32_t);
 static int same(const char *a,const char *b){while(*a&&*a==*b){a++;b++;}return *a==*b;}
@@ -58,4 +59,31 @@ int gr2_file_size(const char *path,uint32_t *out){
     if(!close_owned(handle))valid=0;
     if(valid)*out=position[1];
     return valid;
+}
+
+/* UI owner only. A failed fopen is not an absence proof: exact root-name
+ * find-first runs the original mounted-volume/character/FAT search. Stock
+ * FindClose frees its cursor and metadata without a separate SDK close. */
+int gr2_journals_absent(void){
+    uint8_t *cursor=gr2_allocate(4096);if(!cursor)return -1;
+    const char *paths[2]={"H:/M10V5A.bin","H:/M10V5B.bin"};int result=1;
+    typedef int32_t (*first_fn)(const char *,uint32_t,void *);
+    typedef int32_t (*error_fn)(void);
+    for(uint32_t i=0;i<2;i++){
+        if(((first_fn)(uintptr_t)0xA00653BDu)(paths[i],0x77,cursor)==0){result=0;break;}
+        if(((error_fn)(uintptr_t)0xA00652CFu)()!=3){result=-1;break;}
+    }
+    gr2_release(cursor);return result;
+}
+
+/* Bootstrap may create one initial journal only after both exact root names
+ * were enumerated absent. Corrupt, unreadable or pre-existing journals never
+ * become permission to reset. The existing verified journal path does all
+ * serialization, readback and arbitration. Never call from capture tasks. */
+int gr2_initialize_state(void){
+    m10v_library_state state;
+    if(gr2_load_state(&state))return 1;
+    if(gr2_journals_absent()!=1)return 0;
+    m10v_library_init(&state);
+    return m10v_library_valid(&state)&&gr2_save_state(&state);
 }
