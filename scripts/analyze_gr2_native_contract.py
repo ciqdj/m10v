@@ -366,7 +366,7 @@ def _buffer_pool_fixture(code:bytes,mode:int):
     if type(mode) is not int or not 0<=mode<5:raise ValueError('original buffer layout0..4 required')
     from unicorn import UC_HOOK_CODE,arm_const as r
     uc=runtime_machine(code);definitions=0xA0112048;records=0xA06BC708;control=0xA0129C20
-    original=bytes(uc.mem_read(definitions,69*44));uc.mem_write(0xA0112D69,bytes([mode]))
+    original=bytes(uc.mem_read(definitions,69*44))
     created=[];linear=[];services=[];metadata=[];selected=[]
     word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
     def boundary(machine,address,size,unused):
@@ -392,12 +392,12 @@ def _buffer_pool_fixture(code:bytes,mode:int):
     uc.emu_start(0xA00DFC09,0x5001F000,count=500000)
     if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original buffer initializer exceeded CPU budget')
     for hook in hooks:uc.hook_del(hook)
-    return uc,created,linear,metadata,selected,original,saved
+    return uc,created,linear,metadata,selected,original,saved,boundary
 
 def probe_buffer_pool_layout(code:bytes,mode:int)->dict:
     """Original complete pool layout, with explicit constructor fixtures."""
     from unicorn import arm_const as r
-    uc,created,linear,metadata,selected,original,saved=_buffer_pool_fixture(code,mode)
+    uc,created,linear,metadata,selected,original,saved,constructor=_buffer_pool_fixture(code,mode)
     definitions=0xA0112048;records=0xA06BC708;control=0xA0129C20
     word=lambda address:struct.unpack(">I",uc.mem_read(address,4))[0]
     order=list(struct.unpack('>69I',uc.mem_read(0xA06BC5F4,69*4)))
@@ -419,7 +419,7 @@ def probe_buffer_pool_layout(code:bytes,mode:int)->dict:
     begin=linear[1][1];end=begin+linear[1][0]
     spans=[(row['base'],row['count']*row['stride']) for row in created if row['factory']==0xA0024E16]
     spans.extend((word(pointer+4),word(pointer+8)) for pointer,size in metadata)
-    return dict(mode=mode,final_layout=uc.mem_read(0xA0112D69,1)[0],arena_requested_bytes=linear[1][0],metadata_requested_bytes=linear[0][0],
+    return dict(mode=mode,final_layout=uc.mem_read(control,1)[0],arena_requested_bytes=linear[1][0],metadata_requested_bytes=linear[0][0],
                 all_aliases_match=matches,aliases=aliases,buffers=buffers,constant_prefix=prefix,pool_factories=created,
                 all_pool_spans_bounded=all(begin<=base and size<=end-base for base,size in spans),
                 definitions_preserved=bytes(uc.mem_read(definitions,len(original)))==original,
@@ -436,7 +436,7 @@ def probe_buffer_lifetime(code:bytes,mode:int)->dict:
     No pixel backing, physical cache or live capture concurrency is exercised.
     """
     from unicorn import UC_HOOK_CODE,arm_const as r
-    uc,created,linear,metadata,selected,original,saved=_buffer_pool_fixture(code,mode)
+    uc,created,linear,metadata,selected,original,saved,constructor=_buffer_pool_fixture(code,mode)
     word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
     pools={row['identity']:row for row in created};occupied={identity:set() for identity in pools}
     live={};serial=0;calls=[];abi=True
@@ -638,9 +638,13 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
     uc.mem_write(request,bytes(descriptor));uc.mem_write(context,b'\xa5'*0x500);uc.mem_write(context+0x418,struct.pack('>I',strength))
     before=bytes(uc.mem_read(context,0x500));saved=[0x74560000+i for i in range(8)]
     for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
-    acquired=[];released=[];events=[];stages=[];io=[];cpu_writes=[];svc=[]
+    acquired=[];released=[];events=[];stages=[];io=[];cpu_writes=[];svc=[];bands=[]
     def boundary(machine,address,size,unused):
         args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        if address==0xA014ACEC:
+            level_context=machine.reg_read(r.UC_ARM_REG_R4)
+            bands.append(dict(level=struct.unpack('>I',machine.mem_read(level_context,4))[0],thresholds=list(machine.mem_read(level_context+0x5C,3)),selected_pointer=args[0]))
+            return
         if address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE):
             stages.append(address);return
         if address==0xA00688E8:acquired.append(args[0])
@@ -648,7 +652,7 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
         elif address==0xA00686C4:
             events.append(args[:3]);machine.mem_write(args[3],struct.pack('>I',args[1]))
         machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE,0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0067F8C,0xA00686C4,0xA0068598,0xA00F9888):
+    for address in (0xA013EA7C,0xA01414CC,0xA014A6D4,0xA01410F0,0xA013FFAE,0xA0027360,0xA00273A4,0xA00CE994,0xA00688E8,0xA0067F8C,0xA00686C4,0xA0068598,0xA00F9888,0xA014ACEC):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def interrupt(machine,number,unused):
         pc=machine.reg_read(r.UC_ARM_REG_PC);instruction=struct.unpack('>H',machine.mem_read(pc-2,2))[0]
@@ -668,13 +672,90 @@ def probe_clarity_control_graph(code:bytes,strength:int,geometry:int,*,hdr:bool=
     if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original complete Clarity graph exceeded CPU budget')
     from collections import Counter
     return dict(returned_normally=True,resources_balanced=Counter(acquired)==Counter(released),resource_acquisitions=acquired,resource_releases=released,
-                event_waits=events,hardware_stage_count=len(stages),stages=stages,mmio_write_count=len(io),scheduler_svc_count=svc.count(12),
+                event_waits=events,hardware_stage_count=len(stages),stages=stages,band_curves=bands,mmio_write_count=len(io),scheduler_svc_count=svc.count(12),
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,
                 request_preserved=bytes(uc.mem_read(request,64))==descriptor,context_preserved=bytes(uc.mem_read(context,0x500))==before,
                 arena_guards_preserved=all(bytes(uc.mem_read(base+size,32))==b'\x5a'*32 for base,size in arenas),
                 cpu_pixel_writes_bounded=all(any(base<=address and address+length<=base+size for base,size in arenas) for address,length in cpu_writes),
                 pixel_processing_verified=False,hardware_tested=False,
                 scope='Original complete A014ADEE graph and nested stage/driver CPU instructions. Four synthetic image/work arenas, passive register banks, explicit600A0100 reset-ready response, kernel resource/event/SVC/peripheral-clock/power boundaries. Events synthesize success; DMA never produces pixels. Graph return/resource balance/CPU guards/HDR context restoration only; no real completion, DMA span/coherence or live capture proof.')
+
+def probe_buffer_layout_selection(code:bytes,camera_mode:int,arguments:tuple,current:int,properties:dict)->dict:
+    """Execute original pre-capture layout decision, without changing pools."""
+    official_profile(code,'gr2')
+    if type(camera_mode) is not int or not 2<=camera_mode<=10 or type(current) is not int or not 0<=current<5:raise ValueError('audited original camera/layout mode required')
+    if len(arguments)!=3 or any(type(value) is not int or not 0<=value<=0xffffffff for value in arguments):raise ValueError('three original u32 mode arguments required')
+    if any(type(key) is not int or type(value) is not int or not 0<=key<=0xffffffff or not 0<=value<=0xffffffff for key,value in properties.items()):raise ValueError('u32 property fixture required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);uc.mem_write(0xA0129C20,bytes([current]));values=dict(properties);reads=[]
+    def getter(machine,address,size,unused):
+        key=machine.reg_read(r.UC_ARM_REG_R0);reads.append(key)
+        machine.reg_write(r.UC_ARM_REG_R0,values.get(key,0));machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    uc.hook_add(UC_HOOK_CODE,getter,begin=0xA00E0E2E,end=0xA00E0E2E)
+    saved=[0x74560000+i for i in range(8)]
+    for i,value in enumerate(saved):uc.reg_write(r.UC_ARM_REG_R4+i,value)
+    for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),(camera_mode,*arguments)):uc.reg_write(reg,value)
+    uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+    uc.emu_start(0xA00E5D93,0x5001F000,count=1000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original pool selector exceeded CPU budget')
+    return dict(selected_layout=uc.reg_read(r.UC_ARM_REG_R0),property_reads=reads,properties_preserved=values==properties,
+                current_layout_preserved=uc.mem_read(0xA0129C20,1)[0]==current,stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,
+                callee_saved_preserved=[uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved,hardware_tested=False,
+                scope='Complete original A00E5D92 selector and A00DFDFE current-bank getter. Property reads are synthetic, read-only values. No pool transition, capture-mode naming, frame admission or settings concurrency proof.')
+
+def probe_buffer_pool_transitions(code:bytes,sequence:tuple)->dict:
+    """Original idle bank transitions; never inject a transition mid-capture."""
+    if not sequence or len(sequence)>8 or any(type(value) is not int or not 0<=value<5 for value in sequence):raise ValueError('one to eight original layout indices required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc,created,linear,metadata,selected,original,saved,constructor=_buffer_pool_fixture(code,0)
+    word=lambda address:struct.unpack('>I',uc.mem_read(address,4))[0]
+    order=list(struct.unpack('>69I',uc.mem_read(0xA06BC5F4,69*4)));prefix=word(0xA0129C24)
+    constant={i:bytes(uc.mem_read(0xA06BC708+20*i,20)) for i in order[:prefix]}
+    alive={row['identity'] for row in created};rings={pointer for pointer,size in metadata};retired_rings=[];layouts=[0]
+    constant_ok=True;identities_ok=True;spans_ok=True;stack_ok=True;callee_ok=True
+    def boundary(machine,address,size,unused):
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3)]
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original idle transition assertion')
+        if address in (0xA0027270,0xA0024B0C,0xA0024E16,0xA0024C3C,0xA0027434,0xA0026EC6):
+            constructor(machine,address,size,None);value=machine.reg_read(r.UC_ARM_REG_R0)
+            if address in (0xA0024B0C,0xA0024E16):alive.add(value)
+            elif address==0xA0024C3C:rings.add(value)
+            return
+        value=0
+        if address==0xA00271DA:
+            mode=uc.mem_read(0xA0129C20,1)[0]
+            counts=[struct.unpack('>i',uc.mem_read(0xA0112048+44*i+20+4*mode,4))[0] for i in range(69) if word(0xA06BC708+20*i+8)==args[0]]
+            if not counts:raise RuntimeError('unknown transition semaphore')
+            value=max(counts)
+        elif address==0xA0025160:
+            if args[0] not in alive:raise RuntimeError('double/unknown pool destruction')
+            alive.remove(args[0])
+        elif address==0xA0024D76:
+            if args[1] not in rings or bytes(uc.mem_read(args[1],4))!=b'void':raise RuntimeError('invalid original ring metadata destruction')
+            rings.remove(args[1]);retired_rings.append(args[1])
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA0027270,0xA0024B0C,0xA0024E16,0xA0024C3C,0xA0027434,0xA0026EC6,0xA00271DA,0xA0025160,0xA0024D76,0xA00274AC,0xA0026F40,0xA00272E4,0xA0027360,0xA00273A4,0xA0027526,0xA0039F9C,0xA003A01A):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    begin=linear[1][1];end=begin+linear[1][0]
+    for target in sequence:
+        uc.reg_write(r.UC_ARM_REG_R0,target);uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+        uc.emu_start(0xA00DF847,0x5001F000,count=200000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original idle pool transition exceeded CPU budget')
+        layouts.append(uc.mem_read(0xA0129C20,1)[0])
+        if layouts[-1]!=target:raise RuntimeError('original pool transition selected unexpected layout')
+        constant_ok=constant_ok and all(bytes(uc.mem_read(0xA06BC708+20*i,20))==before for i,before in constant.items())
+        identities={word(0xA06BC708+20*i) for i in range(69)}-{0}
+        mpl={row['identity'] for row in created if row['factory']==0xA0024B0C}
+        identities_ok=identities_ok and identities==(alive-mpl)|rings
+        spans=[(row['base'],row['count']*row['stride']) for row in created if row['identity'] in alive and row['factory']==0xA0024E16]
+        spans.extend((word(pointer+4),word(pointer+8)) for pointer in rings)
+        spans_ok=spans_ok and all(begin<=base and size<=end-base for base,size in spans)
+        stack_ok=stack_ok and uc.reg_read(r.UC_ARM_REG_SP)==0x50018000
+        callee_ok=callee_ok and [uc.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)]==saved
+    return dict(layouts=layouts,linear_allocation_count=len(linear),constant_pools_preserved=constant_ok,live_pool_identities_match=identities_ok,
+                ring_metadata_reclaimed=all(pointer not in rings for pointer in retired_rings),all_live_spans_bounded=spans_ok,
+                stack_preserved=stack_ok,callee_saved_preserved=callee_ok,hardware_tested=False,
+                scope='Original A00DF846 idle destruction/repopulation/inverse mapping across one arena; constructors/destructors, idle semaphore counts and locks are fixtures. No outstanding image blocks or live threads. Not transactional rejection, mid-capture admission or hardware lifecycle proof.')
 
 def probe_clarity_entry(code:bytes,strength:int,*,hdr:bool=False)->dict:
     """Original Clarity/HDR prelude through coefficient admission or bypass.

@@ -116,3 +116,43 @@ class Gr2ClarityTests(unittest.TestCase):
                 self.assertTrue(result['arena_guards_preserved']);self.assertTrue(result['cpu_pixel_writes_bounded'])
                 self.assertGreater(result['hardware_stage_count'],8)
                 self.assertFalse(result['pixel_processing_verified'])
+
+    def test_original_layout_selector_reserves_a_second_jpeg_for_clarity_without_changing_effect_property(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_buffer_layout_selection'))
+        for current in range(5):
+            for effect in (0,9,12,16,17,18,19,20):
+                with self.subTest(current=current,effect=effect):
+                    result=native.probe_buffer_layout_selection(component('gr2','b01firm8'),6,(0,0,0),current,{0x2d:effect})
+                    self.assertEqual(result['selected_layout'],0 if effect in (12,16,17,19) else 1)
+                    self.assertTrue(result['properties_preserved']);self.assertTrue(result['current_layout_preserved'])
+                    self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+        for properties,expected in (({1:2},3),({1:0},4)):
+            mode=5 if expected==3 else 10
+            self.assertEqual(native.probe_buffer_layout_selection(component('gr2','b01firm8'),mode,(0,0,0),0,properties)['selected_layout'],expected)
+
+        for current in range(5):
+            result=native.probe_buffer_layout_selection(component('gr2','b01firm8'),7,(0,0,0),current,{0x2d:0})
+            self.assertEqual(result['selected_layout'],current if current in (0,1) else 1)
+            self.assertTrue(result['current_layout_preserved'])
+
+    def test_original_idle_pool_transitions_reuse_one_arena_and_preserve_constant_pool_owners(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_buffer_pool_transitions'))
+        result=native.probe_buffer_pool_transitions(component('gr2','b01firm8'),(1,2,3,4,0))
+        self.assertEqual(result['layouts'],[0,1,2,3,4,0])
+        self.assertEqual(result['linear_allocation_count'],2)
+        self.assertTrue(result['constant_pools_preserved']);self.assertTrue(result['live_pool_identities_match'])
+        self.assertTrue(result['ring_metadata_reclaimed']);self.assertTrue(result['all_live_spans_bounded'])
+        self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+
+    def test_original_full_resolution_pyramid_selects_eleven_detail_band_curves_in_reverse_level_order(self):
+        from scripts import analyze_gr2_native_contract as native
+        for strength in (1,9):
+            result=native.probe_clarity_control_graph(component('gr2','b01firm8'),strength,0x0cc01340)
+            self.assertIn('band_curves',result)
+            bands=result['band_curves'];self.assertEqual([row['level'] for row in bands],list(range(11,0,-1)))
+            for row in bands:
+                thresholds=row['thresholds'];level=row['level']
+                index=next((i for i,threshold in enumerate(thresholds) if level<threshold),3)
+                self.assertEqual(row['selected_pointer'],0x51000000+8192*index)
