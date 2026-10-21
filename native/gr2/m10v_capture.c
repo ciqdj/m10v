@@ -1,4 +1,5 @@
 #include "m10v_capture.h"
+#include "m10v_hdf.h"
 #include "../gr3/m10v_sd_library.h"
 _Static_assert(sizeof(m10v_gr2_frame)==128,"GR II inline frame ABI changed");
 static int valid(uint32_t p,uint32_t n){return p&&n&&n<=UINT32_MAX-p;}
@@ -42,7 +43,7 @@ uint32_t gr2_image_owner_bytes(const uint8_t *context){
     if(be32((const uint8_t *)(uintptr_t)0xa0129c54u)!=(uint32_t)(uintptr_t)pool||
        be32(pool)!=0x4d504c20u)return 0;
     uint32_t body=be32((const uint8_t *)(uintptr_t)0xa01137ecu),block=be32(pool+8);
-    if((body!=0xfb0cu&&body!=0xfb8cu&&body!=0x12b8cu)||block!=body+8||be32(pool+12)!=60*block)return 0;
+    if((body!=0xfb0cu&&body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)||block!=body+8||be32(pool+12)!=60*block)return 0;
     uint32_t id=((uint32_t)pool[20]<<8)|pool[21];
     const uint8_t *maximum=(const uint8_t *)(uintptr_t)0xa00b5bfcu;
     if(!id||id>(((uint32_t)maximum[0]<<8)|maximum[1]))return 0;
@@ -64,7 +65,7 @@ static void copy_bytes(void *destination,const void *source,uint32_t bytes){
 static int frame_prepare(uint8_t *context,const m10v_library_state *source,uint32_t slot,uint32_t seed,m10v_gr2_frame *frame){
     if(slot>=5||!source)return 0;
     uint32_t body=gr2_image_owner_bytes(context);
-    if(body!=0xfb8cu&&body!=0x12b8cu)return 0;
+    if(body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)return 0;
     uint32_t address=(uint32_t)(uintptr_t)source,owner=(uint32_t)(uintptr_t)context-8;
     if(!valid(address,sizeof(*source))||overlaps(address,sizeof(*source),owner,body+8))return 0;
     frame->processed=0;frame->magic=0x47324652u;frame->version=2;frame->slot=slot;frame->seed=seed;
@@ -85,9 +86,10 @@ int gr2_frame_freeze(uint8_t *context,const m10v_library_state *source,uint32_t 
 }
 int gr2_frame_freeze_custom(uint8_t *context,const m10v_library_state *source,uint32_t slot,uint32_t seed,const uint8_t *record){
     m10v_gr2_frame frame;
-    if(gr2_image_owner_bytes(context)!=0x12b8cu||!frame_prepare(context,source,slot,seed,&frame))return 0;
+    uint32_t body=gr2_image_owner_bytes(context);
+    if((body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)||!frame_prepare(context,source,slot,seed,&frame))return 0;
     uint32_t id=frame.state.slots[slot].film,address=(uint32_t)(uintptr_t)record,owner=(uint32_t)(uintptr_t)context-8;
-    if(id<=M10V_FILM_COUNT||!valid(address,M10V_SD_RECORD_BYTES)||overlaps(address,M10V_SD_RECORD_BYTES,owner,0x12b94u)||
+    if(id<=M10V_FILM_COUNT||!valid(address,M10V_SD_RECORD_BYTES)||overlaps(address,M10V_SD_RECORD_BYTES,owner,body+8u)||
        m10v_sd_record(record,M10V_SD_RECORD_BYTES,id)!=id)return 0;
     uint8_t *snapshot=context+0xfb8c;
     for(uint32_t i=0;i<M10V_SD_RECORD_BYTES;i++)if(snapshot[i])return 0;
@@ -101,14 +103,14 @@ int gr2_frame_freeze_custom(uint8_t *context,const m10v_library_state *source,ui
 int gr2_frame_read(const uint8_t *context,m10v_gr2_frame *out){
     if(!out)return 0;
     uint32_t body=gr2_image_owner_bytes(context);
-    if(body!=0xfb8cu&&body!=0x12b8cu)return 0;
+    if(body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)return 0;
     uint32_t address=(uint32_t)(uintptr_t)out,owner=(uint32_t)(uintptr_t)context-8;
     if(!valid(address,sizeof(*out))||overlaps(address,sizeof(*out),owner,body+8))return 0;
     m10v_gr2_frame frame;copy_bytes(&frame,context+0xfb0c,sizeof(frame));
     if(frame.magic!=0x47324652u||frame.version!=2||frame.slot>=5||(frame.processed&~7u)||
        frame.crc!=m10v_sd_crc((const uint8_t *)&frame,124)||!m10v_library_valid(&frame.state))return 0;
     uint32_t id=frame.state.slots[frame.slot].film;
-    if(id>M10V_FILM_COUNT&&(body!=0x12b8cu||m10v_sd_record(context+0xfb8c,M10V_SD_RECORD_BYTES,id)!=id))return 0;
+    if(id>M10V_FILM_COUNT&&((body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)||m10v_sd_record(context+0xfb8c,M10V_SD_RECORD_BYTES,id)!=id))return 0;
     copy_bytes(out,&frame,sizeof(frame));return 1;
 }
 static void frame_store(uint8_t *context,m10v_gr2_frame *frame){
@@ -131,7 +133,7 @@ int gr2_producer_ingress(uint8_t *context,const m10v_library_state *state,uint32
     uint32_t body=gr2_image_owner_bytes(context);
     if(!body)return -1;
     uint32_t mode=context[0x408];m10v_gr2_frame frame;
-    if((body==0xfb8cu||body==0x12b8cu)&&gr2_frame_read(context,&frame)){
+    if((body==0xfb8cu||body==0x12b8cu||body==GR2_IMAGE_BODY_BYTES)&&gr2_frame_read(context,&frame)){
         if(mode&&mode!=carriers[frame.slot])return -1;
         if(frame.processed){frame.processed=0;frame_store(context,&frame);}
         context[0x408]=0;return 1;

@@ -156,3 +156,16 @@ class Gr2ClarityTests(unittest.TestCase):
                 thresholds=row['thresholds'];level=row['level']
                 index=next((i for i,threshold in enumerate(thresholds) if level<threshold),3)
                 self.assertEqual(row['selected_pointer'],0x51000000+8192*index)
+
+    def test_original_layout_manager_defers_hdf_admission_while_native_pipeline_reports_busy(self):
+        from scripts import analyze_gr2_native_contract as native
+        self.assertTrue(hasattr(native,'probe_buffer_layout_manager'))
+        for busy in ({},{0x342:2},{0x343:1},{0x344:1},{0x345:1}):
+            with self.subTest(busy=busy):
+                result=native.probe_buffer_layout_manager(component('gr2','b01firm8'),1,1,busy)
+                self.assertEqual(result['transition_requests'],[] if busy else [0])
+                self.assertEqual(result['final_layout'],1 if busy else 0)
+                self.assertEqual(result['deferred'],int(bool(busy)))
+                self.assertTrue(result['effect_property_preserved']);self.assertTrue(result['stack_preserved'])
+        result=native.probe_buffer_layout_manager(component('gr2','b01firm8'),0,0,{0x344:1})
+        self.assertEqual(result['transition_requests'],[]);self.assertEqual(result['final_layout'],0)

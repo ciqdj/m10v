@@ -757,6 +757,35 @@ def probe_buffer_pool_transitions(code:bytes,sequence:tuple)->dict:
                 stack_preserved=stack_ok,callee_saved_preserved=callee_ok,hardware_tested=False,
                 scope='Original A00DF846 idle destruction/repopulation/inverse mapping across one arena; constructors/destructors, idle semaphore counts and locks are fixtures. No outstanding image blocks or live threads. Not transactional rejection, mid-capture admission or hardware lifecycle proof.')
 
+def probe_buffer_layout_manager(code:bytes,current:int,hdf_strength:int,busy_properties:dict)->dict:
+    """Original manager/phase guard, with modeled HDF decision and transition."""
+    official_profile(code,'gr2')
+    if type(current) is not int or not 0<=current<5 or type(hdf_strength) is not int or not 0<=hdf_strength<=3:raise ValueError('audited layout/HDF strength required')
+    if any(key not in (0x342,0x2BF,0x1B,0x343,0x346,0x2D8,0x344,0x345) or type(value) is not int or not 0<=value<=0xffffffff for key,value in busy_properties.items()):raise ValueError('audited native busy properties required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);uc.mem_write(0xA0129C20,bytes([current]));properties={0:6,0x2D:0,**busy_properties};before=properties[0x2D]
+    transitions=[];writes=[];reads=[];decisions=[]
+    def boundary(machine,address,size,unused):
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1)]
+        if address==0xA00E40CA:
+            result=args[0];selected=0 if hdf_strength and result==1 else result;decisions.append([result,selected]);machine.reg_write(r.UC_ARM_REG_R0,selected);return
+        if address in (0xA0039F9C,0xA003A01A):raise RuntimeError('original pool manager assertion')
+        if address==0xA00E0E2E:reads.append(args[0]);value=properties.get(args[0],0)
+        elif address==0xA00E0C94:
+            writes.append(args);properties[args[0]]=args[1];value=0
+        elif address==0xA00DF846:
+            transitions.append(args[0]);machine.mem_write(0xA0129C20,bytes([args[0]]));value=0
+        else:raise RuntimeError('unexpected pool manager boundary')
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA00E40CA,0xA00E0E2E,0xA00E0C94,0xA00DF846,0xA0039F9C,0xA003A01A):uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001F001)
+    uc.emu_start(0xA00E4095,0x5001F000,count=10000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001F000:raise RuntimeError('original pool manager exceeded CPU budget')
+    return dict(transition_requests=transitions,final_layout=uc.mem_read(0xA0129C20,1)[0],deferred=properties.get(0x25D),
+                decisions=decisions,property_reads=reads,property_writes=writes,effect_property_preserved=properties[0x2D]==before,
+                stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000,hardware_tested=False,
+                scope='Original A00E4094 manager, A00E5D92 selector, A00E3FD6 busy guard and current-bank getter. Normal camera-mode6 fixture. HDF result1->0 override and actual pool transition/property storage are explicit models; original idle transitions are independently tested. Not a native installed hook, concurrent admission or live camera-mode proof.')
+
 def probe_clarity_entry(code:bytes,strength:int,*,hdr:bool=False)->dict:
     """Original Clarity/HDR prelude through coefficient admission or bypass.
 
@@ -969,7 +998,7 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
-def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None,custom_record:bytes|None=None)->dict:
+def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=None,custom_record:bytes|None=None,hdf_snapshot:tuple|None=None)->dict:
     """Original fixed-block image pool/factory/clone/retirement CPU evidence.
 
     Extra bytes change only the size table in synthetic RAM. Mutex operations
@@ -977,7 +1006,8 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     helpers, property setters, zeroing/copying and releases execute unchanged.
     """
     if type(extra) is not int or not 0<=extra<=16384 or extra&3:raise ValueError('bounded aligned synthetic inline extension required')
-    if custom_record is not None and (not native_runtime or extra!=128+12288 or len(custom_record)!=12288):raise ValueError('native runtime and complete inline custom record required')
+    if custom_record is not None and (not native_runtime or extra not in (128+12288,128+12288+16) or len(custom_record)!=12288):raise ValueError('native runtime and complete inline custom record required')
+    if hdf_snapshot is not None and (not native_runtime or extra!=128+12288+16 or len(hdf_snapshot)!=2 or type(hdf_snapshot[0]) is not int or not 0<=hdf_snapshot[0]<=3 or type(hdf_snapshot[1]) is not int or not 0<=hdf_snapshot[1]<=0xffffffff):raise ValueError('independent HDF snapshot and reserved image tail required')
     from unicorn import UC_HOOK_CODE
     from unicorn import arm_const as r
     uc=runtime_machine(code);uc.mem_map(0xA1000000,0x400000);stop=0x5001f000;stack=0x50018000
@@ -1015,7 +1045,7 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     constructor_zeroed=bytes(uc.mem_read(source,payload_bytes))==b'\x01'+bytes(payload_bytes-1)
     count_after=word(0x5000D000+0x347*4)
     frame_clone={}
-    if owner_entry and extra in (128,128+12288):
+    if owner_entry and extra in (128,128+12288,128+12288+16):
         run(native_runtime['symbols']['m10v_library_init'],0x50002000,thumb=False)
         if custom_record is not None:
             import zlib
@@ -1024,6 +1054,8 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
             frame_clone['freeze']=run(native_runtime['symbols']['gr2_frame_freeze_custom'],source,0x50002000,2,0x12345678,0x56000000,thumb=False)
         else:frame_clone['freeze']=run(native_runtime['symbols']['gr2_frame_freeze'],source,0x50002000,2,0x12345678,thumb=False)
     elif extra:uc.mem_write(source+0xfb0c,b'\xa5'*extra)
+    hdf_clone={};hdf_retired=[]
+    if hdf_snapshot is not None:hdf_clone['freeze']=run(native_runtime['symbols']['gr2_hdf_frame_freeze'],source,*hdf_snapshot,thumb=False)
     original=bytes(uc.mem_read(source,payload_bytes));clone=run(0xA029B57C if owner_entry else 0xA00E1E9E,source)
     clone_matches=bytes(uc.mem_read(clone,payload_bytes))==original
     inline_cloned=not extra or bytes(uc.mem_read(clone+0xfb0c,extra))==original[0xfb0c:]
@@ -1033,6 +1065,9 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
         frame_clone['read']=run(native_runtime['symbols']['gr2_frame_read'],clone,0x50003080,thumb=False)
         frame_clone['matches']=bytes(uc.mem_read(0x50003080,128))==original[0xfb0c:0xfb8c]
         if custom_record is not None:frame_clone['custom_record_matches']=bytes(uc.mem_read(clone+0xfb8c,12288))==custom_record
+    if hdf_snapshot is not None:
+        hdf_clone['read']=run(native_runtime['symbols']['gr2_hdf_frame_read'],clone,0x50003100,thumb=False)
+        hdf_clone['matches']=bytes(uc.mem_read(0x50003100,16))==original[0x12b8c:0x12b9c]
     owner_live=[];owner_rejected=[];owner_retired=[]
     if owner_entry:
         owner_live=[run(owner_entry,pointer,thumb=False) for pointer in (source,clone)]
@@ -1046,6 +1081,7 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     uc.mem_write(0x50004000,struct.pack('>I',source));run(0xA029B522,0x50004000)
     retired_slot_cleared=word(0x50004000)==0;count_retired=word(0x5000D000+0x347*4)
     if owner_entry:owner_retired=[run(owner_entry,pointer,thumb=False) for pointer in (source,clone)]
+    if hdf_snapshot is not None:hdf_retired=[run(native_runtime['symbols']['gr2_hdf_frame_read'],pointer,0x50003100,thumb=False) for pointer in (source,clone)]
     # MPF links overwrite the poison word after the generic free marks 'void'.
     # Assert the actual released header is no longer live, not a retained tag.
     invalid=bytes(uc.mem_read(source-8,4))!=b'IMG ' and bytes(uc.mem_read(clone-8,4))!=b'IMG '
@@ -1061,7 +1097,7 @@ def probe_image_object_pools(code:bytes,*,extra:int=0,native_runtime:dict|None=N
     return dict(linear_region_base=linear_base,linear_region_limit=linear_limit,linear_cursor_after_pools=linear_cursor,
                 pools_within_linear_region=all(linear_base<=address and address+count*block<=linear_limit for address,count,block in pool_creates),
                 pools_exclude_runtime=all(address>=0xA0800000 or address+count*block<=0xA0798000 for address,count,block in pool_creates),
-                native_frame_clone=frame_clone,native_owner_live=owner_live,native_owner_rejected=owner_rejected,native_owner_retired=owner_retired,pool_counts=[row[1] for row in pool_creates],pool_block_bytes=[row[2] for row in pool_creates],
+                native_frame_clone=frame_clone,native_hdf_clone=hdf_clone,native_hdf_retired=hdf_retired,native_owner_live=owner_live,native_owner_rejected=owner_rejected,native_owner_retired=owner_retired,pool_counts=[row[1] for row in pool_creates],pool_block_bytes=[row[2] for row in pool_creates],
                 pool_data=[hex(row[0]) for row in pool_creates],inline_extra=extra,constructor_zeroed=constructor_zeroed,
                 header_magic=header[:4].decode('ascii'),object_kind=struct.unpack_from('>I',header,4)[0],
                 source=hex(source),clone=hex(clone),counter_after_construct=count_after,clone_matches=clone_matches,

@@ -46,3 +46,45 @@ class Gr2HdfTests(unittest.TestCase):
             u.mem_write(base,original);u.mem_write(base+offset,bytes([original[offset]^1]));before=bytes(u.mem_read(base,capacity))
             self.assertEqual(call(runtime['symbols']['gr2_hdf_prepare_bands'],[base,capacity,1]),0xffffffff)
             self.assertEqual(bytes(u.mem_read(base,capacity)),before)
+
+    def test_independent_hdf_frame_snapshot_preserves_film_state_and_rejects_stale_or_corrupt_owners(self):
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        from tests import test_gr2_capture as capture_tests
+        import zlib
+        code=component('gr2','b01firm8')
+        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(code,{},Path(folder))
+        self.assertIn('gr2_hdf_frame_freeze',runtime['symbols']);self.assertIn('gr2_hdf_frame_read',runtime['symbols'])
+        u=runtime_machine(code);u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']));u.mem_map(0x51000000,0x20000)
+        context=0x51000008;offset=0x12b8c;body=offset+16;out=0x50003000
+        capture_tests.Gr2CaptureTests.owner_pool(self,u,extra=128+12288+16)
+        u.mem_write(context-8,b'IMG '+bytes(4));u.mem_write(context,b'\xa5'*offset+bytes(16));prefix=bytes(u.mem_read(context,offset))
+        call=lambda name,args:runtime_tests.Gr2RuntimeBuildTests.call(self,u,runtime['symbols'][name],args)
+        for strength in range(4):
+            u.mem_write(context+offset,bytes(16));sequence=0x12345678+strength
+            self.assertEqual(call('gr2_hdf_frame_freeze',[context,strength,sequence]),1)
+            self.assertEqual(bytes(u.mem_read(context,offset)),prefix)
+            self.assertEqual(call('gr2_hdf_frame_read',[context,out]),1)
+            raw=bytes(u.mem_read(out,16));self.assertEqual(struct.unpack('>4I',raw),(0x47324844,0x10000|strength,sequence,zlib.crc32(raw[:12])))
+            self.assertEqual(call('gr2_hdf_frame_freeze',[context,(strength+1)%4,sequence+1]),0)
+            self.assertEqual(bytes(u.mem_read(context+offset,16)),raw)
+        before=bytes(u.mem_read(context,body))
+        self.assertEqual(call('gr2_hdf_frame_freeze',[context,4,0]),0);self.assertEqual(bytes(u.mem_read(context,body)),before)
+        self.assertEqual(call('gr2_hdf_frame_read',[context,context+offset]),0);self.assertEqual(bytes(u.mem_read(context,body)),before)
+        u.mem_write(out,b'\xa5'*16);u.mem_write(context+offset+12,bytes(4))
+        self.assertEqual(call('gr2_hdf_frame_read',[context,out]),0);self.assertEqual(bytes(u.mem_read(out,16)),b'\xa5'*16)
+        u.mem_write(context+offset,bytes(16));u.mem_write(context-8,b'void')
+        self.assertEqual(call('gr2_hdf_frame_freeze',[context,1,1]),0);self.assertEqual(bytes(u.mem_read(context+offset,16)),bytes(16))
+
+    def test_original_image_factory_clones_and_retires_independent_hdf_snapshot_without_extra_references(self):
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        from scripts.analyze_gr2_native_contract import probe_image_object_pools
+        code=component('gr2','b01firm8')
+        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(code,{},Path(folder))
+        result=probe_image_object_pools(code,extra=128+12288+16,native_runtime=runtime,hdf_snapshot=(3,7))
+        self.assertEqual(result['native_owner_live'],[0x12b9c]*2)
+        self.assertEqual(result['native_hdf_clone'],dict(freeze=1,read=1,matches=True))
+        self.assertEqual(result['native_hdf_retired'],[0,0])
+        self.assertTrue(result['constructor_zeroed']);self.assertTrue(result['all_blocks_released'])
+        self.assertTrue(result['pools_within_linear_region']);self.assertTrue(result['pools_exclude_runtime'])
+        self.assertEqual(result['pool_counts'],[60,91]);self.assertEqual(result['pool_block_bytes'],[0x12ba4,0x7f00])

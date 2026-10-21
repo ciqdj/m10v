@@ -32,7 +32,7 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         self.assertTrue(hasattr(module,'memory_reservations'))
         code=component('gr2','b01firm8');rows=module.memory_reservations(code)
         self.assertEqual([(v['address'],v['record_index'],v['expected'],v['replacement']) for v in rows],
-                         [(0xa0023154,0,0xa0798000,0xa0800000),(0xa01137ec,1,0xfb0c,0x12b8c)])
+                         [(0xa0023154,0,0xa0798000,0xa0800000),(0xa01137ec,1,0xfb0c,0x12b9c)])
         for row in rows:
             self.assertEqual(struct.unpack_from('>I',code,row['source_file_offset'])[0],row['expected'])
             self.assertEqual(row['install_stage'],'before_original_module_load')

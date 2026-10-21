@@ -1,6 +1,11 @@
 #ifndef M10V_GR2_HDF_H
 #define M10V_GR2_HDF_H
 #include <stdint.h>
+#define GR2_HDF_FRAME_OFFSET 0x12b8cu
+#define GR2_IMAGE_BODY_BYTES (GR2_HDF_FRAME_OFFSET+16u)
+typedef struct {uint32_t magic,control,sequence,crc;} gr2_hdf_frame;
+int gr2_hdf_frame_freeze(uint8_t *context,uint32_t strength,uint32_t sequence);
+int gr2_hdf_frame_read(const uint8_t *context,gr2_hdf_frame *out);
 #define GR2_HDF_BANDS 11u
 #define GR2_HDF_CURVE_OFFSET 0xe040u
 #define GR2_HDF_CURVE_BYTES 8192u

@@ -100,7 +100,7 @@ def memory_reservations(official:bytes)->list[dict]:
     segments=parse_executable_load_map(official);result=[]
     for address,record,expected,replacement,purpose in (
         (0xA0023154,0,BASE,LIMIT,'exclude runtime window from original C heap'),
-        (0xA01137EC,1,0xFB0C,0xFB0C+128+12288,'reserve inline immutable capture state and custom record')):
+        (0xA01137EC,1,0xFB0C,0xFB0C+128+12288+16,'reserve inline immutable capture state, custom record and independent HDF snapshot')):
         row=segments[record]
         if not row['address']<=address<=row['address']+row['length']-4:raise ValueError('reservation literal load owner changed')
         offset=row['source_file_offset']+address-row['address']
@@ -266,7 +266,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     report['menu_raster_classifier_source_offset']=source
 
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
-                  hdf_coefficients_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,
+                  hdf_coefficients_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,hdf_frame_bytes=16,
                   effect_name_contract=text_contract,configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
                   configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),

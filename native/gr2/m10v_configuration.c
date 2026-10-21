@@ -1,4 +1,5 @@
 #include "m10v_configuration.h"
+#include "m10v_hdf.h"
 #include "m10v_sd.h"
 #include "m10v_storage.h"
 #include "../gr3/m10v_sd_library.h"
@@ -62,7 +63,7 @@ int gr2_configuration_read(m10v_library_state *out){
     unlock();return ok;
 }
 int gr2_configuration_freeze(uint8_t *context,uint32_t seed){
-    uint32_t body=gr2_image_owner_bytes(context);if(body!=0xfb8cu&&body!=0x12b8cu)return 0;
+    uint32_t body=gr2_image_owner_bytes(context);if(body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)return 0;
     static const uint8_t carriers[5]={9,10,11,18,8};
     m10v_gr2_frame existing;
     if(gr2_frame_read(context,&existing))return !context[0x408]||context[0x408]==carriers[existing.slot];

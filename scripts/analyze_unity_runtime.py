@@ -299,7 +299,7 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
             if activation_fixture and first==2:
                 # Explicit pool geometry fixture; original factory/pool
                 # initialization is executed in its independent owner probes.
-                block=0x12b94;pool=0xA05FB0E8;pool_base=0xA0B00020
+                block=struct.unpack('>I',machine.mem_read(0xA01137EC,4))[0]+8;pool=0xA05FB0E8;pool_base=0xA0B00020
                 machine.mem_write(0xA0129C54,struct.pack('>I',pool))
                 machine.mem_write(pool,struct.pack('>5I2H',0x4d504c20,0x01000000,block,60*block,0,1,0))
                 machine.mem_write(0xA05F8E30,struct.pack('>6I',0xffffffff,pool_base,60,60*block,block,pool_base))
