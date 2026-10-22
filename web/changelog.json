@@ -2,17 +2,31 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.7",
+      "date": "2026-10-22",
+      "title": "上线两档自定义焦距，补齐服务器构建体积预算",
+      "changes": [
+        "GR III 保留两档裁切，支持机内分别设置 28–100mm、1mm 步进并保存；入口为 MENU → 设置 → 自定义裁切焦距。",
+        "在原有 960 KiB 固件增长预算上，为新增焦距模块、文字和画幅适配预留有界 16 KiB；各构建器与独立回读共用 976 KiB 上限，继续检查原始指令、区段、校验和及机型隔离。",
+        "修复上一提交在服务器调试构建阶段触发预算拒绝的问题，并为超限错误增加实际字节数。保留方块世界等既有功能；GR IIIx／GR IV 不启用自定义焦距。离线验证不替代机身实拍及完整 DNG 验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.6",
       "date": "2026-10-22",
       "title": "GR III 支持机内自定义两档裁切焦距",
       "changes": [
         "GR III 2.10 保留两档裁切，在 MENU → 设置 → 自定义裁切焦距中分别按 1mm 调整 28–100mm，OK 保存、MENU 取消；默认仍为原厂 35mm／50mm，关闭裁切为 28mm。",
         "接通焦距切换、数码裁切取景、JPEG 尺寸和逐张照片裁切记录，兼容已有画幅；两份带 CRC 的机内存档支持回读校验与损坏恢复，保存失败显示提示。",
-        "GR IIIx／GR IV 不启用此项。保留方块世界、Charmera、五槽胶卷库、自定义 LUT 和现有水印；最终固件已做离线 Hook 回读与 ARM 执行验证，未完成机身实拍及完整 DNG 验收。"
+        "GR IIIx／GR IV 不启用此项。保留方块世界、Charmera、五槽胶卷库、自定义 LUT 和现有水印；最终固件已做离线 Hook 回读与 ARM 执行验证，未完成机身实拍及完整 DNG 验收。",
+        "此提交的宝塔部署因服务器调试固件超出旧体积预算而失败，已自动回退；源码已推送，不代表该版本成功上线。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "59d80c167553591b35ab7a29249ae1b23a055bb6",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/59d80c167553591b35ab7a29249ae1b23a055bb6"
     },
     {
       "version": "2026.10.22.5",
@@ -24,8 +38,8 @@
         "效果只处理静态 JPEG，取景与 RAW 不像素化；需更新固件后使用新胶卷。GR IV 不开放本效果。按用户授权完成离线验证后直接发布，尚未实机验收。"
       ],
       "commit": "028270bdf3ece83ec6bacfddfee723a93eaa037f",
-      "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/028270bdf3ece83ec6bacfddfee723a93eaa037f"
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39776198431"
     },
     {
       "version": "2026.10.22.4",

@@ -1,6 +1,6 @@
-// Charmera adds 35,584 bytes of immutable enum artwork and a bounded live
-// profile/slider adapter. Keep construction and independent audits on one
-// ceiling; do not remove section/preimage/tail or final decode checks.
-// 960 KiB reserves the former 896 KiB ceiling plus 64 KiB for this addition.
-// Measured build footprints are recorded with the C03 release evidence.
-export const MAX_NATIVE_RTOS_GROWTH=960*1024;
+// Shared construction and independent readback ceiling. The existing 960 KiB
+// includes immutable film/icon data. Reserve a further bounded 16 KiB for the
+// two-slot focal runtime, captions, controller and aspect adapters; compiler
+// versions produce different ARM sizes. Keep preimage, section, tail and final
+// decode verification over the entire expanded extent.
+export const MAX_NATIVE_RTOS_GROWTH=976*1024;

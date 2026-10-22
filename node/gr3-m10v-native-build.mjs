@@ -461,7 +461,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
   // Reserve 64 KiB for the new immutable LUT/icon bank and native profiles.
   // Mapping/readback/section preservation checks below still cover the whole extent.
-  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,'native RTOS growth invalid');
+  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,`native RTOS growth invalid: ${growth} bytes exceeds budget ${MAX_NATIVE_RTOS_GROWTH}`);
   const insertion=rtos.offset+rtos.size;
   const target=Buffer.concat([decoded.subarray(0,insertion),Buffer.alloc(growth),decoded.subarray(insertion)]);
   target.writeUInt32LE(newPayload,rtos.offset+12);
