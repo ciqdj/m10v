@@ -91,6 +91,16 @@ class Gr2ConfigurationTests(unittest.TestCase):
         self.assertEqual(invoke('clear'),1);self.assertEqual(free(),before)
         self.assertEqual(self.call(u,sym['gr2_frame_read'],[context,out]),1)
         self.assertEqual(bytes(u.mem_read(context+0xfb8c,12288)),record)
+        # Only a new outer recipe clears the previous value-only snapshot;
+        # worker freeze and publication above deliberately retain it.
+        self.assertIn('gr2_configuration_begin',sym)
+        prefix=bytes(u.mem_read(context,0xfb0c));self.assertEqual(invoke('begin',context),0)
+        self.assertEqual(bytes(u.mem_read(context+0xfb0c,128+12288)),bytes(128+12288));self.assertEqual(bytes(u.mem_read(context,0xfb0c)),prefix)
+        u.mem_write(state,initial);self.assertEqual(invoke('publish',state,records),1);u.mem_write(context+0x408,b'\x0a')
+        self.assertEqual(invoke('begin',context),1);self.assertEqual(self.call(u,sym['gr2_frame_read'],[context,out]),1)
+        self.assertEqual(word(out+8),1);self.assertEqual(bytes(u.mem_read(out+16,104)),initial)
+        self.assertEqual(bytes(u.mem_read(context+0xfb8c,12288)),bytes(12288))
+        self.assertEqual(invoke('clear'),1);self.assertEqual(free(),before)
         if user:
             from unicorn import arm_const as r
             self.assertEqual(u.reg_read(r.UC_ARM_REG_CPSR)&31,16)

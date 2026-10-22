@@ -11,12 +11,20 @@ uint32_t gr2_hdf_buffer_layout(uint32_t mode,uint32_t drive,uint32_t auxiliary,u
  return selected;
 }
 
+int gr2_hdf_layout_supports_graph(void){
+ uint32_t bank=*(const volatile uint8_t *)(uintptr_t)0xA0129C20u;
+ const uint8_t *definition=(const uint8_t *)(uintptr_t)(0xA0112048u+23u*44u);
+ if(bank>4u||definition[0]!=0x17u||*(const uint32_t *)(definition+4)!=0x1f0e020u)return 0;
+ uint32_t count=*(const uint32_t *)(definition+20u+4u*bank);
+ return count>=2u&&count<=3u;
+}
+
 int gr2_hdf_prepare_pool(uint32_t strength){
  if(strength>3u||preparing||!gr2_ui_storage_ready())return 0;
  /* Off never releases a bank before the old effective setting is replaced. */
- if(!strength||*(volatile const uint8_t *)(uintptr_t)0xA0129C20u==0u)return 1;
+ if(!strength||gr2_hdf_layout_supports_graph())return 1;
  preparing=1;
  ((void (*)(void))(uintptr_t)0xA00E4095u)();
  preparing=0;
- return *(volatile const uint8_t *)(uintptr_t)0xA0129C20u==0u;
+ return gr2_hdf_layout_supports_graph();
 }

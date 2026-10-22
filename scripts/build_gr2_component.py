@@ -73,8 +73,8 @@ def build_gr2_component(official:bytes,runtime_report:dict)->tuple[bytes,dict]:
     graph=hdf_graph_hooks(official,symbols,len(runtime))
     if runtime_report.get('hdf_graph_hooks')!=graph:raise ValueError('HDF graph source contract differs')
     for row in graph:write(row['source_file_offset'],bytes.fromhex(row['expected_hex']),bytes.fromhex(row['patch_hex']),row['name']+' source hook',row['address'])
-    if runtime_report.get('menu_raster_classifier_patch_hex')!='2d6a':raise ValueError('private raster classifier contract differs')
-    write(offset(0xA039D60E,2),bytes.fromhex('2d68'),bytes.fromhex('2d6a'),'two private caption raster classes',0xA039D60E)
+    if runtime_report.get('menu_raster_classifier_patch_hex')!='2d6b':raise ValueError('private raster classifier contract differs')
+    write(offset(0xA039D60E,2),bytes.fromhex('2d68'),bytes.fromhex('2d6b'),'three private caption raster classes',0xA039D60E)
     at=0x20+14*20
     write(at,official[at:at+20],struct.pack('>5I',source_field,BASE,len(runtime),BASE+len(runtime),runtime_report['memory_bytes']-len(runtime)),'native module14 load record')
     checksum=compute_update_checksum(bytes(candidate[512:]),initial_position=struct.unpack_from('>I',candidate,0x20)[0])

@@ -68,3 +68,37 @@ class Gr2HdfConfigurationTests(unittest.TestCase):
                 self.assertEqual(result['engine_mode'],0);self.assertEqual(result['restored_mode'],tone)
                 self.assertEqual(result['hdf_filesystem_calls'],[]);self.assertTrue(result['stack_preserved'])
                 self.assertEqual(result['snapshot_valid'],int(tone==9))
+
+    def test_new_producer_epoch_refreshes_hdf_while_worker_freeze_keeps_queued_snapshot(self):
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        code=component('gr2','b01firm8')
+        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(code,{},Path(folder))
+        self.assertIn('gr2_hdf_configuration_begin',runtime['symbols'])
+        u=runtime_machine(code);u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']));u.mem_map(0x51000000,0x20000)
+        capture_tests.Gr2CaptureTests.owner_pool(self,u,extra=128+12288+16);context=0x51000008
+        u.mem_write(context-8,b'IMG '+bytes(4));u.mem_write(context,b'\xa5'*0x12b8c+bytes(16));prefix=bytes(u.mem_read(context,0x12b8c))
+        def kernel(machine,address,size,unused):
+            machine.reg_write(r.UC_ARM_REG_R0,17 if address==0xa00665cc else 0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        for address in (0xa00665cc,0xa0066d94,0xa00671b8):u.hook_add(UC_HOOK_CODE,kernel,begin=address,end=address)
+        call=lambda name,args:runtime_tests.Gr2RuntimeBuildTests.call(self,u,runtime['symbols'][name],args)
+        for bank in (0,2,3,4):
+            u.mem_write(0xa0129c20,bytes([bank]));self.assertEqual(call('gr2_hdf_configuration_publish',[1,10]),1)
+            self.assertEqual(call('gr2_hdf_configuration_begin',[context]),1)
+            self.assertEqual(call('gr2_hdf_configuration_publish',[3,11]),1)
+            self.assertEqual(call('gr2_hdf_configuration_freeze',[context]),1)
+            self.assertEqual(call('gr2_hdf_frame_read',[context,0x50003000]),1)
+            self.assertEqual(struct.unpack('>2I',u.mem_read(0x50003004,8)),(0x10001,10))
+            self.assertEqual(call('gr2_hdf_configuration_begin',[context]),1)
+            self.assertEqual(call('gr2_hdf_frame_read',[context,0x50003000]),1)
+            self.assertEqual(struct.unpack('>2I',u.mem_read(0x50003004,8)),(0x10003,11))
+        self.assertEqual(call('gr2_hdf_configuration_clear',[]),1)
+        self.assertEqual(call('gr2_hdf_configuration_begin',[context]),0)
+        self.assertEqual(call('gr2_hdf_frame_read',[context,0x50003000]),1)
+        self.assertEqual(struct.unpack('>2I',u.mem_read(0x50003004,8)),(0x10000,0))
+        self.assertEqual(call('gr2_hdf_configuration_publish',[3,12]),1)
+        self.assertEqual(call('gr2_hdf_configuration_freeze',[context]),1)
+        self.assertEqual(call('gr2_hdf_frame_read',[context,0x50003000]),1)
+        self.assertEqual(struct.unpack('>2I',u.mem_read(0x50003004,8)),(0x10000,0))
+        self.assertEqual(bytes(u.mem_read(context,0x12b8c)),prefix)

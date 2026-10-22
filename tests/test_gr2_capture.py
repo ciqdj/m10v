@@ -460,3 +460,32 @@ class Gr2CaptureTests(unittest.TestCase):
             self.assertTrue(handoff['source_primary_cleared']);self.assertTrue(handoff['clone_primary_cleared']);self.assertTrue(handoff['distinct_shared_jpeg'])
             self.assertEqual(handoff['hdf_freeze'],1);self.assertEqual(handoff['hdf_read'],1);self.assertEqual(handoff['hdf_values'],[0x10003,77])
             self.assertEqual(handoff['postprocessor_guard_calls'],[]);self.assertTrue(post['ring_restored']);self.assertTrue(post['property_counters_balanced'])
+
+    def test_original_scratch_alias_keeps_one_pixel_block_live_across_postprocessor_cleanup(self):
+        from scripts import analyze_gr2_native_contract as native
+        from tests.test_unity_update import component
+        runtime=self.build()
+        for effect in (0,12,17):
+            with self.subTest(effect=effect):
+                result=native.probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,postprocess_effect=effect,
+                                                         postprocess_original_prepare=True,postprocess_retain_scratch=True)
+                post=result['postprocessor'];retention=post['retention']
+                self.assertEqual(retention['refcount_before'],2);self.assertEqual(retention['refcount_after_original'],1)
+                for key in ('metadata_distinct','shared_data','pixel_pool_empty_before','alias_live_after_original','pixel_pool_empty_after_original',
+                            'data_access_after_original','alias_cleared','alias_retired','original_pixel_block_reclaimed'):
+                    self.assertTrue(retention[key],key)
+                self.assertTrue(post['primary_retained']);self.assertTrue(post['property_counters_balanced']);self.assertTrue(post['ring_restored'])
+
+
+class Gr2OriginalWorkerRouteTests(unittest.TestCase):
+    def test_original_worker_keeps_existing_input_and_completed_jpeg_frontends_separate(self):
+        from scripts.analyze_gr2_native_contract import probe_processing_worker_route
+        from tests.test_unity_update import component
+        code=component('gr2','b01firm8')
+        for message,handle,address,kind in ((0x20004001,0,0xa02aed1c,'primary-still'),
+                                            (0x20004001,0x12345000,0xa02aecb8,'existing-input'),
+                                            (0x20004002,0,0xa02aeecc,'secondary-still'),
+                                            (0x20004003,0,0xa02aefaa,'completed-jpeg')):
+            result=probe_processing_worker_route(code,message,external_buffer=handle)
+            self.assertEqual(result['frontend']['address'],address);self.assertEqual(result['frontend']['kind'],kind)
+            self.assertEqual(result['worker_frame_bytes'],16);self.assertEqual(len(result['notifications']),1)

@@ -1,4 +1,5 @@
 #include "m10v_boot.h"
+#include "m10v_hdf_control.h"
 #include "m10v_configuration.h"
 #include "m10v_effect_names.h"
 #include "m10v_settings_page.h"
@@ -23,6 +24,7 @@ int gr2_ui_storage_ready(void){
  * Called by the existing UI event owner, never startup/capture workers. */
 volatile uint32_t gr2_ui_boot_state;
 int gr2_ui_bootstrap(const uint32_t *message){
+    gr2_hdf_ui_bootstrap(message);
     if(gr2_ui_boot_state==3u)return 1;
     if(!message||((uintptr_t)message&3u)||gr2_ui_boot_state==1u)return 0;
     if(gr2_ui_boot_state==2u&&message[0]!=0x6000100Au&&message[0]!=0x60001016u)return 0;
@@ -30,9 +32,9 @@ int gr2_ui_bootstrap(const uint32_t *message){
     gr2_ui_boot_state=1;
     int ready=gr2_initialize_state()&&gr2_configuration_reload();
     if(ready){
-        ready=gr2_menu_entries_enable(1);
+        ready=gr2_menu_films_enable(1);
         if(ready&&!gr2_effect_names_refresh()){
-            gr2_menu_entries_enable(0);ready=0;
+            gr2_menu_films_enable(0);ready=0;
         }
     }
     gr2_ui_boot_state=ready?3u:2u;

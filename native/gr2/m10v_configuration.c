@@ -80,6 +80,13 @@ int gr2_configuration_freeze(uint8_t *context,uint32_t seed){
     }
     unlock();return ok;
 }
+int gr2_configuration_begin(uint8_t *context){
+ uint32_t body=gr2_image_owner_bytes(context);
+ if(body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)return 0;
+ uint32_t bytes=body==0xfb8cu?128u:128u+M10V_SD_RECORD_BYTES;
+ for(uint32_t i=0;i<bytes;i++)((volatile uint8_t *)context)[0xfb0cu+i]=0;
+ return gr2_configuration_freeze(context,0);
+}
 int gr2_configuration_clear(void){
     if(!lock())return 0;
     configuration *old=published;published=0;unlock();gr2_release(old);return 1;

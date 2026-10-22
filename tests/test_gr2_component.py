@@ -23,7 +23,7 @@ class Gr2ComponentTests(unittest.TestCase):
         before=parse_executable_load_map(official);after=parse_executable_load_map(candidate)
         self.assertFalse(audit['can_package']);self.assertFalse(audit['activation_ready'])
         self.assertEqual(candidate[0x170:0x180],official[0x170:0x180]);self.assertEqual(after[15],before[15])
-        self.assertEqual(after[0]['length'],before[0]['length']+52)
+        self.assertEqual(after[0]['length'],before[0]['length']+64)
         self.assertEqual(after[14]['address'],runtime['base']);self.assertEqual(after[14]['length'],runtime['code_bytes'])
         self.assertEqual(after[14]['zero_length'],runtime['memory_bytes']-runtime['code_bytes'])
         for index in range(1,14):
@@ -143,8 +143,16 @@ class Gr2ComponentTests(unittest.TestCase):
         for row in runtime['hdf_graph_hooks']:
             offset=row['source_file_offset'];expected=bytes.fromhex(row['patch_hex'])
             self.assertEqual(candidate[offset:offset+len(expected)],expected)
+        # Native special effects branch directly to AE842. The reservation
+        # dispatch must end before that entry, not install a long veneer there.
+        dispatch=next(row for row in runtime['hdf_graph_hooks'] if row['address']==0xa02ae83e)
+        self.assertEqual(len(bytes.fromhex(dispatch['patch_hex'])),4)
+        from scripts.analyze_unity_runtime import parse_executable_load_map
+        owner=next(row for row in parse_executable_load_map(official) if row['address']<=0xa02ae842<row['address']+row['length'])
+        at=owner['source_file_offset']+0xa02ae842-owner['address']
+        self.assertEqual(candidate[at:at+8],official[at:at+8])
         changed=copy.deepcopy(runtime);changed['hdf_graph_hooks'][0]['target']+=4
         with self.assertRaisesRegex(ValueError,'HDF graph source contract'):module.build_gr2_component(official,changed)
-        for fault in ('hdf_core','hdf_band'):
+        for fault in ('hdf_core','hdf_band','hdf_postprocess','hdf_production','hdf_preparation','hdf_reservation','hdf_reservation_dispatch'):
             proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,activation_fault=fault)
             self.assertEqual(proof['native_activation_ready'],0);self.assertEqual(proof['activation_syscalls'],[])

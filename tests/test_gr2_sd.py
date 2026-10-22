@@ -49,7 +49,7 @@ class Gr2SdTests(unittest.TestCase):
             elif address==0xa00652ce:value=directory['error']
             elif address==0xa00267ba:value=1
             elif address in (0xa002b0ee,0xa0027360,0xa00273a4,0xa00a2058,0xa0039de4):value=0
-            else:self.fail('original file/pool assertion')
+            else:self.fail('original file/pool assertion '+hex(address)+' caller '+hex(uc.reg_read(r.UC_ARM_REG_LR)))
             uc.reg_write(r.UC_ARM_REG_R0,value);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
         for address in (0xa00653bc,0xa0065324,0xa0024c3c,0xa0024d76,0xa00653a0,0xa0065318,0xa0065386,0xa0065428,0xa00652f0,0xa00652e2,0xa00652ce,0xa002b0ee,0xa0027360,0xa00273a4,0xa00a2058,0xa00267ba,0xa0039de4,0xa0039f9c,0xa003a01a):u.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
         self.assertIn('gr2_initialize_state',report['symbols'])
@@ -70,8 +70,8 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(struct.unpack('>H',u.mem_read(0x5000100c,2))[0],79);self.assertEqual(bytes(u.mem_read(0x5000103e,1)),b'\x01')
         self.assertEqual(self.call(u,report['symbols']['gr2_sd_custom_record'],[0x50001000,0,0x53000000,12288]),1)
         self.assertEqual(bytes(u.mem_read(0x53000000,12288)),pack[4096:]);self.assertEqual(tokens,{})
-        u.mem_write(0xa00b5bf8,struct.pack('>h',2));u.mem_write(0xa00b5bd4,struct.pack('>I',0x50006c00))
-        for i in range(2):u.mem_write(0x50006c00+14*i,struct.pack('>h',-2))
+        u.mem_write(0xa00b5bf8,struct.pack('>h',3));u.mem_write(0xa00b5bd4,struct.pack('>I',0x50006c00))
+        for i in range(3):u.mem_write(0x50006c00+14*i,struct.pack('>h',-2))
         u.mem_write(0xa06b6de0,b'\1');u.mem_write(0xa06b6de3,b'\1');u.mem_write(0xa00c22c0,struct.pack('>h',1))
         task=0xa05f5c28+68;u.mem_write(task+8,struct.pack('>2h',-1,-1));u.mem_write(task+24,struct.pack('>3h',20,0,20))
         # Automatic UI restoration uses actual journal/custom-snapshot file
@@ -85,9 +85,22 @@ class Gr2SdTests(unittest.TestCase):
         u.mem_write(0xA00C2C6C+0x20,bytes(8));u.mem_write(0xA061EAD0,struct.pack('>I',1))
         u.mem_write(0xA06AA6A0+0x61A8,struct.pack('>I',3));u.mem_write(0xA06AA6A0+0x61AC,b'H')
         for name in ('gr2_activation_ready','gr2_startup_complete'):u.mem_write(report['symbols'][name],struct.pack('>I',1))
+        # HDF boot admission now reads original busy property344. Provide
+        # the same initialized no-observer bank as the native menu fixtures.
+        u.mem_map(0x56000000,0x10000)
+        u.mem_write(0xa0129c38,struct.pack('>4I',0xa0129adc,0x56000000,0x56008000,0x383))
+        u.mem_write(0x56008000,struct.pack('>5I',0,0,0x383,0x56009000,0))
+        self.assertEqual(self.call(u,0xa00e0e2f,[0x344]),0)
+        # An existing independent HDF journal is restored through the same
+        # real FILE wrappers and its own original kernel mutex, without writes.
+        hdf_record=struct.pack('<5I',0x31464448,1,21,2,0)
+        files['H:/M10VHD1.BIN']=hdf_record+struct.pack('<I',zlib.crc32(hdf_record))
         message=0x50005F00;u.mem_write(message,struct.pack('>3I',0x60000001,0,0));count=len(writes)
         self.assertEqual(self.call(u,report['symbols']['gr2_ui_bootstrap'],[message]),1)
         self.assertEqual(word(report['symbols']['gr2_ui_boot_state']),3);self.assertEqual(len(writes),count)
+        self.assertEqual(word(report['symbols']['gr2_hdf_ui_boot_state']),3)
+        self.assertEqual(self.call(u,report['symbols']['gr2_hdf_configuration_read'],[0x50005e00,0x50005e04]),1)
+        self.assertEqual(struct.unpack('>2I',u.mem_read(0x50005e00,8)),(2,21))
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
         self.assertEqual(struct.unpack('>H',u.mem_read(0x5000500c,2))[0],79)
         pointer=self.call(u,report['symbols']['gr2_original_text'],[112,4])

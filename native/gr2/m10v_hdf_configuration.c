@@ -1,5 +1,6 @@
 #include "m10v_hdf_configuration.h"
 #include "m10v_hdf.h"
+#include "m10v_hdf_layout.h"
 #include "m10v_capture.h"
 static struct {uint32_t magic,strength,sequence;} cache;
 static int32_t mutex_id;
@@ -19,7 +20,7 @@ static int output(const uint32_t *pointer){
  return a&&!(a&3u)&&a<=UINT32_MAX-4u&&disjoint(a,4,(uintptr_t)&cache,sizeof(cache))&&disjoint(a,4,(uintptr_t)&mutex_id,4);
 }
 int gr2_hdf_configuration_publish(uint32_t strength,uint32_t sequence){
- if(strength>3u||(strength&&*(volatile const uint8_t *)(uintptr_t)0xA0129C20u!=0u)||!create()||!lock())return 0;
+ if(strength>3u||(strength&&!gr2_hdf_layout_supports_graph())||!create()||!lock())return 0;
  cache.strength=strength;cache.sequence=sequence;cache.magic=0x47324843u;needs_bank0=strength!=0;unlock();return 1;
 }
 int gr2_hdf_configuration_read(uint32_t *strength,uint32_t *sequence){
@@ -34,8 +35,18 @@ int gr2_hdf_configuration_freeze(uint8_t *context){
  if(gr2_hdf_frame_read(context,&existing))return 1;
  uint32_t strength,sequence;
  if(!gr2_hdf_configuration_read(&strength,&sequence)||
-    (strength&&*(volatile const uint8_t *)(uintptr_t)0xA0129C20u!=0u))return 0;
+    (strength&&!gr2_hdf_layout_supports_graph()))return 0;
  return gr2_hdf_frame_freeze(context,strength,sequence);
+}
+/* Preparation seals the recipe under the original stage6 mutex, before
+ * JPEG reservations. Cache failure seals off against later publication. */
+int gr2_hdf_configuration_begin(uint8_t *context){
+ if(gr2_image_owner_bytes(context)!=GR2_IMAGE_BODY_BYTES)return 0;
+ uint32_t strength=0,sequence=0;
+ int ready=gr2_hdf_configuration_read(&strength,&sequence)&&(!strength||gr2_hdf_layout_supports_graph());
+ for(uint32_t i=0;i<16u;i++)((volatile uint8_t *)context)[GR2_HDF_FRAME_OFFSET+i]=0;
+ int sealed=gr2_hdf_frame_freeze(context,ready?strength:0,ready?sequence:0);
+ return ready&&sealed;
 }
 int gr2_hdf_configuration_clear(void){
  if(mutex_id<=0)return 1;
@@ -45,3 +56,8 @@ int gr2_hdf_configuration_clear(void){
 
 /* Conservative pool hint only; never used as the per-frame setting value. */
 uint32_t gr2_hdf_configuration_needs_bank0(void){return needs_bank0!=0;}
+
+int gr2_hdf_reservation_required(uint8_t *context){
+ gr2_hdf_frame frame;
+ return gr2_hdf_frame_read(context,&frame)&&(frame.control&3u)&&gr2_hdf_layout_supports_graph();
+}

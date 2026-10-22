@@ -86,3 +86,14 @@ class Gr2HdfLayoutTests(unittest.TestCase):
         self.assertTrue(result['constant_pools_preserved']);self.assertTrue(result['live_pool_identities_match'])
         self.assertTrue(result['ring_metadata_reclaimed']);self.assertTrue(result['all_live_spans_bounded'])
         self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+
+    def test_original_layout_policy_admits_every_layout_with_two_jpeg_blocks(self):
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        code=component('gr2','b01firm8')
+        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(code,{},Path(folder))
+        self.assertIn('gr2_hdf_layout_supports_graph',runtime['symbols'])
+        u=runtime_machine(code);u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']))
+        for bank,expected in ((0,1),(1,0),(2,1),(3,1),(4,1),(5,0),(255,0)):
+            u.mem_write(0xa0129c20,bytes([bank]))
+            self.assertEqual(runtime_tests.Gr2RuntimeBuildTests.call(self,u,runtime['symbols']['gr2_hdf_layout_supports_graph'],[]),expected)

@@ -43,11 +43,11 @@ class Gr2BootTests(unittest.TestCase):
         runtime=self.build();self.assertTrue('gr2_ui_bootstrap' in runtime['symbols'])
         u=runtime_machine(component('gr2','b01firm8'));u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']))
         symbols=runtime['symbols'];calls=[];behavior={'storage':0,'fail':None}
-        names=['gr2_ui_storage_ready','gr2_initialize_state','gr2_configuration_reload','gr2_menu_entries_enable','gr2_effect_names_refresh']
+        names=['gr2_ui_storage_ready','gr2_initialize_state','gr2_configuration_reload','gr2_menu_films_enable','gr2_effect_names_refresh','gr2_hdf_ui_bootstrap']
         addresses={symbols[name]:name for name in names}
         def backend(machine,address,size,unused):
             name=addresses[address];arg=machine.reg_read(r.UC_ARM_REG_R0)
-            calls.append([name,arg] if name=='gr2_menu_entries_enable' else [name])
+            if name!='gr2_hdf_ui_bootstrap':calls.append([name,arg] if name=='gr2_menu_films_enable' else [name])
             if name=='gr2_ui_storage_ready':value=behavior['storage']
             else:
                 value=int(name!=behavior['fail'])
@@ -66,11 +66,13 @@ class Gr2BootTests(unittest.TestCase):
         self.assertEqual(calls,[])
         behavior['fail']='gr2_effect_names_refresh'
         self.assertEqual(event(0x6000100a),0)
-        self.assertEqual(calls,[['gr2_ui_storage_ready'],['gr2_initialize_state'],['gr2_configuration_reload'],['gr2_menu_entries_enable',1],['gr2_effect_names_refresh'],['gr2_menu_entries_enable',0]])
+        self.assertEqual(calls,[['gr2_ui_storage_ready'],['gr2_initialize_state'],['gr2_configuration_reload'],['gr2_menu_films_enable',1],['gr2_effect_names_refresh'],['gr2_menu_films_enable',0]])
         calls.clear();behavior['fail']=None
         self.assertEqual(event(0x60001016),1)
-        self.assertEqual(calls,[['gr2_ui_storage_ready'],['gr2_initialize_state'],['gr2_configuration_reload'],['gr2_menu_entries_enable',1],['gr2_effect_names_refresh']])
-        calls.clear();self.assertEqual(event(0x60000001),1);self.assertEqual(event(0x6000100a),1);self.assertEqual(calls,[])
+        self.assertEqual(calls,[['gr2_ui_storage_ready'],['gr2_initialize_state'],['gr2_configuration_reload'],['gr2_menu_films_enable',1],['gr2_effect_names_refresh']])
+        calls.clear();behavior['fail']='gr2_hdf_ui_bootstrap'
+        self.assertEqual(event(0x60000001),1);self.assertEqual(event(0x6000100a),1)
+        self.assertEqual(calls,[]);calls.clear()
         self.assertEqual(struct.unpack('>I',u.mem_read(symbols['gr2_ui_boot_state'],4))[0],3)
         u.mem_write(symbols['gr2_ui_boot_state'],struct.pack('>I',1));self.assertEqual(event(0x6000100a),0);self.assertEqual(calls,[])
 
@@ -93,3 +95,22 @@ class Gr2BootTests(unittest.TestCase):
         self.assertEqual([u.reg_read(r.UC_ARM_REG_R4+i) for i in range(8)],saved)
         self.assertEqual(u.reg_read(r.UC_ARM_REG_SP),0x50018000)
         self.assertEqual(bytes(u.mem_read(message,12)),struct.pack('>3I',0x6000100a,7,9))
+
+    def test_failed_film_journal_does_not_prevent_independent_hdf_restoration(self):
+        from scripts.analyze_gr2_native_contract import runtime_machine
+        from unicorn import UC_HOOK_CODE,arm_const as r
+        runtime=self.build();symbols=runtime['symbols'];self.assertIn('gr2_menu_hdf_enable',symbols)
+        u=runtime_machine(component('gr2','b01firm8'));u.mem_write(runtime['base'],bytes.fromhex(runtime['runtime_hex']))
+        values={'gr2_ui_storage_ready':1,'gr2_menu_hdf_enable':1,'gr2_hdf_reload':1,'gr2_initialize_state':0}
+        addresses={symbols[name]:name for name in values};events=[]
+        def backend(machine,address,size,unused):
+            if address==0xa00e0e2e:
+                self.assertEqual(machine.reg_read(r.UC_ARM_REG_R0),0x344);value=0
+            else:events.append(addresses[address]);value=values[addresses[address]]
+            machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        for address in (*addresses,0xa00e0e2e):u.hook_add(UC_HOOK_CODE,backend,begin=address,end=address)
+        u.mem_write(0x50003000,struct.pack('>3I',0x60000003,0,0))
+        self.assertEqual(self.call(u,symbols['gr2_ui_bootstrap'],[0x50003000]),0)
+        self.assertEqual(struct.unpack('>I',u.mem_read(symbols['gr2_ui_boot_state'],4))[0],2)
+        self.assertEqual(struct.unpack('>I',u.mem_read(symbols['gr2_hdf_ui_boot_state'],4))[0],3)
+        self.assertIn('gr2_menu_hdf_enable',events);self.assertIn('gr2_hdf_reload',events);self.assertEqual(events[-1],'gr2_initialize_state')
