@@ -110,7 +110,8 @@ def hdf_graph_hooks(official:bytes,symbols:dict,code_bytes:int)->list:
             (0xA014ACEC,'a928902820017388a9208608','gr2_hdf_band_chain','b4084b01471846c0'),
             (0xA02AF6CE,'b5f00004b09b2000210d','gr2_hdf_postprocess_chain','4b01471846c0'),
             (0xA02ADEA6,'b5f0000426002005b0ab','gr2_hdf_production_chain','4b01471846c0'),
-            (0xA02AE7F6,'002636ff200936c101806a311820','gr2_hdf_preparation_chain','b4084b01471846c046c0')):
+            (0xA02AE7F6,'002636ff200936c101806a311820','gr2_hdf_preparation_chain','b4084b01471846c046c0'),
+            (0xA029DEB8,'b5f80004200d0180','gr2_hdf_policy_chain','4b004718')):
         target=symbols.get(name)
         if type(target) is not int or target&3 or not BASE<=target<BASE+code_bytes:raise ValueError('native HDF graph ARM target differs')
         owners=[row for row in parse_executable_load_map(official)[:15] if row['address']<=address and address+len(bytes.fromhex(expected))<=row['address']+row['length']]
@@ -207,6 +208,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_configuration.c'),'-o',str(hdf_configuration)],check=True,capture_output=True)
     hdf_storage=out_dir/'hdf_storage.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_storage.c'),'-o',str(hdf_storage)],check=True,capture_output=True)
+    hdf_scheduling=out_dir/'hdf_scheduling.o'
+    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_scheduling.c'),'-o',str(hdf_scheduling)],check=True,capture_output=True)
     hdf_page=out_dir/'hdf_page.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_page.c'),'-o',str(hdf_page)],check=True,capture_output=True)
     hdf_control=out_dir/'hdf_control.o'
@@ -247,7 +250,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_settings_page.c'),'-o',str(settings_page)],check=True,capture_output=True)
     artwork=out_dir/'artwork.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_artwork.c'),'-o',str(artwork)],check=True,capture_output=True)
-    render_objects=[str(hdf_page),str(hdf_control),str(hdf_postprocess),str(hdf_graph),str(hdf_layout),str(hdf_hooks),str(hdf_configuration),str(hdf_storage),str(hdf),str(boot_ui),str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
+    render_objects=[str(hdf_scheduling),str(hdf_page),str(hdf_control),str(hdf_postprocess),str(hdf_graph),str(hdf_layout),str(hdf_hooks),str(hdf_configuration),str(hdf_storage),str(hdf),str(boot_ui),str(boot),str(planar),str(capture),str(storage),str(snapshot),str(services),str(cache),str(files),str(ui),str(sd),str(effect_names),str(configuration_object),str(settings_backend),str(settings_page),str(artwork)]
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
@@ -333,7 +336,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     report['menu_raster_classifier_source_offset']=source
 
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
-                  hdf_ui_control_compiled=True,hdf_menu_compiled=True,hdf_ui_restore_compiled=True,hdf_global_postprocess_compiled=True,hdf_graph_hooks_compiled=True,hdf_graph_preparation_compiled=True,hdf_coefficients_compiled=True,hdf_journal_compiled=True,hdf_configuration_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,hdf_frame_bytes=16,
+                  hdf_scheduling_policy_compiled=True,hdf_ui_control_compiled=True,hdf_menu_compiled=True,hdf_ui_restore_compiled=True,hdf_global_postprocess_compiled=True,hdf_graph_hooks_compiled=True,hdf_graph_preparation_compiled=True,hdf_coefficients_compiled=True,hdf_journal_compiled=True,hdf_configuration_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,hdf_frame_bytes=16,
                   effect_name_contract=text_contract,configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
                   configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),

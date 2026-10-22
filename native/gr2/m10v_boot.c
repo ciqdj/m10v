@@ -8,7 +8,7 @@ volatile uint32_t gr2_activation_ready;
 volatile uint32_t gr2_startup_complete;
 extern void gr2_finalize_chain(void);
 extern void gr2_hdf_layout_chain(void),gr2_hdf_core_chain(void),gr2_hdf_band_chain(void),gr2_hdf_postprocess_chain(void),gr2_hdf_production_chain(void);
-extern void gr2_hdf_preparation_chain(void),gr2_hdf_reservation_chain(void);
+extern void gr2_hdf_preparation_chain(void),gr2_hdf_reservation_chain(void),gr2_hdf_policy_chain(void);
 extern void gr2_startup_chain(void),gr2_producer_chain(void),gr2_jpeg_chain(void);
 extern void gr2_ui_event_chain(void),gr2_menu_route_chain(void),gr2_menu_descriptor_chain(void);
 extern uint32_t *gr2_menu_categories(uint32_t);
@@ -42,6 +42,7 @@ static int prepared(void){
        HALF(0xA02AE83Eu)!=0xF616u||HALF(0xA02AE840u)!=0xF95Bu||
        WORD(0xA00C4AF8u)!=0xB4084B01u||WORD(0xA00C4AFCu)!=0x471846C0u||
        WORD(0xA00C4B00u)!=(uint32_t)(uintptr_t)gr2_hdf_reservation_chain)return 0;
+    if(WORD(0xA029DEB8u)!=0x4B004718u||WORD(0xA029DEBCu)!=(uint32_t)(uintptr_t)gr2_hdf_policy_chain)return 0;
     if(WORD(0xA0023154u)!=0xA0800000u||WORD(0xA01137ECu)!=GR2_IMAGE_BODY_BYTES||
        WORD(0xA05F5400u)!=0x47700000u||WORD(0xA0044F4Cu)!=0xE12FFF1Eu||
        HALF(0xA039D60Eu)!=0x2D6Bu)return 0;

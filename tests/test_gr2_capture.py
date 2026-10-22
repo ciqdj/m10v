@@ -485,7 +485,27 @@ class Gr2OriginalWorkerRouteTests(unittest.TestCase):
         for message,handle,address,kind in ((0x20004001,0,0xa02aed1c,'primary-still'),
                                             (0x20004001,0x12345000,0xa02aecb8,'existing-input'),
                                             (0x20004002,0,0xa02aeecc,'secondary-still'),
-                                            (0x20004003,0,0xa02aefaa,'completed-jpeg')):
+                                            (0x20004003,0,0xa02aefaa,'completed-jpeg'),
+                                            (0x20004005,0,0xa02af0a2,'thumbnail')):
             result=probe_processing_worker_route(code,message,external_buffer=handle)
             self.assertEqual(result['frontend']['address'],address);self.assertEqual(result['frontend']['kind'],kind)
             self.assertEqual(result['worker_frame_bytes'],16);self.assertEqual(len(result['notifications']),1)
+
+    def test_original_clone_policy_enqueues_both_primary_family_members_but_skips_auxiliary_for_clarity(self):
+        from scripts.analyze_gr2_native_contract import probe_thumbnail_clone_scheduling
+        from tests.test_unity_update import component
+        code=component('gr2','b01firm8')
+        for sibling in (False,True):
+            for effect in (0,7,9,12,13,16,17,19):
+                with self.subTest(sibling=sibling,effect=effect):
+                    result=probe_thumbnail_clone_scheduling(code,effect,sibling=sibling)
+                    self.assertTrue(result['stack_preserved']);self.assertEqual(len(result['decisions']),1)
+                    decision=result['decisions'][0];self.assertEqual(decision['context'],result['parent'])
+                    self.assertEqual(decision['return_address'],0xa029e1f7 if sibling else 0xa029e25f)
+                    self.assertEqual(decision['live_r5'],result['main'] if sibling else 0)
+                    optimized=effect in (0,9)
+                    expected=([[0x20004005,result['auxiliary'],0]] if optimized else [])
+                    if sibling:expected.append([0x20004001,result['main'],0])
+                    expected.append([0x20004001,result['parent'],0])
+                    self.assertEqual(result['queues'],expected)
+                    self.assertEqual(result['clones'],[result['main'] if sibling else result['parent']] if optimized else [])

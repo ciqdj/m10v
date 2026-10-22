@@ -1076,7 +1076,7 @@ def probe_isp_color_recipe(code:bytes,tone:int,*,native_runtime:dict|None=None)-
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=[],hardware_tested=False,
                 scope='Original A0141E68 frame color-mode +408 dispatch, complete 64-byte descriptor and auxiliary output, original software-float and property helpers. Synthetic metadata and initialized no-observer property bank; no ISP hardware or neutralization hook installation.')
 
-def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False,postprocess_effect:int|None=None,postprocess_original_prepare:bool=False,postprocess_render:bool=False,postprocess_handoff_clone:bool=False,postprocess_retain_scratch:bool=False,postprocess_hdf:int|None=None,postprocess_execute_hdf:bool=False,postprocess_clarity_strength:int=1,initial_layout:int=0,postprocess_production_epoch:bool=False,postprocess_fail_tag:int|None=None,postprocess_fail_alias:bool=False)->dict:
+def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int=0,workspace_owner:bool=False,hdf_graph:bool=False,postprocess_effect:int|None=None,postprocess_original_prepare:bool=False,postprocess_render:bool=False,postprocess_handoff_clone:bool=False,postprocess_retain_scratch:bool=False,postprocess_hdf:int|None=None,postprocess_execute_hdf:bool=False,postprocess_clarity_strength:int=1,initial_layout:int=0,postprocess_production_epoch:bool=False,postprocess_fail_tag:int|None=None,postprocess_fail_alias:bool=False,postprocess_secondary:int=0,postprocess_policy_strength:int|None=None,admit_hdf_layout:bool=False)->dict:
     """Actual system MPL -> BUFF -> IMG factories and kernel pool identities.
 
     Empty kernel tables and synchronization services are fixtures. Linear and
@@ -1098,7 +1098,7 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         for index in range(count):uc.mem_write(table+index*stride,struct.pack('>h',-2))
     uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
     body=next(row['replacement'] for row in native_runtime['memory_reservations'] if row['address']==0xA01137EC)
-    uc.mem_write(0xA01137EC,struct.pack('>I',body));created=[];services=[];pages=[];linear=[];abi=True;buffer_handles=set();peak_jpeg_blocks=0;original_returns=[];in_postprocess=False;allocation_faults=[]
+    uc.mem_write(0xA01137EC,struct.pack('>I',body));created=[];services=[];pages=[];linear=[];abi=True;buffer_handles=set();peak_jpeg_blocks=0;original_returns=[];in_postprocess=False;allocation_faults=[];layout_entries=[];destroyed_pools=[]
     saved=[0x74560000+i for i in range(8)]
     def boundary(machine,address,size,unused):
         nonlocal peak_jpeg_blocks
@@ -1111,7 +1111,17 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
             if in_postprocess and postprocess_fail_tag==args[0]:
                 allocation_faults.append(args[0]);machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
             return
-        if address==0xA00DF846:machine.reg_write(r.UC_ARM_REG_R0,initial_layout);return
+        if address==0xA00DF846:
+            if not layout_entries:machine.reg_write(r.UC_ARM_REG_R0,initial_layout)
+            layout_entries.append(machine.reg_read(r.UC_ARM_REG_R0));return
+        if address==0xA0025160:
+            if args[0]==word(0xA0129C54):raise RuntimeError('buffer transition attempted to delete the image pool')
+            destroyed_pools.append(args[0]);return
+        if address==0xA00271DA:
+            bank=bytes(machine.mem_read(0xA0129C20,1))[0]
+            counts=[struct.unpack('>i',machine.mem_read(0xA0112048+44*i+20+4*bank,4))[0] for i in range(69) if word(0xA06BC708+20*i+8)==args[0]]
+            if not counts:raise RuntimeError('unknown idle buffer semaphore')
+            machine.reg_write(r.UC_ARM_REG_R0,max(counts));machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR));return
         if address in (0xA00DFF96,0xA00E0326):
             buffer_handles.add(args[0])
             live={word(pointer+4) for pointer in buffer_handles if bytes(machine.mem_read(pointer,4))==b'BUFF' and machine.mem_read(pointer+16,1)[0]==0x17}
@@ -1122,9 +1132,9 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         if address in (0xA0024E16,0xA0024B0C):created.append([address,*args[:3]]);return
         if address==0xA0024BC4:
             header=machine.reg_read(r.UC_ARM_REG_R4);linear.append([word(header+4),word(header+8)]);return
-        services.append(address);value=0 if address in (0xA0027360,0xA00273A4,0xA0027188,0xA0026FBA,0xA0027526,0xA00276A2) else len(services)
+        services.append(address);value=0 if address in (0xA0027360,0xA00273A4,0xA0027188,0xA0026FBA,0xA0027526,0xA00276A2,0xA00274AC,0xA0026F40,0xA00272E4) else len(services)
         machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0027188,0xA0026FBA,0xA0027526,0xA00276A2,0xA00DF846,0xA029A94E,0xA00E02AA,0xA00DFF96,0xA00E0326,0xA029AA1A,0xA02AF926,0xA0039F9C,0xA003A01A):
+    for address in (0xA0024E16,0xA0024B0C,0xA0024BC4,0xA0027270,0xA0027360,0xA00273A4,0xA0027434,0xA0026EC6,0xA0027188,0xA0026FBA,0xA0027526,0xA00276A2,0xA00271DA,0xA00274AC,0xA0026F40,0xA00272E4,0xA0025160,0xA00DF846,0xA029A94E,0xA00E02AA,0xA00DFF96,0xA00E0326,0xA029AA1A,0xA02AF926,0xA0039F9C,0xA003A01A):
         uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
     def memory(machine,access,address,size,value,unused):
         page=address&~4095
@@ -1204,24 +1214,43 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
     if postprocess_effect is not None:
         if type(postprocess_effect) is not int or not 0<=postprocess_effect<=20:raise ValueError('audited original effect required')
         properties={};property_calls=[];preparation_trace=[];stage_locks=set()
+        def property_boundary(machine,address,size,unused):
+            key=machine.reg_read(r.UC_ARM_REG_R0);value=machine.reg_read(r.UC_ARM_REG_R1)
+            property_calls.append([address,key,value]);result=0
+            if address==0xA02AB5F2:stage_locks.add(key)
+            elif address==0xA02AB61C:stage_locks.discard(key)
+            if address==native_runtime['symbols']['gr2_ui_storage_ready']:result=1
+            elif address==0xA00E0E2E:result=properties.get(key,0)
+            elif address==0xA00E0C94:properties[key]=value
+            machine.reg_write(r.UC_ARM_REG_R0,result);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        for address in (0xA00E127A,0xA00E1286,0xA00E0E2E,0xA00E0C94):uc.hook_add(UC_HOOK_CODE,property_boundary,begin=address,end=address)
+        admission={}
+        if admit_hdf_layout:
+            if initial_layout!=1:raise ValueError('live-image admission fixture starts in bank1')
+            uc.mem_write(0xA00E5D92,bytes.fromhex(native_runtime['buffer_layout_hook_patch_hex']))
+            uc.hook_add(UC_HOOK_CODE,property_boundary,begin=native_runtime['symbols']['gr2_ui_storage_ready'],end=native_runtime['symbols']['gr2_ui_storage_ready'])
+            image_head=word(0xA0129C54);image_id=struct.unpack('>H',uc.mem_read(image_head+20,2))[0]
+            image_record=word(0xA00B5BDC)+24*(image_id-1)
+            before_kernel=bytes(uc.mem_read(image_record,24));before_header=bytes(uc.mem_read(image_head,28))
+            before_owner=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
+            properties.update({0:6,0x2d:0})
+            returned=run(native_runtime['symbols']['gr2_hdf_prepare_pool'],3,thumb=False)
+            admission=dict(scope='Original idle manager, buffer destruction/kernel deletion/recreation and IMG owner checks execute with a live IMG. Idle semaphore counts, property bank and UI readiness are fixtures; no concurrent threads or physical transition proof.',returned=returned,layouts=list(layout_entries),image_owner_before=before_owner,
+                           image_owner_after=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False),
+                           image_kernel_preserved=bytes(uc.mem_read(image_record,24))==before_kernel,
+                           image_header_preserved=word(0xA0129C54)==image_head and bytes(uc.mem_read(image_head,28))==before_header,
+                           destroyed_pools=list(destroyed_pools))
+            if returned!=1:raise RuntimeError('original buffer manager did not admit HDF')
         scratch_record=0xA06BC708+20*word(0xA06BCC6C+4*0x2e);scratch_head=word(scratch_record)
         if word(scratch_record+12):
             pool_state=lambda:bytes(uc.mem_read(scratch_head,832))
         else:
             pool_id=struct.unpack('>H',uc.mem_read(scratch_head+20,2))[0];pool_record=word(0xA00B5BDC)+24*(pool_id-1)
             pool_state=lambda:bytes(uc.mem_read(pool_record,24))
-        ring_before=pool_state()
-        def property_boundary(machine,address,size,unused):
-            key=machine.reg_read(r.UC_ARM_REG_R0);value=machine.reg_read(r.UC_ARM_REG_R1)
-            property_calls.append([address,key,value]);result=0
-            if address==0xA02AB5F2:stage_locks.add(key)
-            elif address==0xA02AB61C:stage_locks.discard(key)
-            if address==0xA00E0E2E:result=properties.get(key,0)
-            elif address==0xA00E0C94:properties[key]=value
-            machine.reg_write(r.UC_ARM_REG_R0,result);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
-        for address in (0xA00E127A,0xA00E1286,0xA00E0E2E,0xA00E0C94):uc.hook_add(UC_HOOK_CODE,property_boundary,begin=address,end=address)
+        ring_before=pool_state();initial_properties=dict(properties)
         packets=[];raw_handle=0
-        uc.mem_write(source+0x408,bytes([postprocess_effect]))
+        if postprocess_secondary not in (0,16,17,20):raise ValueError('audited secondary postprocessor selector required')
+        uc.mem_write(source+0x357,bytes([postprocess_secondary]));uc.mem_write(source+0x408,bytes([postprocess_effect]))
         uc.mem_write(source+0x258,struct.pack('>I',0xcc01340));uc.mem_write(source+0x3e4,struct.pack('>I',0xcc01340))
         # Install and publish before preparation, so this exercises early
         # snapshot/reservation under the original stage6 ownership boundary.
@@ -1230,12 +1259,18 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
                 machine.reg_write(r.UC_ARM_REG_R0,33 if address==0xA00665CC else 0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
             for address in (0xA00665CC,0xA0066D94,0xA00671B8):uc.hook_add(UC_HOOK_CODE,cache_kernel,begin=address,end=address)
             grade,sequence=(1,10) if postprocess_production_epoch else (postprocess_hdf,77)
-            if grade and initial_layout==1:
+            if postprocess_policy_strength is not None:
+                if postprocess_policy_strength not in (0,1,2,3) or not postprocess_original_prepare or postprocess_production_epoch:raise ValueError('prepared single-recipe policy fixture required')
+                grade=postprocess_policy_strength
+            if grade and uc.mem_read(0xA0129C20,1)[0]==1:
                 # Fixture an already frozen frame for late-path rejection; UI
                 # publication correctly refuses this one-JPEG layout.
                 pass
             elif run(native_runtime['symbols']['gr2_hdf_configuration_publish'],grade,sequence,thumb=False)!=1:raise RuntimeError('early HDF publication failed')
             for row in native_runtime['hdf_graph_hooks']:uc.mem_write(row['address'],bytes.fromhex(row['patch_hex']))
+            if postprocess_policy_strength is not None:
+                if run(native_runtime['symbols']['gr2_hdf_configuration_policy'],source,0,thumb=False)!=1:raise RuntimeError('early policy fixture failed')
+                if run(native_runtime['symbols']['gr2_hdf_configuration_publish'],postprocess_hdf,88,thumb=False)!=1:raise RuntimeError('later UI publication fixture failed')
         def preparation_observer(machine,address,size,unused):
             if machine.reg_read(r.UC_ARM_REG_R0)==0x17:
                 preparation_trace.append(dict(stage6=6 in stage_locks,reserved=word(source+0x1f8),primary=word(source+0x1f0)))
@@ -1402,7 +1437,7 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
         if raw_handle:
             for offset in (0x1e0,0x1e4):
                 if word(source+offset):run(0xA029AA1A,source+offset,0,0,0)
-        postprocessor=dict(preparation_trace=preparation_trace,allocation_faults=allocation_faults,epoch=epoch,clarity_strength_after=word(source+0x418),dsp=dsp,hdf_after=hdf_after,postprocess_return=postprocess_return,original_returns=original_returns,peak_jpeg_blocks=peak_jpeg_blocks,retention=retention,handoff=handoff,rendered=rendered,ring_restored=pool_state()==ring_before,original_prepare=postprocess_original_prepare,reserved_before=reserved_before,reserved_after=word(source+0x1f8),jpeg_capacity=jpeg_capacity,plane_metadata=plane_metadata,effect=postprocess_effect,packets=packets,primary_retained=primary_retained,jpeg_data=jpeg_data,property_counters_balanced=all(value==0 for value in properties.values()),
+        postprocessor=dict(admission=admission,secondary=postprocess_secondary,preparation_trace=preparation_trace,allocation_faults=allocation_faults,epoch=epoch,clarity_strength_after=word(source+0x418),dsp=dsp,hdf_after=hdf_after,postprocess_return=postprocess_return,original_returns=original_returns,peak_jpeg_blocks=peak_jpeg_blocks,retention=retention,handoff=handoff,rendered=rendered,ring_restored=pool_state()==ring_before,original_prepare=postprocess_original_prepare,reserved_before=reserved_before,reserved_after=word(source+0x1f8),jpeg_capacity=jpeg_capacity,plane_metadata=plane_metadata,effect=postprocess_effect,packets=packets,primary_retained=primary_retained,jpeg_data=jpeg_data,property_counters_balanced=all(value==initial_properties.get(key,0) for key,value in properties.items()),
                            scope=("Original preparation/postprocessor, real pool/BUFF operations, native global wrapper and original operation13 dispatcher/core/nested drivers execute together. Passive MMIO/reset-ready, synthetic events/OS/property/progress/task services and independent uncached RAM backing. Non13 engine operations remain explicit boundaries. No pixels, DMA/cache coherence, physical completion, concurrent scheduling or live camera proof." if postprocess_execute_hdf else "Original complete postprocessor A02AF6CE, real pool/BUFF allocation-access-release and packet construction. Property bank/lock, progress/task notifications and OS synchronization are fixtures. Optional A02AE7EA original preparation owns RAW/primary/reserved scratch and constructs padded plane metadata. ISP dispatcher is an explicit boundary; native workspace predicate executes there before synthetic engine return. No pixel processing, physical completion, clone scheduling or live pipeline proof."))
     run(0xA00E2020,source);retired=run(native_runtime['symbols']['gr2_image_owner_bytes'],source,thumb=False)
     return dict(cpu_stack_write_bytes=0x50018000-stack_low[0],initial_layout=initial_layout,postprocessor=postprocessor,hdf_graph=graph,workspace_owner=workspace,image_pool_id=identifier,image_pool_head=pool,image_base=image_base,pixel_arena_end=pixel_end,fixed_pools_before_images=fixed_before,
@@ -1414,14 +1449,78 @@ def probe_ordered_capture_pools(code:bytes,*,native_runtime:dict,prior_fixed:int
                 stack_preserved=abi,callee_saved_preserved=abi,hardware_tested=False,
                 scope='Original system2MiB MPL, optional earlier fixed owners, complete BUFF initializer before IMG pool initializer, original linear/MPF/MPL factories and object allocate/retire. Synthetic empty kernel tables and OS synchronization only; sparse RAM backing. Not full phase1 initialization, scheduling, DMA, cache coherence or camera boot.')
 
+def probe_thumbnail_clone_scheduling(code:bytes,effect:int,*,sibling:bool,native_runtime:dict|None=None,hdf_strength:int=0,publish_after:tuple[int,int]|None=None)->dict:
+    """Original two scheduling arms and predicate, with explicit SDK boundaries."""
+    if type(effect) is not int or not 0<=effect<=20:raise ValueError('native effect index required')
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);uc.mem_map(0x51000000,0x40000)
+    parent=0x51000008;main=parent+0x12ba4;auxiliary=main+0x12ba4;body=0x12b9c
+    for context in (parent,main,auxiliary):
+        uc.mem_write(context-8,b'IMG '+bytes(4));uc.mem_write(context+0x355,b'\x01');uc.mem_write(context+0x408,bytes([effect]))
+    if native_runtime:
+        if type(hdf_strength) is not int or not 0<=hdf_strength<=3:raise ValueError('HDF grade required')
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        rows=[row for row in native_runtime['hdf_graph_hooks'] if row['address']==0xA029DEB8]
+        if len(rows)!=1:raise ValueError('native thumbnail policy hook missing')
+        uc.mem_write(0xA029DEB8,bytes.fromhex(rows[0]['patch_hex']))
+        # Same bounded initialized MPF shape as the capture-owner unit fixtures;
+        # independent probes run the real original ordered pool constructors.
+        block=0x12ba4;uc.mem_write(0xa0129c54,struct.pack('>I',0xa05fb0e8));uc.mem_write(0xa01137ec,struct.pack('>I',body))
+        uc.mem_write(0xa05fb0e8,b'MPL '+struct.pack('>4I',0x01000000,block,60*block,0)+struct.pack('>2H',1,0))
+        uc.mem_write(0xa00b5bfc,struct.pack('>H',1));uc.mem_write(0xa00b5bdc,struct.pack('>I',0x50008000))
+        uc.mem_write(0x50008000,struct.pack('>6I',0xffffffff,0x51000000,0,60*block,block,0x51000000))
+        def mutex_boundary(machine,address,size,unused):
+            machine.reg_write(r.UC_ARM_REG_R0,17 if address==0xa00665cc else 0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        for address in (0xa00665cc,0xa0066d94,0xa00671b8):uc.hook_add(UC_HOOK_CODE,mutex_boundary,begin=address,end=address)
+    def native(name,*args):
+        for register,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2,r.UC_ARM_REG_R3),args):uc.reg_write(register,value)
+        uc.reg_write(r.UC_ARM_REG_SP,0x50018000);uc.reg_write(r.UC_ARM_REG_LR,0x5001f000)
+        uc.emu_start(native_runtime['symbols'][name],0x5001f000,count=100000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=0x5001f000:raise RuntimeError('native scheduling helper budget exceeded')
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    if native_runtime and native('gr2_hdf_configuration_publish',hdf_strength,77)!=1:raise RuntimeError('HDF policy fixture publication failed')
+    decisions=[];clones=[];queues=[];calls=[]
+    def boundary(machine,address,size,unused):
+        args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]
+        if address==0xA029DEB8:
+            decisions.append(dict(context=args[0],live_r5=machine.reg_read(r.UC_ARM_REG_R5),return_address=machine.reg_read(r.UC_ARM_REG_LR)));return
+        if address==0xA029B57C:
+            clones.append(args[0]);machine.mem_write(auxiliary,bytes(machine.mem_read(args[0],body)));machine.mem_write(auxiliary,b'\x01');value=auxiliary
+        elif address==0xA029BAEE:queues.append(args);value=0
+        elif address in (0xA0039F9C,0xA003A01A,0xA029AA1A):raise RuntimeError('unexpected scheduling assertion/reference release')
+        else:calls.append([address,*args]);value=0
+        machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA029DEB8,0xA029B57C,0xA029DA98,0xA029D55C,0xA029BAEE,0xA02A41FE,0xA029D7C4,0xA029BD08,0xA00361E0,0xA0039F9C,0xA003A01A,0xA029AA1A):
+        uc.hook_add(UC_HOOK_CODE,boundary,begin=address,end=address)
+    uc.reg_write(r.UC_ARM_REG_R4,parent);uc.reg_write(r.UC_ARM_REG_R5,main if sibling else 0)
+    uc.reg_write(r.UC_ARM_REG_R7,parent+0x400);uc.reg_write(r.UC_ARM_REG_SP,0x50018000)
+    uc.mem_write(0x5001800c,bytes(4));uc.mem_write(0x5001801c,struct.pack('>I',parent+0x4a0))
+    uc.emu_start(0xA029E1ED if sibling else 0xA029E259,0xA029E2CC,count=100000)
+    if uc.reg_read(r.UC_ARM_REG_PC)!=0xA029E2CC:raise RuntimeError('original scheduling slice budget exceeded')
+    stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==0x50018000;frozen=[];prepared=[]
+    if native_runtime:
+        family=[parent,main] if sibling else [parent]
+        def read(context):
+            if native('gr2_hdf_frame_read',context,0x50003000)!=1:raise RuntimeError('scheduled family snapshot missing')
+            return list(struct.unpack('>2I',uc.mem_read(0x50003004,8)))
+        frozen=[read(context) for context in family]
+        if publish_after:
+            if native('gr2_hdf_configuration_publish',*publish_after)!=1:raise RuntimeError('post-policy UI publication failed')
+            for context in family:
+                if native('gr2_hdf_configuration_prepare',context)!=1:raise RuntimeError('policy snapshot consumption failed')
+                prepared.append(read(context))
+    return dict(frozen=frozen,prepared=prepared,parent=parent,main=main,auxiliary=auxiliary,effect=effect,sibling=sibling,decisions=decisions,clones=clones,queues=queues,calls=calls,
+                stack_preserved=stack_preserved,hardware_tested=False,
+                scope='Original E1EC/E258 through both main enqueue arms, original DEB8 predicate and E542 auxiliary enqueue body. Synthetic valid-shaped metadata (355=1), metadata-only clone, cache/stage/queue callbacks. No actual BUF allocation, pixel ownership, ISP, OS scheduling or thumbnail image proof.')
+
 def probe_processing_worker_route(code:bytes,message:int,*,external_buffer:int=0)->dict:
     """Original Proc-SR dispatch only; queue receive/notify are boundaries."""
-    if message not in (0x20004001,0x20004002,0x20004003):raise ValueError('audited still-processing message required')
+    if message not in (0x20004001,0x20004002,0x20004003,0x20004005):raise ValueError('audited still-processing message required')
     if type(external_buffer) is not int or not 0<=external_buffer<=0xffffffff:raise ValueError('u32 input handle required')
     from unicorn import UC_HOOK_CODE,arm_const as r
     uc=runtime_machine(code);uc.mem_map(0x51000000,0x20000);context=0x51000008
     uc.mem_write(context+0xfb04,struct.pack('>I',external_buffer));notifications=[];front=[]
-    targets={0xA02AECB8:'existing-input',0xA02AED1C:'primary-still',0xA02AEECC:'secondary-still',0xA02AEFAA:'completed-jpeg'}
+    targets={0xA02AECB8:'existing-input',0xA02AED1C:'primary-still',0xA02AEECC:'secondary-still',0xA02AEFAA:'completed-jpeg',0xA02AF0A2:'thumbnail'}
     def boundary(machine,address,size,unused):
         args=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]
         if address in targets:

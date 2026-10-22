@@ -15,6 +15,11 @@ _Static_assert(sizeof(configuration)==132,"GR II configuration ABI");
 static configuration *published;
 static int32_t mutex_id;
 static uint32_t frame_seed;
+static const uint8_t carriers[5]={9,10,11,18,8};
+int gr2_configuration_is_carrier(uint32_t tone){
+ for(uint32_t i=0;i<5u;i++)if(tone==carriers[i])return 1;
+ return 0;
+}
 static int span(const void *p,uint32_t n,uint32_t alignment){uintptr_t v=(uintptr_t)p;return v&&!(v&(alignment-1))&&n<=UINTPTR_MAX-v;}
 static void copy(void *out,const void *in,uint32_t n){for(uint32_t i=0;i<n;i++)((uint8_t *)out)[i]=((const uint8_t *)in)[i];}
 static int lock(void){return mutex_id>0&&((int32_t (*)(int32_t,int32_t))(uintptr_t)0xA0066D94u)(mutex_id,0)==0;}
@@ -65,7 +70,6 @@ int gr2_configuration_read(m10v_library_state *out){
 }
 int gr2_configuration_freeze(uint8_t *context,uint32_t seed){
     uint32_t body=gr2_image_owner_bytes(context);if(body!=0xfb8cu&&body!=0x12b8cu&&body!=GR2_IMAGE_BODY_BYTES)return 0;
-    static const uint8_t carriers[5]={9,10,11,18,8};
     m10v_gr2_frame existing;
     if(gr2_frame_read(context,&existing))return !context[0x408]||context[0x408]==carriers[existing.slot];
     uint32_t slot=0;while(slot<5&&context[0x408]!=carriers[slot])slot++;

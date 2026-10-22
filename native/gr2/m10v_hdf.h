@@ -6,6 +6,10 @@
 typedef struct {uint32_t magic,control,sequence,crc;} gr2_hdf_frame;
 int gr2_hdf_frame_freeze(uint8_t *context,uint32_t strength,uint32_t sequence);
 int gr2_hdf_frame_read(const uint8_t *context,gr2_hdf_frame *out);
+/* Private inline phase: scheduling freezes one family before clone policy;
+ * preparation consumes that phase once before reserving JPEG buffers. */
+int gr2_hdf_frame_policy_mark(uint8_t *context,uint8_t *peer);
+int gr2_hdf_frame_policy_consume(uint8_t *context);
 #define GR2_HDF_BANDS 11u
 #define GR2_HDF_CURVE_OFFSET 0xe040u
 #define GR2_HDF_CURVE_BYTES 8192u

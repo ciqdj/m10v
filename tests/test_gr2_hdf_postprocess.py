@@ -31,9 +31,9 @@ class Gr2HdfPostprocessTests(unittest.TestCase):
         from scripts.analyze_gr2_native_contract import probe_ordered_capture_pools
         from collections import Counter
         runtime=self.build()
-        for effect in (0,16):
+        for effect,secondary in ((0,0),(16,0),(16,17)):
             result=probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,postprocess_effect=effect,
-                                             postprocess_original_prepare=True,postprocess_hdf=3,postprocess_execute_hdf=True,postprocess_clarity_strength=9)
+                                             postprocess_original_prepare=True,postprocess_hdf=3,postprocess_execute_hdf=True,postprocess_clarity_strength=9,postprocess_secondary=secondary)
             post=result['postprocessor'];dsp=post['dsp'];workspace=post['packets'][-1]['scratch'][0]
             self.assertEqual(dsp['graph_calls'],1)
             self.assertEqual(dsp['bands'],[[level,workspace+0xe040+(level-1)*8192] for level in range(11,0,-1)])
@@ -85,3 +85,17 @@ class Gr2HdfPostprocessTests(unittest.TestCase):
         self.assertNotEqual(post['reserved_before'],0);self.assertEqual(post['reserved_after'],0)
         self.assertTrue(post['primary_retained']);self.assertTrue(post['property_counters_balanced']);self.assertTrue(post['ring_restored'])
         self.assertEqual(post['postprocess_return'],post['original_returns'][0])
+
+    def test_secondary_stock_selector_preserves_original_operation_and_hdf_runs_exactly_once(self):
+        from scripts.analyze_gr2_native_contract import probe_ordered_capture_pools
+        runtime=self.build()
+        for effect,secondary,stock in ((0,16,[5]),(0,17,[4]),(0,20,[]),(16,16,[13]),(16,17,[4]),(16,20,[13]),(19,17,[4])):
+            for strength in (0,3):
+                with self.subTest(effect=effect,secondary=secondary,strength=strength):
+                    post=probe_ordered_capture_pools(component('gr2','b01firm8'),native_runtime=runtime,postprocess_effect=effect,
+                                                     postprocess_original_prepare=True,postprocess_hdf=strength,postprocess_secondary=secondary)['postprocessor']
+                    extra=bool(strength and effect!=19 and 13 not in stock)
+                    self.assertEqual([row['operation'] for row in post['packets']],stock+([13] if extra else []))
+                    self.assertEqual(post['reserved_after'],0);self.assertLessEqual(post['peak_jpeg_blocks'],2)
+                    self.assertTrue(post['primary_retained']);self.assertTrue(post['property_counters_balanced']);self.assertTrue(post['ring_restored'])
+                    self.assertEqual(post['postprocess_return'],post['original_returns'][0])

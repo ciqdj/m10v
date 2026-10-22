@@ -153,6 +153,6 @@ class Gr2ComponentTests(unittest.TestCase):
         self.assertEqual(candidate[at:at+8],official[at:at+8])
         changed=copy.deepcopy(runtime);changed['hdf_graph_hooks'][0]['target']+=4
         with self.assertRaisesRegex(ValueError,'HDF graph source contract'):module.build_gr2_component(official,changed)
-        for fault in ('hdf_core','hdf_band','hdf_postprocess','hdf_production','hdf_preparation','hdf_reservation','hdf_reservation_dispatch'):
+        for fault in ('hdf_core','hdf_band','hdf_postprocess','hdf_production','hdf_preparation','hdf_reservation','hdf_reservation_dispatch','hdf_policy'):
             proof=probe_gr2_startup_order(official,native_runtime=runtime,early_native=True,candidate_component=candidate,activation_fixture=True,activation_fault=fault)
             self.assertEqual(proof['native_activation_ready'],0);self.assertEqual(proof['activation_syscalls'],[])

@@ -45,7 +45,10 @@ static int planes(uint32_t *root,uint8_t *context,uint32_t base,uint32_t capacit
 uint32_t gr2_hdf_postprocess(uint8_t *context){
  gr2_hdf_frame frame;uint32_t primary=0,base=0,capacity=0,temp=0,held=0;int inserted=0,owned_temporary=0;
  int eligible=gr2_hdf_frame_read(context,&frame)&&(frame.control&3u)&&
-              gr2_hdf_layout_supports_graph()&&context[0x408]<=20u&&context[0x408]!=16u&&context[0x408]!=19u;
+              gr2_hdf_layout_supports_graph()&&context[0x408]<=20u&&context[0x408]!=19u&&
+              /* Selector17 takes original operation4 even for effect16.
+               * Only skip a second graph when stock actually uses Clarity13. */
+              (context[0x408]!=16u||context[0x357]==17u);
  if(eligible){
   primary=word(context+0x1f0);eligible=view(primary,&base,&capacity);
  }

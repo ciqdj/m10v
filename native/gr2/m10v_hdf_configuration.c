@@ -61,3 +61,15 @@ int gr2_hdf_reservation_required(uint8_t *context){
  gr2_hdf_frame frame;
  return gr2_hdf_frame_read(context,&frame)&&(frame.control&3u)&&gr2_hdf_layout_supports_graph();
 }
+
+int gr2_hdf_configuration_policy(uint8_t *context,uint8_t *peer){
+ if(gr2_image_owner_bytes(context)!=GR2_IMAGE_BODY_BYTES||
+    (peer&&(peer==context||gr2_image_owner_bytes(peer)!=GR2_IMAGE_BODY_BYTES)))return 0;
+ /* Cache failure still seals a valid off recipe against later publication. */
+ gr2_hdf_configuration_begin(context);
+ return gr2_hdf_frame_policy_mark(context,peer);
+}
+int gr2_hdf_configuration_prepare(uint8_t *context){
+ if(gr2_hdf_frame_policy_consume(context))return 1;
+ return gr2_hdf_configuration_begin(context);
+}

@@ -97,3 +97,18 @@ class Gr2HdfLayoutTests(unittest.TestCase):
         for bank,expected in ((0,1),(1,0),(2,1),(3,1),(4,1),(5,0),(255,0)):
             u.mem_write(0xa0129c20,bytes([bank]))
             self.assertEqual(runtime_tests.Gr2RuntimeBuildTests.call(self,u,runtime['symbols']['gr2_hdf_layout_supports_graph'],[]),expected)
+
+    def test_idle_hdf_admission_preserves_a_live_image_pool_and_then_leases_both_real_jpeg_blocks(self):
+        from scripts.build_gr2_runtime import build_gr2_runtime
+        from scripts.analyze_gr2_native_contract import probe_ordered_capture_pools
+        code=component('gr2','b01firm8')
+        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(code,{},Path(folder))
+        result=probe_ordered_capture_pools(code,native_runtime=runtime,initial_layout=1,admit_hdf_layout=True,
+                                         postprocess_effect=0,postprocess_original_prepare=True,postprocess_hdf=3,postprocess_execute_hdf=True)
+        admission=result['postprocessor']['admission'];self.assertEqual(admission['layouts'],[1,0]);self.assertEqual(admission['returned'],1)
+        self.assertEqual(admission['image_owner_before'],0x12b9c);self.assertEqual(admission['image_owner_after'],0x12b9c)
+        self.assertTrue(admission['image_kernel_preserved']);self.assertTrue(admission['image_header_preserved'])
+        post=result['postprocessor'];self.assertEqual(post['peak_jpeg_blocks'],2);self.assertNotEqual(post['reserved_before'],0)
+        self.assertEqual([packet['operation'] for packet in post['packets']],[13]);self.assertEqual(post['dsp']['graph_calls'],1)
+        self.assertTrue(post['primary_retained']);self.assertTrue(post['property_counters_balanced']);self.assertTrue(post['ring_restored'])
+        self.assertTrue(result['runtime_preserved']);self.assertTrue(result['stack_preserved'])

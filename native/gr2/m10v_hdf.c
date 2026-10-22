@@ -59,9 +59,32 @@ int gr2_hdf_frame_read(const uint8_t *context,gr2_hdf_frame *out){
  uintptr_t a=(uintptr_t)out,b=(uintptr_t)context-8u;
  if(!a||(a&3u)||a>UINT32_MAX-16u||(a<b+GR2_IMAGE_BODY_BYTES+8u&&b<a+16u))return 0;
  gr2_hdf_frame next;copy(&next,context+GR2_HDF_FRAME_OFFSET,16);
- if(next.magic!=0x47324844u||(next.control&~3u)!=0x10000u||
+ uint32_t phase=next.control&~3u;
+ if(next.magic!=0x47324844u||(phase!=0x10000u&&phase!=0x30000u)||
     next.crc!=m10v_sd_crc((const uint8_t *)&next,12))return 0;
  copy(out,&next,16);return 1;
+}
+
+/* Callers own these image references and publish before enqueue. Invalid
+ * magic spans the rewrite, and the CRC includes the private phase bits. */
+static void frame_publish(uint8_t *context,gr2_hdf_frame *frame){
+ uint8_t *tail=context+GR2_HDF_FRAME_OFFSET;
+ frame->crc=m10v_sd_crc((const uint8_t *)frame,12);
+ *(volatile uint32_t *)tail=0;
+ for(uint32_t i=4;i<16u;i++)((volatile uint8_t *)tail)[i]=((const uint8_t *)frame)[i];
+ *(volatile uint32_t *)tail=frame->magic;
+}
+int gr2_hdf_frame_policy_mark(uint8_t *context,uint8_t *peer){
+ if(peer&&(peer==context||gr2_image_owner_bytes(peer)!=GR2_IMAGE_BODY_BYTES))return 0;
+ gr2_hdf_frame frame;if(!gr2_hdf_frame_read(context,&frame))return 0;
+ frame.control|=0x20000u;frame_publish(context,&frame);
+ if(peer)frame_publish(peer,&frame);
+ return 1;
+}
+int gr2_hdf_frame_policy_consume(uint8_t *context){
+ gr2_hdf_frame frame;
+ if(!gr2_hdf_frame_read(context,&frame)||(frame.control&~3u)!=0x30000u)return 0;
+ frame.control&=~0x20000u;frame_publish(context,&frame);return 1;
 }
 
 static uint32_t word(uint32_t address){return *(const volatile uint32_t *)(uintptr_t)address;}

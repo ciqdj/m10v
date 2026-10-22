@@ -12,6 +12,10 @@ int gr2_hdf_configuration_freeze(uint8_t *context);
  * Failure seals an off snapshot so worker fallback cannot adopt newer settings. */
 int gr2_hdf_configuration_begin(uint8_t *context);
 int gr2_hdf_reservation_required(uint8_t *context);
+/* Scheduling owner: parent and optional sibling are frozen from one cache
+ * read. Preparation consumes that marker once; a later recipe refreshes. */
+int gr2_hdf_configuration_policy(uint8_t *context,uint8_t *peer);
+int gr2_hdf_configuration_prepare(uint8_t *context);
 int gr2_hdf_configuration_clear(void);
 uint32_t gr2_hdf_configuration_needs_bank0(void);
 #endif

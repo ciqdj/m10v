@@ -180,7 +180,7 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC
     candidate_mode=candidate_component is not None
     if activation_fixture and not candidate_mode:raise ValueError('activation fixture requires actual candidate source')
-    if activation_masks not in (0,0x40,0x80,0xc0) or activation_policy not in (0,32) or activation_fault not in (None,'pool','hook','vector','hdf_layout','pool_overlap','hdf_core','hdf_band','hdf_postprocess','hdf_production','hdf_preparation','hdf_reservation','hdf_reservation_dispatch') or activation_pool_id not in (40,43):raise ValueError('bounded activation CPU/cache policy required')
+    if activation_masks not in (0,0x40,0x80,0xc0) or activation_policy not in (0,32) or activation_fault not in (None,'pool','hook','vector','hdf_layout','pool_overlap','hdf_core','hdf_band','hdf_postprocess','hdf_production','hdf_preparation','hdf_reservation','hdf_reservation_dispatch','hdf_policy') or activation_pool_id not in (40,43):raise ValueError('bounded activation CPU/cache policy required')
     if candidate_mode:
         if not early_native or native_runtime is None:raise ValueError('candidate startup requires early native runtime')
         from scripts.build_gr2_component import build_gr2_component
@@ -269,6 +269,7 @@ def probe_gr2_startup_order(code:bytes,*,phase_results:dict[int,int]|None=None,n
                 elif activation_fault=='hdf_preparation':machine.mem_write(0xA02AE800,struct.pack('>I',0x5001D000))
                 elif activation_fault=='hdf_reservation':machine.mem_write(0xA00C4B00,struct.pack('>I',0x5001D000))
                 elif activation_fault=='hdf_reservation_dispatch':machine.mem_write(0xA02AE83E,bytes.fromhex('46c046c0'))
+                elif activation_fault=='hdf_policy':machine.mem_write(0xA029DEBC,struct.pack('>I',0x5001D000))
                 elif activation_fault=='vector':machine.mem_write(0xA00AF884,struct.pack('>I',0x5001D000))
             events.append(['post_load',0])
             if native_runtime is not None:

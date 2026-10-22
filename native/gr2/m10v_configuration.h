@@ -9,6 +9,7 @@ int gr2_configuration_publish(const m10v_library_state *,const uint8_t *const re
 int gr2_configuration_read(m10v_library_state *);
 /* One atomic UI value snapshot, five persistent-label inputs, 96 UTF16 units each. */
 int gr2_configuration_names(uint16_t out[5][96]);
+int gr2_configuration_is_carrier(uint32_t tone);
 int gr2_configuration_freeze(uint8_t *context,uint32_t seed);
 /* Called once by the original outer processing owner, not by each ISP pass. */
 int gr2_configuration_begin(uint8_t *context);

@@ -158,7 +158,7 @@ gr2_hdf_preparation_chain:
     mrs r0,cpsr
     stmdb sp!,{r0,r1}
     mov r0,r4
-    bl gr2_hdf_configuration_begin
+    bl gr2_hdf_configuration_prepare
     ldmia sp!,{r0,r1}
     msr cpsr_fs,r0
     ldmia sp!,{r0-r12,lr}
@@ -222,3 +222,29 @@ gr2_hdf_reservation_replay:
     bx lr
 .balign 4
 .Lreservation_continue: .word 0xA02AE87F
+
+.arm
+.balign 4
+.global gr2_hdf_policy_chain
+.type gr2_hdf_policy_chain,%function
+gr2_hdf_policy_chain:
+    mov r1,r5
+    mov r2,lr
+    b gr2_hdf_clone_policy
+.size gr2_hdf_policy_chain,.-gr2_hdf_policy_chain
+
+.thumb
+.balign 4
+.global gr2_clone_policy_original
+.type gr2_clone_policy_original,%function
+.thumb_func
+gr2_clone_policy_original:
+    push {r3-r7,lr}
+    movs r4,r0
+    movs r0,#0xd
+    lsls r0,r0,#6
+    ldr r3,.Lpolicy_continue
+    bx r3
+.balign 4
+.Lpolicy_continue: .word 0xA029DEC1
+.size gr2_clone_policy_original,.-gr2_clone_policy_original

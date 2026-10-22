@@ -1207,18 +1207,19 @@
             "native/gr2/m10v_hdf_postprocess.c",
             "native/gr2/m10v_hdf_hooks.S",
             "native/gr2/m10v_hdf_control.c",
-            "native/gr2/m10v_hdf_page.c"
+            "native/gr2/m10v_hdf_page.c",
+            "native/gr2/m10v_hdf_scheduling.c"
           ],
           "evidence_files": [
             "docs/research/gr2-clarity-hdf-2026-10-21.md",
             "scripts/analyze_gr2_native_contract.py"
           ],
           "automated_checks": [
-            ".venv/bin/python -m unittest tests.test_gr2_clarity tests.test_gr2_hdf tests.test_gr2_hdf_storage tests.test_gr2_hdf_configuration tests.test_gr2_hdf_graph tests.test_gr2_hdf_preparation tests.test_gr2_hdf_postprocess tests.test_gr2_hdf_control tests.test_gr2_hdf_page tests.test_gr2_settings tests.test_gr2_component"
+            ".venv/bin/python -m unittest tests.test_gr2_clarity tests.test_gr2_hdf tests.test_gr2_hdf_storage tests.test_gr2_hdf_configuration tests.test_gr2_hdf_graph tests.test_gr2_hdf_preparation tests.test_gr2_hdf_postprocess tests.test_gr2_hdf_control tests.test_gr2_hdf_page tests.test_gr2_settings tests.test_gr2_component tests.test_gr2_hdf_scheduling tests.test_gr2_hdf_layout"
           ],
           "browser_evidence": [],
           "hardware_status": "pending",
-          "limitation": "独立存档、三档逐频段系数、原厂准备锁内缓冲预留、全局JPEG链、独立相机菜单与UI恢复已有离线CPU证据；网页构建导出、缩略图分流/克隆策略、无RAW输入的完整生命周期、物理并发/缓存及真机成像继续研究，尚未启用HDF配置导出。"
+          "limitation": "独立存档、三档逐频段系数、原厂准备锁内缓冲预留、全局JPEG链、独立相机菜单与UI恢复已有离线CPU证据；网页构建导出、缩略图回退像素与复杂克隆、无RAW输入的完整生命周期、物理并发/缓存及真机成像继续研究，尚未启用HDF配置导出。"
         }
       }
     }
