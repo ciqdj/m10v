@@ -28,7 +28,7 @@ class HarmanFilmTests(NativeFilmLibraryTests):
         return self.lib.m10v_library_effects(C.byref(s),0,field,value,store or STORE(lambda _,p:0),None)
 
     def test_new_stocks_select_with_independent_defaults(self):
-        for film,grain,size,gain in [(67,1,0,2),(68,2,1,0)]:
+        for film,grain,size,gain in [(67,0,0,0),(68,0,1,0)]:
             s=self.state();ok=STORE(lambda _,p:0)
             self.assertEqual(self.lib.m10v_library_select(C.byref(s),0,film,ok,None),0)
             self.assertEqual((s.slots[0].grain,s.effects[0][0],s.slots[0].halo_gain),(grain,size,gain))

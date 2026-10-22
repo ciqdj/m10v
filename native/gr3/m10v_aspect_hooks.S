@@ -136,12 +136,14 @@ entry filter_hook
     jump 0x540b8cb0
 entry live_width_hook
     ldrb ip,[sp]
-    cmp ip,#5
+    cmp ip,#4
+    cmpne ip,#5
     beq m10v_aspect_live_width
     jump 0x540b85bc
 entry live_height_hook
     ldrb ip,[sp]
-    cmp ip,#5
+    cmp ip,#4
+    cmpne ip,#5
     beq m10v_aspect_live_height
     jump 0x540b860c
 entry face_config
@@ -150,12 +152,12 @@ entry face_config
     cmp r3,#4
     jump 0x540b9144
 entry live_select
-    cmp r2,#5
+    cmp r2,#4
+    cmpne r2,#5
     bne 1f
     cmp r1,#1
     bhi 1f
-    mov r2,r3
-    b m10v_aspect_write_active
+    b m10v_aspect_live_region
 1:  cmp r2,#4
     jump 0x540b916c
 entry common_dispatch
@@ -164,11 +166,13 @@ entry common_dispatch
     cmp r0,#0
     beq 1f
     bl m10v_aspect_current
-    cmp r0,#5
+    cmp r0,#4
+    cmpne r0,#5
     bne 1f
     pop {r0,r1,r2,r3,r4,r5,ip,lr}
-    mov r2,r4
-    bl m10v_aspect_write_active
+    mov r2,r5
+    mov r3,r4
+    bl m10v_aspect_live_region
     sub sp,fp,#0x1c
     ldm sp,{r3,r4,r5,r6,fp,sp,lr}
     bx lr

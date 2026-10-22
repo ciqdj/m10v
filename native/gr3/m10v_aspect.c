@@ -24,7 +24,8 @@ u32 m10v_aspect_current(void) {
     return root && WORD(root,0) ? CALL(0x5354a778,u32 (*)(u32))(WORD(root,0)) : 0;
 }
 u32 m10v_aspect_mask_active(void) {
-    if(m10v_aspect_current()!=5) return CALL(0x540b7f74,u32 (*)(void))();
+    u32 ratio=m10v_aspect_current();
+    if(ratio!=4 && ratio!=5) return 0;
     u32 root=CALL(0x53525d5c,u32 (*)(void))();
     if(!root || !WORD(root,0) || CALL(0x53549958,u32 (*)(u32))(WORD(root,0))==1) return 0;
     u32 manager=CALL(0x53654150,u32 (*)(void))();
@@ -48,12 +49,13 @@ u32 m10v_aspect_filter(u32 mag,u32 crop_enabled) {
     if(mag==0x3fe3d70a || mag==0x3fe49249) return 0x3ef418fc;
     return 0x3f5a583c;
 }
-u32 m10v_aspect_live_width(u32 a,u32 b,u32 c,u32 d) {
+u32 m10v_aspect_live_width(u32 a,u32 b,u32 c,u32 d,u32 ratio) {
     u32 width=CALL(0x540b8678,u32 (*)(u32,u32,u32,u32,u32))(a,b,c,d,0);
-    return 2*((width*7+9)/18);
+    return ratio==5 && !m10v_aspect_mask_active()?2*((width*7+9)/18):width;
 }
-u32 m10v_aspect_live_height(u32 a,u32 b,u32 c,u32 d) {
-    return CALL(0x540b8680,u32 (*)(u32,u32,u32,u32,u32))(a,b,c,d,0);
+u32 m10v_aspect_live_height(u32 a,u32 b,u32 c,u32 d,u32 ratio) {
+    u32 height=CALL(0x540b8680,u32 (*)(u32,u32,u32,u32,u32))(a,b,c,d,0);
+    return ratio==4 && !m10v_aspect_mask_active()?2*((height*69+125)/250):height;
 }
 u32 m10v_aspect_write_active(u32 context,u32 unused,u32 mag) {
     (void)unused;
@@ -74,6 +76,17 @@ u32 m10v_aspect_write_active(u32 context,u32 unused,u32 mag) {
      * the final geometry is stored and retain its native return convention.
      */
     return CALL(0x536ae870,u32 (*)(u32))(context+0x24bc);
+}
+
+/* Masked live view keeps the native 3:2 focal crop underneath the mask.
+ * Both AF and common refresh must publish the SAME source rectangle. Native
+ * +24 is recomputed for crop/AF; fixed still-JPEG rectangles cannot replace it.
+ * Outside this view (magnified focus/movie), retain the existing adapters. */
+u32 m10v_aspect_live_region(u32 context,u32 mode,u32 ratio,u32 mag) {
+    if(m10v_aspect_mask_active())
+        return CALL(0x53666770,u32 (*)(u32,u32))(context,mag==0x2000?0:1);
+    if(ratio==5) return m10v_aspect_write_active(context,mode,mag);
+    return CALL(0x540b6240,u32 (*)(u32,u32,u32))(context,4,mag);
 }
 
 void m10v_aspect_draw(u32 view,u32 surface) {

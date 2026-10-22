@@ -84,3 +84,20 @@ test('CRC repaired custom record with changed reserved byte is rejected',()=>{
  pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);
  assert.throws(()=>auditSdFilmPack(pack));
 });
+
+test('last delivered 47-film and named custom packs remain readable after opt-in defaults',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const old=JSON.parse(readFileSync(new URL('./gr3-sd-20261021-contract.json',import.meta.url)));
+ const custom=parseCustomCube(Buffer.from('LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n'),'old.cube','Old custom');
+ for(const pack of [buildSdFilmPack(),buildSdFilmPack([33,289],[custom])]){
+  const count=pack.readUInt32LE(16);
+  for(let i=0;i<count;i++){
+   const r=pack.subarray(4096+i*SD_RECORD_BYTES,4096+(i+1)*SD_RECORD_BYTES);
+   Buffer.from(old.renderer,'hex').copy(r,8448);
+   r.writeUInt32LE(sdCrc(r.subarray(0,-4)),SD_RECORD_BYTES-4);pack.writeUInt32LE(r.readUInt32LE(SD_RECORD_BYTES-4),68+i*12);
+  }
+  pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);
+  assert.equal(auditSdFilmPack(pack).count,count);
+  const bad=Buffer.from(pack);bad[4096+64]^=1;assert.throws(()=>auditSdFilmPack(bad));
+ }
+});

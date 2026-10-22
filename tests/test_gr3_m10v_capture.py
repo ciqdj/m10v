@@ -43,7 +43,7 @@ class M10VCaptureTests(unittest.TestCase):
         cls.official = subprocess.check_output(['node', '--input-type=module', '-e', js], cwd=Path(__file__).resolve().parents[1])
         host_tests.NativeFilmLibraryTests.setUpClass(); cls.addClassCleanup(host_tests.NativeFilmLibraryTests.doClassCleanups)
 
-    def fixture(self, tone=18, jpeg=1, raw=0, raw_alias=False, allocation=True, raw_bank=0x60000000, film=2, clock_ready=1, date=(2026, 10, 14, 23, 59, 17), stamp=2, debug=False, capture_date=None, allocation_fail_first=False):
+    def fixture(self, tone=18, jpeg=1, raw=0, raw_alias=False, allocation=True, raw_bank=0x60000000, film=2, clock_ready=1, date=(2026, 10, 14, 23, 59, 17), stamp=2, debug=False, capture_date=None, allocation_fail_first=False, halo=None):
         h = arm_tests.FilmLibraryArmTests(); h.manifest = self.debug_manifest if debug else self.manifest; h.code = self.debug_code if debug else self.code; u = h.machine()
         h.capture_events = []
         for address in (0x536af000, 0x5383c000, 0x532b3000): u.mem_map(address, 4096)
@@ -88,6 +88,8 @@ class M10VCaptureTests(unittest.TestCase):
         h.call(u, 'm10v_library_init', 0x55001000)
         h.call(u, 'm10v_camera_library_select', 0x55001000, 1, film)
         h.call(u, 'm10v_camera_library_texture', 0x55001000, 1, 2, 3)
+        if halo is not None:
+            h.call(u,'m10v_camera_library_halation',0x55001000,1,halo,3,5,2)
         h.call(u, 'm10v_camera_library_stamp', 0x55001000, stamp, 2, 3, 1)
         h.file_calls.clear()
         recipe = 0x55070000; req = 0x55076000; shooting = 0x55078000
@@ -162,7 +164,7 @@ class M10VCaptureTests(unittest.TestCase):
                         {'date': (2026, 10, 14, 24, 0, 0)},
                         {'date': (2026, 10, 14, 23, 59, 60)}):
             with self.subTest(options=options):
-                h,u,context,y,uv,cache,frees,width,height,stride = self.fixture(film=33, **options)
+                h,u,context,y,uv,cache,frees,width,height,stride = self.fixture(film=33, halo=3, **options)
                 saved = dict(h.files)
                 self.assertEqual(h.call(u, 'm10v_capture_library', context), 0)
                 state = host_tests.State.from_buffer_copy(u.mem_read(0x55001000, C.sizeof(host_tests.State)))
@@ -279,6 +281,8 @@ class M10VCaptureTests(unittest.TestCase):
 
     def test_800t_is_a_real_library_film_with_halation_and_shared_texture_stamp_chain(self):
         h,u,context,y,uv,cache,frees,width,height,stride=self.fixture(film=33)
+        # Spatial effects are opt-in; explicitly exercise the retained halo path.
+        h.call(u,'m10v_camera_library_halation',0x55001000,1,3,3,5,2)
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         state=host_tests.State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(host_tests.State)))
         hy=(C.c_uint8*len(y)).from_buffer_copy(y);hc=(C.c_uint8*len(uv)).from_buffer_copy(uv)
@@ -291,6 +295,7 @@ class M10VCaptureTests(unittest.TestCase):
         self.assertGreater(max(hc[row*stride+x+1] for row in range(42,55) for x in range(58,72,2)),128)
         self.assertEqual(len(cache),4);self.assertEqual(len(frees),1)
         h,u,context,y,uv,cache,frees,*_=self.fixture(film=33,allocation=False)
+        h.call(u,'m10v_camera_library_halation',0x55001000,1,3,3,5,2)
         self.assertEqual(h.call(u,'m10v_capture_library',context),-6)
         self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
 
@@ -311,7 +316,7 @@ class M10VCaptureTests(unittest.TestCase):
         # catch retained lattice/blur state and unbalanced scratch ownership.
         for film in (33,66,67):
             with self.subTest(film=film):
-                h,u,context,y,uv,cache,frees,*_=self.fixture(raw=1,raw_bank=0xa3000000,film=film,stamp=0)
+                h,u,context,y,uv,cache,frees,*_=self.fixture(raw=1,raw_bank=0xa3000000,film=film,stamp=0,halo=3 if film==33 else 2 if film==67 else None)
                 outputs=[];before_files=dict(h.files)
                 for frame in range(3):
                     u.mem_write(0x55010000,bytes(y));u.mem_write(0x55020000,bytes(uv))
@@ -324,7 +329,7 @@ class M10VCaptureTests(unittest.TestCase):
                 self.assertFalse(any(address==0x53825fa8 for address,_ in h.file_calls))
 
     def test_failed_scratch_allocation_preserves_image(self):
-        h, u, context, y, uv, cache, frees, *_ = self.fixture(allocation=False,film=33)
+        h, u, context, y, uv, cache, frees, *_ = self.fixture(allocation=False,film=33,halo=3)
         self.assertLess(h.call(u, 'm10v_capture_library', context), 0)
         self.assertEqual(bytes(u.mem_read(0x55010000, len(y))), bytes(y))
         self.assertEqual(bytes(u.mem_read(0x55020000, len(uv))), bytes(uv))
@@ -333,7 +338,7 @@ class M10VCaptureTests(unittest.TestCase):
 
 
     def test_optional_cache_allocation_failure_retries_required_spatial_storage(self):
-        h,u,context,y,uv,cache,frees,*_=self.fixture(film=67,allocation_fail_first=True,stamp=0)
+        h,u,context,y,uv,cache,frees,*_=self.fixture(film=67,allocation_fail_first=True,stamp=0,halo=2)
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         self.assertEqual(h.allocations,[4*128*96+65536,6*128*96])
         self.assertEqual(frees,[0x550b0000]);self.assertEqual(len(cache),4)

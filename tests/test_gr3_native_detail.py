@@ -75,8 +75,14 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   row=0x5500a000
   if real_row:
    u.mem_write(row+0xec,struct.pack('<III',row+0x200,row+0x400,row+0x600))
+   # Original row ctor5339e130 uses factory type10 -> IconView ctor5339a908.
+   # Its literal5339a98c installs53c0a8a8 (RTTI8IconView); bounds dispatch
+   # dereferences vptr+1c. A zeroed fake child crashes the real View setter.
+   self.assertEqual(struct.unpack_from('<I',self.rtos,0x39a98c)[0],0x53c0a8a8)
+   u.mem_write(row+0x400,struct.pack('<I',0x53c0a8a8))
+   u.mem_write(row+0x420,struct.pack('<4I',50,10,90,50))
+   u.mem_write(row+0x454,struct.pack('<4I',0,0,40,40))
    u.mem_write(row+0x600,struct.pack('<I',0x53c09e80))
-   u.mem_write(row+0x400,self.rtos[0x39a98c:0x39a990])
    u.mem_write(row+0x620,struct.pack('<4I',50,10,40,40))
    u.mem_write(row+0x654,struct.pack('<4I',0,0,40,40))
   def hook(uc,a,n,data):
@@ -350,6 +356,13 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    self.assertIn(('row',648,text),calls)
    self.execute(u,0x531b05c4,ui)
    self.assertIn(('range',0,1),calls)
+
+ def test_stock_slider_default_markers_match_opt_in_grain_halo_and_leak(self):
+  for film in (33,35,66,67,68,69,71,78,289):
+   for field in ((0,3,6) if film in (33,67) else (3,6)):
+    u,ui,slider,calls,state=self.machine(film=film,field=field)
+    self.execute(u,0x531b05c4,ui)
+    self.assertIn(('default',0),calls,(film,field))
 
  def test_fine_grain_new_stocks_restore_the_same_size_in_stock_slider_defaults(self):
   for film in (74,75,77,78):

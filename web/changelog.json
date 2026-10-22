@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.4",
+      "date": "2026-10-22",
+      "title": "修复裁切对焦跳动与回放滤镜，额外质感默认关闭",
+      "changes": [
+        "GR III 2.10 修复 XPan／6x7 配合焦距裁切时，对焦与取景刷新使用不同画面范围引发的拉伸跳动；保留 JPEG／DNG 最终裁切尺寸和身份。",
+        "修复逐张配方已选胶卷但原厂色调信息滞后时的滤镜跳过，并补齐 CPU 处理路径的独立 JPEG 缩略图着色；保护 RAW、配方及图像缓冲边界，避免回放预览偶发缺少滤镜。",
+        "胶卷颗粒、柔化、光晕和漏光在新建、换卷及重置时默认关闭，可在机内自行开启；网页与机内默认值一致，保留已有用户设置及上一版合法 SD 胶卷包。共用胶卷默认值也适用于 GR IIIx，其他机型未获得本轮真机验收。",
+        "用户已确认 GR III 2.10 的 r3 测试包通过（BIN 4c3dea9e…）并授权发布；保留线上已有 A/B、独立五槽、HDF、首张换卷、实时取景和低内存构建时限修复。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.3",
       "date": "2026-10-22",
       "title": "GR III 新增 6x7 裁切，宽幅统一命名 XPan",
@@ -11,9 +25,9 @@
         "新增源码构建和固件前像校验，裁切模块与时间戳、水平仪、胶卷库资源独立组合；保留已发布 A/B、独立五槽、HDF、首张换卷和实时取景修复。",
         "本轮按用户明确授权完成离线回归后直接发布，测试包与线上均保留 camera_tested=false；6x7 的真实机身显示、拍摄、RAW 显影与重启恢复仍需实机确认。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "5db685d3d12e202e3359bee2512d6653be1599c0",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39713263550"
     },
     {
       "version": "2026.10.22.2",

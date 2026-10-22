@@ -152,7 +152,7 @@ class FilmLibraryArmTests(unittest.TestCase):
             self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(10<<8)|2),1 if film==68 else 0)
 
     def test_detail_reset_restores_all_visible_fields_in_one_atomic_slot_commit(self):
-        for film,grain,gain,size in ((33,0,3,1),(35,0,3,1),(66,1,0,1),(67,1,2,0),(68,2,0,1)):
+        for film,grain,gain,size in ((33,0,0,1),(35,0,0,1),(66,0,0,1),(67,0,0,0),(68,0,0,1)):
             with self.subTest(film=film):
                 u=self.machine();state=0x55001000;ui=0x55007000
                 self.call(u,'m10v_library_init',state)
@@ -316,6 +316,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.call(u, 'm10v_library_init', state)
         before = bytes(u.mem_read(state, C.sizeof(State)))
         self.assertEqual([s.film for s in State.from_buffer_copy(before).slots], [34,35,36,37,33])
+        self.assertTrue(all(not v.grain and not v.soft and not v.halo_gain for v in State.from_buffer_copy(before).slots))
         self.assertEqual(self.call(u, 'm10v_library_valid', state), 1)
         self.store_result = -1
         self.assertEqual(self.call(u, 'm10v_library_select', state, 4, 32, 0x550ff100, 0), -2)
@@ -453,7 +454,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         state=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)))
         self.assertEqual((state.version,state.size,state.sequence),(4,104,7))
         self.assertEqual([s.film for s in state.slots],[33,32,31,30,29])
-        self.assertEqual([state.slots[0].halo_gain,state.slots[0].halo_spread,state.slots[0].halo_threshold,state.slots[0].halo_profile],[3,3,5,2])
+        self.assertEqual([state.slots[0].halo_gain,state.slots[0].halo_spread,state.slots[0].halo_threshold,state.slots[0].halo_profile],[0,3,5,2])
         self.assertEqual(self.call(u,'m10v_camera_library_halation',0x55001000,0,8,1,7,3),0)
         self.assertEqual(self.files['M10V1.bin'],bytes(old));self.assertIn('M10V5A.bin',self.files)
         self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),0)
@@ -674,7 +675,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         u.mem_write(model+0x1d,b'\x0f');self.focus=4
         self.call(u,'m10v_menu_confirm',controller);self.call(u,'m10v_camera_library_load',state)
         s=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
-        self.assertEqual(list(s.effects[1])[:5],[1,0,0,4,0]);self.assertEqual(s.slots[1].grain,1)
+        self.assertEqual(list(s.effects[1])[:5],[1,0,0,4,0]);self.assertEqual(s.slots[1].grain,0)
 
     def test_5207_arm_pixels_match_host_with_leak_grain_and_padding(self):
         u=self.machine();state=0x55001000;self.call(u,'m10v_library_init',state)

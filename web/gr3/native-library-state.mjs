@@ -1,6 +1,6 @@
 // One catalogue and one five-slot contract for simulation and in-camera library.
 export const defaultEffects=()=>({grainSize:1,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0,filmExposure:0});
-export const defaultHalo=()=>({gain:3,spread:3,threshold:5,profile:2});
+export const defaultHalo=()=>({gain:0,spread:3,threshold:5,profile:2});
 export const defaultConfiguration=()=>({slots:Array.from({length:5},(_,i)=>({film:i===4?33:34+i,grain:0,soft:0,halo:defaultHalo(),effects:defaultEffects()})),stamp:0,format:0,corner:0,color:0,filmNameStamp:false,hdf:0});
 export function normalizeConfiguration(value=defaultConfiguration()){
  const exact=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).sort().join('|')===[...keys].sort().join('|');
@@ -61,10 +61,11 @@ export function nativeSelection(features,configuration,model){
 
 export function selectNativeFilm(value,slot,film){
  const c=normalizeConfiguration(value);if(!Number.isInteger(slot)||slot<0||slot>4)throw Error('槽位无效');
- const s=c.slots[slot];if(s.film!==film&&film===66){s.grain=1;s.soft=0;s.halo={gain:0,spread:3,threshold:5,profile:1};s.effects=defaultEffects();}
- if(s.film!==film&&film===67){s.grain=1;s.soft=0;s.halo={gain:2,spread:3,threshold:5,profile:2};s.effects={...defaultEffects(),grainSize:0};}
- if(s.film!==film&&film===68){s.grain=2;s.soft=0;s.halo={gain:0,spread:3,threshold:5,profile:2};s.effects=defaultEffects();}
- if(s.film!==film&&film>=69){s.grain=film===72?0:film===71?2:1;s.soft=0;s.halo={gain:0,spread:3,threshold:5,profile:2};s.effects={...defaultEffects(),grainSize:[71,73,76].includes(film)?1:0};}
+ const s=c.slots[slot];
+ if(s.film!==film){
+  s.grain=0;s.soft=0;s.halo={gain:0,spread:3,threshold:5,profile:film===66?1:2};
+  s.effects={...defaultEffects(),grainSize:[67,69,70,72,74,75,77,78].includes(film)?0:1};
+ }
  if(film!==s.film||![67,68].includes(film))s.effects.filmExposure=0;
  if(film===289){s.effects.charmeraColor=s.film===289?(s.effects.charmeraColor??0):0;if(s.film!==289)s.grain=0;}else delete s.effects.charmeraColor;
  s.film=film;return normalizeConfiguration(c);
@@ -72,5 +73,5 @@ export function selectNativeFilm(value,slot,film){
 
 export function resetNativeTexture(value,slot){
  const c=normalizeConfiguration(value);if(!Number.isInteger(slot)||slot<0||slot>4)throw Error("槽位无效");
- const s=c.slots[slot];s.grain=s.film===289?0:s.film===72?0:[68,71].includes(s.film)?2:s.film>=66?1:0;s.soft=0;s.effects={...defaultEffects(),grainSize:[67,69,70,72,74,75,77,78].includes(s.film)?0:1,filmExposure:s.effects.filmExposure,...(s.film===289?{charmeraColor:s.effects.charmeraColor}: {})};return c;
+ const s=c.slots[slot];s.grain=0;s.halo.gain=0;s.soft=0;s.effects={...defaultEffects(),grainSize:[67,69,70,72,74,75,77,78].includes(s.film)?0:1,filmExposure:s.effects.filmExposure,...(s.film===289?{charmeraColor:s.effects.charmeraColor}: {})};return c;
 }

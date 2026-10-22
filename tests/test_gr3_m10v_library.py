@@ -59,6 +59,22 @@ class NativeFilmLibraryTests(unittest.TestCase):
         cls.lib.m10v_library_tables.argtypes=[C.c_uint32,C.POINTER(C.c_int16),C.POINTER(C.c_int16),C.POINTER(C.c_uint16),C.POINTER(C.c_uint16)]
         cls.lib.m10v_library_name.argtypes = [C.c_uint32]; cls.lib.m10v_library_name.restype = C.c_char_p
 
+    def test_extra_effects_are_opt_in_on_init_selection_and_reset(self):
+        state=self.state();ok=STORE(lambda ctx,next:0)
+        self.lib.m10v_library_reset.argtypes=[C.POINTER(State),C.c_uint32,STORE,C.c_void_p]
+        def off():
+            self.assertEqual((state.slots[0].grain,state.slots[0].soft,state.slots[0].halo_gain,state.effects[0][1]),(0,0,0,0))
+        off()
+        for film in list(range(33,79))+[289]:
+            self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,film,ok,None),0);off()
+            self.assertEqual(self.lib.m10v_library_texture(C.byref(state),0,3,0,ok,None),0)
+            if film not in (66,68):self.assertEqual(self.lib.m10v_library_halation(C.byref(state),0,6,3,5,2,ok,None),0)
+            saved=bytes(state)
+            self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,film,ok,None),0)
+            self.assertEqual(state.slots[0].grain,3);self.assertEqual(state.slots[0].halo_gain,0 if film in (66,68) else 6)
+            self.assertEqual(self.lib.m10v_library_reset(C.byref(state),0,ok,None),0);off()
+            self.assertNotEqual(bytes(state),saved)
+
     def test_charmera_colors_are_atomic_per_slot_and_render_preserves_padding(self):
         state=self.state();ok=STORE(lambda ctx,next:0);bad=STORE(lambda ctx,next:-1)
         self.lib.m10v_library_effects.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
@@ -95,6 +111,13 @@ class NativeFilmLibraryTests(unittest.TestCase):
         before=(bytes(y),bytes(uv))
         self.assertLess(self.render(image,state,scratch),0)
         self.assertEqual((bytes(y),bytes(uv)),before)
+
+    def test_selecting_new_custom_film_does_not_inherit_previous_light_leak(self):
+        state=self.state();ok=STORE(lambda ctx,next:0)
+        self.lib.m10v_library_effects.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
+        self.assertEqual(self.lib.m10v_library_effects(C.byref(state),0,1,8,ok,None),0)
+        self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,79,0,ok,None),0)
+        self.assertEqual(state.effects[0][1],0)
 
     def test_custom_slot_bank_commits_only_with_state_and_clears_on_builtin(self):
         state=self.state();before=bytes(state);bad=STORE(lambda ctx,next:-1);ok=STORE(lambda ctx,next:0)
@@ -225,8 +248,8 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertNotEqual((bytes(y), bytes(uv)), old)
         outputs = []
         for seed in (12, 12, 13):
-            state = self.state(); self.lib.m10v_library_texture(C.byref(state), 0, 3, 0, save, None)
-            self.lib.m10v_library_select(C.byref(state), 0, 1, save, None)
+            state = self.state(); self.lib.m10v_library_select(C.byref(state), 0, 1, save, None)
+            self.lib.m10v_library_texture(C.byref(state), 0, 3, 0, save, None)
             image, y, uv, scratch = self.image(); self.assertEqual(self.render(image, state, scratch, seed=seed), 0)
             outputs.append(bytes(y)); self.assertEqual(bytes(uv), bytes(self.image()[2]))
             for row in range(image.height): self.assertEqual(bytes(y[row * image.stride + 128:(row + 1) * image.stride]), bytes([173] * 8))

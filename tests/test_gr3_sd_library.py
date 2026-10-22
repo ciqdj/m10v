@@ -37,6 +37,19 @@ class SdLibraryTests(unittest.TestCase):
   self.assertEqual(self.lib.m10v_sd_record(record,len(record),79),79)
   damaged=bytearray(record);damaged[7000]^=1;struct.pack_into('<I',damaged,12284,zlib.crc32(damaged[:-4]))
   self.assertEqual(self.lib.m10v_sd_record(bytes(damaged),len(damaged),79),0)
+ def test_last_delivered_builtin_and_custom_records_survive_default_only_change(self):
+  contract=json.loads((ROOT/'node/gr3-sd-20261021-contract.json').read_text())
+  for i in range(47):
+   record=bytearray(self.pack[4096+i*12288:4096+(i+1)*12288]);id=struct.unpack_from('<I',record,8)[0]
+   record[8448:8480]=bytes.fromhex(contract['renderer']);struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
+   import hashlib
+   self.assertEqual(hashlib.sha256(record).hexdigest(),contract['hashes'][contract['ids'].index(id)])
+   self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),id),id)
+  source="import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Old LUT',rgb:Buffer.alloc(6591)},79));"
+  record=bytearray(subprocess.check_output(['node','--input-type=module','-e',source],cwd=ROOT))
+  record[8448:8480]=bytes.fromhex(contract['renderer']);struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
+  self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),79),79)
+
  def test_previous_v1_builtin_record_remains_accepted(self):
   record=bytearray(self.pack[4096:4096+12288])
   record[8448:8480]=bytes.fromhex('52c0e9f5e8bc84b0430702ecd187c0a9dc816822f20ec8d5de670b9e97276d59')
