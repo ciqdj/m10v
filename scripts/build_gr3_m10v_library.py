@@ -116,6 +116,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             else: raise ValueError('unsupported ARM relocation: ' + str(kind))
             struct.pack_into('<I', image, out_at, word)
     required = {
+        'm10v_zoom_': set(),  # Checked against the zoom module's explicit ABI registry.
         'm10v_isp_native_effects_': {'m10v_isp_native_effects_noise_shape'},
         'm10v_isp_frame_': {'m10v_isp_frame_apply'},
         'm10v_lifecycle_': {'m10v_lifecycle_phase','m10v_lifecycle_file_flush'},
@@ -143,7 +144,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_sd_camera_': {'m10v_sd_camera_item','m10v_sd_camera_install','m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name'},
         'm10v_debug_': {'m10v_debug_log','m10v_debug_batch'},
         'm10v_settings_': {'m10v_settings_open','m10v_settings_key'},
-        'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
+        'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy','m10v_settings_view_zoom'},
         'm10v_settings_controller_': {'m10v_settings_controller_card_directory','m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
         'm10v_hdf_': {'m10v_hdf_alloc','m10v_hdf_producer','m10v_hdf_gate','m10v_hdf_settings','m10v_hdf_load','m10v_hdf_save','m10v_hdf_done'},
@@ -155,7 +156,9 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True):
+    if type(custom_zoom)is not bool:raise ValueError('custom zoom must be boolean')
+    custom_zoom=custom_zoom and film_library
     if type(appended_slots)is not bool or (appended_slots and (not film_library or not sd_library)):raise ValueError('appended slots require the film/SD library')
     compile_flags=FLAGS+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
     render_flags=RENDER_FLAGS+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
@@ -393,7 +396,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 lifecycle_report['view_deferred']=view_report
                 lifecycle_report['patches']+=view_report['patches']
         settings_report = None
+        zoom_report = None
         if sd_library:
+            from scripts.build_gr3_zoom import build as build_zoom
+            zoom_base=(base+len(image)+15)&~15
+            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000)
+            zoom_report['enabled']=custom_zoom
+            image+=bytes(zoom_base-base-len(image))+zoom_code
+            symbols.update(zoom_report['symbols'])
             from scripts.generate_m10v_film_cards import generate as card_data
             if (ROOT/'native/gr3/m10v_film_card_data.h').read_text()!=card_data():raise ValueError('film card labels differ from catalog')
             for name,prefix in [('m10v_film_card.c','m10v_film_card_'),('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
@@ -409,7 +419,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
-            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=live_color,appended_slots=appended_slots)
+            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=live_color,appended_slots=appended_slots,custom_zoom=custom_zoom)
             code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
@@ -421,7 +431,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start)},'m10v_hdf_menu_')
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
             hook_start=(start+len(provisional)+15)&~15
-            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=live_color)
+            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=live_color,custom_zoom=custom_zoom)
             code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
         # Link dedicated stock-detail backend against the same camera journal.
@@ -495,6 +505,11 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         texts+=['Kodak Charmera','颜色','红','黄','蓝','灰']
         if sd_library:texts+=['A/B 请选择不同风格','OK选定 MENU返回 DISP退出快切','上下选项 左右换风格 OK进入','A/B 已启用 · DISP切换','A/B 未启用']
         texts+=['方块世界' if sd_library else 'Pixel World']
+        if sd_library:
+            if 786+len(texts)!=1024:raise ValueError('zoom resource allocation differs')
+            texts+=['自定义裁切焦距','第一档','第二档','上下选档 OK编辑 MENU返回',
+                    '左右1mm OK保存 MENU取消','保存或应用失败','读取失败']
+            texts+=[f'{mm}mm' for mm in range(28,101)]
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
@@ -747,6 +762,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs']})
     manifest['settings_menu']=settings_report
+    manifest['zoom']=zoom_report
+    if zoom_report:manifest['sources'].update(zoom_report['sources'])
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','native/gr3/m10v_ab.h','native/gr3/m10v_ab_camera.inc','native/gr3/m10v_ab_host.inc','scripts/build_gr3_settings_hooks.py','node/gr3-settings-menu.mjs']})
     manifest['detail']=detail_report
@@ -813,4 +830,5 @@ if __name__ == '__main__':
     parser.add_argument('--hdf-default',type=int,default=0)
     parser.add_argument('--no-hdf',action='store_true')
     parser.add_argument('--with-hdf',action='store_true')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))
+    parser.add_argument('--no-custom-zoom',action='store_true',help='Keep original focal crop hooks and hide custom zoom menu (GR IIIx)')
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))

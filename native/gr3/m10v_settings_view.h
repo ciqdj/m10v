@@ -1,6 +1,7 @@
 #ifndef M10V_SETTINGS_VIEW_H
 #define M10V_SETTINGS_VIEW_H
 #include "m10v_settings.h"
+#include "m10v_zoom_menu.h"
 /* GR III 2.10 only. Unintegrated view; caller owns route and root lifetime. */
 enum { M10V_VIEW_CAPACITY=40, M10V_VIEW_COUNT=37 };
 typedef struct { uint32_t widgets[M10V_VIEW_CAPACITY]; uint32_t count; } m10v_settings_view;
@@ -20,6 +21,7 @@ enum {
 /* Initialize the entire struct to zero before first create. */
 int m10v_settings_view_create(m10v_settings_view *);
 void m10v_settings_view_draw(m10v_settings_view *, const m10v_settings *, const m10v_settings_ops *);
+void m10v_settings_view_zoom(m10v_settings_view *,const m10v_zoom_menu *);
 /* Caller must unregister the shown root before destruction. */
 void m10v_settings_view_destroy(m10v_settings_view *);
 #endif

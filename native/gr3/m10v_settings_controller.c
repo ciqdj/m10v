@@ -5,6 +5,7 @@
 #include "m10v_debug.h"
 #include "m10v_sd_library.h"
 #include "m10v_film_card.h"
+#include "m10v_zoom_camera.h"
 #ifndef M10V_LIVE_COLOR
 #define M10V_LIVE_COLOR 0
 #endif
@@ -42,6 +43,7 @@ static int film_name_stamp(void *ctx,uint32_t enabled){
  if(m10v_camera_library_load(&fresh)<0)return -1;
  return m10v_camera_library_film_name_stamp(&fresh,enabled);
 }
+static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;}
 static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
@@ -78,7 +80,7 @@ uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
  return m10v_settings_top_dtor_original(owner);
 }
 uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
- if(route!=M10V_SETTINGS_FILMS_ROUTE&&route!=M10V_SETTINGS_STAMP_ROUTE&&route!=M10V_SETTINGS_NAME_ROUTE&&route!=M10V_SETTINGS_AB_ROUTE)
+ if(route!=M10V_SETTINGS_FILMS_ROUTE&&route!=M10V_SETTINGS_STAMP_ROUTE&&route!=M10V_SETTINGS_NAME_ROUTE&&route!=M10V_SETTINGS_AB_ROUTE&&route!=M10V_SETTINGS_ZOOM_ROUTE)
   return m10v_settings_factory_original(factory,route);
  uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
  return owner?(uint32_t)(uintptr_t)page(owner,route==M10V_SETTINGS_STAMP_ROUTE||route==M10V_SETTINGS_NAME_ROUTE):0;
@@ -86,7 +88,7 @@ uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
 uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t route){
  p->display_trace=0;
  p->pending_source=0;
- p->page=route==M10V_SETTINGS_AB_ROUTE?M10V_SETTINGS_AB:route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_STAMP:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
+ p->page=route==M10V_SETTINGS_ZOOM_ROUTE?M10V_SETTINGS_ZOOM:route==M10V_SETTINGS_AB_ROUTE?M10V_SETTINGS_AB:route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_STAMP:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
  /* AB is a shooting ImageControl child, not a generic Setup controller.
   * Match stock 531ab0f8 / 531ab160(route02000012): mode0 waits for the
   * shooting transition before presentation; parameter137=0 keeps the active
@@ -95,7 +97,9 @@ uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t rou
   * The same owner is also used by Setup, so restore its original defaults. */
  p->base[0x12b]=p->page==M10V_SETTINGS_AB?0:2;
  p->base[0x137]=p->page==M10V_SETTINGS_AB?0:2;
- int opened=m10v_settings_open(&p->state,&o,p->page);
+ int opened=0;
+ if(p->page==M10V_SETTINGS_ZOOM){m10v_zoom_menu_ops z;zoom_ops(&z);m10v_zoom_menu_open(&p->zoom,&z);}
+ else opened=m10v_settings_open(&p->state,&o,p->page);
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(92,route,(uint32_t)opened,p->state.screen,p->view.count);
  if(opened)return 0;
  if(p->page==M10V_SETTINGS_AB){p->ab.down=0;ab_pair(&p->ab);p->state.slot=p->ab.a;p->state.index=p->ab.b;}
@@ -107,7 +111,8 @@ void m10v_settings_controller_enter(m10v_settings_controller *p,uint32_t route,u
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(94,(uint32_t)(uintptr_t)p,route,p->state.screen,flags);
  (void)route;(void)flags;m10v_settings_ops o;ops(&o);
  M10V_LOG(80,p->page,route,p->state.screen,p->state.focus);
- m10v_settings_view_draw(&p->view,&p->state,&o);
+ if(p->page==M10V_SETTINGS_ZOOM)m10v_settings_view_zoom(&p->view,&p->zoom);
+ else m10v_settings_view_draw(&p->view,&p->state,&o);
  ((fn3)0x5316d354u)((uint32_t)(uintptr_t)p,0,p->view.widgets[0]);
  M10V_LOG(81,p->page,route,p->state.screen,p->state.focus);
 }
@@ -159,6 +164,13 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
  case 0x86:case 0x89:case 0xda:key=M10V_KEY_BACK;break;
  default:return 0;
  }
+ if(p->page==M10V_SETTINGS_ZOOM){
+  m10v_zoom_menu_ops z;zoom_ops(&z);
+  m10v_zoom_menu_key(&p->zoom,&z,key);
+  if(p->zoom.closed)((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);
+  else m10v_settings_view_zoom(&p->view,&p->zoom);
+  return 1;
+ }
  m10v_settings_ops o;ops(&o);uint32_t before=p->state.screen;
  m10v_settings_key(&p->state,&o,key);
  if(before==M10V_SETTINGS_CATALOG&&p->state.screen==M10V_SETTINGS_FILMS&&key==M10V_KEY_OK){p->ab.enabled=0;ab_clear(&p->ab);}
@@ -191,7 +203,7 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
 /* Scoped to the original key dispatch call site, never the global route getter. */
 uint32_t m10v_settings_controller_key_route(uint32_t model){
  uint32_t route=((fn1)0x53228c4cu)(model);
- return route==M10V_SETTINGS_FILMS_ROUTE||route==M10V_SETTINGS_STAMP_ROUTE||route==M10V_SETTINGS_NAME_ROUTE||route==M10V_SETTINGS_AB_ROUTE?0x0200004au:route;
+ return route==M10V_SETTINGS_FILMS_ROUTE||route==M10V_SETTINGS_STAMP_ROUTE||route==M10V_SETTINGS_NAME_ROUTE||route==M10V_SETTINGS_AB_ROUTE||route==M10V_SETTINGS_ZOOM_ROUTE?0x0200004au:route;
 }
 
 /* Dynamic bitmap metadata belongs to the same heap allocation as its pixels.

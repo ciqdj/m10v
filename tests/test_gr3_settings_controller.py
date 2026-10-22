@@ -42,7 +42,7 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_camera_library_load','m10v_sd_camera_item','m10v_sd_camera_install',
          'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log','m10v_debug_batch','m10v_library_name','m10v_sd_camera_custom_name',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event']]]
   names += [f'm10v_ab_adj_{n}_original' for n in ('refresh','exit','destroy','changed')]
-  names += ['m10v_ab_dispatch_original']
+  names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -150,6 +150,18 @@ class ControllerLifetimeTests(unittest.TestCase):
   return u.reg_read(UC_ARM_REG_R0)
  def count(self,name):return sum(e[0]==name for e in self.events)
  def setup_owner(self,u):self.call(u,'top_ctor',OWNER)
+
+ def test_zoom_route_reuses_first_owner_and_avoids_film_state(self):
+  u=self.machine();self.setup_owner(u)
+  self.assertEqual(self.call(u,'factory',0x55123400,0x0200f105),PAGE)
+  self.assertEqual(self.call(u,'ready',PAGE,0x0200f105),1)
+  self.assertEqual(self.count('m10v_zoom_menu_open'),1)
+  self.assertEqual(self.count('m10v_camera_library_load'),0)
+  self.call(u,'enter',PAGE,0x0200f105,0)
+  self.assertEqual(self.count('m10v_settings_view_zoom'),1)
+  u.mem_write(0x10000100,struct.pack('<H',0xd8));self.call(u,'key',PAGE,0x10000100)
+  self.assertEqual(self.count('m10v_zoom_menu_key'),1)
+  self.assertEqual(self.count('m10v_settings_view_draw'),0)
 
  def test_dynamic_card_ids_resolve_all_five_owned_descriptors(self):
   u=self.machine();owner=0x55040000;page=owner+0x13bc;heap=0x55080000

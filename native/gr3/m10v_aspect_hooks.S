@@ -162,15 +162,14 @@ entry live_select
     jump 0x540b916c
 entry common_dispatch
     push {r0,r1,r2,r3,r4,r5,ip,lr}
-    bl m10v_aspect_mask_active
-    cmp r0,#0
-    beq 1f
+    cmp r1,#1
+    bhi 1f
     bl m10v_aspect_current
     cmp r0,#4
     cmpne r0,#5
     bne 1f
+    str r0,[sp,#8]
     pop {r0,r1,r2,r3,r4,r5,ip,lr}
-    mov r2,r5
     mov r3,r4
     bl m10v_aspect_live_region
     sub sp,fp,#0x1c

@@ -108,7 +108,7 @@ def apply_overlay(rtos):
     # Redirect internal callers, retaining the unchanged implementations for
     # the new adapters' legacy fallbacks. Relocations distinguish code/data.
     report=json.loads((ROOT/'.runtime/grlife-current/reconstruction/firmware_store/templates/urban160-link-report.json').read_text())
-    redirects={'gr_dng_default_crop_tags':'dng_tags','open_gate_mask_is_active':'mask_active','draw_overlay':'draw','gr3_sro_af_bounds_test02':'af_bounds'}
+    redirects={'gr_dng_default_crop_tags':'dng_tags','open_gate_mask_is_active':'mask_active','draw_overlay':'draw','gr3_sro_af_bounds_test02':'af_bounds','gr3_sro_write_active_locked':'private_active'}
     for row in report['relocations']:
         if row['type'] in ('R_ARM_CALL','R_ARM_JUMP24') and row['symbol'] in redirects:
             address=row['place'];word(address,branch(address,symbols['m10v_aspect_'+redirects[row['symbol']]],row['type']=='R_ARM_CALL'))

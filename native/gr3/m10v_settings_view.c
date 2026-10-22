@@ -181,3 +181,33 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  }
  ((fn1)0x533ad308u)(v->widgets[ROOT]);
 }
+
+/* Reuse the existing owned37 widgets; no film allocation on this page. */
+extern uint32_t m10v_zoom_title(void);
+extern uint32_t m10v_zoom_bits(unsigned);
+extern uint32_t m10v_zoom_caption(uint32_t);
+void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
+ if(!v||!s||v->count!=COUNT)return;
+ uint32_t title=m10v_zoom_title();
+ caption(v->widgets[TITLE],title);
+ caption(v->widgets[FOOTER],title+(s->editing?4:3));
+ visible(v->widgets[NAME],0);
+ visible(v->widgets[ERROR_TEXT],s->error!=0);
+ if(s->error)caption(v->widgets[ERROR_TEXT],title+(s->error==2?6:5));
+ for(uint32_t i=0;i<5;i++){
+  visible(v->widgets[FRAME+i],0);visible(v->widgets[INNER+i],0);visible(v->widgets[ICON+i],0);
+ }
+ for(uint32_t i=0;i<4;i++){
+  uint32_t selected=i<2&&i==s->focus;
+  visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],selected);
+  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],1);
+  visible(v->widgets[ROW+i],i<2);visible(v->widgets[VALUE+i],i<2);
+  if(i<2){
+   caption(v->widgets[ROW+i],title+1+i);
+   unsigned mm=s->editing&&selected?s->editor.value:s->saved.mm[i];
+   caption(v->widgets[VALUE+i],m10v_zoom_caption(m10v_zoom_bits(mm)));
+   ((fn2)0x5339658cu)(v->widgets[ROW+i],selected&&!s->editing?10:31);
+   ((fn2)0x5339658cu)(v->widgets[VALUE+i],selected?10:31);
+  }
+ }
+}

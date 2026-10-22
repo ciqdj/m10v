@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.6",
+      "date": "2026-10-22",
+      "title": "GR III 支持机内自定义两档裁切焦距",
+      "changes": [
+        "GR III 2.10 保留两档裁切，在 MENU → 设置 → 自定义裁切焦距中分别按 1mm 调整 28–100mm，OK 保存、MENU 取消；默认仍为原厂 35mm／50mm，关闭裁切为 28mm。",
+        "接通焦距切换、数码裁切取景、JPEG 尺寸和逐张照片裁切记录，兼容已有画幅；两份带 CRC 的机内存档支持回读校验与损坏恢复，保存失败显示提示。",
+        "GR IIIx／GR IV 不启用此项。保留方块世界、Charmera、五槽胶卷库、自定义 LUT 和现有水印；最终固件已做离线 Hook 回读与 ARM 执行验证，未完成机身实拍及完整 DNG 验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.5",
       "date": "2026-10-22",
       "title": "M10V 精选新增方块世界像素胶卷",
@@ -10,9 +23,9 @@
         "新胶卷使用独立 ID 290，保留历史胶卷、自定义 LUT 与 Charmera 编号，兼容此前合法 SD 胶卷包；颗粒与漏光默认关闭，开启颗粒时在像素化后处理。",
         "效果只处理静态 JPEG，取景与 RAW 不像素化；需更新固件后使用新胶卷。GR IV 不开放本效果。按用户授权完成离线验证后直接发布，尚未实机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "028270bdf3ece83ec6bacfddfee723a93eaa037f",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/028270bdf3ece83ec6bacfddfee723a93eaa037f"
     },
     {
       "version": "2026.10.22.4",

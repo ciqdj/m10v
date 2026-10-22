@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { inspectOfficial } from './firmware.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
 import {settingsSources,settingsPatches,checkSettings,abPatches} from './gr3-settings-menu.mjs';
+import {zoomPatches} from './gr3-zoom.mjs';
 import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 
@@ -184,7 +185,7 @@ function checkRuntime(runtime, manifest) {
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?238:168;
+  const resourceCount=manifest.sd_library?318:168;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -415,7 +416,7 @@ function patchList(manifest,runtime) {
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...appendedSlotPatches(runtime,manifest),...abPatches(manifest),...hdfPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abPatches(manifest),...hdfPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

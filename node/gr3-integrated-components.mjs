@@ -79,6 +79,16 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
    const stock=original.rtos.subarray(off,off+4),addition=c.rtos.subarray(off,off+4);
    if(addition.equals(stock))continue;
    const current=rtos.subarray(off,off+4),address=LOAD+off;
+   if(e.aspect&&address===0x536a2a30&&manifest.zoom?.enabled===true&&manifest.film_library_enabled!==false){
+    const hook=manifest.zoom.patches.find(p=>p.address===address);
+    const aspectBranch=(0xea000000|(((0x540b9450-address-8)>>2)&0xffffff))>>>0;
+    need(stock.readUInt32LE()===0xeddf7af8&&addition.readUInt32LE()===aspectBranch&&
+      hook&&current.readUInt32LE()===hook.replacement&&
+      manifest.zoom.bindings.m10v_zoom_original_resolution===0x540b9450,'zoom/aspect resolution chain differs');
+    // Zoom delegates canonical dimensions to the existing aspect dispatcher.
+    // Preserve the verified zoom entry; the component body is copied below.
+    stockWords++;continue;
+   }
    const nativeBound=(0xe3003000|manifest.resources.last_id)>>>0;
    const router=e.aspect&&[0x533966d4,0x533970ec].includes(address);
    need(current.equals(stock)||(router&&current.readUInt32LE()===nativeBound),'camera components overlap native patch at '+address.toString(16));

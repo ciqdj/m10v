@@ -29,7 +29,7 @@ class SettingsViewTests(unittest.TestCase):
    card=Path(d)/'card.o'
    subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(card)],check=True,capture_output=True)
    cls.card,entries=link_object(card.read_bytes(),BASE+0x4000,prefix='m10v_film_card_')
-   cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,**entries},prefix='m10v_settings_view_')
+   cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,'m10v_zoom_title':0x540b0040,'m10v_zoom_bits':0x540b0044,'m10v_zoom_caption':0x540b0048,**entries},prefix='m10v_settings_view_',additional_exports=('m10v_settings_view_zoom',))
  def machine(self,fail_object=0,fail_cards=False,native_accessor=False,custom_names=None,catalog_ids=None):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   for addr,size in [(0x53000000,0x2000000),(0x55000000,0x1000000),(0x10000000,0x200000)]:u.mem_map(addr,size)
@@ -55,6 +55,9 @@ class SettingsViewTests(unittest.TestCase):
     p=uc.reg_read(UC_ARM_REG_R0)
     if p:self.assertIn(p,self.live);del self.live[p]
    elif a==0x540b60e0 and not native_accessor:uc.reg_write(UC_ARM_REG_R0,0x10004000)
+   elif a==0x540b0040:uc.reg_write(UC_ARM_REG_R0,1024)
+   elif a==0x540b0044:pass # Numeric mm boundary mock for this view test.
+   elif a==0x540b0048:uc.reg_write(UC_ARM_REG_R0,1031+uc.reg_read(UC_ARM_REG_R0)-28)
    elif a==0x540b0000:uc.reg_write(UC_ARM_REG_R0,0x10000800)
    elif a==0x540b0010:
     index=uc.reg_read(UC_ARM_REG_R1);uc.reg_write(UC_ARM_REG_R0,catalog_ids.get(index,0) if catalog_ids is not None else 33+index if index<7 else 0)
@@ -246,6 +249,21 @@ class SettingsViewTests(unittest.TestCase):
   outer=struct.unpack('<4I',u.mem_read(w[6]+0x20,16));inner=struct.unpack('<4I',u.mem_read(w[11]+0x20,16))
   self.assertEqual(outer,(24,102,128,204));self.assertEqual(inner,(26,104,124,200))
   self.assertEqual(struct.unpack('<4I',u.mem_read(w[16]+0x20,16)),(28,106,120,196))
+ def test_zoom_two_rows_draft_error_and_no_film_allocation(self):
+  u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u);heap=self.heap
+  # saved state, editor, focus/editing/closed/error
+  u.mem_write(0x10002000,struct.pack('<IHH7I',9,35,50,9,1,49,1,1,0,1))
+  self.call(u,'zoom',0x10001000,0x10002000)
+  self.assertEqual(self.heap,heap)
+  self.assertEqual([u.mem_read(w[29+i]+0x9e,1)[0] for i in range(4)],[1,1,0,0])
+  self.assertEqual([u.mem_read(w[33+i]+0x9e,1)[0] for i in range(4)],[1,1,0,0])
+  self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[0]*5)
+  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0,1,0,0])
+  cap=lambda index:struct.unpack('<H',u.mem_read(w[index]+0xea,2))[0]
+  self.assertEqual([cap(i) for i in (2,4,5,29,30,33,34)],[1024,1028,1029,1025,1026,1038,1052])
+  self.assertEqual(u.mem_read(w[5]+0x9e,1)[0],1)
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+
  def test_catalog_highlights_actual_index_and_hides_empty_last_page_entries(self):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u);self.state(u,2,4)
   u.mem_write(0x10002000+116,struct.pack('<I',6))

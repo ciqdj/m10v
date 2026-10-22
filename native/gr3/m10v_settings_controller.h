@@ -2,6 +2,7 @@
 #define M10V_SETTINGS_CONTROLLER_H
 #include "m10v_settings_view.h"
 #include "m10v_ab.h"
+#include "m10v_zoom_menu.h"
 #ifndef M10V_AB_NATIVE_HOST
 #define M10V_AB_NATIVE_HOST 1
 #endif
@@ -16,11 +17,13 @@ typedef struct {
 typedef struct {
  uint8_t base[0x158];
  m10v_settings_view view;
- union {m10v_settings state;m10v_native_ab_host host;};
+ union {m10v_settings state;m10v_native_ab_host host;m10v_zoom_menu zoom;};
  uint32_t page;
  m10v_ab ab;
  uint32_t display_trace;
  uint32_t pending_source;
+ uint16_t zoom_mm[2];
+ uint32_t zoom_flags;
 } m10v_settings_controller;
 _Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");
 #define M10V_SETTINGS_OWNER_BYTES 0x13bcu
@@ -30,6 +33,8 @@ _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,
 #define M10V_SETTINGS_STAMP_ROUTE 0x0200f101u
 #define M10V_SETTINGS_NAME_ROUTE 0x0200f103u
 #define M10V_SETTINGS_AB_ROUTE 0x0200f104u
+#define M10V_SETTINGS_ZOOM_ROUTE 0x0200f105u
+_Static_assert(sizeof(m10v_zoom_menu)<=sizeof(m10v_settings),"zoom state capacity");
 uint32_t m10v_settings_controller_owner_size(void);
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner);
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner);

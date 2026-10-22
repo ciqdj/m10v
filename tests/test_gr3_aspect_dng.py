@@ -83,7 +83,7 @@ class AspectDngTests(unittest.TestCase):
         u.reg_write(A.UC_ARM_REG_LR, STOP)
         u.reg_write(A.UC_ARM_REG_R0, image)
         u.reg_write(A.UC_ARM_REG_R1, out)
-        u.emu_start(entry or self.entry, STOP, count=10000)
+        u.emu_start(entry or self.entry, STOP, count=100000)
         result = u.reg_read(A.UC_ARM_REG_R0)
         return result - 0x100000000 if result & 0x80000000 else result
 
@@ -98,6 +98,14 @@ class AspectDngTests(unittest.TestCase):
                     self.assertEqual(bytes(u.mem_read(OUT, 20)), struct.pack('<4I4B', x, 14, crop_w, h, 5, index, 1, 0))
                     self.assertEqual(bytes(u.mem_read(OUT - 4, 4)), b'\xa5' * 4)
                     self.assertEqual(bytes(u.mem_read(OUT + 20, 4)), b'\xa5' * 4)
+
+    def test_custom_already_cropped_geometry_is_immutable_and_recognized(self):
+        for mm in (29,41,70,100):
+            w=(4672*28//mm)//16*16
+            h=(4000*28//mm)//16*16
+            u=self.machine(width=w,height=h,origin=(20,14))
+            self.assertEqual(self.call(u),1)
+            self.assertEqual(struct.unpack('<4I',u.mem_read(OUT,16)),(20,14,w,h))
 
     def test_unknown_size_keeps_original_crop_and_returns_unrecognized(self):
         u = self.machine(width=1000, height=700, origin=(2, 4))

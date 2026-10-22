@@ -32,13 +32,37 @@ u32 m10v_aspect_mask_active(void) {
     return manager && !CALL(0x53654220,u32 (*)(u32,u32))(manager,0x4a);
 }
 
+/* Exact integer-mm float values only; no VFP state or writable global state. */
+u32 m10v_aspect_mm(u32 bits) {
+    if(bits<0x3f800000 || bits>0x40649249) return 0;
+    u32 shift=(bits>>23)==127?10:9;
+    u32 q=((bits&0x7fffff)|0x800000)+(1u<<(shift-1));
+    q>>=shift;
+    u32 mm=(q*28+4096)/8192;
+    if(mm<28 || mm>100) return 0;
+    u32 mantissa=((mm<<23)+14)/28;
+    u32 expected=0x3f000000+mantissa;
+    if(mm>=56) expected=0x3f800000+(((mm<<22)+14)/28);
+    return bits==expected?mm:0;
+}
+static u32 stock_q13(u32 q) {
+    return q==0x2000 || q==0x2800 || q==0x38f6 || q==0x3925;
+}
+
 void m10v_aspect_resolution(u32 mag,u32 quality,u16 *width,u16 *height) {
     static const u16 sizes[4][2]={{4672,4000},{3728,3200},{2608,2240},{1488,1280}};
     if(quality>3 || !width || !height) return;
     u32 index=quality;
     if(mag==0x3fa00000 && index<1) index=1;
     else if((mag==0x3fe3d70a || mag==0x3fe49249) && index<2) index=2;
-    else if(mag!=0x3f800000 && mag!=0x3fa00000 && mag!=0x3fe3d70a && mag!=0x3fe49249) return;
+    else if(mag!=0x3f800000 && mag!=0x3fa00000 && mag!=0x3fe3d70a && mag!=0x3fe49249) {
+        u32 mm=m10v_aspect_mm(mag);
+        if(!mm) return;
+        u32 w=(4672*28/mm/16)*16,h=(4000*28/mm/16)*16;
+        *width=w<sizes[index][0]?w:sizes[index][0];
+        *height=h<sizes[index][1]?h:sizes[index][1];
+        return;
+    }
     *width=sizes[index][0]; *height=sizes[index][1];
 }
 /* Native filter radius follows the diagonal of the output, normalized by
@@ -68,6 +92,15 @@ u32 m10v_aspect_write_active(u32 context,u32 unused,u32 mag) {
         {1832387,1572864,558367,196608},
         {1281884,1101005,833618,432538}
     };
+    if(!stock_q13(mag) && mag>=8192 && mag<=29257) {
+        CALL(0x53665c2c,void (*)(u32))(context);
+        /* Use the native calculator's rectangle, never a second crop table. */
+        u32 w=WORD(context,0x24)*7/9,h=WORD(context,0x28);
+        WORD(context,0x64)=w; WORD(context,0x68)=h;
+        WORD(context,0x6c)=(2949120-w+1)/2;
+        WORD(context,0x70)=WORD(context,0x30);
+        return CALL(0x536ae870,u32 (*)(u32))(context+0x24bc);
+    }
     u32 index=CALL(0x540b62f8,u32 (*)(u32))(mag);
     if(index>2) index=0;
     CALL(0x53665c2c,void (*)(u32))(context);
@@ -78,6 +111,19 @@ u32 m10v_aspect_write_active(u32 context,u32 unused,u32 mag) {
     return CALL(0x536ae870,u32 (*)(u32))(context+0x24bc);
 }
 
+u32 m10v_aspect_private_active(u32 context,u32 ratio,u32 mag) {
+    if(!stock_q13(mag) && mag>=8192 && mag<=29257 && (ratio==2 || ratio==4)) {
+        CALL(0x53665c2c,void (*)(u32))(context);
+        u32 w=WORD(context,0x24),h=WORD(context,0x28);
+        if(ratio==2) w=w*8/9; else h=h*69/250;
+        WORD(context,0x64)=w;WORD(context,0x68)=h;
+        WORD(context,0x6c)=(2949120-w+1)/2;
+        WORD(context,0x70)=(1966080-h+1)/2;
+        return CALL(0x536ae870,u32 (*)(u32))(context+0x24bc);
+    }
+    return CALL(0x540b6240,u32 (*)(u32,u32,u32))(context,ratio,mag);
+}
+
 /* Masked live view keeps the native 3:2 focal crop underneath the mask.
  * Both AF and common refresh must publish the SAME source rectangle. Native
  * +24 is recomputed for crop/AF; fixed still-JPEG rectangles cannot replace it.
@@ -86,6 +132,14 @@ u32 m10v_aspect_live_region(u32 context,u32 mode,u32 ratio,u32 mag) {
     if(m10v_aspect_mask_active())
         return CALL(0x53666770,u32 (*)(u32,u32))(context,mag==0x2000?0:1);
     if(ratio==5) return m10v_aspect_write_active(context,mode,mag);
+    if(!stock_q13(mag) && mag>=8192 && mag<=29257) {
+        CALL(0x53665c2c,void (*)(u32))(context);
+        u32 w=WORD(context,0x24),h=WORD(context,0x28)*69/250;
+        WORD(context,0x64)=w; WORD(context,0x68)=h;
+        WORD(context,0x6c)=WORD(context,0x2c);
+        WORD(context,0x70)=(1966080-h+1)/2;
+        return CALL(0x536ae870,u32 (*)(u32))(context+0x24bc);
+    }
     return CALL(0x540b6240,u32 (*)(u32,u32,u32))(context,4,mag);
 }
 
@@ -109,6 +163,29 @@ void m10v_aspect_draw(u32 view,u32 surface) {
 
 /* AF retains the native safety inset and follows all three crop magnifications. */
 u32 m10v_aspect_af_bounds(u32 ratio,u32 crop,u32 *out) {
+    if(out && (ratio==1 || ratio==4 || ratio==5)) {
+        u32 owner=CALL(0x5320ad88,u32 (*)(void))();
+        owner=owner?CALL(0x5320b31c,u32 (*)(u32))(owner):0;
+        u32 props=owner?WORD(owner,4):0;
+        u32 bits=props?WORD(props,0x4c4):0;
+        u32 mm=m10v_aspect_mm(bits);
+        if(mm && mm!=28 && mm!=35 && mm!=50) {
+            u32 shift=(bits>>23)==127?10:9;
+            u32 q=(((bits&0x7fffff)|0x800000)+(1u<<(shift-1)))>>shift;
+            /* Native Q13 centered crop projected into the aspect view and
+             * intersected with the existing AF safety extent. Device AF
+             * behavior requires camera validation. Existing size helper caps
+             * mode0 at560x360 and modes14/15 at336x216. */
+            u32 w=((ratio==1?640:ratio==5?560:720)*8192+q/2)/q;
+            u32 h=((ratio==4?264:480)*8192+q/2)/q;
+            u32 left=(720-w+1)/2,top=(480-h+1)/2;
+            u32 inset=ratio==5?120:80;
+            if(left<inset) left=inset;
+            if(top<60) top=60;
+            out[0]=left;out[1]=top;out[2]=720-left;out[3]=480-top;
+            return 1;
+        }
+    }
     if(ratio!=5) return CALL(0x540b6458,u32 (*)(u32,u32,u32 *))(ratio,crop,out);
     static const u16 rects[3][4]={{120,60,600,420},{136,60,584,420},{203,106,517,374}};
     if(!out) return 0;

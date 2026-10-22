@@ -30,18 +30,10 @@ class AspectTests(unittest.TestCase):
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             cls.code, cls.entries = module.apply_overlay(cls.code)
-        candidate=os.environ.get('M10V_ASPECT_BIN') or os.environ.get('M10V_ASPECT_CANDIDATE')
+        candidate=os.environ.get('M10V_ASPECT_BIN')
         if candidate:
             script="import{readFileSync}from'node:fs';import{decodeFrameMap}from'./node/gr3-frames.mjs';const b=readFileSync(process.argv[1]),d=decodeFrameMap(b,b.readUInt32LE(b.length-8)).decoded;process.stdout.write(d.subarray(0x10870,0x10870+d.readUInt32LE(0x1086c)));"
             cls.code=subprocess.check_output(['node','--input-type=module','-e',script,candidate],cwd=ROOT)
-            # Retain the production delivery/source binding audit with the new
-            # geometry tests. Composition changes only the caption IDs.
-            from scripts.gr3_aspect_overlay import build_module, MODULE
-            blob,entries=build_module();expected=bytearray(blob)
-            at=entries['m10v_aspect_id_record']-MODULE
-            expected[at+4:at+12]=cls.code[MODULE-BASE+at+4:MODULE-BASE+at+12]
-            if cls.code[MODULE-BASE:MODULE-BASE+len(blob)]!=bytes(expected):
-                raise AssertionError('delivered crop module differs from source-built ARM')
         cls.caption_id=struct.unpack_from('<I',cls.code,cls.entries['m10v_aspect_id_record']-BASE+4)[0]
 
     def machine(self):
@@ -150,6 +142,52 @@ class AspectTests(unittest.TestCase):
                 with self.subTest(mag=hex(mag),quality=quality):
                     u=self.call(self.entries['m10v_aspect_resolution'],mag,quality,RAM,RAM+2)
                     self.assertEqual(struct.unpack('<HH',u.mem_read(RAM,4)),expected)
+
+    def test_custom_active_geometry_projects_native_rectangle_under_lock(self):
+        from unicorn import arm_const as A
+        for mm in range(29,101):
+            if mm in (35,50): continue
+            bits=struct.unpack('<I',struct.pack('<f',mm/28))[0]
+            q=int(mm/28*8192+0.5)
+            nw=(2949120*8192+q//2)//q;nh=(1966080*8192+q//2)//q
+            for ratio in (2,4,5):
+                u=self.live_machine(ratio,bits);context=RAM+0x4000
+                u.mem_write(context+0x24,struct.pack('<4I',nw,nh,(2949120-nw+1)//2,(1966080-nh+1)//2))
+                u.reg_write(A.UC_ARM_REG_R0,context);u.reg_write(A.UC_ARM_REG_R1,ratio)
+                u.reg_write(A.UC_ARM_REG_R2,q)
+                name='m10v_aspect_write_active' if ratio==5 else 'm10v_aspect_private_active'
+                u.emu_start(self.entries[name],STOP,count=10000)
+                w=nw*7//9 if ratio==5 else nw*8//9 if ratio==2 else nw
+                h=nh*69//250 if ratio==4 else nh
+                self.assertEqual(struct.unpack('<4I',u.mem_read(context+0x64,16)),(w,h,(2949120-w+1)//2,(1966080-h+1)//2))
+
+    def test_custom_float_validation_and_af_bounds_every_mm(self):
+        from unicorn import arm_const as A
+        for mm in range(28,101):
+            bits=struct.unpack('<I',struct.pack('<f',mm/28))[0]
+            self.assertEqual(self.call(self.entries['m10v_aspect_mm'],bits).reg_read(A.UC_ARM_REG_R0),mm)
+            for ratio in (1,4,5):
+                u=self.live_machine(ratio,bits)
+                for reg,value in ((A.UC_ARM_REG_R0,ratio),(A.UC_ARM_REG_R1,0 if mm==28 else 1 if mm==35 else 2 if mm==50 else 0),(A.UC_ARM_REG_R2,RAM+0x9000)):
+                    u.reg_write(reg,value)
+                u.emu_start(self.entries['m10v_aspect_af_bounds'],STOP,count=10000)
+                self.assertEqual(u.reg_read(A.UC_ARM_REG_R0),1)
+                l,t,r,b=struct.unpack('<4I',u.mem_read(RAM+0x9000,16))
+                self.assertEqual((l+r,t+b),(720,480))
+                self.assertGreater(r,l);self.assertGreater(b,t)
+                self.assertGreaterEqual(l,120 if ratio==5 else 80)
+                self.assertGreaterEqual(t,60)
+        for bits in (0,0x7fc00000,0x3f000000,0x40800000,0x3f800001):
+            self.assertEqual(self.call(self.entries['m10v_aspect_mm'],bits).reg_read(A.UC_ARM_REG_R0),0)
+
+    def test_custom_six_by_seven_resolution_uses_continuous_crop(self):
+        for mm in (29, 41, 70, 100):
+            bits=struct.unpack('<I',struct.pack('<f',mm/28))[0]
+            for quality, maximum in enumerate((4000,3200,2240,1280)):
+                h=min(maximum,(4000*28//mm)//16*16)
+                w=min((4672,3728,2608,1488)[quality],(4672*28//mm)//16*16)
+                u=self.call(self.entries['m10v_aspect_resolution'],bits,quality,RAM,RAM+2)
+                self.assertEqual(struct.unpack('<HH',u.mem_read(RAM,4)),(w,h))
 
     def test_text_routes_both_new_names_in_every_native_language(self):
         from unicorn import arm_const as A

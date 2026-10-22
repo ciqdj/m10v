@@ -70,5 +70,23 @@ int m10v_aspect_dng_tags(uint32_t image, uint32_t out) {
         result[18] = 1;
         return 1;
     }
+    /* New arbitrary crops already carry their final rectangle. Recognize
+     * only dimensions produced by the 1mm/16px capture policy; never read
+     * mutable current camera settings or reinterpret older ratio identities.
+     * Unknown/full-width custom descriptors retain the safe fallback above. */
+    if(!(width&15) && !(height&15)) {
+        static const uint16_t qw[4]={4672,3728,2608,1488};
+        for(unsigned mm=29;mm<=100;mm++) {
+            if(mm==35 || mm==50) continue;
+            for(i=0;i<4;i++) {
+                if(width>qw[i] || height>heights[i]) continue;
+                unsigned w_ok=width*mm<=4672*28 &&
+                    (width==qw[i] || (width+16)*mm>4672*28);
+                unsigned h_ok=height*mm<=4000*28 &&
+                    (height==heights[i] || (height+16)*mm>4000*28);
+                if(w_ok && h_ok) { result[17]=(uint8_t)i;result[18]=1;return 1; }
+            }
+        }
+    }
     return 0;
 }
