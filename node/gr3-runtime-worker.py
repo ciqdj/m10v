@@ -30,6 +30,13 @@ def main():
         'configuration_sha256': prepared['configuration_sha256'],
     }
     candidate, receipt = build(source, plan, consent)
+    if any(item['id'] == 'aspect' for item in json.loads(plan)['features']):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+        from gr3_aspect_overlay import extend_candidate
+        candidate, receipt['m10v_aspect'] = extend_candidate(candidate)
+        import hashlib
+        receipt['candidate_sha256'] = hashlib.sha256(candidate).hexdigest()
+        receipt['candidate_bytes'] = len(candidate)
     Path(output_path).write_bytes(candidate)
     print(json.dumps(receipt, ensure_ascii=False))
 

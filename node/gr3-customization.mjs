@@ -56,6 +56,8 @@ export async function prepareCustomization(source,input,options={}){
   'gr3-runtime.mjs','gr3-runtime-worker.py','gr3-candidate-audit.mjs',
   'gr3-stock-audit.mjs','gr3-film-texture.mjs','gr3-customization.mjs',
   'gr3-patch-plan.mjs','gr3-stock-presets.mjs','gr3-raw-nr.mjs',
+  '../scripts/gr3_aspect_overlay.py','../native/gr3/m10v_aspect.c',
+  '../native/gr3/m10v_aspect_hooks.S','../native/gr3/m10v_aspect_dng.c',
  ].map(n=>[n,hash(readFileSync(new URL(n,import.meta.url)))]);
  const configuration_sha256=hash(JSON.stringify({source:report.sha256,config,engineSources,upstream:upstream?.configuration_sha256}));
  return {schema:'m10v-gr3-customization-preparation/v2',ready:blockers.length===0&&(upstream?.ready??edits.length>0),

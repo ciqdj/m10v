@@ -31,7 +31,7 @@ test('final joined firmware contains all selected components and rejects repaire
  const plan=prepareNative(source,config,{extensions});
  const result=await generateNative(source,config,plan.configuration_sha256,{extensions});
  assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
- assert.equal(result.manifest.base,0x540ba000);
+ assert.equal(result.manifest.base,0x540be000);
  assert.ok(result.receipt.composition.verified);
  assert.equal(result.receipt.composition.aspect_resource_id,1023);
  assert.equal(result.receipt.composition.native_resource_range[0],786);

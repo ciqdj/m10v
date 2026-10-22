@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.3",
+      "date": "2026-10-22",
+      "title": "GR III 新增 6x7 裁切，宽幅统一命名 XPan",
+      "changes": [
+        "GR III 裁切菜单新增 6x7（横幅 7:6），同步接通 JPEG 四档尺寸、三档焦距裁切、取景蒙版、AF 范围、RAW 默认裁切信息与拍摄／回放身份。",
+        "原 65:24 选项统一显示为 XPan，保留原有裁切尺寸、存储身份及旧照片解释；网页工作台同步更新名称与选项说明，GR IV 工具保持现有范围。",
+        "新增源码构建和固件前像校验，裁切模块与时间戳、水平仪、胶卷库资源独立组合；保留已发布 A/B、独立五槽、HDF、首张换卷和实时取景修复。",
+        "本轮按用户明确授权完成离线回归后直接发布，测试包与线上均保留 camera_tested=false；6x7 的真实机身显示、拍摄、RAW 显影与重启恢复仍需实机确认。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.2",
       "date": "2026-10-22",
       "title": "发布 A/B 快切修复，完善低内存构建时限",
@@ -11,9 +25,9 @@
         "修复低内存服务器 GR III／IIIx 兼容构建被统一180秒限时提前终止的问题：构建单独设为最多300秒，预检保留180秒，继续保留取消、内存、机型审计和服务器600秒整组上限；失败信息明确显示超时。",
         "上一提交在 GR IIIx 构建阶段退出并已自动恢复旧版服务；本次只调整电脑端构建时限和诊断，不修改已验收的相机运行时代码或成像参数。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a90cf59fbebbe8ddd5448c5c866d2c8a11796f0d",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39636659246"
     },
     {
       "version": "2026.10.22.1",

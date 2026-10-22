@@ -37,7 +37,7 @@ const slots = [
 const definitions = [
   ['digitalHdf', 'HDF 模拟', '普通 GR III 的独立数字柔焦。机内入口：MENU → 设置 → HDF 模拟；可单独使用。', '普通 GR III · 独立机内菜单'],
   ['timestamp', '时间戳', '在 JPEG 中写入拍摄日期、时间和胶卷名称，机内也可调整。', '拍摄时间'],
-  ['aspect', '画幅比例', '增加 4:3、65:24 画幅与宽幅取景蒙版。', '4:3 / 65:24'],
+  ['aspect', '画幅比例', '增加 4:3、6x7、XPan 画幅与取景蒙版。', '4:3 / 6x7 / XPan'],
   ['negativeGrain', '原厂负片颗粒', '开放原厂负片颗粒菜单，档位在机内调整。', '机内调整'],
   ['rawNr', 'RAW 降噪', '设置写入 DNG 前的降噪策略。', '独立设置'],
   ['level', '滑轨水平仪', '使用横竖滑轨显示机身倾斜。', '取景辅助'],
@@ -236,7 +236,7 @@ function renderFeatures() {
     const heading = document.createElement('div');
     heading.className = 'feature-title';
     heading.append(textNode('span', String(index + 1).padStart(2, '0'), 'feature-num'), textNode('h3', name));
-    copy.append(heading, textNode('p',gr4Workbench&&id==='timestamp'?'在 JPEG 中写入拍摄日期与时间，样式可在机内调整。':description), textNode('span', tag, 'feature-tag'));
+    copy.append(heading, textNode('p',gr4Workbench&&id==='timestamp'?'在 JPEG 中写入拍摄日期与时间，样式可在机内调整。':gr4Workbench&&id==='aspect'?'增加 65:24 画幅与宽幅取景蒙版。':description), textNode('span', gr4Workbench&&id==='aspect'?'65:24':tag, 'feature-tag'));
     const button = textNode('button', active ? '关闭' : '开启', 'feature-toggle' + (active ? ' selected' : ''));
     button.type = 'button';
     button.setAttribute('aria-pressed',String(active));
@@ -277,11 +277,11 @@ function renderFeatures() {
         }
         else detail.append(textNode('p', '默认 ON · YYYY.MM.DD · 右下 · 中 · 橙。日期格式、位置、字号和颜色可在相机菜单中调整，关机后保留。'));
         const points = document.createElement('div'); points.className = 'feature-points';
-        for (const value of (state.profile==='native'?(gr4Workbench?['开 / 关','四种颜色','四种日期格式','四角位置']:['开 / 关','胶卷名称','四种颜色','四种日期格式','四角位置']):['ON / OFF', '五色字体', '四种日期格式', '四角位置', '3:2 / 4:3 / 1:1 / 65:24'])) points.append(textNode('span', value));
+        for (const value of (state.profile==='native'?(gr4Workbench?['开 / 关','四种颜色','四种日期格式','四角位置']:['开 / 关','胶卷名称','四种颜色','四种日期格式','四角位置']):['ON / OFF', '五色字体', '四种日期格式', '四角位置', '3:2 / 4:3 / 1:1 / 6x7 / XPan'])) points.append(textNode('span', value));
         detail.append(points);
       } else if (id === 'aspect') {
         const points = document.createElement('div'); points.className = 'feature-points';
-        for (const value of ['＋ 4:3 画幅', '＋ 全宽 65:24 画幅', '＋ 实时半透明取景蒙版']) points.append(textNode('span', value));
+        for (const value of (gr4Workbench?['＋ 全宽 65:24 画幅','＋ 实时半透明取景蒙版']:['＋ 4:3 画幅','＋ 6x7 画幅','＋ 全宽 XPan 画幅','＋ 实时半透明取景蒙版'])) points.append(textNode('span', value));
         detail.append(points);
       } else {
         detail.append(textNode('p', '底部横轨显示左右倾斜；右侧竖轨显示前后俯仰。圆点移入中间圆环并变绿时表示水平。'));

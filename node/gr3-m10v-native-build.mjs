@@ -10,7 +10,7 @@ import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 
 const LOAD = 0x53000000;
-const nativeBases = [0x540b6000, 0x540ba000];
+const nativeBases = [0x540b6000, 0x540ba000, 0x540be000];
 const sha = value => createHash('sha256').update(value).digest('hex');
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const hooks = [
