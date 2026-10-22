@@ -130,6 +130,34 @@ class Gr2SdTests(unittest.TestCase):
         for key in (3,3,3,3,4,1,4):self.call(u,report['symbols']['m10v_settings_key'],[page,ops,key])
         self.assertEqual(self.call(u,report['symbols']['gr2_load_state'],[0x50001000]),1);self.assertEqual(word(0x50001060),1)
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
+        # Detail editing uses the actual FILE/journal/custom-configuration
+        # backend too, not the UI fixture's substitute callback implementation.
+        detail_ops=0x50004040;detail=0x50003100;hdf_before=files['H:/M10VHD1.BIN']
+        self.call(u,report['symbols']['gr2_detail_backend_bind'],[detail_ops])
+        self.assertEqual(self.call(u,report['symbols']['gr2_detail_open'],[detail,detail_ops,0]),1)
+        for field_value in (3<<8|3,11<<8):
+            # This transaction deliberately executes three full journal/LUT
+            # validations (before, activation, reconciliation). Its bounded
+            # CPU work exceeds the generic helper's10M instruction budget.
+            for reg,value in ((r.UC_ARM_REG_R0,detail),(r.UC_ARM_REG_R1,detail_ops),(r.UC_ARM_REG_R2,field_value),
+                              (r.UC_ARM_REG_SP,0x50018000),(r.UC_ARM_REG_LR,0x5001f000)):u.reg_write(reg,value)
+            u.emu_start(report['symbols']['gr2_detail_set'],0x5001f000,count=30000000)
+            self.assertEqual(u.reg_read(r.UC_ARM_REG_PC),0x5001f000)
+            self.assertEqual(u.reg_read(r.UC_ARM_REG_SP),0x50018000)
+            self.assertEqual(u.reg_read(r.UC_ARM_REG_R0),1)
+            self.assertEqual(self.call(u,report['symbols']['gr2_configuration_read'],[0x50005000]),1)
+            self.assertEqual(bytes(u.mem_read(0x50005000,104)),bytes(u.mem_read(detail,104)))
+            wire=files[writes[-1]]
+            self.assertEqual(len(wire),104);self.assertEqual(struct.unpack_from('<H',wire,12)[0],79)
+            self.assertEqual(wire[14],3 if field_value==(3<<8|3) else 1)
+            self.assertEqual(wire[62],1);self.assertEqual(wire[52],1)
+            self.assertEqual(struct.unpack_from('<I',wire,96)[0],1)
+            self.assertEqual(struct.unpack_from('<I',wire,8)[0],word(detail+8))
+            self.assertEqual(struct.unpack_from('<I',wire,100)[0],zlib.crc32(wire[:100]))
+        self.assertEqual(files['H:/M10VHD1.BIN'],hdf_before)
+        self.assertEqual(self.call(u,report['symbols']['gr2_hdf_configuration_read'],[0x50005e00,0x50005e04]),1)
+        self.assertEqual(struct.unpack('>2I',u.mem_read(0x50005e00,8)),(2,21))
+        self.assertEqual(self.call(u,report['symbols']['gr2_load_state'],[0x50001000]),1)
         committed=bytes(u.mem_read(0x50001000,104));self.assertEqual(bytes(u.mem_read(0x50005000,104)),committed)
         files['H:/M10VC00.bin']=b'bad snapshot'
         self.assertEqual(self.call(u,report['symbols']['gr2_configuration_reload'],[]),0)

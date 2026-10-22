@@ -2527,7 +2527,7 @@ def probe_osd_colors(code:bytes)->dict:
     return dict(colors=rows,helpers_intercepted=[],hardware_tested=False,
                 scope='Original palette lookup, fixed-point YUV to RGB and channel/alpha nibble packing. CPU format evidence, no display hardware or compositing proof.')
 
-def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False,settings_overlay:bool=False,language:int=1,settings_out_dir:Path|None=None,settings_raw_hook:bool=False,menu_entries_draw:bool=False,hdf_overlay:bool=False,hdf_out_dir:Path|None=None,menu_flags:int=3)->dict:
+def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,native_runtime:dict|None=None,native_font_missing:bool=False,native_card:bool=False,native_card_allocation_failure:bool=False,attach:bool=False,overlay:bool=False,native_fill:bool=False,native_text_full:bool=False,settings_overlay:bool=False,language:int=1,settings_out_dir:Path|None=None,settings_raw_hook:bool=False,menu_entries_draw:bool=False,hdf_overlay:bool=False,hdf_out_dir:Path|None=None,menu_flags:int=3,detail_overlay:bool=False,detail_out_dir:Path|None=None)->dict:
     """Original stock list/graphics/font bodies, with bounded ROM-file reads.
 
     All display planes, active geometry and property/kernel state are synthetic.
@@ -2535,8 +2535,8 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
     generation, widget drawing, navigation, allocation or property mutation.
     """
     import hashlib
-    if (overlay or settings_overlay or hdf_overlay) and not attach:raise ValueError('overlay evidence requires the original active root transition')
-    if (settings_overlay or hdf_overlay) and native_runtime is None:raise ValueError('native settings overlay requires compiled runtime')
+    if (overlay or settings_overlay or hdf_overlay or detail_overlay) and not attach:raise ValueError('overlay evidence requires the original active root transition')
+    if (settings_overlay or hdf_overlay or detail_overlay) and native_runtime is None:raise ValueError('native settings overlay requires compiled runtime')
     if menu_entries_draw and (native_runtime is None or not attach):raise ValueError('menu entries require native runtime and active root')
     if settings_raw_hook and not settings_overlay:raise ValueError('raw hook evidence requires owned settings page')
     if not isinstance(language,int) or not 0<=language<=20:raise ValueError('official language index out of range')
@@ -2761,6 +2761,90 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
             settings_after_catalog=after_catalog,settings_after_install=after_install,settings_writes=writes,settings_changed_bytes=changed,
             settings_camera_root_preserved=word(word(0xA0398DC4))==root,settings_pool_restored=pool_free()==available,
             settings_closed=closed,settings_underlying_effect=word(0x5000D000+43*4))
+    detail_report={}
+    if detail_overlay:
+        uc.mem_write(native_runtime['base'],bytes.fromhex(native_runtime['runtime_hex']))
+        symbols=native_runtime['symbols'];ops=0x50006100;out=0x50006400;row_out=0x50006500
+        run(symbols['m10v_library_init'],0x50006000,thumb=False)
+        saved=bytearray(uc.mem_read(0x50006000,104));writes=[];fail=[False];deliveries=[];inflight=[False]
+        uc.mem_write(ops,struct.pack('>3I',0x1234,0x5001d200,0x5001d204))
+        def detail_backend(machine,address,size,unused):
+            if machine.reg_read(r.UC_ARM_REG_R0)!=0x1234:raise RuntimeError('detail context mismatch')
+            pointer=machine.reg_read(r.UC_ARM_REG_R1);value=0
+            if address==0x5001d200:machine.mem_write(pointer,bytes(saved))
+            else:
+                writes.append(bytes(machine.mem_read(pointer,104)))
+                if fail[0]:value=0xffffffff
+                else:saved[:]=writes[-1]
+            machine.reg_write(r.UC_ARM_REG_R0,value);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        uc.hook_add(UC_HOOK_CODE,detail_backend,begin=0x5001d200,end=0x5001d204)
+        def observe_detail(machine,address,size,unused):
+            if inflight[0]:deliveries.append(address)
+        for address in (0xA0394B60,0xA0398E6C):uc.hook_add(UC_HOOK_CODE,observe_detail,begin=address,end=address)
+        uc.mem_write(0xA0394950,bytes.fromhex(native_runtime['ui_event_hook_patch_hex']))
+        def detail_key(identity):
+            uc.mem_write(event,struct.pack('>3I',identity,1,0));inflight[0]=True
+            result=run(0xA039494E,0,event);inflight[0]=False
+            if result!=1:raise RuntimeError('detail raw key not consumed')
+        def detail_image(name):
+            if detail_out_dir is None:return
+            from PIL import Image
+            palette={item['index']:item['rgb4444'] for item in probe_osd_colors(code)['colors']}
+            indexed=bytes(uc.mem_read(0x68000000,720*480));rgb=bytes(uc.mem_read(0x68200000,720*480*2));pixels=bytearray(720*480*3)
+            for i,index in enumerate(indexed):
+                base=int.from_bytes(rgb[2*i:2*i+2],'big');over=palette.get(index,0);alpha=(over&15)/15
+                for channel,shift in enumerate((12,8,4)):
+                    pixels[3*i+channel]=round(((over>>shift&15)*alpha+(base>>shift&15)*(1-alpha))*17)
+            target=Path(detail_out_dir);target.mkdir(parents=True,exist_ok=True)
+            Image.frombytes('RGB',(720,480),bytes(pixels)).save(target/(name+'.png'))
+        def detail_peek():
+            if run(symbols['gr2_settings_detail_peek'],out,row_out,thumb=False)!=1:raise RuntimeError('detail page unexpectedly closed')
+            return word(row_out)
+        def pool_free():return word(word(0x50007004)+12)*word(0x50007014)
+        stock_routes=[]
+        def observe_route(machine,address,size,unused):
+            stock_routes.append(machine.reg_read(r.UC_ARM_REG_R0))
+            machine.reg_write(r.UC_ARM_REG_R0,0);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+        route_observer=uc.hook_add(UC_HOOK_CODE,observe_route,begin=0xA03948C0,end=0xA03948C0)
+        uc.mem_write(0x5000D000+43*4,struct.pack('>I',8))
+        run(0xA03BB2CE,root+0x84,run(0xA0396AE2,0x66))
+        uc.mem_write(event,struct.pack('>3I',0x60002010,1,0));run(0xA0398E6C,event)
+        uc.hook_del(route_observer)
+        available=pool_free();before=bytes(uc.mem_read(0x68200000,720*480*2))
+        if run(symbols['gr2_menu_films_enable'],1,thumb=False)!=1:raise RuntimeError('film menu activation failed')
+        uc.mem_write(0xA03948C4,bytes.fromhex(native_runtime['menu_route_hook_patch_hex']))
+        route_slots=[]
+        def bind_detail_backend(machine,address,size,unused):
+            route_slots.append(machine.reg_read(r.UC_ARM_REG_R0))
+            if machine.reg_read(r.UC_ARM_REG_R1):raise RuntimeError('native detail route supplied a foreign backend')
+            # The journal callback is this fixture's explicit filesystem
+            # boundary. Continue the real allocator/overlay/controller body.
+            machine.reg_write(r.UC_ARM_REG_R1,ops)
+        bind=uc.hook_add(UC_HOOK_CODE,bind_detail_backend,begin=symbols['gr2_settings_detail_open'],end=symbols['gr2_settings_detail_open'])
+        uc.mem_write(event,struct.pack('>3I',0x60002010,1,0));run(0xA0398E6C,event)
+        uc.hook_del(bind)
+        opened=run(symbols['gr2_settings_active'],thumb=False)
+        detail_peek();fields=[]
+        for row in range(12):
+            field=run(symbols['gr2_detail_field'],out,row,thumb=False)
+            if field==0xffffffff:break
+            fields.append(field)
+        run(0xA0398F20)
+        detail_image("detail-first")
+        changed=sum(a!=b for a,b in zip(before,bytes(uc.mem_read(0x68200000,720*480*2))))
+        for _ in range(3):detail_key(0x60001007)
+        detail_key(0x60001009);detail_peek();grain=run(symbols['gr2_detail_value'],out,3,thumb=False)
+        fail[0]=True;detail_key(0x60001009);detail_peek();failed_value=run(symbols['gr2_detail_value'],out,3,thumb=False)
+        run(0xA0398F20);detail_image("detail-save-error");fail[0]=False
+        for _ in range(6):detail_key(0x60001007)
+        if detail_peek()!=9:raise RuntimeError('detail scroll did not reach reset')
+        run(0xA0398F20);detail_image("detail-last");detail_key(0x6000100a);detail_peek()
+        reset_grain=run(symbols['gr2_detail_value'],out,3,thumb=False)
+        detail_key(0x6000100e)
+        detail_report=dict(detail_opened=bool(opened),detail_stock_routes=stock_routes,detail_route_slots=route_slots,detail_fields=fields,detail_grain=grain,detail_failed_value=failed_value,
+            detail_reset_grain=reset_grain,detail_writes=len(writes),detail_changed_bytes=changed,
+            detail_root_preserved=word(word(0xA0398DC4))==root,detail_pool_restored=pool_free()==available,
+            detail_raw_deliveries=len(deliveries),detail_closed=run(symbols['gr2_settings_active'],thumb=False)==0)
     hdf_report={}
     if hdf_overlay:
         def pool_free():return word(word(0x50007004)+12)*word(0x50007014)
@@ -2958,7 +3042,7 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
                     pixels[3*index+channel]=round(((over>>shift&15)*alpha+(base>>shift&15)*(1-alpha))*17)
             target=Path(frame_out).with_suffix('.png');Image.frombytes('RGB',(720,480),bytes(pixels)).save(target)
             menu_report['menu_composite_path']=str(target)
-    return dict(**hdf_report,**menu_report,**settings_report,**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
+    return dict(**detail_report,**hdf_report,**menu_report,**settings_report,**native_fill_report,**overlay_report,page_events=page_events,active_root_matches=word(word(0xA0398DC4))==root,low_module_loaded=attach,**native_card_report,native_text_outside_bounds=native_text_outside_bounds,native_text_return=native_text_return,native_text_changed_bytes=native_text_changed_bytes,font_resources=read_names,font_engine_calls=font_engine_calls,font_arena_bytes=arena_bytes,
                 page_returns=page_returns,navigation_effects=navigation,draw_returns=draw_returns,
                 display_nonzero_bytes=sum(value!=0 for value in frame),display_sha256=hashlib.sha256(frame).hexdigest(),
                 palette_backend_calls=palette_calls,guards_unchanged=bytes(uc.mem_read(root-16,16))==b'\xa5'*16 and bytes(uc.mem_read(root+0x600,16))==b'\xa5'*16,

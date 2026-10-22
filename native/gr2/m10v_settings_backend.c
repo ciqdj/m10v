@@ -47,3 +47,5 @@ int gr2_settings_backend_bind(gr2_settings_backend *backend,m10v_settings_ops *o
     ops->context=backend;ops->load=load;ops->item=item;ops->install=install;ops->stamp=stamp;ops->film_name_stamp=name_stamp;
     return 1;
 }
+
+void gr2_detail_backend_bind(gr2_detail_ops *ops){if(ops){ops->context=0;ops->load=load;ops->store=store;}}
