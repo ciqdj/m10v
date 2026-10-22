@@ -90,7 +90,7 @@ int m10v_library_valid(const m10v_library_state *state) {
         state->size != sizeof(*state) || (state->reserved & ~1u) || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
-        if (!state->slots[i].film || (state->slots[i].film > M10V_CUSTOM_MAX_ID && state->slots[i].film != M10V_CHAR_ID) ||
+        if (!state->slots[i].film || (state->slots[i].film > M10V_CUSTOM_MAX_ID && state->slots[i].film != M10V_CHAR_ID && state->slots[i].film != M10V_PIXEL_ID) ||
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
             state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
     for(uint32_t i=0;i<5;i++){const m10v_film_effects *e=&state->effects[i];
@@ -100,6 +100,7 @@ int m10v_library_valid(const m10v_library_state *state) {
 }
 const char *m10v_library_name(uint32_t id) {
     static const char appended_names[13][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200","CCD Classic","Fuji C200","ProImage 100","T-Max 100","Aerochrome","2460","5203"};
+    if(id==M10V_PIXEL_ID)return "Pixel World";
     if(id==M10V_CHAR_ID)return "Kodak Charmera";
     return !id || id>M10V_FILM_COUNT ? (const char *)0 : id>=66 ? appended_names[id-66] : id<=33 ? films[id-1].name : legacy_records[id-34].name;
 }
@@ -204,6 +205,7 @@ int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,
     return commit(state,&next,store,ctx);
 }
 #include "m10v_charmera.h"
+#include "m10v_pixel_world.h"
 static uint8_t clamp(int value) { return (uint8_t)(value < 0 ? 0 : value > 255 ? 255 : value); }
 static int overlap(const void *a, uint32_t an, const void *b, uint32_t bn) {
     uintptr_t x = (uintptr_t)a, z = (uintptr_t)b;
@@ -563,6 +565,10 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
 #endif
     if(M10V_CUSTOM(choice->film)){
         custom_color(image,custom_lut);
+        if(grain||effects.leak_gain)m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,0,0,texture_stats);
+    }
+    else if(choice->film==M10V_PIXEL_ID){
+        m10v_pixel_world_render(image);
         if(grain||effects.leak_gain)m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,0,0,texture_stats);
     }
     else if(choice->film==M10V_CHAR_ID){

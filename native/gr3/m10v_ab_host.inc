@@ -20,7 +20,7 @@ static uint32_t ab_host_start_row(uint32_t focus,uint32_t size){if(size==6)retur
 static uint32_t ab_host_film(m10v_native_ab_host *h,uint32_t choice){uint32_t slot=m10v_ab_slot(choice);return slot<5?h->films[slot]:0;}
 static uint32_t ab_host_icon(m10v_native_ab_host *h,uint32_t choice){
  uint32_t id=ab_host_film(h,choice);
- if(m10v_ab_slot(choice)<5)return M10V_CUSTOM(id)?754:id==M10V_CHAR_ID?755:id>=1&&id<=78?670+id:0;
+ if(m10v_ab_slot(choice)<5)return M10V_CUSTOM(id)?754:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:id>=1&&id<=78?670+id:0;
  return ((fn2)0x532a9988u)(0,m10v_ab_tone(choice));
 }
 static void ab_host_name(m10v_native_ab_host *h,uint32_t choice,char *out,uint32_t prefix){

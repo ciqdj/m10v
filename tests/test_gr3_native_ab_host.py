@@ -42,6 +42,12 @@ class NativeHostTests(adapter.ControllerLifetimeTests):
   self.assertFalse(self.count('dispatch'))
   self.assertTrue(any(e[0]==0x53394e8c and e[1:3]==(self.list,5 if self.appended_slots else 6) for e in self.ui))
   self.assertFalse(self.count('activate_tone'))
+ def test_pixel_world_slot_keeps_its_icon_in_ab_picker(self):
+  self.fresh_films=[290,34,35,36,37]
+  u=self.begin();self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
+  # The native icon setter receives the appended builtin resource.
+  self.assertTrue(any(e[0]==0x533a1734 and 761 in e[1:] for e in self.ui))
+
  def test_menu_uses_native_adj_route_and_original_parent(self):
   u=self.begin();self.route=0x02000012;source=0x55051000
   self.call(u,'ab_setup',source,self.event(u,0x37),self.route)

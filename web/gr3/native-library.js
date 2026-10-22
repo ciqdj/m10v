@@ -1,8 +1,12 @@
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
+import {createFilmPreview} from './preview-controller.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture} from './native-library-state.mjs';
 export function mountNativeLibrary(root=document,{model='gr3',onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
 const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
+let pixelPreview=null,pixelFigure=null;
+window.addEventListener('pagehide',()=>{pixelPreview?.destroy();pixelPreview=null;});
+window.addEventListener('pageshow',event=>{if(event.persisted)render();});
 const storageKey=model==='gr4'?'m10v-gr4-native-library-v1':'m10v-native-library-v1';
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
 let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
@@ -35,6 +39,16 @@ function render(){
  segment('#grain',levels,configuration.slots[active].grain,v=>configuration.slots[active].grain=v);
 
  const film=configuration.slots[active].film;
+ if(film===290&&!pixelFigure){
+  pixelFigure=document.createElement('figure');pixelFigure.style.margin='16px 0';
+  const canvas=document.createElement('canvas');canvas.width=620;canvas.height=413;
+  canvas.style.cssText='display:block;width:100%;max-width:620px;height:auto;image-rendering:pixelated;border-radius:8px';
+  canvas.setAttribute('role','img');canvas.setAttribute('aria-label','方块世界像素效果参考样张');
+  const caption=document.createElement('figcaption');caption.className='hint';
+  caption.textContent='方块世界 · 效果参考（不含额外颗粒与漏光）。仅静态 JPEG；需更新固件，实际成片以相机为准。';
+  pixelFigure.append(canvas,caption);$('#active-slot-label').closest('.section-head').after(pixelFigure);
+ }
+ if(pixelFigure){pixelFigure.hidden=film!==290;if(film===290){pixelPreview??=createFilmPreview();pixelPreview.request(pixelFigure.querySelector('canvas'),{film:290},error=>{pixelFigure.querySelector('figcaption').textContent=error;});}}
  const label=$('#active-slot-label');if(label)label.textContent=`槽位 ${active+1} · ${films.find(f=>f.id===film)?.name||'载入中'}`;
  if($('#charmera-controls')){$('#charmera-controls').hidden=film!==289;$('#effect-charmeraColor').value=String(configuration.slots[active].effects.charmeraColor??0);$('#effect-charmeraColor').disabled=busy;}
  $('#halo-controls').hidden=![33,67].includes(film);

@@ -12,7 +12,7 @@ test('new curated stocks retain stable identities and precede legacy simulations
   const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'M10V精选');
   assert.equal(f.camera_calibrated,false);assert.equal(f.film_calibrated,false);
  }
- assert.equal(c.films.length,47);
+ assert.equal(c.films.length,48);
 });
 test('SD library places curated stocks first even when input is interleaved',()=>{
  const a=auditSdFilmPack(buildSdFilmPack([35,71,34,70,69,33]));

@@ -12,8 +12,8 @@ class SdLibraryTests(unittest.TestCase):
   cls.lib=C.CDLL(str(out));cls.lib.m10v_sd_header.argtypes=[C.c_void_p,C.c_uint32];cls.lib.m10v_sd_record.argtypes=[C.c_void_p,C.c_uint32,C.c_uint32]
   cls.pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
  def test_all_current_recipes_and_indices(self):
-  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),47)
-  for i in range(47):
+  self.assertEqual(self.lib.m10v_sd_header(self.pack[:4096],len(self.pack)),48)
+  for i in range(48):
    id=struct.unpack_from('<I',self.pack,64+i*12)[0]
    r=self.pack[4096+i*12288:4096+(i+1)*12288]
    self.assertEqual(self.lib.m10v_sd_record(r,len(r),id),id)
@@ -39,7 +39,8 @@ class SdLibraryTests(unittest.TestCase):
   self.assertEqual(self.lib.m10v_sd_record(bytes(damaged),len(damaged),79),0)
  def test_last_delivered_builtin_and_custom_records_survive_default_only_change(self):
   contract=json.loads((ROOT/'node/gr3-sd-20261021-contract.json').read_text())
-  for i in range(47):
+  for i in range(48):
+   if struct.unpack_from('<I',self.pack,64+i*12)[0] not in contract['ids']:continue
    record=bytearray(self.pack[4096+i*12288:4096+(i+1)*12288]);id=struct.unpack_from('<I',record,8)[0]
    record[8448:8480]=bytes.fromhex(contract['renderer']);struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
    import hashlib
@@ -49,6 +50,17 @@ class SdLibraryTests(unittest.TestCase):
   record=bytearray(subprocess.check_output(['node','--input-type=module','-e',source],cwd=ROOT))
   record[8448:8480]=bytes.fromhex(contract['renderer']);struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
   self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),79),79)
+
+ def test_pre_pixel_builtin_records_remain_accepted_but_cannot_claim_new_effect(self):
+  import hashlib
+  contract=json.loads((ROOT/'node/gr3-sd-pre-pixel-contract.json').read_text())
+  for i in range(48):
+   record=bytearray(self.pack[4096+i*12288:4096+(i+1)*12288]);id=struct.unpack_from('<I',record,8)[0]
+   record[8448:8480]=bytes.fromhex(contract['renderer']);struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
+   if id==290:self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),id),0)
+   else:
+    self.assertEqual(hashlib.sha256(record).hexdigest(),contract['hashes'][contract['ids'].index(id)])
+    self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),id),id)
 
  def test_previous_v1_builtin_record_remains_accepted(self):
   record=bytearray(self.pack[4096:4096+12288])

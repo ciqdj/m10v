@@ -95,6 +95,14 @@ def generate():
  text(d,12,10,'KODA','#000000');text(d,12,25,'PIXEL','#000000')
  raw=im.tobytes();im.save(out/'289.png');(ROOT/'native/gr3/m10v_charmera.rgba').write_bytes(raw)
  meta.append({'id':289,'name':'Kodak Charmera','title':'KODA','code':'PIXEL','color':'#fad84e','icon_url':'/gr3/film-icons/289.png','sha256':hashlib.sha256(raw).hexdigest()})
+ # Original grass/earth voxel cartridge, rendered on the established 40px grid.
+ im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
+ d.rectangle((8,5,32,35),fill='#243629');d.rectangle((16,1,23,4),fill='#b3bbb0')
+ d.rectangle((10,8,30,18),fill='#76a849');d.rectangle((10,19,30,32),fill='#815b3b')
+ for x,y,c in [(10,8,'#a3ca65'),(18,12,'#557c35'),(26,8,'#8bb852'),(10,23,'#63432f'),(22,27,'#a37a51')]:d.rectangle((x,y,x+4,y+3),fill=c)
+ text(d,11,20,'PIXEL','#ffffff')
+ raw=im.tobytes();im.save(out/'290.png');(ROOT/'native/gr3/m10v_pixel_world.rgba').write_bytes(raw)
+ meta.append({'id':290,'name':'方块世界','title':'PIXEL','code':'WORLD','color':'#76a849','icon_url':'/gr3/film-icons/290.png','sha256':hashlib.sha256(raw).hexdigest()})
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  sheet.save(ROOT/'docs/previews/m10v-film-icons.png')
  return meta

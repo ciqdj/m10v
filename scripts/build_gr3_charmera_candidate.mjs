@@ -15,7 +15,7 @@ configuration=selectNativeFilm(configuration,4,33);
 const options={hdf_enabled:true,debug_mode:false,extensions:{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'stock'}}};
 const original=await readNativeOfficial('gr3'),plan=prepareNative(original,configuration,options);
 const result=await generateNative(original,configuration,plan.configuration_sha256,options);
-if(!result.manifest.hdf_enabled||result.receipt.sd_film_library.supported_films!==47||!result.manifest.detail.variant_ids.charmera.includes(29))throw Error('Charmera/HDF capability missing');
+if(!result.manifest.hdf_enabled||result.receipt.sd_film_library.supported_films!==48||!result.manifest.detail.variant_ids.charmera.includes(29))throw Error('Charmera/HDF capability missing');
 const pack=buildSdFilmPack(),audit=auditSdFilmPack(pack);
 const json=v=>Buffer.from(JSON.stringify(v,null,2)+'\n');
 const provenance={candidate:'m10v-charmera-gr3-20261021-c03',stage:'RELEASE_AUTHORIZED_CAMERA_UNTESTED',model:'GR III',public_firmware:'2.10',

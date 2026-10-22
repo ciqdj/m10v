@@ -5,13 +5,13 @@ import {nativeCatalog,initialState} from './gr3-native-library.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture,migrateSimulationSelection} from '../web/gr3/native-library-state.mjs';
 
 test('Harman films append stable IDs and shared 40px icon records',async()=>{
- const c=await nativeCatalog();assert.equal(c.films.length,47);
+ const c=await nativeCatalog();assert.equal(c.films.length,48);
  for(const [id,name] of [[67,'蓝凤凰'],[68,'哈曼 RED']]){
   const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'M10V精选');
   assert.equal(f.camera_calibrated,false);assert.equal(f.film_calibrated,false);
  }
  const icons=JSON.parse(await readFile(new URL('../web/gr3/film-icons/catalog.json',import.meta.url)));
- assert.equal(icons.length,79);assert.equal((await readFile(new URL('../native/gr3/m10v_icons.rgba',import.meta.url))).length,78*40*40*4);
+ assert.equal(icons.length,80);assert.equal((await readFile(new URL('../native/gr3/m10v_icons.rgba',import.meta.url))).length,78*40*40*4);
  assert.equal(icons[66].color,'#397ac4');assert.equal(icons[67].color,'#c74435');
 });
 test('film selection supplies the two stock defaults without changing other slots',()=>{

@@ -32,6 +32,7 @@ static inline uint32_t m10v_ab_caption(uint32_t choice,uint32_t film){
  static const uint16_t stock[12]={4,268,269,270,271,272,273,274,275,276,277,278};
  if(choice>=M10V_TONE_CHOICES)return 4;
  if(m10v_ab_slot(choice)>=5)return stock[choice];
+ if(film==M10V_PIXEL_ID)return 1023;
  if(film==M10V_CHAR_ID)return 1012;
  if(film>=1&&film<=32)return 785+film;
  if(film==33)return 860;

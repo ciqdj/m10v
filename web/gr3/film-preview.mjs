@@ -1,3 +1,4 @@
+import {previewPixelWorld} from './pixel-world.mjs';
 // Browser approximation from the film tables read from the supplied firmware.
 const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
 
@@ -63,8 +64,9 @@ function previewRgbLutPixels(source,lut,table){
   return output;
 }
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise;
-export async function renderPreviewPixels(source, look) {
+export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(film===290)return previewPixelWorld(source,width,height);
   if(film===289){
     const color=look.effects?.charmeraColor??0,palette=[[253,1,0],[249,211,78],[1,0,249],[224,224,224]];
     if(!Number.isInteger(color)||color<0||color>3)throw new RangeError('Charmera 颜色无效');

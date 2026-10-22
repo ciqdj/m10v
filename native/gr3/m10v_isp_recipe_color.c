@@ -190,7 +190,7 @@ int m10v_isp_frame_recipe_finish(const void *context){
     uint32_t film=s->state.slots[slot].film;
     /* Charmera's live ISP approximation is never completion evidence for
      * the exact still YUV threshold/pair chroma renderer. */
-    if(film==M10V_CHAR_ID){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
+    if(film==M10V_CHAR_ID||film==M10V_PIXEL_ID){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
     uint32_t exposure=(film==67||film==68)?s->state.effects[slot].film_exposure:0;
     uint32_t generation=(uint32_t)(uintptr_t)s^s->si^s->sequence;
     if(!generation)generation=1;
@@ -257,6 +257,12 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
      * ownership/planning rejects, keep native grain off for the CPU route. */
     ((int16_t *)values)[2]=0;
     if(!s)return hdf;
+    /* Pixel cells overwrite native grain; apply its selected texture on CPU
+     * after the spatial pass. Independent shared HDF still owns its result. */
+    if(s->state.slots[slot].film==M10V_PIXEL_ID){
+        s->native_grain.planned=0;s->native_grain.armed=0;s->native_grain.done=0;
+        return hdf;
+    }
     uint32_t grain=s->state.slots[slot].grain,size=s->state.effects[slot].grain_size;
     if(grain>3||size>2)return hdf;
     if(execution){

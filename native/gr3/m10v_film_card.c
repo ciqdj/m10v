@@ -38,6 +38,7 @@ static int render(uint32_t *p,const char *main,const char *sub,uint32_t c,uint32
 }
 
 int m10v_film_card_render(uint32_t *p,uint32_t film,uint32_t slot,uint32_t selected){
+ if(film==290)return render(p,"PIXEL","WORLD",0xff76a849u,0xff152c1cu,slot,selected);
  if(film==289)return render(p,"CHARM","KODAK",0xfffad84eu,0xff101010u,slot,selected);
  if(!film||film>78)return -1;
  return render(p,cards[film-1].main,cards[film-1].sub,cards[film-1].color,cards[film-1].ink,slot,selected);

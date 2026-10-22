@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.5",
+      "date": "2026-10-22",
+      "title": "M10V 精选新增方块世界像素胶卷",
+      "changes": [
+        "GR III / IIIx 精选新增「方块世界 / Pixel World」：方块像素、有限色阶与轻微增色，提供原创草地方块图标、网页预览、五槽配置与 SD 胶卷包。",
+        "新胶卷使用独立 ID 290，保留历史胶卷、自定义 LUT 与 Charmera 编号，兼容此前合法 SD 胶卷包；颗粒与漏光默认关闭，开启颗粒时在像素化后处理。",
+        "效果只处理静态 JPEG，取景与 RAW 不像素化；需更新固件后使用新胶卷。GR IV 不开放本效果。按用户授权完成离线验证后直接发布，尚未实机验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.4",
       "date": "2026-10-22",
       "title": "修复裁切对焦跳动与回放滤镜，额外质感默认关闭",
@@ -11,9 +24,9 @@
         "胶卷颗粒、柔化、光晕和漏光在新建、换卷及重置时默认关闭，可在机内自行开启；网页与机内默认值一致，保留已有用户设置及上一版合法 SD 胶卷包。共用胶卷默认值也适用于 GR IIIx，其他机型未获得本轮真机验收。",
         "用户已确认 GR III 2.10 的 r3 测试包通过（BIN 4c3dea9e…）并授权发布；保留线上已有 A/B、独立五槽、HDF、首张换卷、实时取景和低内存构建时限修复。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "1ce2ca9f13298970d19fb5300ef7f1fdefdcc7fb",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39751329190"
     },
     {
       "version": "2026.10.22.3",

@@ -75,6 +75,22 @@ class NativeFilmLibraryTests(unittest.TestCase):
             self.assertEqual(self.lib.m10v_library_reset(C.byref(state),0,ok,None),0);off()
             self.assertNotEqual(bytes(state),saved)
 
+    def test_pixel_world_flat_cells_partial_edge_padding_and_native_completion(self):
+        state=self.state();ok=STORE(lambda ctx,next:0)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,290,ok,None),0)
+        self.assertEqual(self.lib.m10v_library_name(290),b'Pixel World')
+        self.lib.m10v_library_render_native.argtypes=self.lib.m10v_library_render.argtypes+[C.c_uint32]
+        for completed in (0,31):
+            y=(C.c_uint8*24)(*[100,100,180,180,240,240,91,92]*3)
+            uv=(C.c_uint8*24)(*(([128]*6+[81,82])*3))
+            image=Image(y,uv,24,24,6,3,8)
+            self.assertEqual(self.lib.m10v_library_render_native(C.byref(image),C.byref(state),0,None,0,None,0,completed),0)
+            self.assertEqual(list(y),[96,96,176,176,240,240,91,92]*3)
+            self.assertEqual(list(uv),([128]*6+[81,82])*3)
+        before=bytes(state)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,291,ok,None),-1)
+        self.assertEqual(bytes(state),before)
+
     def test_charmera_colors_are_atomic_per_slot_and_render_preserves_padding(self):
         state=self.state();ok=STORE(lambda ctx,next:0);bad=STORE(lambda ctx,next:-1)
         self.lib.m10v_library_effects.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]

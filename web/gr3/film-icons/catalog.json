@@ -709,5 +709,14 @@
     "color": "#fad84e",
     "icon_url": "/gr3/film-icons/289.png",
     "sha256": "e3eaf78ac8bcc94dc4d151df50f7c9bc111af2652bbf453dedfa750aab830779"
+  },
+  {
+    "id": 290,
+    "name": "方块世界",
+    "title": "PIXEL",
+    "code": "WORLD",
+    "color": "#76a849",
+    "icon_url": "/gr3/film-icons/290.png",
+    "sha256": "8dbf50dd0dea97a980c69d822ced7952af0802378df936372a8598feccde0e3d"
   }
 ]

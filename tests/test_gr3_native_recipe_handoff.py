@@ -64,6 +64,21 @@ class NativeRecipeHandoffTests(unittest.TestCase):
      e.call(completed,r,si,tone,data);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
      e.call(completed,r,si+4,tone,data);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
      e.u.mem_write(data,state((film,)*5,sequence=9));e.call(completed,r,si,tone,data);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
+ def test_pixel_world_defers_grain_until_after_spatial_rendering(self):
+  e,r,o,i,c,si=self.fixture();data=bytearray(state((290,)*5));data[14]=2
+  struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.assertEqual(self.snapshot(e,r,data)[0],1)
+  self.callback(e,o,i,c);self.assertNotEqual(self.status(e,r),2)
+  digital=r+0x4320;e.u.mem_write(digital,bytes(e.u.mem_read(c,0x40)));e.w32(digital,0x53d0fc60)
+  params=e.alloc(0x40);values=e.alloc(12);e.w32(params+0x10,values);source=e.alloc(104);e.u.mem_write(source,bytes(data))
+  for execution in (0,1):
+   e.u.mem_write(values+4,struct.pack('<h',3))
+   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_settings'],digital,params,execution)
+   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
+   self.assertEqual(struct.unpack('<h',e.u.mem_read(values+4,2))[0],0)
+  e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_done'],digital,params,1)
+  e.call(self.manifest['exports']['m10v_isp_frame_recipe_completed'],r,si,12,source)
+  self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
+
  def test_grain_completion_requires_matching_plan_execution_and_native_success(self):
   import struct,zlib
   e,r,o,i,c,si=self.fixture();data=bytearray(state((67,)*5));data[14]=2;data[56]=1;struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.snapshot(e,r,data);self.callback(e,o,i,c)

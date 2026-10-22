@@ -18,7 +18,7 @@ export function createFilmPreview(){
    if(destroyed||!pending?.canvas.isConnected)return;
    const {canvas,look}=pending,id=latest;
    if(worker){inFlight=id;worker.postMessage({kind:'render',id,look});}
-   else {inFlight=id;renderPreviewPixels(source.data,look).then(pixels=>{if(!destroyed&&id===latest&&canvas.isConnected)canvas.getContext('2d').putImageData(new ImageData(pixels,620,413),0,0);}).catch(error=>{if(id===latest)pending?.onError?.(error.message);}).finally(()=>{inFlight=0;if(id!==latest)dispatch();});}
+   else {inFlight=id;renderPreviewPixels(source.data,look,source.width,source.height).then(pixels=>{if(!destroyed&&id===latest&&canvas.isConnected)canvas.getContext('2d').putImageData(new ImageData(pixels,620,413),0,0);}).catch(error=>{if(id===latest)pending?.onError?.(error.message);}).finally(()=>{inFlight=0;if(id!==latest)dispatch();});}
   });
  }
  if(worker){
@@ -36,7 +36,7 @@ export function createFilmPreview(){
  return {async request(canvas,look,onError){
   const id=++latest;pending={canvas,look,onError};
   try{source??=await loadSource();if(destroyed||id!==latest)return;
-   if(worker&&!worker.sourceSent){worker.postMessage({kind:'source',pixels:source.data.buffer.slice(0)});worker.sourceSent=true;}
+   if(worker&&!worker.sourceSent){worker.postMessage({kind:'source',width:source.width,height:source.height,pixels:source.data.buffer.slice(0)});worker.sourceSent=true;}
    dispatch();
   }catch(error){if(id===latest)onError?.(error.message);}
  },destroy(){destroyed=true;cancelAnimationFrame(tick);worker?.terminate();}};
