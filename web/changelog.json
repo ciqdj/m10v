@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.9",
+      "date": "2026-10-22",
+      "title": "修复 ADJ 方块世界胶卷图标缺失",
+      "changes": [
+        "GR III / IIIx：修正原厂图标尺寸读取、绘制上限及像素地址转换范围，ADJ 与影像控制可正常读取「方块世界」40×40 图标。",
+        "同时覆盖启用与关闭 SD 胶卷库的构建，保留原有胶卷编号、效果、五槽设置及自定义焦距；新增执行最终固件图标解码器的 ARM 回归。",
+        "按用户授权完成离线回归后直接发布，尚未完成此次修复的机身实测。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.8",
       "date": "2026-10-22",
       "title": "发布两档自定义焦距，修复 GR IV 共享构建隔离",
@@ -10,9 +23,9 @@
         "将自定义焦距视图接口限定为 GR III 链接扩展，恢复 GR IV 的原有接口清单；继续严格校验导出接口，GR IIIx／GR IV 不启用自定义焦距。",
         "保留有界 976 KiB 固件增长预算、逐张照片裁切记录、保存失败提示和既有胶卷／画幅功能。完整离线构建与回读不代表机身实拍或 DNG 验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "0e3c3b93d467d0480e82b1d5cadcf2feda678cab",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39780432107"
     },
     {
       "version": "2026.10.22.7",

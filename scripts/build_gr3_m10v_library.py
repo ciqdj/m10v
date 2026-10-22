@@ -670,7 +670,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             movw ip,#671
             cmp r1,ip
             blo 1f
-            movw ip,#754
+            movw ip,#ICON_LAST
             cmp r1,ip
             bhi 1f
             lsl ip,r6,#2
@@ -680,13 +680,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             pop {r0,r1}
             ldr pc,=0x5320a838
             .ltorg
-        """)
+        """.replace('ICON_LAST',str(icon_count-1)))
         if sd_library:
             # Private resources fall back to immutable 40px icons unless their
             # live view owner has published a valid RAM descriptor directory.
             for i,index in enumerate((32,65,66,67,34)):
                 struct.pack_into('<I',image,icon_table-base+(749+i)*4,icon_descriptors+index*8)
-            text=icon_asm.read_text().replace('movw ip,#754','movw ip,#760')
+            text=icon_asm.read_text()
             for name,reg,idreg,ret in [('width',3,1,0x53209fd4),('height',3,1,0x5320a008),('draw',2,3,0x5320a80c)]:
                 text+=f"\n.global m10v_icon_directory_{name}\n.type m10v_icon_directory_{name},%function\nm10v_icon_directory_{name}:\n"
                 text+="push {r0-r12,lr}\nmrs ip,cpsr\npush {ip,lr}\n"
