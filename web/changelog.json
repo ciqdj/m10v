@@ -2,17 +2,31 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.22.8",
+      "date": "2026-10-22",
+      "title": "发布两档自定义焦距，修复 GR IV 共享构建隔离",
+      "changes": [
+        "GR III 2.10：MENU → 设置 → 自定义裁切焦距，可分别按 1mm 调整两档为 28–100mm 并保存；默认 35mm／50mm，关闭裁切为 28mm。",
+        "将自定义焦距视图接口限定为 GR III 链接扩展，恢复 GR IV 的原有接口清单；继续严格校验导出接口，GR IIIx／GR IV 不启用自定义焦距。",
+        "保留有界 976 KiB 固件增长预算、逐张照片裁切记录、保存失败提示和既有胶卷／画幅功能。完整离线构建与回读不代表机身实拍或 DNG 验收。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.7",
       "date": "2026-10-22",
       "title": "上线两档自定义焦距，补齐服务器构建体积预算",
       "changes": [
         "GR III 保留两档裁切，支持机内分别设置 28–100mm、1mm 步进并保存；入口为 MENU → 设置 → 自定义裁切焦距。",
         "在原有 960 KiB 固件增长预算上，为新增焦距模块、文字和画幅适配预留有界 16 KiB；各构建器与独立回读共用 976 KiB 上限，继续检查原始指令、区段、校验和及机型隔离。",
-        "修复上一提交在服务器调试构建阶段触发预算拒绝的问题，并为超限错误增加实际字节数。保留方块世界等既有功能；GR IIIx／GR IV 不启用自定义焦距。离线验证不替代机身实拍及完整 DNG 验收。"
+        "修复上一提交在服务器调试构建阶段触发预算拒绝的问题，并为超限错误增加实际字节数。保留方块世界等既有功能；GR IIIx／GR IV 不启用自定义焦距。离线验证不替代机身实拍及完整 DNG 验收。",
+        "服务器 GR III／IIIx 检查通过，GR IV 因共享链接接口清单不匹配失败，整次部署自动回退，未成功上线。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "567fd11bf91032fdaa1007010eb41437d11e3d0a",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/567fd11bf91032fdaa1007010eb41437d11e3d0a"
     },
     {
       "version": "2026.10.22.6",

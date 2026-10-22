@@ -23,3 +23,17 @@ class ZoomBuildTests(unittest.TestCase):
         bad=bytearray(stock);bad[0x1b6bf0]^=1
         with self.assertRaisesRegex(ValueError,'preimage'):
             module.build(0x54180000,bad,aspect=True)
+
+    def test_shared_linker_keeps_gr4_view_independent_of_zoom(self):
+        import os, shutil, subprocess, tempfile
+        from scripts.build_gr3_m10v_library import FLAGS, link_object
+        compiler=os.environ.get('M10V_LLVM_CLANG') or shutil.which('clang')
+        self.assertTrue(compiler)
+        with tempfile.TemporaryDirectory() as folder:
+            obj=Path(folder)/'gr4-view.o'
+            subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr4/m10v_settings_view.c'),'-o',str(obj)],check=True,capture_output=True)
+            code,symbols=link_object(obj.read_bytes(),0x54400000,{'m10v_library_name':0x54410000},prefix='m10v_settings_view_')
+            self.assertTrue(code)
+            self.assertEqual(set(symbols),{'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'})
+            with self.assertRaisesRegex(ValueError,'runtime API incomplete'):
+                link_object(obj.read_bytes(),0x54400000,{'m10v_library_name':0x54410000},prefix='m10v_settings_view_',additional_exports=('m10v_settings_view_zoom',))
