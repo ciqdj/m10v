@@ -42,7 +42,8 @@ def generate():
  if len(words)>256 or len(palette)>256:raise ValueError('card dictionary exceeds index capacity')
  rows=['/* Generated portrait artwork; shared labels and palette are immutable. */',
   'static const uint32_t box_palette[]={'+','.join('0xff'+c[1:]+'u' for c in palette)+'};',
-  'static const char box_labels[][16]={'+','.join(json.dumps(word) for word in words)+'};']+rows
+  'static const char box_labels[]='+''.join(json.dumps(word)+'"\\0"' for word in words)+';',
+  'static const uint16_t box_label_offsets[]={'+','.join(str(sum(len(v)+1 for v in words[:i])) for i in range(len(words)))+'};']+rows
  rows+=['};','static const uint8_t smooth_width[95]={']
  widths,glyphs,_=canonical_raster()
  rows.append(','.join(str(v) for v in widths)+'};')

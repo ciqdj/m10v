@@ -34,6 +34,14 @@ class DirectorySDTests(unittest.TestCase):
   self.assertEqual(self.call('m10v_sd_camera_directory_install',4,298,2),0xffffffff)
   self.assertEqual(self.calls,[]);self.assertEqual((self.opened,self.allocated),(0,0))
 
+ def test_previous_flat_catalog_pack_including_5213_survives_new_2460_renderer(self):
+  self.card=gzip.decompress((ROOT/'tests/fixtures/gr3-pre-aerocolor-films.m10.gz').read_bytes())
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',4),298)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',5),77)
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',4,298,2),0)
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',5,77,2),0)
+  self.assertEqual((self.opened,self.allocated),(0,0))
+
  def test_stale_identity_corrupt_record_and_close_failure_do_not_save(self):
   self.assertEqual(self.call('m10v_sd_camera_directory_install',4,77,2),0xffffffff)
   card=bytearray(self.pack);card[4096+4*12288+80]^=1;self.card=bytes(card)
