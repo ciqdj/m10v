@@ -5,7 +5,7 @@ export function navigationItems(pathname = '/') {
   const sd = /\/sd-library(?:\.html)?\/?$/.test(path);
   return [
     ['gr3', '/gr3/', 'GR III / IIIx'], ['gr4', '/gr4/', 'GR IV'],
-    ['gr2', '/gr2/', 'GR II'], ['sd', `/${model}/sd-library.html`, 'SD 胶卷'],
+    ['gr2', '/gr2/', 'GR II'], ['sd', path.startsWith('/gr2') ? '/gr2/#sd' : `/${model}/sd-library.html`, 'SD 胶卷'],
     ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'],
   ].map(([id, href, label]) => ({id, href, label, active: id === 'sd' ? sd : !sd && (id === 'gr3' ? path.startsWith('/gr3') : id === 'gr4' ? path.startsWith('/gr4') : id === 'gr2' ? path.startsWith('/gr2') : path.startsWith(`/${id}`))}));
 }

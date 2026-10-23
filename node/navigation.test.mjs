@@ -29,3 +29,7 @@ test('derived GR IV and generated changelog include the same shared navigation a
  assert.match(gr4,/<option value="gr4">GR IV · 1.11<\/option>/);
  assert.match(gr4,/id="studio-model-status"/);
 });
+test('GR II SD navigation stays in its own experimental workbench',()=>{
+ assert.equal(navigationItems('/gr2/').find(i=>i.id==='sd').href,'/gr2/#sd');
+ assert.equal(navigationItems('/gr2/inspect/').find(i=>i.id==='sd').href,'/gr2/#sd');
+});
