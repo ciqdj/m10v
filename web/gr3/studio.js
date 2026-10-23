@@ -292,7 +292,7 @@ function renderFeatures() {
     }
     if(existing)existing.replaceWith(row);else target.append(row);
   }
-  $('selection-count').textContent = settingsTab==='library'?`已选 ${state.nativeConfig.slots.length}/${gr4Workbench?5:10} 款胶卷`:`已开启 ${extensionFeatures.filter(id=>state.features.has(id)).length} 项扩展功能`;
+  $('selection-count').textContent = settingsTab==='library'?`已选 ${state.nativeConfig.slots.length}/${chosenModel==='gr3'?10:5} 款胶卷`:`已开启 ${extensionFeatures.filter(id=>state.features.has(id)).length} 项扩展功能`;
   $('features-next').disabled = state.profile!=='native' && !state.features.size || (state.features.has('recipes') && !state.recipes.size);
   renderLedger();
 }
@@ -435,7 +435,7 @@ function renderFilmControls(panel) {
   controls.append(grain, hdf); panel.append(heading, controls);
 }
 function renderFilmDetail(target) {
-  target.append(textNode('p',`已选 ${state.nativeConfig.slots.length}/${gr4Workbench?5:10} 款胶卷，按选择顺序显示；每款胶卷参数独立保存。`));
+  target.append(textNode('p',`已选 ${state.nativeConfig.slots.length}/${chosenModel==='gr3'?10:5} 款胶卷，按选择顺序显示；每款胶卷参数独立保存。`));
   const rows=document.createElement('div');rows.className='shared-slots';
   state.nativeConfig.slots.forEach((slot,index)=>{
     const film=state.nativeCatalog.find(f=>f.id===slot.film),label=textNode('div',`${index+1}. ${film?.name||slot.film}`);
@@ -484,7 +484,7 @@ function renderBuildSummary() {
     $('build-details').replaceChildren(textNode('p',`HDF 模拟默认档位 · ${['关闭','弱','中','强'][state.nativeConfig.hdf]}`),textNode('p','机内入口：MENU → 设置 → HDF 模拟。未启用胶卷库。'));return;
   }
   if(state.profile==='native'){
-    $('build-feature-count').textContent=`${state.nativeCatalog.length} 套胶卷 / 已选 ${state.nativeConfig.slots.length}/${gr4Workbench?5:10} / 专属参数 / 质感 / 时间戳`+(state.features.has('aspect')?' / 画幅':'')+(state.features.has('level')?' / 水平仪':'')+(state.features.has('negativeGrain')?' / 负片颗粒':'');
+    $('build-feature-count').textContent=`${state.nativeCatalog.length} 套胶卷 / 已选 ${state.nativeConfig.slots.length}/${chosenModel==='gr3'?10:5} / 专属参数 / 质感 / 时间戳`+(state.features.has('aspect')?' / 画幅':'')+(state.features.has('level')?' / 水平仪':'')+(state.features.has('negativeGrain')?' / 负片颗粒':'');
     $('runtime-state').textContent='胶卷库 · 全部内置';
     $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`槽位 ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]}`)),textNode('p',`专属光晕 · ${state.nativeConfig.slots.filter(v=>[33,67].includes(v.film)).map(v=>`${v.film===67?'蓝凤凰':'800T'} 强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`哈曼 RED · ${state.nativeConfig.slots.filter(v=>v.film===68).map(v=>`模拟曝光EI ${[125,64,250][v.effects.filmExposure]}`).join(' / ')||'未装入'}`),textNode('p',`HDF 模拟（全局） · ${['关闭','弱','中','强'][state.nativeConfig.hdf||0]}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>id==='film'?'胶卷库':featureName[id]).join('、')}。机内入口：菜单 → 设置 → 胶卷库；快捷菜单保留原厂列表。`));
     return;
@@ -511,7 +511,7 @@ async function importSource(file,local=false) {
       report=gr4Workbench?imported:await (await api(`/api/projects/${imported.project_id}`)).json();
     }else report=await (await api(gr4Workbench?nativeApi+'/import':'/api/import',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})).json();
     if(!(gr4Workbench?['GR IV']:['GR III','GR IIIx']).includes(report.model))throw Error('当前工作台仅支持 GR III 和 GR IIIx 官方包。');
-    chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;
+    chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;nativeEditor?.setModel(chosenModel);
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
     $('build-model').textContent=`${report.model} · ${report.public_version}`;

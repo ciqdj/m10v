@@ -514,7 +514,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         texts+=[s['name'] for s in json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']]
         if sd_library:
             if 786+len(texts)!=1111:raise ValueError('multiselect text base differs')
-            texts+=['Custom LUT']*5+[f'胶卷库  已启用 {n}/10' for n in range(11)]+['最多启用10卷，请先停用一卷']
+            texts+=['Custom LUT']*5+[f'胶卷库  已启用 {n}/10' for n in range(11)]+['已达启用上限，请先停用一卷']
         last_resource=786+len(texts)-1
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []

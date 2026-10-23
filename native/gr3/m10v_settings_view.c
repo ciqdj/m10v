@@ -99,7 +99,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  uint32_t ab_page=s->screen==M10V_SETTINGS_AB;
  uint32_t films=s->screen==M10V_SETTINGS_FILMS||s->screen==M10V_SETTINGS_CATALOG;
  uint32_t focus=s->screen==M10V_SETTINGS_CATALOG?s->index%10:s->focus;
- caption(v->widgets[TITLE],films?1116+m10v_library_count(&s->saved):M10V_VIEW_STAMP);
+ caption(v->widgets[TITLE],films?(M10V_APPENDED_SLOTS?1116+m10v_library_count(&s->saved):M10V_VIEW_FILMS):M10V_VIEW_STAMP);
  caption(v->widgets[FOOTER],s->screen==M10V_SETTINGS_CATALOG?M10V_VIEW_CATALOG_HELP:
    s->screen==M10V_SETTINGS_FILMS?M10V_VIEW_FILM_HELP:
    s->screen==M10V_SETTINGS_VALUE||name_page?M10V_VIEW_VALUE_HELP:M10V_VIEW_STAMP_HELP);

@@ -59,7 +59,7 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
    m10v_library_state fresh;if(o->load(o->context,&fresh)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
    uint32_t count=m10v_library_count(&fresh),slot=0;
    while(slot<count&&fresh.slots[slot].film!=p->expected)slot++;
-   if(slot==count&&count==M10V_SLOT_COUNT){p->error=M10V_SETTINGS_FULL;return;}
+   if(slot==count&&count>=(M10V_APPENDED_SLOTS?10u:5u)){p->error=M10V_SETTINGS_FULL;return;}
    int r=slot<count?o->remove(o->context,slot):o->install(o->context,p->index,p->expected,count);
    if(r||o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
    p->error=0;

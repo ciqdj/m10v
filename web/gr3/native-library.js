@@ -3,7 +3,7 @@ import {createFilmPreview} from './preview-controller.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,toggleNativeFilm,resetNativeTexture} from './native-library-state.mjs';
 export function mountNativeLibrary(root=document,{model='gr3',onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
-const selectionLimit=model==='gr4'?5:10;
+const selectionLimit=()=>sourceModel==='gr3'?10:5;
 const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
 let pixelPreview=null,pixelFigure=null;
 window.addEventListener('pagehide',()=>{pixelPreview?.destroy();pixelPreview=null;});
@@ -38,7 +38,7 @@ function render(){
  const focused=document.activeElement?.dataset?.focus;
  active=Math.max(0,Math.min(active,configuration.slots.length-1));
  const current=configuration.slots[active];
- const countNode=$("#selected-film-count");if(countNode)countNode.textContent=`已选 ${configuration.slots.length}/${selectionLimit}`;
+ const countNode=$("#selected-film-count");if(countNode)countNode.textContent=`已选 ${configuration.slots.length}/${selectionLimit()}`;
  const params=$(".film-parameters-panel");if(params)params.hidden=!current;
  const slotNode=$('#slots');slotNode.replaceChildren(...configuration.slots.map((s,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus='slot-'+i;b.className='slot';b.disabled=busy;b.setAttribute('aria-pressed',String(i===active));const n=document.createElement('small');n.textContent=`已选 ${i+1}`;const t=document.createElement('strong');t.textContent=unresolved.find(v=>v.slot===i)?'需重选 · '+unresolved.find(v=>v.slot===i).id:films.find(f=>f.id===s.film)?.name||'载入中';const e=document.createElement('em');e.textContent=`颗粒 ${levels[s.grain]}`;const art=filmIcon(films.find(f=>f.id===s.film));b.append(n,art,t,e);b.onclick=()=>{active=i;const status=$('#film-selection-status');if(status)status.textContent='';render();};return b;}));
  if(current){
@@ -81,7 +81,7 @@ function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=
   count++;const label=document.createElement('label');label.className='film';label.dataset.selected=String(selected.has(f.id));
   const check=document.createElement('input');check.type='checkbox';check.value=String(f.id);check.checked=selected.has(f.id);check.disabled=busy;check.dataset.focus='film-'+f.id;check.setAttribute('aria-label',`选择 ${f.name}`);
   const strong=document.createElement('strong');strong.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;label.append(check,filmIcon(f),strong);
-  check.onchange=()=>{try{if(!selected.has(f.id)&&configuration.slots.length>=selectionLimit)throw Error(`最多选择 ${selectionLimit} 款胶卷，请先取消一款`);const wasSelected=selected.has(f.id),activeFilm=configuration.slots[active]?.film;configuration=toggleNativeFilm(configuration,f.id);active=wasSelected?Math.max(0,configuration.slots.findIndex(s=>s.film===activeFilm)):configuration.slots.length-1;invalidate({filmSelection:true});render();const status=$('#film-selection-status');if(status)status.textContent=`${wasSelected?'已取消':'已选择'} ${f.name} · 已选 ${configuration.slots.length}/${selectionLimit}`; }catch(error){check.checked=selected.has(f.id);const status=$('#film-selection-status');if(status)status.textContent=error.message;else message(error.message,true);}};
+  check.onchange=()=>{try{if(!selected.has(f.id)&&configuration.slots.length>=selectionLimit())throw Error(`最多选择 ${selectionLimit()} 款胶卷，请先取消一款`);const wasSelected=selected.has(f.id),activeFilm=configuration.slots[active]?.film;configuration=toggleNativeFilm(configuration,f.id);active=wasSelected?Math.max(0,configuration.slots.findIndex(s=>s.film===activeFilm)):configuration.slots.length-1;invalidate({filmSelection:true});render();const status=$('#film-selection-status');if(status)status.textContent=`${wasSelected?'已取消':'已选择'} ${f.name} · 已选 ${configuration.slots.length}/${selectionLimit()}`; }catch(error){check.checked=selected.has(f.id);const status=$('#film-selection-status');if(status)status.textContent=error.message;else message(error.message,true);}};
   return label;
  }));$('#empty').hidden=count!==0;
 }
@@ -119,6 +119,6 @@ $('#build').onclick=async()=>{
 };
 (async()=>{try{const [status,catalog]=await Promise.all([fetch('/api/status').then(jsonResponse),fetch(catalogApi).then(jsonResponse)]);token=status.session_token;films=catalog.films;$('#search').placeholder=`搜索 ${films.length} 套胶卷…`;for(const node of root.querySelectorAll('[data-film-count-copy]'))for(const child of node.childNodes)if(child.nodeType===3)child.textContent=child.textContent.replace(/[0-9]+(?=\s*[套款])/g,String(films.length));for(const group of [...new Set(films.map(f=>f.group))]){const option=document.createElement('option');option.value=group;option.textContent=group;option.dataset.icon=films.find(f=>f.group===group)?.icon_url;$('#film-group').append(option);}enhanceFilmSelect($('#film-group'),{caption:'胶卷分类',searchable:false});$('#local-source').dataset.available=catalog.local_source_available?'1':'';$('#source-status').textContent=catalog.local_source_available?'已找到目录中的官方包，请选择使用。':'请选择对应的官方固件包。';render();}catch(e){message(e.message,true);$('#source-status').textContent='服务暂不可用，请刷新页面。';}})();render();
 
-return {getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{active=slot;if(slot===configuration.slots.length){configuration=toggleNativeFilm(configuration,id);}else configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=normalizeConfiguration(value);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
+return {setModel:value=>{if(!['gr3','gr3x','gr4'].includes(value))throw Error('不支持的相机机型');sourceModel=value;render();},getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{active=slot;if(slot===configuration.slots.length){configuration=toggleNativeFilm(configuration,id);}else configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=normalizeConfiguration(value);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
 }
 if(location.pathname.endsWith('/native-library.html'))mountNativeLibrary();
