@@ -509,7 +509,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         texts+=['方块世界' if sd_library else 'Pixel World']
         if sd_library:
             if 786+len(texts)!=1024:raise ValueError('zoom resource allocation differs')
-            texts+=['自定义裁切焦距','第一档','第二档','上下选档 OK编辑 MENU返回',
+            texts+=['裁切焦距','第一档','第二档','上下选档 左右1mm OK确定 MENU返回',
                     '左右1mm OK保存 MENU取消','保存或应用失败','读取失败']
             texts+=[f'{mm}mm' for mm in range(28,101)]
         last_resource=786+len(texts)-1

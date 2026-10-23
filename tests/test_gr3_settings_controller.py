@@ -42,7 +42,7 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_camera_library_load','m10v_sd_camera_item','m10v_sd_camera_install',
          'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log','m10v_debug_batch','m10v_library_name','m10v_sd_camera_custom_name',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event']]]
   names += [f'm10v_ab_adj_{n}_original' for n in ('refresh','exit','destroy','changed')]
-  names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom']
+  names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom','m10v_zoom_live_apply','m10v_zoom_live_slot']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -162,6 +162,17 @@ class ControllerLifetimeTests(unittest.TestCase):
   u.mem_write(0x10000100,struct.pack('<H',0xd8));self.call(u,'key',PAGE,0x10000100)
   self.assertEqual(self.count('m10v_zoom_menu_key'),1)
   self.assertEqual(self.count('m10v_settings_view_draw'),0)
+
+ def test_zoom_confirm_return_and_key_mapping_preserve_native_parent(self):
+  u=self.machine();self.setup_owner(u);self.call(u,'ready',PAGE,0x0200f105)
+  for raw,key in [(0xce,0),(0xcf,1),(0xd0,2),(0xd1,3),(0xd8,4),(0x86,5)]:
+   u.mem_write(0x10000100,struct.pack('<H',raw));self.call(u,'key',PAGE,0x10000100)
+   self.assertEqual([e for e in self.events if e[0]=='m10v_zoom_menu_key'][-1][3],key)
+  u.mem_write(PAGE+0x150,struct.pack('<I',0x0200004a))
+  u.mem_write(PAGE+SAVED_STATE+28,struct.pack('<I',1)) # menu confirmed/closed
+  u.mem_write(0x10000100,struct.pack('<H',0xd8));self.call(u,'key',PAGE,0x10000100)
+  self.assertIn(0x5316ca28,self.executed)
+  self.assertIn(('dispatch',PAGE,0x0200004a,0x10000000),[e[:4] for e in self.events])
 
  def test_dynamic_card_ids_resolve_all_five_owned_descriptors(self):
   u=self.machine();owner=0x55040000;page=owner+0x13bc;heap=0x55080000

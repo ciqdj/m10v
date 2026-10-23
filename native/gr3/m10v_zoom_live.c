@@ -21,11 +21,16 @@ static u32 apply(u32 front,u32 bits,u32 slot){
     M10V_LOG(211,slot,bits,m10v_zoom_native_back_bits(backend()),result);
     return result;
 }
+u32 m10v_zoom_live_slot(void){
+    return m10v_zoom_camera_slot(m10v_zoom_native_back_bits(backend()));
+}
 /* Used after editing the active slot; reports backend acceptance. */
 int m10v_zoom_live_apply(u32 slot) {
     if(slot>2) return -1;
     u32 bits=m10v_zoom_camera_bits(slot);
-    (void)apply(controller(),bits,slot);
+    u32 front=controller();
+    if(m10v_zoom_native_back_bits(backend())!=bits||m10v_zoom_native_front_bits(front)!=bits)
+        (void)apply(front,bits,slot);
     if(m10v_zoom_native_back_bits(backend())!=bits) return -1;
     (void)m10v_zoom_camera_select(slot);
     return 0;

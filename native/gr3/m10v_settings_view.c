@@ -198,14 +198,15 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
   visible(v->widgets[FRAME+i],0);visible(v->widgets[INNER+i],0);visible(v->widgets[ICON+i],0);
  }
  for(uint32_t i=0;i<4;i++){
-  uint32_t selected=i<2&&i==s->focus;
+  uint32_t selected=i<3&&i==s->focus;
   visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],selected);
   color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],1);
-  visible(v->widgets[ROW+i],i<2);visible(v->widgets[VALUE+i],i<2);
-  if(i<2){
-   caption(v->widgets[ROW+i],title+1+i);
-   unsigned mm=s->editing&&selected?s->editor.value:s->saved.mm[i];
-   caption(v->widgets[VALUE+i],m10v_zoom_caption(m10v_zoom_bits(mm)));
+  visible(v->widgets[ROW+i],i<3);visible(v->widgets[VALUE+i],i>0&&i<3);
+  if(i<3){
+   caption(v->widgets[ROW+i],i?title+i:2);
+   if(i){unsigned mm=s->editing&&selected?s->editor.value:s->saved.mm[i-1];
+    caption(v->widgets[VALUE+i],m10v_zoom_caption(m10v_zoom_bits(mm)));}
+
    ((fn2)0x5339658cu)(v->widgets[ROW+i],selected&&!s->editing?10:31);
    ((fn2)0x5339658cu)(v->widgets[VALUE+i],selected?10:31);
   }

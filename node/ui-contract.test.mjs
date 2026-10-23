@@ -101,7 +101,7 @@ test('HDF entry is independent of film and preserves the simplified workbench',a
  assert.match(app,/MENU → 设置 → HDF 模拟/);
  assert.match(app,/film_library:state.features.has\('film'\)/);
  assert.match(app,/hdf_enabled:state.features.has\('digitalHdf'\)/);
- assert.match(app,/if\(!meta.globalHdf\)state.features.add\('film'\)/);
+ assert.match(app,/if\(!meta.globalHdf&&!meta.globalZoom\)state.features.add\('film'\)/);
  assert.match(app,/仅使用 HDF/);
  const html=await readFile(new URL('../web/gr3/index.html',import.meta.url),'utf8');
  assert.match(html,/>影像方案<\/button>/);

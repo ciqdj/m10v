@@ -27,7 +27,7 @@ export function zoomPatches(runtime,m){
   return {address,expected,replacement:branch(address,target,link),name};
  });
  need(z.patches.length===patches.length&&patches.every((p,i)=>['address','expected','replacement'].every(k=>p[k]===z.patches[i][k])),'hook inventory differs');
- need(m.resources.texts[238]==='自定义裁切焦距','editor title missing');
+ need(m.resources.texts[238]==='裁切焦距','editor title missing');
  for(let mm=28;mm<=100;mm++)need(m.resources.texts[245+mm-28]===mm+'mm','numeric focal caption differs');
  return patches;
 }

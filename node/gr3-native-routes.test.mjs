@@ -54,7 +54,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(receipt.candidate_sha256,createHash('sha256').update(bytes).digest('hex'));
   // Two next-buffer film snapshot Hooks are replaced by one current-submit
   // Hook; this no-HDF export therefore has one fewer independently verified patch.
-  assert.deepEqual(receipt.configuration,config);assert.equal(receipt.camera_tested,false);assert.equal(receipt.verified_hooks,148);assert.deepEqual(receipt.appended_slots.tones,[25,26,27,28,29]);assert.equal(receipt.appended_slots.stock_presets_preserved,true);
+  assert.deepEqual(receipt.configuration,config);assert.equal(receipt.camera_tested,false);assert.equal(receipt.verified_hooks,147);assert.deepEqual(receipt.appended_slots.tones,[25,26,27,28,29]);assert.equal(receipt.appended_slots.stock_presets_preserved,true);
   assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,200);
   assert.equal((await post(`/api/projects/${xid}/native-library/build`,{configuration:config,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
   const nrPlan=await (await post(route+'prepare',{configuration:config,extensions:nrExtensions})).json();
@@ -72,7 +72,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const debugReceipt=JSON.parse(Buffer.from(debugBuilt.headers.get('X-M10V-Native-Receipt'),'base64'));
   assert.equal(debugReceipt.debug_mode,true);assert.equal(debugReceipt.debug_log.build_id,debugPlan.configuration_sha256.slice(0,8));
   assert.equal(debugReceipt.candidate_sha256,createHash('sha256').update(Buffer.from(await debugBuilt.arrayBuffer())).digest('hex'));
-  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,149);assert.equal(debugReceipt.capture_pipeline,'gr3-native-v8');assert.equal(debugReceipt.experimental_capture.native_color,true);assert.equal(debugReceipt.experimental_capture.native_grain,true);
+  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,148);assert.equal(debugReceipt.capture_pipeline,'gr3-native-v8');assert.equal(debugReceipt.experimental_capture.native_color,true);assert.equal(debugReceipt.experimental_capture.native_grain,true);
   assert.equal(receipt.external_film_pack,true);assert.equal(receipt.initial_state_hex.length,208);
   assert.equal(receipt.version_unlock.enabled,false);
   const unlocked=await post(route+'build',{configuration:config,version_unlock,accepted_configuration_sha256:unlockPlan.configuration_sha256});

@@ -9,13 +9,14 @@ const stockVtable=[0x5316c7e0,0x5316c774,0x5316c7bc,0x5316c740,0x5316c748,0x5316
 export function settingsPatches(m){
  if(!m.sd_library)return [];
  need(typeof m.zoom?.enabled==='boolean','explicit zoom enabled contract');
- const zoom=m.zoom.enabled,count=zoom?4:3;
+ const zoom=m.zoom.enabled,count=3;
  const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.live_color?0x19bc:0x193c;
  need(d&&d.owner_bytes===ownerBytes&&JSON.stringify(d.private_routes)===JSON.stringify([33616128,33616129,33616131,33616132,...(zoom?[33616133]:[])])&&d.rows?.length===count,'missing route/owner contract');
  const patches=[];
  for(const [a,e,n,l] of [[0x5316f3b8,0xe300313b,'factory',false],[0x5319667c,0xe1a0c00d,'top_dtor',false],[0x5316fcf8,0xeb00ab5a,'top_ctor',true],[0x53221a4c,0xeb001c7e,'key_route',true]])patches.push({address:a,expected:e,replacement:branch(a,s['m10v_settings_controller_'+n],l),name:'settings '+n});
  patches.push({address:0x5316fcec,expected:0xe30103bc,replacement:movw(0,ownerBytes),name:'TopMenu owned tail'}, {address:0x53b36adc,expected:0x1e1d1b19,replacement:((30+count)<<24)|0x1d1b19,name:'Setup appended count'});
  for(let i=0;i<count;i++)patches.push({address:0x53b36bd0+i*8,expected:0,replacement:d.rows[i],name:'settings row '+i},{address:0x53b36c88+i*4,expected:0x10000000,replacement:[0x0200f100,0x0200f101,0x0200f103,0x0200f105][i],name:'settings route '+i});
+ if(zoom)patches.push({address:0x53b37018,expected:0x02000074,replacement:0x0200f105,name:'Crop selection and focal editor entry'});
  return patches;
 }
 export function checkSettings(runtime,m){

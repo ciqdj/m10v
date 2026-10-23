@@ -43,7 +43,9 @@ static int film_name_stamp(void *ctx,uint32_t enabled){
  if(m10v_camera_library_load(&fresh)<0)return -1;
  return m10v_camera_library_film_name_stamp(&fresh,enabled);
 }
-static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;}
+extern unsigned m10v_zoom_live_slot(void);
+extern int m10v_zoom_live_apply(unsigned);
+static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;o->select=m10v_zoom_live_apply;o->current=m10v_zoom_live_slot;}
 static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);

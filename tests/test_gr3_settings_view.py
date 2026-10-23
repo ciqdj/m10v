@@ -249,18 +249,18 @@ class SettingsViewTests(unittest.TestCase):
   outer=struct.unpack('<4I',u.mem_read(w[6]+0x20,16));inner=struct.unpack('<4I',u.mem_read(w[11]+0x20,16))
   self.assertEqual(outer,(24,102,128,204));self.assertEqual(inner,(26,104,124,200))
   self.assertEqual(struct.unpack('<4I',u.mem_read(w[16]+0x20,16)),(28,106,120,196))
- def test_zoom_two_rows_draft_error_and_no_film_allocation(self):
+ def test_zoom_three_rows_direct_draft_error_and_no_film_allocation(self):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u);heap=self.heap
-  # saved state, editor, focus/editing/closed/error
-  u.mem_write(0x10002000,struct.pack('<IHH7I',9,35,50,9,1,49,1,1,0,1))
+  # saved state, editor, focus/editing/closed/error/selected
+  u.mem_write(0x10002000,struct.pack('<IHH8I',9,35,50,9,1,49,2,1,0,1,0))
   self.call(u,'zoom',0x10001000,0x10002000)
   self.assertEqual(self.heap,heap)
-  self.assertEqual([u.mem_read(w[29+i]+0x9e,1)[0] for i in range(4)],[1,1,0,0])
-  self.assertEqual([u.mem_read(w[33+i]+0x9e,1)[0] for i in range(4)],[1,1,0,0])
+  self.assertEqual([u.mem_read(w[29+i]+0x9e,1)[0] for i in range(4)],[1,1,1,0])
+  self.assertEqual([u.mem_read(w[33+i]+0x9e,1)[0] for i in range(4)],[0,1,1,0])
   self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[0]*5)
-  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0,1,0,0])
+  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0,0,1,0])
   cap=lambda index:struct.unpack('<H',u.mem_read(w[index]+0xea,2))[0]
-  self.assertEqual([cap(i) for i in (2,4,5,29,30,33,34)],[1024,1028,1029,1025,1026,1038,1052])
+  self.assertEqual([cap(i) for i in (2,4,5,29,30,31,34,35)],[1024,1028,1029,2,1025,1026,1038,1052])
   self.assertEqual(u.mem_read(w[5]+0x9e,1)[0],1)
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
 

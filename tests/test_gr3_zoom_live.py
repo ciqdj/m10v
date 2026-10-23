@@ -59,6 +59,12 @@ class ZoomLive(unittest.TestCase):
  def test_set_readback_and_rejection(self):
   for reject in (0,1):
    u,s=self.machine(reject=reject);self.call(u,'set',0,0);self.assertEqual(s['sets'],[bits(36)]);self.assertEqual(s['selected'],[] if reject else [0])
+ def test_current_slot_uses_native_magnification_and_same_value_skips_setter(self):
+  u,s=self.machine(slot=1);self.assertEqual(self.call(u,'live_slot'),1)
+  self.assertEqual(self.call(u,'live_apply',1),0);self.assertFalse(s['sets']);self.assertEqual(s['selected'],[1])
+ def test_apply_repairs_stale_front_even_if_backend_already_matches(self):
+  u,s=self.machine(slot=1);s['front']=bits(28);self.call(u,'live_apply',1)
+  self.assertEqual(s['sets'],[bits(49)]);self.assertEqual(s['front'],bits(49))
  def test_active_edit_reports_backend_acceptance(self):
   for reject in (0,1):
    u,s=self.machine(reject=reject);self.assertEqual(self.call(u,'live_apply',0),0xffffffff if reject else 0);self.assertEqual(s['selected'],[] if reject else [0])

@@ -20,6 +20,27 @@ class SettingsRootTests(unittest.TestCase):
             raise unittest.SkipTest('set M10V_GR3_ORIGINAL_RTOS to official GR III 2.10 RTOS')
         cls.data = audit.read_firmware(path)
 
+    def test_crop_root_enters_unified_editor_without_duplicate_setup_row(self):
+        from collections import defaultdict
+        from scripts.build_gr3_settings_hooks import build_settings_hooks
+        _, report = build_settings_hooks(0x540c0000, defaultdict(lambda:0x540c1000))
+        patched=bytearray(self.data)
+        for patch in report['patches']:
+            at=patch['address']-audit.BASE
+            expected=bytes.fromhex(patch['expected'])
+            self.assertEqual(patched[at:at+len(expected)],expected)
+            patched[at:at+len(expected)]=bytes.fromhex(patch['replacement'])
+        old,_=audit.emulate_loader(self.data)
+        new,_=audit.emulate_loader(bytes(patched))
+        self.assertEqual(struct.unpack_from('<I',old,0x3e4+28*4)[0],0x02000074)
+        self.assertEqual(struct.unpack_from('<I',new,0x3e4+28*4)[0],0x0200f105)
+        self.assertEqual(new[4*0x384+0x2b3],33)
+        for category in range(5):
+            for row in range([38,18,16,22,30][category]):
+                if (category,row)==(0,28):continue
+                offset=category*0x384+0x3e4+row*4
+                self.assertEqual(new[offset:offset+4],old[offset:offset+4])
+
     def test_sha_fails_closed(self):
         with tempfile.NamedTemporaryFile() as f:
             f.write(b'not official firmware'); f.flush()
