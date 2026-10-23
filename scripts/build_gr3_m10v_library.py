@@ -403,16 +403,11 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             zoom_report['enabled']=custom_zoom
             image+=bytes(zoom_base-base-len(image))+zoom_code
             symbols.update(zoom_report['symbols'])
-            from scripts.generate_m10v_film_cards import generate as card_data,caption_blob
+            from scripts.generate_m10v_film_cards import generate as card_data
             if (ROOT/'native/gr3/m10v_film_card_data.h').read_text()!=card_data():raise ValueError('film card labels differ from catalog')
-            # Caption coverage is immutable resource data, not executable code.
-            # Keep the bounded ELF code budget and publish it like icon pixels.
-            captions=(base+len(image)+3)&~3
-            image+=bytes(captions-base-len(image))+caption_blob()
-            symbols.update(caption_offsets=captions,caption_rle=captions+88*4)
             for name,prefix in [('m10v_film_card.c','m10v_film_card_'),('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
                 obj_path=folder/(name+'.o')
-                subprocess.run([compiler,*compile_flags,'-DM10V_CARD_CAPTION_EXTERNAL=1',f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
+                subprocess.run([compiler,*compile_flags,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
                 start=(base+len(image)+15)&~15
                 code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix,
                     additional_exports=('m10v_settings_view_zoom',) if prefix=='m10v_settings_view_' else ())
@@ -500,7 +495,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Light Leak':'','Grain Size':'','Leak Gain':'','Leak Position':'','Leak Spread':'','Leak Variation':'','Fine':'细','Standard':'标准','Coarse':'粗','Left':'左','Right':'右','Top':'上','Bottom':'下','Corner':'角落','Random':'随机','Fixed':'固定','Per Shot':'每张变化','Reset Texture':'重置质感','Phoenix II':'蓝凤凰','Phoenix II Halation':'Harman Phoenix II 光晕','Film Exposure':'模拟曝光EI','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
             texts=[translations.get(t,t) for t in texts]
         if sd_library:
-            texts += ['胶卷库','时间水印','方向键选择 OK启用/停用 MENU返回','方向键选择 OK启用/停用 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
+            texts += ['胶卷库','时间水印','方向键选择 OK启停 MENU返回 DISP拍摄','方向键选择 OK启停 MENU返回 DISP拍摄','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
         if sd_library:texts+=['HDF 模拟','左右选择 OK保存 MENU取消','关闭','弱','中','强','读取或保存失败','全局数字柔焦 · 独立于胶卷']
         texts+=['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
         if sd_library:
@@ -523,8 +518,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         from scripts.generate_m10v_directory import directory as display_directory
         from scripts.generate_m10v_card_captions import resource as film_resource_id
         if sd_library:
-            texts += ['5213']+[g['name'] for g in display_directory()]+['胶卷分类','上下选择 OK进入 MENU返回','清理已停用胶卷']
-            texts += [str(n) for n in range(31)]
+            texts += ['5213','Fn清旧卷 OK启停 MENU返回 DISP拍摄']
             for g in display_directory():
                 for film in g['films']:texts[film_resource_id(film['id'])-786]=film['name']
         else:texts+=['5213']
@@ -829,7 +823,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':120,'height':148,'artwork_height':120,'caption_height':28,'descriptor_storage':'view-owned-heap','descriptor_offset':710400,'directory_offset':710480,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':710580} if sd_library else None
+    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':120,'height':148,'artwork_height':148,'caption_height':0,'descriptor_storage':'view-owned-heap','descriptor_offset':710400,'directory_offset':710480,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':710580} if sd_library else None
     manifest['film_curated']=[]
     for i,payload in enumerate(curated_payloads):
         offset=bytes(image).find(payload)
@@ -854,7 +848,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         manifest['film_style_filters'].append({'film_id':291+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
     manifest['style_icons']={'first_id':762,'last_id':768,'pixels':style_icon_data,'sha256':sha(style_pixels)}
     manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
-    if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-derived-uppercase-alphanumeric-prefix-5-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
+    if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-portrait-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest

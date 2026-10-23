@@ -189,14 +189,14 @@ function checkRuntime(runtime, manifest) {
       runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
     need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
-    need(c?.first_id===749&&c.last_id===773&&c.width===120&&c.height===148&&c.artwork_height===120&&c.caption_height===28&&c.heap_bytes===710580&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===710400&&c.directory_offset===710480&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===749&&c.last_id===773&&c.width===120&&c.height===148&&c.artwork_height===148&&c.caption_height===0&&c.heap_bytes===710580&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===710400&&c.directory_offset===710480&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?382:176;
+  const resourceCount=manifest.sd_library?344:176;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {

@@ -1,5 +1,7 @@
 # 2026-10-23 胶卷目录重组与光谱重做验证
 
+> **旧候选已撤回**：用户实机反馈进入胶卷库黑屏，可关机。请改用[黑屏修复r1](gr3-film-directory-black-screen-r1-20261023.md)，不要继续使用本页原6fb3855d测试包。
+
 状态：**WAITING_FOR_USER_VALIDATION**。本次交付 GR III 官方 2.10 的本地测试包；尚未真机验收，未合并 main、推送或部署。实现基于 `41f6f777ee4abe5c25ef74a9bfd693eb335dbb66`，代码版本 `fdc09f9d640840b268faae4e25dfd5910467dfa0`，分支 `daily/film-catalog-order-20261023`。原脏工作区保持原样，改动位于隔离工作树。
 
 测试包：[M10V GR III fdc09f9 ZIP](../../builds/M10V-GR3-film-directory-20261023-fdc09f9.zip)，附 `.sha256` 与包内 `SHA256SUMS`。

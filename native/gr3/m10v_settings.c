@@ -18,21 +18,15 @@ int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t scre
  if(p->saved.stamp>2||p->saved.format>3||p->saved.corner>3||p->saved.color>3)return -1;
  if(!m10v_library_valid(&p->saved))return -1;
  p->focus=p->slot=p->index=p->expected=p->value=p->error=p->group=0;
- p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_GROUPS:screen;
- if(p->screen==M10V_SETTINGS_CATALOG){p->expected=item(o,0);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;}
+ p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_CATALOG:screen;
+ if(p->screen==M10V_SETTINGS_CATALOG){while(p->index+1<M10V_DIRECTORY_COUNT&&!item(o,p->index))p->index++;p->expected=item(o,p->index);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;}
  if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
 }
 void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key){
- if(!p||!ready(o)||key>M10V_KEY_DISP)return;
+ if(!p||!ready(o)||key>M10V_KEY_CLEAN)return;
  uint32_t previous=key==M10V_KEY_LEFT||key==M10V_KEY_UP;
  uint32_t next=key==M10V_KEY_RIGHT||key==M10V_KEY_DOWN;
- if(p->screen==M10V_SETTINGS_FILMS){p->screen=M10V_SETTINGS_GROUPS; }
- else if(p->screen==M10V_SETTINGS_GROUPS){
-  if(p->focus>M10V_DIRECTORY_GROUPS)return;
-  if(previous&&p->focus)p->focus--;
-  if(next&&p->focus<M10V_DIRECTORY_GROUPS)p->focus++;
-  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
-  if(key==M10V_KEY_OK&&p->focus==M10V_DIRECTORY_GROUPS){
+ if(p->screen==M10V_SETTINGS_CATALOG&&key==M10V_KEY_CLEAN){
    /* Explicit maintenance only: loading/browsing never migrates a journal. */
    for(uint32_t n=0;n<M10V_SLOT_COUNT;n++){
     m10v_library_state fresh;
@@ -45,8 +39,6 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
    }
    if(o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
    p->error=0;return;
-  }
-  if(key==M10V_KEY_OK){p->group=p->focus;p->index=m10v_directory_first[p->group];uint32_t end=m10v_directory_first[p->group+1];while(p->index+1<end&&!item(o,p->index))p->index++;p->expected=item(o,p->index);p->screen=M10V_SETTINGS_CATALOG;p->error=p->expected?0:M10V_SETTINGS_EMPTY;}
  }else if(p->screen==M10V_SETTINGS_AB){
   p->value=0;
   if(key==M10V_KEY_UP&&p->focus)p->focus--;
@@ -59,10 +51,9 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
   if(key==M10V_KEY_OK&&p->focus>=2)p->value=p->focus-1;
  }else if(p->screen==M10V_SETTINGS_CATALOG){
-  if(p->group>=M10V_DIRECTORY_GROUPS)return;
-  uint32_t first=m10v_directory_first[p->group],end=m10v_directory_first[p->group+1];
+  uint32_t first=0,end=M10V_DIRECTORY_COUNT;
   if(p->index<first||p->index>=end)return;
-  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_GROUPS;p->focus=p->group;p->error=0;return;}
+  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;return;}
   uint32_t i=p->index;
   if(key==M10V_KEY_LEFT&&i>first)i--;
   if(key==M10V_KEY_RIGHT)i++;

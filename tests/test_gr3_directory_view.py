@@ -1,43 +1,41 @@
-"""Group-page regression using original GR III 2.10 constructors and setters.
-
-No text setter is mocked: the broken group count invokes an ASCII setter on a
-resource-label object and faults inside the original string routine.
-"""
+"""Flat catalog with original GR III constructors, setters and teardown."""
 import struct,unittest,tempfile
 from pathlib import Path
 from tests import test_gr3_settings_view as support
+IDS=[33,66,62,78,298,77,69,37,70,73,56,36,35,58,74,34,71,67,68,292,75,289,72,293,296,290,76,291,297,65]
 
 class DirectoryViewTests(unittest.TestCase):
  setUpClass=classmethod(support.SettingsViewTests.setUpClass.__func__)
  machine=support.SettingsViewTests.machine
  call=support.SettingsViewTests.call
-
- def state(self,u,focus):
-  s=bytearray(216) # schema5 journal184 + eight menu words
+ def state(self,u,index):
+  s=bytearray(216)
   for i,film in enumerate([38,75,79]):struct.pack_into('<H',s,12+8*i,film)
-  struct.pack_into('<8I',s,184,8,focus,0,0,0,0,0,0)
+  struct.pack_into('<8I',s,184,2,0,0,index,IDS[index],0,0,0)
   u.mem_write(0x10002000,bytes(s))
-
- def test_group_entry_counts_use_resource_labels_and_return_without_fault(self):
-  u=self.machine();self.assertEqual(self.call(u,'create',0x10001000),0)
-  w=struct.unpack('<56I',u.mem_read(0x10001000,224))
-  self.state(u,0);self.call(u,'draw',0x10001000,0x10002000,0)
-  caption=lambda index:struct.unpack('<H',u.mem_read(w[index]+0xea,2))[0]
-  self.assertEqual([caption(i) for i in range(44,48)],[1129,1130,1131,1132])
-  self.assertEqual([caption(i) for i in range(48,52)],[1143,1151,1138,1143])
-  self.assertEqual([caption(2),caption(4)],[1134,1135])
+  u.mem_write(0x10003000,struct.pack('<7I',0,0,0x540b0010,0,0,0,0))
+ def test_all_three_pages_have_ten_cards_no_name_overlay_and_reuse_buffers(self):
+  u=self.machine(catalog_ids=dict(enumerate(IDS)));self.assertEqual(self.call(u,'create',0x10001000),0)
+  w=struct.unpack('<56I',u.mem_read(0x10001000,224));allocated=None
+  for index in [0,10,20,29,0]:
+   self.state(u,index);self.call(u,'draw',0x10001000,0x10002000,0x10003000)
+   self.assertEqual(u.mem_read(w[3]+0x9e,1),b'\0')
+   self.assertEqual([u.mem_read(w[i]+0x9e,1)[0] for i in range(26,36)],[1]*10)
+   self.assertEqual([u.mem_read(w[i]+0x9e,1)[0] for i in range(44,52)],[0]*8)
+   name_ptr=struct.unpack('<I',u.mem_read(w[52]+0xf0,4))[0]
+   self.assertEqual(bytes(u.mem_read(name_ptr,8)).decode('utf-16le').split('\0')[0],f'{index//10+1}/3')
+   heap=struct.unpack('<I',u.mem_read(0x10001000+55*4,4))[0]
+   for i in range(10):self.assertEqual(struct.unpack('<HH',u.mem_read(heap+710400+8*i,4)),(120,148))
+   if allocated is not None:self.assertEqual(len(self.live),allocated)
+   allocated=len(self.live)
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
-
- def test_last_group_and_retired_count_redraw_without_corrupting_widgets(self):
-  u=self.machine();self.call(u,'create',0x10001000)
+ def test_card_heap_failure_keeps_exact_fallback_icons_and_teardown(self):
+  u=self.machine(fail_cards=True,catalog_ids=dict(enumerate(IDS)));self.call(u,'create',0x10001000)
   w=struct.unpack('<56I',u.mem_read(0x10001000,224))
-  for focus in [0,4,5,0,4]:
-   self.state(u,focus);self.call(u,'draw',0x10001000,0x10002000,0)
-   caption=lambda index:struct.unpack('<H',u.mem_read(w[index]+0xea,2))[0]
-   if focus>=4:
-    self.assertEqual([caption(44),caption(45)],[1133,1136])
-    self.assertEqual([caption(48),caption(49)],[1140,1139])
-    self.assertEqual([u.mem_read(w[i]+0x9e,1)[0] for i in range(44,48)],[1,1,0,0])
+  for index in [0,10,20]:
+   self.state(u,index);self.call(u,'draw',0x10001000,0x10002000,0x10003000)
+   icon=lambda film:774 if film==298 else 762+film-291 if 291<=film<=297 else 761 if film==290 else 755 if film==289 else 670+film
+   self.assertEqual([struct.unpack('<H',u.mem_read(w[26+i]+0xea,2))[0] for i in range(10)],[icon(v) for v in IDS[index:index+10]])
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
 
 class LinkedDirectoryViewTests(DirectoryViewTests):
@@ -49,6 +47,6 @@ class LinkedDirectoryViewTests(DirectoryViewTests):
    manifest=build(Path(tmp),base=support.BASE,sd_library=True,appended_slots=True)
    cls.code=(Path(tmp)/'m10v-library-arm.bin').read_bytes()
    cls.symbols=manifest['symbols'];cls.card=b'';cls.captions=b''
-   assert manifest['resources']['texts'][1137-786:1168-786]==list(map(str,range(31)))
-
+   assert len(manifest['resources']['texts'])==344
+   assert not any(n in cls.symbols for n in ('caption_offsets','caption_rle'))
 if __name__=='__main__':unittest.main()

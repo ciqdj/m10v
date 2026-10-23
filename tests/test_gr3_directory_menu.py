@@ -20,31 +20,25 @@ static int name(void *c,unsigned v){(void)c;return m10v_library_film_name_stamp(
 int main(void){
  m10v_settings_ops o={0,load,item,install,remove_film,stamp,name};m10v_settings p;
  m10v_library_init(&saved);assert(m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS)==0);
- assert(p.screen==8); /* group selector, not the old ungrouped catalogue */
- const unsigned first[]={0,6,20,21,27},count[]={6,14,1,6,3};
- for(unsigned g=0;g<5;g++){
-  assert(p.focus==g);m10v_settings_key(&p,&o,M10V_KEY_OK);assert(p.screen==2&&p.index==first[g]&&p.expected==ids[first[g]]);
-  for(unsigned n=1;n<count[g];n++){m10v_settings_key(&p,&o,M10V_KEY_RIGHT);assert(p.expected==ids[first[g]+n]);}
-  m10v_settings_key(&p,&o,M10V_KEY_RIGHT);assert(p.index==first[g]+count[g]-1);
-  m10v_settings_key(&p,&o,M10V_KEY_NEXT);assert(p.index==first[g]+count[g]-1);
-  m10v_settings_key(&p,&o,M10V_KEY_BACK);assert(p.screen==8&&p.focus==g&&writes==0);
-  if(g<4)m10v_settings_key(&p,&o,M10V_KEY_DOWN);
- }
+ assert(p.screen==M10V_SETTINGS_CATALOG&&p.index==0&&p.expected==33);
+ for(unsigned n=1;n<30;n++){m10v_settings_key(&p,&o,M10V_KEY_RIGHT);assert(p.index==n&&p.expected==ids[n]);}
+ m10v_settings_key(&p,&o,M10V_KEY_RIGHT);m10v_settings_key(&p,&o,M10V_KEY_DOWN);assert(p.index==29&&writes==0);
  m10v_settings_key(&p,&o,M10V_KEY_BACK);assert(p.screen==0&&writes==0);
- m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);m10v_settings_key(&p,&o,M10V_KEY_DOWN);m10v_settings_key(&p,&o,M10V_KEY_OK);
- m10v_settings_key(&p,&o,M10V_KEY_NEXT);assert(p.index==16&&p.expected==71);
- m10v_settings_key(&p,&o,M10V_KEY_DOWN);assert(p.index==19&&p.expected==292);
- m10v_settings_key(&p,&o,M10V_KEY_PREVIOUS);assert(p.index==9&&p.expected==73&&writes==0);
- m10v_settings_key(&p,&o,M10V_KEY_BACK);m10v_settings_key(&p,&o,M10V_KEY_DOWN);m10v_settings_key(&p,&o,M10V_KEY_OK);
- m10v_settings_key(&p,&o,M10V_KEY_LEFT);m10v_settings_key(&p,&o,M10V_KEY_UP);assert(p.index==20&&p.expected==75&&writes==0);
+ m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);
+ m10v_settings_key(&p,&o,M10V_KEY_NEXT);assert(p.index==10&&p.expected==56);
+ m10v_settings_key(&p,&o,M10V_KEY_NEXT);assert(p.index==20&&p.expected==75);
+ m10v_settings_key(&p,&o,M10V_KEY_DOWN);assert(p.index==25&&p.expected==290);
+ m10v_settings_key(&p,&o,M10V_KEY_PREVIOUS);assert(p.index==15&&p.expected==34&&writes==0);
+ m10v_settings_key(&p,&o,M10V_KEY_UP);assert(p.index==10&&p.expected==56);
+ m10v_settings_key(&p,&o,M10V_KEY_PREVIOUS);m10v_settings_key(&p,&o,M10V_KEY_LEFT);assert(p.index==0&&writes==0);
  for(unsigned n=1;m10v_library_count(&saved)<10;n++){
   unsigned exists=0;for(unsigned k=0;k<10;k++)exists|=saved.slots[k].film==ids[n];
   if(!exists)assert(m10v_library_select(&saved,m10v_library_count(&saved),ids[n],store,0)==0);
  }
- unsigned before=writes;m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);m10v_settings_key(&p,&o,M10V_KEY_DOWN);m10v_settings_key(&p,&o,M10V_KEY_OK);m10v_settings_key(&p,&o,M10V_KEY_OK);
+ unsigned before=writes;m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);m10v_settings_key(&p,&o,M10V_KEY_NEXT);m10v_settings_key(&p,&o,M10V_KEY_OK);
  assert(p.error==M10V_SETTINGS_FULL&&writes==before&&m10v_library_count(&saved)==10);
- m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);m10v_settings_key(&p,&o,M10V_KEY_OK);broken=1;m10v_settings_key(&p,&o,M10V_KEY_OK);assert(writes==before&&p.error);
- broken=2;m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);m10v_settings_key(&p,&o,M10V_KEY_OK);assert(p.index==2&&p.expected==62);m10v_settings_key(&p,&o,M10V_KEY_RIGHT);assert(p.index==5&&p.expected==77&&writes==before);
+ m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);broken=1;m10v_settings_key(&p,&o,M10V_KEY_OK);assert(writes==before&&p.error);
+ broken=2;m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);assert(p.index==2&&p.expected==62);m10v_settings_key(&p,&o,M10V_KEY_RIGHT);assert(p.index==5&&p.expected==77&&writes==before);
  const unsigned spectral[]={77,298};
  for(unsigned j=0;j<2;j++){
   m10v_library_state s;m10v_library_init(&s);assert(m10v_library_select(&s,0,spectral[j],store,0)==0);
@@ -60,20 +54,19 @@ int main(void){
  while(m10v_library_count(&saved))assert(m10v_library_remove(&saved,0,store,0)==0);
  for(unsigned n=0;n<10;n++)assert(m10v_library_select(&saved,n,38+n,store,0)==0);
  before=writes;broken=0;m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);
- for(unsigned n=0;n<5;n++)m10v_settings_key(&p,&o,M10V_KEY_DOWN);
- assert(p.focus==5&&writes==before); /* explicit maintenance action, not a sixth group */
- fail_remove=1;m10v_settings_key(&p,&o,M10V_KEY_OK);assert(p.error==M10V_SETTINGS_SAVE_FAILED&&writes==before&&m10v_library_count(&saved)==10);
- fail_remove=0;m10v_settings_key(&p,&o,M10V_KEY_OK);assert(!p.error&&m10v_library_count(&saved)==0&&writes==before+10);
- m10v_settings_key(&p,&o,M10V_KEY_OK);assert(writes==before+10);
+ assert(p.screen==M10V_SETTINGS_CATALOG&&writes==before);
+ fail_remove=1;m10v_settings_key(&p,&o,M10V_KEY_CLEAN);assert(p.error==M10V_SETTINGS_SAVE_FAILED&&writes==before&&m10v_library_count(&saved)==10);
+ fail_remove=0;m10v_settings_key(&p,&o,M10V_KEY_CLEAN);assert(!p.error&&m10v_library_count(&saved)==0&&writes==before+10);
+ m10v_settings_key(&p,&o,M10V_KEY_CLEAN);assert(writes==before+10);
  m10v_settings_key(&p,&o,M10V_KEY_BACK);m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);
- m10v_settings_key(&p,&o,M10V_KEY_OK);m10v_settings_key(&p,&o,M10V_KEY_OK);assert(saved.slots[0].film==33);
+ m10v_settings_key(&p,&o,M10V_KEY_OK);assert(saved.slots[0].film==33);
  assert(m10v_ab_caption(12,298)==1128&&m10v_ab_caption(17,298)==1128);
  const unsigned style[]={291,292,293,296,297};for(unsigned n=0;n<5;n++)assert(m10v_ab_caption(12,style[n])==1104+style[n]-291);
  return 0;
 }
 '''
 class DirectoryMenuTests(unittest.TestCase):
- def test_groups_navigation_cancel_stale_card_and_ten_film_limit(self):
+ def test_flat_navigation_cancel_stale_card_and_ten_film_limit(self):
   with tempfile.TemporaryDirectory() as tmp:
    t=Path(tmp);(t/'test.c').write_text(HARNESS)
    sources=['m10v_settings.c','m10v_library.c','halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c']

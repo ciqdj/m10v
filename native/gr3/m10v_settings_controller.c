@@ -5,6 +5,7 @@
 #include "m10v_debug.h"
 #include "m10v_sd_library.h"
 #include "m10v_film_card.h"
+#include "m10v_film_directory.h"
 #include "m10v_zoom_camera.h"
 #ifndef M10V_LIVE_COLOR
 #define M10V_LIVE_COLOR 0
@@ -160,7 +161,26 @@ void m10v_settings_controller_ab_render(m10v_settings_controller *p){
 uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event){
  uint32_t raw=*(const uint16_t *)(uintptr_t)event,key;
  M10V_LOG(82,raw,p->state.screen,p->state.focus,p->state.value);
- switch(raw){
+ /* Physical MENU/DISP can be filtered before this virtual handler. The
+  * dispatch adapter retries only an unhandled first press on this owned page. */
+ if(raw==4||raw==5||raw==0x1b){
+  if(p->page!=M10V_SETTINGS_FILMS||p->state.screen!=M10V_SETTINGS_CATALOG)return 0;
+  uint32_t payload=*(const uint32_t *)(uintptr_t)(event+4);
+  if(!ab_ram(payload,8)||*(const uint8_t *)(uintptr_t)payload!=1||
+     *(const uint32_t *)(uintptr_t)(payload+4)!=1)return 0;
+  if(raw==0x1b){
+   uint32_t retired=0;
+   for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(p->state.saved.slots[i].film&&!m10v_directory_name(p->state.saved.slots[i].film))retired=1;
+   if(!retired)return 0;
+  }
+  p->pending_source=event;
+  if(raw==4){
+   p->state.screen=M10V_SETTINGS_CLOSED;
+   ((fn3)0x5316c9d8u)((uint32_t)(uintptr_t)p,0x08000000u,0x10000000u);
+   return 1;
+  }
+  key=raw==5?M10V_KEY_BACK:M10V_KEY_CLEAN;
+ }else switch(raw){
  case 0xce:key=M10V_KEY_LEFT;break;
  case 0xcf:case 0xd3:key=M10V_KEY_RIGHT;break;
  case 0xd0:case 0xd4:key=M10V_KEY_UP;break;

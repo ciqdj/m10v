@@ -239,6 +239,30 @@ uint32_t m10v_settings_controller_ab_live_event(uint32_t live,uint32_t event){
  * Release/hold, other ADJ slots, capture and power use the original result. */
 extern uint32_t m10v_ab_dispatch_original(uint32_t,uint32_t);
 uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
+ /* The film selector owns no native list that can consume MENU/DISP.
+  * Preserve original service updates, then recover only a filtered first
+  * press. Reacquire ownership after native dispatch; it can destroy the page. */
+ uint32_t raw=*(const uint16_t *)(uintptr_t)event;
+ if(raw==4||raw==5||raw==0x1b){
+  m10v_settings_controller *p=ab_owner();
+  if((uint32_t)(uintptr_t)p==c&&p&&p->page==M10V_SETTINGS_FILMS&&
+     p->state.screen==M10V_SETTINGS_CATALOG&&p->view.count==M10V_VIEW_COUNT&&
+     ab_host_word(c,0x124)==M10V_SETTINGS_FILMS_ROUTE&&ab_route()==M10V_SETTINGS_FILMS_ROUTE){
+   uint32_t payload=*(const uint32_t *)(uintptr_t)(event+4);
+   if(ab_ram(payload,8)&&*(const uint8_t *)(uintptr_t)payload==1&&
+      *(const uint32_t *)(uintptr_t)(payload+4)==1){
+    p->pending_source=0;
+    uint32_t r=m10v_ab_dispatch_original(c,event);
+    if(ab_route()!=M10V_SETTINGS_FILMS_ROUTE)return r;
+    p=ab_owner();
+    if(!p||(uint32_t)(uintptr_t)p!=c||p->page!=M10V_SETTINGS_FILMS||
+       p->view.count!=M10V_VIEW_COUNT||ab_host_word(c,0x124)!=M10V_SETTINGS_FILMS_ROUTE)return r;
+    if(p->pending_source==event){p->pending_source=0;return 1;}
+    if(p->state.screen!=M10V_SETTINGS_CATALOG)return r;
+    return m10v_settings_controller_key(p,event)?1:r;
+   }
+  }
+ }
  if(*(const uint16_t *)(uintptr_t)event!=4||!ab_ram(c,0x274))return m10v_ab_dispatch_original(c,event);
  uint32_t payload=*(const uint32_t *)(uintptr_t)(event+4);
  if(!ab_ram(payload,8)||*(const uint8_t *)(uintptr_t)payload!=1||
