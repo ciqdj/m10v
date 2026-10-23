@@ -22,3 +22,11 @@ class Gr4NativeContractTests(unittest.TestCase):
     def test_unknown_identity_is_rejected(self):
         from scripts.analyze_gr4_native_contract import analyze
         with self.assertRaisesRegex(ValueError,'identity'): analyze(bytes(4096))
+
+    def test_disabled_zoom_configuration_preserves_gr4_state_bytes(self):
+        import json,subprocess
+        from scripts.build_gr4_m10v_firmware import initial_state
+        c=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{defaultConfiguration}from'./web/gr3/native-library-state.mjs';console.log(JSON.stringify(defaultConfiguration()))"],text=True))
+        with_zoom=initial_state(c);zoom=c.pop('zoom');self.assertEqual(initial_state(c),with_zoom)
+        c['zoom']={**zoom,'write':True}
+        with self.assertRaisesRegex(ValueError,'GR III'):initial_state(c)

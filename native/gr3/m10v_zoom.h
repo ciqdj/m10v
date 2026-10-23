@@ -18,6 +18,7 @@ int m10v_zoom_load(m10v_zoom_state *,const m10v_zoom_io *);
 void m10v_zoom_open(m10v_zoom_editor *,const m10v_zoom_state *,unsigned slot);
 void m10v_zoom_adjust(m10v_zoom_editor *,int direction);
 int m10v_zoom_save(m10v_zoom_state *,const m10v_zoom_editor *,const m10v_zoom_io *);
+int m10v_zoom_replace(m10v_zoom_state *,uint32_t,uint32_t,const m10v_zoom_io *);
 uint32_t m10v_zoom_bits(uint32_t mm);
 uint32_t m10v_zoom_mm(uint32_t bits);
 uint32_t m10v_zoom_title(void);

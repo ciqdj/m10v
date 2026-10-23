@@ -73,6 +73,11 @@ int main(void){
  m10v_zoom_adjust(&e,1);s=t;corrupt_read=1;
  assert(m10v_zoom_save(&t,&e,&io)<0&&!memcmp(&s,&t,sizeof(s)));
  corrupt_read=0;
+ /* A web preset commits both slots in one journal record. */
+ s=t;before=writes;fail_write=1;
+ assert(m10v_zoom_replace(&t,50,80,&io)<0&&!memcmp(&s,&t,sizeof(s)));
+ fail_write=0;assert(m10v_zoom_replace(&t,50,80,&io)==0&&writes==before+1);
+ assert(m10v_zoom_load(&s,&io)==1&&s.mm[0]==50&&s.mm[1]==80);
  /* Invalid slot and corrupted records cannot become active geometry. */
  m10v_zoom_open(&e,&t,2);assert(m10v_zoom_save(&t,&e,&io)<0);
  memset(pages,0xff,sizeof(pages));assert(m10v_zoom_load(&s,&io)==0);

@@ -11,6 +11,7 @@ EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'me
         70:'detail.change',71:'detail.reset',80:'page.enter.before',81:'page.enter.after',
         82:'page.key.before',83:'page.state.after',84:'page.draw.after',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',130:'capture.texture',131:'capture.texture.grain',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
 EVENTS.update({85:'ab.disp.route',86:'ab.setup.navigate',87:'ab.switch.result',88:'ab.controller.disp',89:'ab.setup.branch',90:'ab.owner',91:'ab.adj.scope',92:'ab.page.load',93:'ab.page.view',94:'ab.page.enter',95:'ab.raw.packet',96:'ab.navigation.return',99:'ab.navigation.gate'})
+EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'zoom.native.assert'})
 EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
 EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
 EVENTS.update({102:'capture.rejected',121:'capture.image',125:'capture.request.identity',126:'capture.raw.lifetime',122:'capture.cpu-samples.before',

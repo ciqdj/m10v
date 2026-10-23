@@ -1,4 +1,5 @@
 /* GR III 2.10 crop controls. Runtime state and captions are owned by caller. */
+#include "m10v_debug.h"
 typedef unsigned int u32;
 #define FN(a,t) ((t)(a))
 extern u32 m10v_zoom_camera_bits(u32 slot);
@@ -13,11 +14,18 @@ static u32 controller(void) {
 static u32 backend(void) {
     return *(u32 *)FN(0x53525d5c,u32 (*)(void))();
 }
+static u32 apply(u32 front,u32 bits,u32 slot){
+    (void)slot;
+    M10V_LOG(210,slot,bits,m10v_zoom_native_back_bits(backend()),front);
+    u32 result=m10v_zoom_native_set_bits(front,bits);
+    M10V_LOG(211,slot,bits,m10v_zoom_native_back_bits(backend()),result);
+    return result;
+}
 /* Used after editing the active slot; reports backend acceptance. */
 int m10v_zoom_live_apply(u32 slot) {
     if(slot>2) return -1;
     u32 bits=m10v_zoom_camera_bits(slot);
-    (void)m10v_zoom_native_set_bits(controller(),bits);
+    (void)apply(controller(),bits,slot);
     if(m10v_zoom_native_back_bits(backend())!=bits) return -1;
     (void)m10v_zoom_camera_select(slot);
     return 0;
@@ -27,7 +35,7 @@ u32 m10v_zoom_set(u32 ignored,u32 slot) {
     (void)ignored;
     if(slot>2) return 0;
     u32 bits=m10v_zoom_camera_bits(slot);
-    u32 result=m10v_zoom_native_set_bits(controller(),bits);
+    u32 result=apply(controller(),bits,slot);
     if(m10v_zoom_native_back_bits(backend())==bits)
         (void)m10v_zoom_camera_select(slot);
     return result;
@@ -48,7 +56,7 @@ void m10v_zoom_cycle(void) {
         (void)FN(0x5320b7fc,u32 (*)(u32))(root);
         slot=slot==2?0:slot+1;
         u32 bits=m10v_zoom_camera_bits(slot);
-        (void)m10v_zoom_native_set_bits(front,bits);
+        (void)apply(front,bits,slot);
         if(m10v_zoom_native_back_bits(back)==bits) {
             (void)m10v_zoom_camera_select(slot);
             break;

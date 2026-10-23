@@ -4,6 +4,12 @@
 extern uint32_t m10v_zoom_bits(unsigned);
 extern int m10v_zoom_live_apply(unsigned);
 extern uint32_t m10v_zoom_native_back_bits(uint32_t);
+#ifndef M10V_ZOOM_SEED_LO
+#define M10V_ZOOM_SEED_LO 0u
+#define M10V_ZOOM_SEED_HI 0u
+#define M10V_ZOOM_SEED_FIRST 35u
+#define M10V_ZOOM_SEED_SECOND 50u
+#endif
 #define MAGIC 0x5a4d1000u
 #define PENDING 4u
 static const char names[2][12]={"M10VZA.bin","M10VZB.bin"};
@@ -35,10 +41,26 @@ static void publish(m10v_settings_controller *p,const m10v_zoom_state *s){
  unsigned slot=(p->zoom_flags&~7u)==MAGIC?p->zoom_flags&7u:2;
  p->zoom_mm[0]=s->mm[0];p->zoom_mm[1]=s->mm[1];p->zoom_flags=MAGIC|slot;
 }
+const uint32_t m10v_zoom_seed_parameters[6]={0x31575a4du,M10V_ZOOM_SEED_LO,M10V_ZOOM_SEED_HI,
+ ~(0x31575a4du^M10V_ZOOM_SEED_LO^M10V_ZOOM_SEED_HI),M10V_ZOOM_SEED_FIRST,M10V_ZOOM_SEED_SECOND};
+static int apply_seed(m10v_zoom_state *s,uint32_t fs,const m10v_zoom_io *io){
+ if(!(M10V_ZOOM_SEED_LO|M10V_ZOOM_SEED_HI))return 0;
+ const uint32_t *wanted=m10v_zoom_seed_parameters;
+ uint32_t back[4];unsigned equal=1;
+ int read=((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,"M10VZW.bin",sizeof(back),back);
+ for(unsigned i=0;i<4;i++)if(!read||back[i]!=wanted[i])equal=0;
+ if(equal)return 0;
+ if(m10v_zoom_replace(s,M10V_ZOOM_SEED_FIRST,M10V_ZOOM_SEED_SECOND,io))return -1;
+ if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,"M10VZW.bin",16,wanted))return -1;
+ if(!((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,"M10VZW.bin",sizeof(back),back))return -1;
+ for(unsigned i=0;i<4;i++)if(back[i]!=wanted[i])return -1;
+ return 0;
+}
 int m10v_zoom_camera_load(m10v_zoom_state *s){
  uint32_t fs=filesystem();if(!s||!fs)return -1;
  m10v_zoom_io io={(void *)(uintptr_t)fs,read_page,write_page};
- int result=m10v_zoom_load(s,&io);if(result>=0)publish(cache(),s);return result;
+ int result=m10v_zoom_load(s,&io);if(result>=0&&apply_seed(s,fs,&io))return -1;
+ if(result>=0)publish(cache(),s);return result;
 }
 static m10v_settings_controller *ready(void){
  m10v_settings_controller *p=cache();

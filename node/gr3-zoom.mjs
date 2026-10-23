@@ -13,7 +13,15 @@ export function zoomPatches(runtime,m){
  need(z.title_id===1024&&z.focal_first_id===1031,'resource allocation differs');
  need(z.aspect===(m.base>=0x540be000),'aspect fallback contract differs');
  need(Number.isInteger(z.base)&&Number.isInteger(z.bytes)&&z.bytes>0&&z.base>=m.base&&z.base+z.bytes<=m.base+runtime.length,'module bounds');
- const patches=hooks.map(([address,expected,name,link])=>{
+ const seed=z.seed;
+ need(seed===null||(typeof seed?.id==='string'&&/^[0-9a-f]{16}$/.test(seed.id)&&seed.id!=='0000000000000000'&&Array.isArray(seed.slots)&&seed.slots.length===2&&seed.slots.every(mm=>Number.isInteger(mm)&&mm>=28&&mm<=100)),'invalid seed');
+ const lo=seed?parseInt(seed.id.slice(0,8),16):0,hi=seed?parseInt(seed.id.slice(8),16):0;
+ const at=z.seed_parameters-m.base;
+ need(Number.isInteger(at)&&at>=0&&at+24<=runtime.length,'seed parameter bounds');
+ [0x31575a4d,lo,hi,~(0x31575a4d^lo^hi)>>>0,...(seed?seed.slots:[35,50])].forEach((n,i)=>need(runtime.readUInt32LE(at+i*4)===(n>>>0),'seed parameter readback differs'));
+ need(z.debug_trace===m.debug_mode,'trace mode differs');
+ const inventory=[...hooks,...(z.debug_trace?[[0x536b93d0,0xe1a0c00d,'m10v_zoom_assert_trace',false]]:[])];
+ const patches=inventory.map(([address,expected,name,link])=>{
   const target=m.symbols[name];
   need(z.symbols[name]===target&&target>=z.base&&target<z.base+z.bytes,'hook outside module');
   return {address,expected,replacement:branch(address,target,link),name};

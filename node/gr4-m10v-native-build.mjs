@@ -14,6 +14,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 export function validateGr4Source(source){if(!Buffer.isBuffer(source)||hash(source)!==GR4_OFFICIAL_SHA256)throw Error('GR IV 官方固件摘要不匹配');}
 export function normalizeGr4Request(value={}){
  const configuration=normalizeConfiguration(value.configuration),extensions=normalizeExtensions(value.extensions);
+ if(configuration.zoom.write)throw Error('裁切焦距写入仅支持 GR III');
  if(configuration.hdf)throw Error('数字 HDF 模拟当前仅支持普通 GR III');
  if(configuration.filmNameStamp)throw Error('胶卷名称水印当前仅支持 GR III / GR IIIx');
  const debug_mode=value.debug_mode??false;if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');

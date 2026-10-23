@@ -56,3 +56,24 @@ entry label_slot
  bl m10v_zoom_camera_bits
  bl m10v_zoom_caption
  pop {r4,pc}
+
+#if M10V_DEBUG_MODE
+/* Record only failing native assertions; preserve the exact original call. */
+entry assert_trace
+ cmp r0,#0
+ bne m10v_zoom_original_assert
+ push {r0-r4,lr}
+ vpush {d0-d7}
+ sub sp,sp,#8
+ ldr r1,[sp,#76]
+ ldr r2,[sp,#80]
+ ldr r3,[sp,#84]
+ ldr ip,[sp,#92]
+ str ip,[sp]
+ mov r0,#212
+ bl m10v_debug_log
+ add sp,sp,#8
+ vpop {d0-d7}
+ pop {r0-r4,lr}
+ b m10v_zoom_original_assert
+#endif

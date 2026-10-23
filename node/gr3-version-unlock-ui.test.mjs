@@ -1,3 +1,4 @@
+import {defaultConfiguration,prepareZoomConfigurationForBuild} from '../web/gr3/native-library-state.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -40,10 +41,10 @@ const studio=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf
 const independent=await readFile(new URL('../web/gr3/native-library.js',import.meta.url),'utf8');
 function nodes(){const map=new Map();return id=>{if(!map.has(id))map.set(id,{checked:false,value:'',hidden:false,disabled:false,textContent:'',className:''});return map.get(id);};}
 function studioHarness({mismatch=false,simple=false,model='gr3',powerConfiguration={}}={}){
- const $=nodes(),calls=[],downloads=[],state={projectId:'official',profile:'native',revision:3,features:new Set(['film']),nativeConfig:{slots:[{film:33}]}};
+ const $=nodes(),calls=[],downloads=[],state={projectId:'official',profile:'native',revision:3,features:new Set(['film']),nativeConfig:{...defaultConfiguration(),slots:defaultConfiguration().slots.map((s,i)=>i===0?{...s,film:33}:s)}};
  const input=simple?{enabled:true,mode:'dsp-package-only'}:model==='gr3x'?{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
  const audit=simple?{enabled:true,mode:mismatch?'observed-versions':'dsp-package-only',checks:{cpu_payload_unchanged:true}}:{enabled:true,mode:'observed-versions',current_versions:{dsp:input.dsp,cpu:mismatch?'2.10.21.28':input.cpu}};
- const context=vm.createContext({$,state,AbortController,structuredClone,atob,Uint8Array,TextDecoder,JSON,normalizeVersionUnlock,assertVersionUnlockReceipt,powerImages:{getConfiguration:()=>structuredClone(powerConfiguration),setModel(){}},
+ const context=vm.createContext({$,state,prepareZoomConfigurationForBuild,validateZoomControls(){},nativeEditor:{setConfiguration(c){state.nativeConfig=c;state.revision++;}},AbortController,structuredClone,atob,Uint8Array,TextDecoder,JSON,normalizeVersionUnlock,assertVersionUnlockReceipt,powerImages:{getConfiguration:()=>structuredClone(powerConfiguration),setModel(){}},
   versionUnlockSnapshot:()=>normalizeVersionUnlock(input,model),nativeExtensions:()=>({aspect:false}),debugEnabled:()=>false,renderLedger(){},notice(){},
   api:async(path,options)=>{calls.push({path,body:JSON.parse(options.body)});return {json:async()=>({ready:true,configuration_sha256:'hash',filename:'candidate.bin'}),headers:{get:()=>Buffer.from(JSON.stringify({version_unlock:audit})).toString('base64')}};},
   download:async(...args)=>downloads.push(args)});
@@ -82,10 +83,10 @@ test('both entries invalidate previous output when toggle or version inputs chan
 test('actual independent exporter posts identical version snapshot and refuses mismatched audit before exposing URLs',async()=>{
  async function run(mismatch=false,simple=false){
   const $=nodes(),calls=[],created=[],busyChanges=[],messages=[];
-  const configuration={slots:[{film:33}]},option=simple?{enabled:true,mode:'dsp-package-only'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
+  const configuration=defaultConfiguration(),option=simple?{enabled:true,mode:'dsp-package-only'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
   const receipt={debug_mode:false,candidate_sha256:'aa',configuration,version_unlock:simple?{enabled:true,mode:mismatch?'observed-versions':'dsp-package-only',checks:{cpu_payload_unchanged:true}}:{enabled:true,mode:'observed-versions',current_versions:{dsp:option.dsp,cpu:mismatch?'2.10.21.28':option.cpu}}};
   const context=vm.createContext({$,configuration,AbortController,Blob,TextDecoder,Uint8Array,atob,JSON,Array,
-   normalizeConfiguration:structuredClone,versionUnlockSnapshot:()=>normalizeVersionUnlock(option),assertVersionUnlockReceipt,
+   normalizeConfiguration:structuredClone,prepareZoomConfigurationForBuild,validateZoomControls(){},versionUnlockSnapshot:()=>normalizeVersionUnlock(option),assertVersionUnlockReceipt,
    invalidate(){},setBusy:v=>busyChanges.push(v),message:(...args)=>messages.push(args),jsonResponse:async r=>r.json(),
    crypto:{subtle:{digest:async()=>new Uint8Array([170]).buffer}},
    URL:{createObjectURL:()=>{created.push('url');return 'blob:test';}},

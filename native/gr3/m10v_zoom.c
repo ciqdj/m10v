@@ -62,16 +62,18 @@ void m10v_zoom_adjust(m10v_zoom_editor *e,int direction){
  if(direction<0&&e->value>M10V_ZOOM_MIN_MM)e->value--;
  if(direction>0&&e->value<M10V_ZOOM_MAX_MM)e->value++;
 }
-int m10v_zoom_save(m10v_zoom_state *s,const m10v_zoom_editor *e,const m10v_zoom_io *io){
- if(!s||!e||!io||!io->read||!io->write||e->slot>=2||!focal(e->value)||
-    !focal(s->mm[0])||!focal(s->mm[1]))return -1;
- if(e->sequence!=s->sequence)return M10V_ZOOM_STALE;
- if(s->mm[e->slot]==e->value)return 0;
+int m10v_zoom_replace(m10v_zoom_state *s,uint32_t first,uint32_t second,const m10v_zoom_io *io){
+ if(!s||!io||!io->read||!io->write||!focal(first)||!focal(second)||!focal(s->mm[0])||!focal(s->mm[1]))return -1;
+ if(s->mm[0]==first&&s->mm[1]==second)return 0;
  m10v_zoom_state next=*s,check;uint8_t b[M10V_ZOOM_BYTES],back[M10V_ZOOM_BYTES];
- next.sequence++;next.mm[e->slot]=(uint16_t)e->value;encode(b,&next);
+ next.sequence++;next.mm[0]=(uint16_t)first;next.mm[1]=(uint16_t)second;encode(b,&next);
  unsigned page=next.sequence&1u;
- if(io->write(io->context,page,b,sizeof(b))!=1||io->read(io->context,page,back,sizeof(back))!=1||
-    !decode(&check,back))return -1;
+ if(io->write(io->context,page,b,sizeof(b))!=1||io->read(io->context,page,back,sizeof(back))!=1||!decode(&check,back))return -1;
  for(unsigned i=0;i<sizeof(b);i++)if(b[i]!=back[i])return -1;
  *s=next;return 0;
+}
+int m10v_zoom_save(m10v_zoom_state *s,const m10v_zoom_editor *e,const m10v_zoom_io *io){
+ if(!s||!e||e->slot>=2||!focal(e->value))return -1;
+ if(e->sequence!=s->sequence)return M10V_ZOOM_STALE;
+ return m10v_zoom_replace(s,e->slot==0?e->value:s->mm[0],e->slot==1?e->value:s->mm[1],io);
 }

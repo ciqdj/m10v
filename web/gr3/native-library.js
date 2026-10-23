@@ -1,7 +1,8 @@
+import {renderZoomControls,validateZoomControls} from './zoom-controls.mjs';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFilmPreview} from './preview-controller.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
-import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture} from './native-library-state.mjs';
+import {defaultConfiguration,normalizeConfiguration,prepareZoomConfigurationForBuild,selectNativeFilm,resetNativeTexture} from './native-library-state.mjs';
 export function mountNativeLibrary(root=document,{model='gr3',onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
 const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
 let pixelPreview=null,pixelFigure=null;
@@ -11,6 +12,7 @@ const storageKey=model==='gr4'?'m10v-gr4-native-library-v1':'m10v-native-library
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
 let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
 try{const saved=localStorage.getItem(storageKey);if(saved)configuration=normalizeConfiguration(JSON.parse(saved));}catch{}
+if(sourceModel!=='gr3')configuration.zoom.write=false;
 // Retired M10V sketches migrate by slot; their numeric IDs remain firmware-compatible.
 configuration.slots.forEach((s,i)=>{if(s.film<33)s.film=[34,35,36,37,33][i];});
 const message=(text,error=false)=>{$('#progress').textContent=text;$('#progress').dataset.error=String(error);};
@@ -35,6 +37,7 @@ function renderVersionUnlock(){
 function segment(selector,labels,value,change){const node=$(selector);node.replaceChildren(...labels.map((text,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus=selector.slice(1)+'-'+i;b.textContent=text;b.setAttribute('aria-pressed',String(i===value));b.disabled=busy;b.onclick=()=>{change(i);invalidate();render();};return b;}));}
 function render(){
  const focused=document.activeElement?.dataset?.focus;
+ renderZoomControls($('#native-zoom-controls'),configuration,sourceModel,value=>{configuration=value;invalidate();render();},busy);
  const slotNode=$('#slots');slotNode.replaceChildren(...configuration.slots.map((s,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus='slot-'+i;b.className='slot';b.disabled=busy;b.setAttribute('aria-pressed',String(i===active));const n=document.createElement('small');n.textContent=`槽位 ${i+1}`;const t=document.createElement('strong');t.textContent=unresolved.find(v=>v.slot===i)?'需重选 · '+unresolved.find(v=>v.slot===i).id:films.find(f=>f.id===s.film)?.name||'载入中';const e=document.createElement('em');e.textContent=`颗粒 ${levels[s.grain]} · 漏光 ${s.effects.leakGain||"关"}`;const art=filmIcon(films.find(f=>f.id===s.film));b.append(n,art,t,e);b.onclick=()=>{active=i;const status=$('#film-selection-status');if(status)status.textContent='';render();};return b;}));
  segment('#grain',levels,configuration.slots[active].grain,v=>configuration.slots[active].grain=v);
 
@@ -88,7 +91,7 @@ $('#native-version-unlock').onchange=()=>{invalidate();render();};
 $('#native-version-known').onchange=()=>{invalidate();render();};
 for(const key of ['dsp','cpu'])$('#native-version-'+key).oninput=()=>{invalidate();render();};
 $('#build').onclick=async()=>{
- if(busy||!project)return;let version_unlock;try{version_unlock=versionUnlockSnapshot();}catch(e){message(e.message,true);return;}invalidate();abort=new AbortController();setBusy(true);const snapshot=normalizeConfiguration(configuration),debug_mode=$('#native-debug-mode').checked;
+ if(busy||!project)return;let version_unlock;try{validateZoomControls($('#native-zoom-controls'));version_unlock=versionUnlockSnapshot();configuration=prepareZoomConfigurationForBuild(configuration,sourceModel);}catch(e){message(e.message,true);return;}invalidate();abort=new AbortController();setBusy(true);const snapshot=normalizeConfiguration(configuration),debug_mode=$('#native-debug-mode').checked;
  try{message('1 / 3 · 校验五槽配置与官方基线…');const plan=await jsonResponse(await post(`/api/projects/${project}/native-library/prepare`,{configuration:snapshot,debug_mode,version_unlock},abort.signal));
  message('2 / 3 · 编译 ARM 模块、接入机内菜单和 JPEG 路径…');
  const response=await post(`/api/projects/${project}/native-library/build`,{configuration:snapshot,debug_mode,version_unlock,accepted_configuration_sha256:plan.configuration_sha256},abort.signal);
@@ -105,6 +108,6 @@ $('#build').onclick=async()=>{
 };
 (async()=>{try{const [status,catalog]=await Promise.all([fetch('/api/status').then(jsonResponse),fetch(catalogApi).then(jsonResponse)]);token=status.session_token;films=catalog.films;$('#search').placeholder=`搜索 ${films.length} 套胶卷…`;for(const node of root.querySelectorAll('[data-film-count-copy]'))for(const child of node.childNodes)if(child.nodeType===3)child.textContent=child.textContent.replace(/[0-9]+(?=\s*[套款])/g,String(films.length));for(const group of [...new Set(films.map(f=>f.group))]){const option=document.createElement('option');option.value=group;option.textContent=group;option.dataset.icon=films.find(f=>f.group===group)?.icon_url;$('#film-group').append(option);}enhanceFilmSelect($('#film-group'),{caption:'胶卷分类',searchable:false});$('#local-source').dataset.available=catalog.local_source_available?'1':'';$('#source-status').textContent=catalog.local_source_available?'已找到目录中的官方包，请选择使用。':'请选择对应的官方固件包。';render();}catch(e){message(e.message,true);$('#source-status').textContent='服务暂不可用，请刷新页面。';}})();render();
 
-return {getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{active=slot;configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=normalizeConfiguration(value);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
+return {setModel:value=>{sourceModel=value;if(value!=='gr3'&&configuration.zoom.write){configuration.zoom.write=false;invalidate({globalZoom:true});}render();},getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{active=slot;configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=normalizeConfiguration(value);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
 }
 if(location.pathname.endsWith('/native-library.html'))mountNativeLibrary();

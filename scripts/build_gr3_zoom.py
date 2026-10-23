@@ -15,7 +15,7 @@ SOURCES=['m10v_zoom.c',
  'm10v_zoom_capture.c',
  'm10v_zoom_capture_adapters.c',
  'm10v_zoom_capture_hooks.S']
-EXPORTS=['m10v_zoom_adjust',
+EXPORTS=['m10v_zoom_replace','m10v_zoom_adjust',
  'm10v_zoom_bits',
  'm10v_zoom_camera_bits',
  'm10v_zoom_camera_load',
@@ -152,16 +152,25 @@ BINDINGS={'__aeabi_uidiv': 1393809488,
  'm10v_zoom_native_raw_mag': 1395144364,
  'm10v_zoom_native_summary_write': 1398530152}
 
-def build(base, stock, aspect=False):
+def build(base, stock, aspect=False, seed=None, debug_log=None):
+    if seed is not None:
+        if not isinstance(seed,dict) or set(seed)!={'id','slots'} or len(seed['id'])!=16 or any(c not in '0123456789abcdef' for c in seed['id']) or int(seed['id'],16)==0 or len(seed['slots'])!=2 or any(type(mm)is not int or not 28<=mm<=100 for mm in seed['slots']):raise ValueError('invalid zoom seed')
+    flags=[] if seed is None else [f'-DM10V_ZOOM_SEED_LO=0x{seed["id"][:8]}u',f'-DM10V_ZOOM_SEED_HI=0x{seed["id"][8:]}u',f'-DM10V_ZOOM_SEED_FIRST={seed["slots"][0]}u',f'-DM10V_ZOOM_SEED_SECOND={seed["slots"][1]}u']
+    flags+=[f'-DM10V_DEBUG_MODE={int(debug_log is not None)}']
+    extra_hooks=[] if debug_log is None else [{'address':0x536b93d0,'preimage':0xe1a0c00d,'symbol':'m10v_zoom_assert_trace','link':False}]
     from scripts.build_gr3_m10v_library import FLAGS,link_object
     from scripts.build_gr3_menu_patches import branch
-    for hook in [*LIVE_HOOKS,*CAPTURE_HOOKS]:
+    for hook in [*LIVE_HOOKS,*CAPTURE_HOOKS,*extra_hooks]:
         address=hook['address']
         expected=hook.get('preimage')
         if expected is None:expected=int.from_bytes(bytes.fromhex(hook['official_preimage_hex']),'little')
         if struct.unpack_from('<I',stock,address-0x53000000)[0]!=expected:
             raise ValueError(f'zoom hook preimage differs at {address:#x}')
     image=bytearray();bindings=dict(BINDINGS)
+    if debug_log is not None:
+        bindings['m10v_debug_log']=debug_log
+        entry=base+len(image);bindings['m10v_zoom_original_assert']=entry
+        image+=struct.pack('<II',0xe1a0c00d,branch(entry+4,0x536b93d4))
     for hook in CAPTURE_HOOKS:
         name=hook['fallback_symbol'];address=hook['address']
         if name=='m10v_zoom_original_resolution' and aspect:
@@ -186,15 +195,20 @@ def build(base, stock, aspect=False):
         folder=Path(tmp);objects=[]
         for name in SOURCES:
             obj=folder/(name+'.o')
-            subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
+            subprocess.run([clang,*FLAGS,*flags,'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
             objects.append(str(obj))
         linked=folder/'zoom.o'
         subprocess.run([lld,'-r',*objects,'-o',str(linked)],check=True,capture_output=True)
         image+=bytes(-len(image)&15)
-        code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS)
+        code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS+(['m10v_zoom_assert_trace'] if debug_log is not None else []))
         image+=code
+    lo=int(seed['id'][:8],16) if seed else 0
+    hi=int(seed['id'][8:],16) if seed else 0
+    parameters=struct.pack('<6I',0x31575a4d,lo,hi,(~(0x31575a4d^lo^hi))&0xffffffff,*(seed['slots'] if seed else [35,50]))
+    if bytes(image).count(parameters)!=1:raise ValueError('zoom seed parameter provenance differs')
+    seed_parameters=base+bytes(image).find(parameters)
     patches=[]
-    for hook in [*LIVE_HOOKS,*CAPTURE_HOOKS]:
+    for hook in [*LIVE_HOOKS,*CAPTURE_HOOKS,*extra_hooks]:
         expected=hook.get('preimage')
         if expected is None:expected=int.from_bytes(bytes.fromhex(hook['official_preimage_hex']),'little')
         address=hook['address']
@@ -206,4 +220,5 @@ def build(base, stock, aspect=False):
     return bytes(image),dict(schema='m10v-gr3-zoom/v1',base=base,bytes=len(image),
         symbols=symbols,bindings=bindings,patches=patches,aspect=aspect,
         slots=2,min_mm=28,max_mm=100,title_id=1024,focal_first_id=1031,
+        debug_trace=debug_log is not None,seed=seed,seed_parameters=seed_parameters,
         sources={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in sources},camera_tested=False)

@@ -23,9 +23,12 @@ def sha(b):return hashlib.sha256(b).hexdigest()
 
 def initial_state(configuration):
     required={'slots','stamp','format','corner','color'}
-    if not isinstance(configuration,dict) or not required<=set(configuration) or set(configuration)-required-{'hdf','filmNameStamp'}:raise ValueError('complete five-slot configuration required')
+    if not isinstance(configuration,dict) or not required<=set(configuration) or set(configuration)-required-{'hdf','filmNameStamp','zoom'}:raise ValueError('complete five-slot configuration required')
     if configuration.get('hdf',0)!=0:raise ValueError('digital HDF is only supported on GR III')
     if type(configuration.get('filmNameStamp',False)) is not bool or configuration.get('filmNameStamp',False):raise ValueError('film name stamp is only supported on GR III / GR IIIx')
+    zoom=configuration.get('zoom')
+    if zoom is not None:
+        if not isinstance(zoom,dict) or set(zoom)!={'write','slots','revision'} or zoom['write'] is not False or not isinstance(zoom['slots'],list) or len(zoom['slots'])!=2 or any(type(mm)is not int or not 28<=mm<=100 for mm in zoom['slots']) or type(zoom['revision'])is not int or not 0<=zoom['revision']<=0xffffffff:raise ValueError('custom focal writing is only supported on GR III')
     slots=configuration['slots']
     if not isinstance(slots,list) or len(slots)!=5:raise ValueError('five slots required')
     b=bytearray(default_state())

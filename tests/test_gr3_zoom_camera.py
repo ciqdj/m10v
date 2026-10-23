@@ -10,15 +10,15 @@ class CameraZoom(unittest.TestCase):
   cls.symbols={'m10v_zoom_bits':0x540b0000,'m10v_zoom_live_apply':0x540b0004,'m10v_zoom_native_back_bits':0x540b0008};cls.blobs=[]
   with tempfile.TemporaryDirectory() as tmp:
    for name,addr in [('m10v_zoom.c',0x540c0000),('m10v_zoom_camera.c',0x540d0000)]:
-    obj=pathlib.Path(tmp)/'a.o';subprocess.run(['clang',*FLAGS,'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
-    exports=['m10v_zoom_'+n for n in (['load','open','adjust','save'] if name=='m10v_zoom.c' else ['camera_load','camera_save','camera_bits','camera_slot','camera_select'])]
+    obj=pathlib.Path(tmp)/'a.o';subprocess.run(['clang',*FLAGS,*getattr(cls,'seed_flags',[]),'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
+    exports=['m10v_zoom_'+n for n in (['load','open','adjust','save','replace'] if name=='m10v_zoom.c' else ['camera_load','camera_save','camera_bits','camera_slot','camera_select'])]
     b,s=link_object(obj.read_bytes(),addr,cls.symbols,prefix='m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key'),additional_exports=exports);cls.symbols.update(s);cls.blobs.append((addr,b))
  def setUp(self):
   self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u=self.u
   for a,n in [(0x53000000,0x2000000),(0x55000000,0x1000000),(RAM,0x100000)]:u.mem_map(a,n)
   for a,b in self.blobs:u.mem_write(a,b)
   self.word(0x55063910,1);self.word(0x55063988,OWNER);self.word(RAM+0x108,RAM+0x120);self.word(RAM+0x120,RAM+0x140);u.mem_write(RAM+0x160,b'\x01')
-  self.files={};self.reads=0;self.writes=0;self.apply=[];self.fail_write=False;self.fail_apply=False;self.actual_bits=struct.unpack('<I',struct.pack('<f',35/28))[0]
+  self.files={};self.reads=0;self.writes=0;self.apply=[];self.fail_write=False;self.fail_marker=False;self.fail_apply=False;self.actual_bits=struct.unpack('<I',struct.pack('<f',35/28))[0]
   u.reg_write(UC_ARM_REG_SP,RAM+0xe0000)
   def hook(uc,a,size,data):
    r=[uc.reg_read(reg) for reg in [UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3]];v=0
@@ -30,7 +30,7 @@ class CameraZoom(unittest.TestCase):
      if name in self.files:uc.mem_write(r[3],self.files[name]);v=1
     else:
      self.writes+=1
-     if not self.fail_write:self.files[name]=bytes(uc.mem_read(r[3],r[2]));v=1
+     if not self.fail_write and not (self.fail_marker and name==b'M10VZW.bin'):self.files[name]=bytes(uc.mem_read(r[3],r[2]));v=1
    elif a==0x540b0000:v=struct.unpack('<I',struct.pack('<f',r[0]/28))[0]
    elif a==0x53525d5c:self.word(RAM+0x180,RAM+0x190);v=RAM+0x180
    elif a==0x540b0008:v=self.actual_bits
@@ -85,4 +85,25 @@ class CameraZoom(unittest.TestCase):
   self.assertEqual(self.reads,0);self.assertEqual(self.writes,0)
  def test_no_owner_does_not_lazy_read(self):
   self.word(0x55063910,0);self.call('camera_bits',0);self.assertEqual(self.reads,0)
+class SeedZoom(CameraZoom):
+ seed_flags=['-DM10V_ZOOM_SEED_LO=123u','-DM10V_ZOOM_SEED_HI=456u','-DM10V_ZOOM_SEED_FIRST=50u','-DM10V_ZOOM_SEED_SECOND=80u']
+ # Inherited tests describe the disabled configuration; only seed tests apply.
+ def test_seed_writes_both_slots_once_and_preserves_later_camera_changes(self):
+  s=RAM+0x800;e=RAM+0x900
+  self.assertNotEqual(self.call('camera_load',s),0xffffffff)
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(50,80))
+  self.assertIn(b'M10VZW.bin',self.files);writes=self.writes
+  self.call('camera_load',s);self.assertEqual(self.writes,writes)
+  seq=struct.unpack('<I',self.u.mem_read(s,4))[0]
+  self.u.mem_write(e,struct.pack('<III',seq,1,75));self.assertEqual(self.call('camera_save',s,e),0)
+  self.call('camera_load',s);self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(50,75))
+ def test_failed_marker_keeps_error_until_retry_and_does_not_publish(self):
+  s=RAM+0x800;self.fail_marker=True
+  self.assertEqual(self.call('camera_load',s),0xffffffff)
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+696,4)),(0,0))
+  self.fail_marker=False;self.assertNotEqual(self.call('camera_load',s),0xffffffff)
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+696,4)),(50,80))
+# Avoid rerunning the disabled-only cases against the enabled build.
+for _name in list(CameraZoom.__dict__):
+ if _name.startswith('test_'):setattr(SeedZoom,_name,None)
 if __name__=='__main__':unittest.main()
