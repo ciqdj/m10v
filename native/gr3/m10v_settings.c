@@ -28,10 +28,24 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
  uint32_t next=key==M10V_KEY_RIGHT||key==M10V_KEY_DOWN;
  if(p->screen==M10V_SETTINGS_FILMS){p->screen=M10V_SETTINGS_GROUPS; }
  else if(p->screen==M10V_SETTINGS_GROUPS){
-  if(p->focus>=M10V_DIRECTORY_GROUPS)return;
+  if(p->focus>M10V_DIRECTORY_GROUPS)return;
   if(previous&&p->focus)p->focus--;
-  if(next&&p->focus+1<M10V_DIRECTORY_GROUPS)p->focus++;
+  if(next&&p->focus<M10V_DIRECTORY_GROUPS)p->focus++;
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
+  if(key==M10V_KEY_OK&&p->focus==M10V_DIRECTORY_GROUPS){
+   /* Explicit maintenance only: loading/browsing never migrates a journal. */
+   for(uint32_t n=0;n<M10V_SLOT_COUNT;n++){
+    m10v_library_state fresh;
+    if(o->load(o->context,&fresh)<0||!m10v_library_valid(&fresh)){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+    for(uint32_t b=0;b<sizeof(fresh);b++)((uint8_t *)&p->saved)[b]=((const uint8_t *)&fresh)[b];
+    uint32_t count=m10v_library_count(&fresh),slot=0;
+    while(slot<count&&m10v_directory_name(fresh.slots[slot].film))slot++;
+    if(slot==count){p->error=0;return;}
+    if(o->remove(o->context,slot)!=0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+   }
+   if(o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+   p->error=0;return;
+  }
   if(key==M10V_KEY_OK){p->group=p->focus;p->index=m10v_directory_first[p->group];uint32_t end=m10v_directory_first[p->group+1];while(p->index+1<end&&!item(o,p->index))p->index++;p->expected=item(o,p->index);p->screen=M10V_SETTINGS_CATALOG;p->error=p->expected?0:M10V_SETTINGS_EMPTY;}
  }else if(p->screen==M10V_SETTINGS_AB){
   p->value=0;

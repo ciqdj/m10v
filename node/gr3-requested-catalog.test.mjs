@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nativeCatalog} from './gr3-native-library.mjs';
+import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
+import {nativeCatalog,prepareNative,readNativeOfficial} from './gr3-native-library.mjs';
 import {buildSdFilmPack,auditSdFilmPack,sdFilmRecord} from './gr3-sd-film-pack.mjs';
+import {defaultConfiguration,retainCatalogFilms} from '../web/gr3/native-library-state.mjs';
 
 // Literal acceptance list supplied by the user, independently of production data.
 const groups=[
@@ -28,4 +31,19 @@ test('a shuffled subset follows the requested order instead of old curated or nu
 });
 test('removed films cannot be exported as current selectable films',()=>{
  for(const id of [38,39,57,59,60,61,63,64,294,295])assert.throws(()=>buildSdFilmPack([id]));
+});
+test('stale full backend drafts release retired slots while preserving surviving settings',()=>{
+ const c=defaultConfiguration();c.slots=Array.from({length:10},(_,i)=>({...c.slots[0],film:38+i}));
+ const empty=retainCatalogFilms(c,rows);assert.deepEqual(empty.slots,[]);assert.equal(c.slots.length,10);
+ c.slots[3]={...c.slots[3],film:77,grain:2};c.slots[7]={...c.slots[7],film:290};
+ const kept=retainCatalogFilms(c,rows);assert.deepEqual(kept.slots.map(s=>s.film),[77,290]);assert.equal(kept.slots[0].grain,2);
+});
+test('native builds reject retired slots while journal normalization stays compatible',async()=>{
+ const c=defaultConfiguration();c.slots[0].film=38;const source=await readNativeOfficial();
+ assert.throws(()=>prepareNative(source,c),/已停用/);
+});
+test('authentic full pre-directory card stays readable without allowing new retired exports',()=>{
+ const pack=gunzipSync(readFileSync(new URL('../tests/fixtures/gr3-pre-directory-films.m10.gz',import.meta.url)));
+ const old=auditSdFilmPack(pack);assert.equal(old.count,55);assert.ok(old.ids.includes(38)&&old.ids.includes(294));assert.ok(!old.ids.includes(298));
+ assert.throws(()=>buildSdFilmPack(old.ids),/当前平台目录/);
 });

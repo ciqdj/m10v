@@ -43,6 +43,8 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log','m10v_debug_batch','m10v_library_name','m10v_sd_camera_custom_name',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event']]]
   names += [f'm10v_ab_adj_{n}_original' for n in ('refresh','exit','destroy','changed')]
   names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom']
+  names += ['m10v_library_valid','m10v_library_count','m10v_sd_camera_directory_item','m10v_sd_camera_directory_install','m10v_camera_library_remove','m10v_camera_library_shooting_count']
+  names += ['m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -96,6 +98,10 @@ class ControllerLifetimeTests(unittest.TestCase):
      m.mem_write(r[0],bytes(state))
     elif name=='m10v_sd_camera_item':result=33+r[0]*8+r[1]
     elif name=='m10v_sd_camera_install':result=0xffffffff if self.install_fail else 0
+    elif name=='m10v_library_valid':result=1 # state decoding is exercised by real-library tests
+    elif name=='m10v_library_count':result=sum(self.word(m,r[0]+12+8*i)&65535!=0 for i in range(10))
+    elif name=='m10v_camera_library_shooting_count':result=17 if self.appended_slots else 12
+    elif name=='m10v_camera_library_mutation_begin':result=1
     m.reg_write(UC_ARM_REG_R0,result)
    elif a==0x5320ad88:m.reg_write(UC_ARM_REG_R0,0x55007000)
    elif a==0x5320ba9c:m.reg_write(UC_ARM_REG_R0,0x55008000)

@@ -17,14 +17,14 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const workspace=await (await fetch(base+'/gr3/')).text();assert.ok(workspace.includes('id="native-editor"'));
   const status=await (await fetch(base+'/api/status')).json();
   const catalog=await fetch(base+'/api/gr3/native-library/catalog'); assert.equal(catalog.status,200);
-  const data=await catalog.json();assert.equal(data.films.length,55);assert.deepEqual(data.films.filter(f=>f.group==='M10V精选').map(f=>f.name),['800T','5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203','Kodak Charmera','方块世界','Leica Monochrome','Lomography','Polaroid','Fujifilm Velvia 50','Cyberpunk','Cyanotype','德系冷调']);assert.ok(data.films.every(f=>f.id>=33));assert.equal(data.external_film_pack,true);
+  const data=await catalog.json();assert.equal(data.films.length,30);assert.deepEqual([...new Set(data.films.map(f=>f.group))],['ECN2','C41','D76','创意','影像']);assert.ok(data.films.every(f=>f.id>=33));assert.equal(data.external_film_pack,true);
   const post=(url,body,auth=true)=>fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{'X-M10V-Token':status.session_token}:{})},body:JSON.stringify(body)});
   assert.equal((await post('/api/gr3/native-library/import-official',{},false)).status,403);
   const ximport=await post('/api/gr3/native-library/import-official',{model:'gr3x'});assert.equal(ximport.status,200);const xid=(await ximport.json()).project_id;
   const imported=await post('/api/gr3/native-library/import-official',{});assert.equal(imported.status,200);
   const {project_id:id}=await imported.json();
   const route=`/api/projects/${id}/native-library/`;
-  const config=normalizeConfiguration({slots:[{film:33,grain:3,soft:2},{film:7,grain:1,soft:3},{film:16,grain:0,soft:1},{film:21,grain:2,soft:0},{film:1,grain:0,soft:0}],stamp:2,format:3,corner:2,color:1});
+  const config=normalizeConfiguration({slots:[{film:33,grain:3,soft:2},{film:77,grain:1,soft:3},{film:298,grain:0,soft:1},{film:75,grain:2,soft:0},{film:291,grain:0,soft:0}],stamp:2,format:3,corner:2,color:1});
   assert.equal((await post(route+'prepare',{configuration:{...config,stamp:9}})).status,400);
   const xconfig=normalizeConfiguration({...config,slots:config.slots.map(s=>({...s,grain:0}))});
   assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,400);

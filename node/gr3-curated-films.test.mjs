@@ -5,19 +5,19 @@ import {nativeCatalog} from './gr3-native-library.mjs';
 import {buildSdFilmPack,auditSdFilmPack} from './gr3-sd-film-pack.mjs';
 import {defaultConfiguration,selectNativeFilm,resetNativeTexture} from '../web/gr3/native-library-state.mjs';
 
-test('new curated stocks retain stable identities and precede legacy simulations',async()=>{
+test('requested groups retain stock identities',async()=>{
  const c=await nativeCatalog();
- assert.deepEqual(c.films.slice(0,8).map(f=>f.id),[33,66,67,68,69,70,71,72]);
- for(const [id,name] of [[69,'Portra 160'],[70,'富士业务用 100'],[71,'乐凯 C200']]){
-  const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'M10V精选');
+ assert.deepEqual(c.films.slice(0,6).map(f=>f.id),[33,66,62,78,298,77]);
+ for(const [id,name] of [[69,'Portra 160'],[70,'Fuji Industrial 100'],[71,'Lucky C200']]){
+  const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'C41');
   assert.equal(f.camera_calibrated,false);assert.equal(f.film_calibrated,false);
  }
- assert.equal(c.films.length,55);
+ assert.equal(c.films.length,30);
 });
-test('SD library places curated stocks first even when input is interleaved',()=>{
+test('SD subsets use requested group order',()=>{
  const a=auditSdFilmPack(buildSdFilmPack([35,71,34,70,69,33]));
- assert.deepEqual(a.ids,[71,70,69,33,35,34]);
- assert.deepEqual(auditSdFilmPack(buildSdFilmPack()).ids.slice(0,8),[33,66,67,68,69,70,71,72]);
+ assert.deepEqual(a.ids,[33,69,70,35,34,71]);
+ assert.deepEqual(auditSdFilmPack(buildSdFilmPack()).ids.slice(0,6),[33,66,62,78,298,77]);
 });
 test('SD priority partition cannot silently discard malformed identities',()=>{
  for(const ids of [[NaN],[undefined],Array(1),[33,undefined]])assert.throws(()=>buildSdFilmPack(ids));

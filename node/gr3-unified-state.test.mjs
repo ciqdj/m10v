@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection} from '../web/gr3/native-library-state.mjs';
 import {initialState,nativeCatalog} from './gr3-native-library.mjs';
-test('one catalogue accepts every legacy simulation as a real camera slot',async()=>{
- const c=await nativeCatalog();assert.equal(c.films.length,55);assert.deepEqual(c.films.filter(f=>f.group==='M10V精选').map(f=>f.id),[33,66,67,68,69,70,71,72,73,74,75,76,77,78,289,290,291,292,293,294,295,296,297]);
+test('one catalogue exposes only requested legacy simulations',async()=>{
+ const c=await nativeCatalog();assert.equal(c.films.length,30);assert.deepEqual(c.films.filter(f=>f.legacy_id).map(f=>f.id),[62,37,56,36,35,58,34,65]);
  assert.equal(c.films.find(f=>f.legacy_id==='ektar100').id,34);
  const cfg=defaultConfiguration();cfg.slots[0].film=34;cfg.slots[1].film=65;
  assert.equal(normalizeConfiguration(cfg).slots[0].film,34);
@@ -26,7 +26,7 @@ test('film name stamp migrates off and packs independently from date',()=>{
 test('legacy simulation draft migrates into the same slots and flags unknown LUTs',async()=>{
  const {films}=await nativeCatalog();const migrated=migrateSimulationSelection(['ektar100','gold200','lut-private','portra400','vision3-250d'],{ektar100:{grain:2,hdf:1}},films);
  assert.equal(migrated.configuration.slots[0].film,34);assert.equal(migrated.configuration.slots[0].grain,2);assert.equal(migrated.configuration.slots[0].soft,0);
- assert.deepEqual(migrated.unresolved,[{slot:2,id:'lut-private'}]);
+ assert.deepEqual(migrated.unresolved,[{slot:2,id:'lut-private'},{slot:4,id:'vision3-250d'}]);
 });
 test('both colour views edit a single native configuration and do not restore the legacy film builder',async()=>{
  const {readFile}=await import('node:fs/promises');const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');

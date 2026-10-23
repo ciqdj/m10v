@@ -177,12 +177,14 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   caption(v->widgets[TITLE],1134);caption(v->widgets[FOOTER],1135);
   uint32_t offset=(s->focus/4)*4;
   for(uint32_t i=0;i<4;i++){
-   uint32_t g=offset+i,shown=g<M10V_DIRECTORY_GROUPS;
+   uint32_t g=offset+i,shown=g<=M10V_DIRECTORY_GROUPS;
    visible(v->widgets[ROW+i],shown);visible(v->widgets[VALUE+i],shown);
    visible(v->widgets[ROW_FRAME+i],shown&&g==s->focus);visible(v->widgets[ROW_INNER+i],shown&&g==s->focus);
-   if(shown){caption(v->widgets[ROW+i],M10V_DIRECTORY_GROUP_RESOURCE+g);
+   if(shown){caption(v->widgets[ROW+i],g<M10V_DIRECTORY_GROUPS?M10V_DIRECTORY_GROUP_RESOURCE+g:1136);
     ((fn2)0x5339658cu)(v->widgets[ROW+i],g==s->focus?10:31);
-    uint32_t n=m10v_directory_first[g+1]-m10v_directory_first[g];char count[3];uint32_t at=0;
+    uint32_t n=0;if(g<M10V_DIRECTORY_GROUPS)n=m10v_directory_first[g+1]-m10v_directory_first[g];
+    else for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film&&!m10v_directory_name(s->saved.slots[k].film))n++;
+    char count[3];uint32_t at=0;
     if(n>=10)count[at++]=(char)('0'+n/10);count[at++]=(char)('0'+n%10);count[at]=0;
     ((fn2)0x53390ef8u)(v->widgets[VALUE+i],ptr(count));
    }

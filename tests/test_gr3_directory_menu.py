@@ -4,16 +4,17 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 HARNESS=r'''
 #include "m10v_settings.h"
+#include "m10v_ab.h"
 #include <assert.h>
 #include <string.h>
 static const unsigned ids[]={33,66,62,78,298,77,69,37,70,73,56,36,35,58,74,34,71,67,68,292,75,289,72,293,296,290,76,291,297,65};
 static m10v_library_state saved;
-static unsigned writes,broken;
+static unsigned writes,broken,fail_remove;
 static int store(void *c,const m10v_library_state *s){(void)c;(void)s;writes++;return 0;}
 static int load(void *c,m10v_library_state *s){(void)c;*s=saved;return 0;}
 static unsigned item(void *c,unsigned i){(void)c;return i<30?broken==2?(i==2||i==5?ids[i]:0):broken==1&&i==0?34:ids[i]:0;}
 static int install(void *c,unsigned i,unsigned id,unsigned slot){(void)c;assert(i<30&&ids[i]==id);return m10v_library_select(&saved,slot,id,store,0);}
-static int remove_film(void *c,unsigned slot){(void)c;return m10v_library_remove(&saved,slot,store,0);}
+static int remove_film(void *c,unsigned slot){(void)c;if(fail_remove)return -1;return m10v_library_remove(&saved,slot,store,0);}
 static int stamp(void *c,unsigned a,unsigned b,unsigned d,unsigned e){(void)c;return m10v_library_stamp(&saved,a,b,d,e,store,0);}
 static int name(void *c,unsigned v){(void)c;return m10v_library_film_name_stamp(&saved,v,store,0);}
 int main(void){
@@ -56,6 +57,18 @@ int main(void){
   assert(y1[4]==91&&y1[5]==92&&y1[10]==93&&y1[11]==94);
  }
  assert(!strcmp(m10v_library_name(298),"5213"));assert(!strcmp(m10v_library_name(290),"Pixel Worlds"));
+ while(m10v_library_count(&saved))assert(m10v_library_remove(&saved,0,store,0)==0);
+ for(unsigned n=0;n<10;n++)assert(m10v_library_select(&saved,n,38+n,store,0)==0);
+ before=writes;broken=0;m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);
+ for(unsigned n=0;n<5;n++)m10v_settings_key(&p,&o,M10V_KEY_DOWN);
+ assert(p.focus==5&&writes==before); /* explicit maintenance action, not a sixth group */
+ fail_remove=1;m10v_settings_key(&p,&o,M10V_KEY_OK);assert(p.error==M10V_SETTINGS_SAVE_FAILED&&writes==before&&m10v_library_count(&saved)==10);
+ fail_remove=0;m10v_settings_key(&p,&o,M10V_KEY_OK);assert(!p.error&&m10v_library_count(&saved)==0&&writes==before+10);
+ m10v_settings_key(&p,&o,M10V_KEY_OK);assert(writes==before+10);
+ m10v_settings_key(&p,&o,M10V_KEY_BACK);m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS);
+ m10v_settings_key(&p,&o,M10V_KEY_OK);m10v_settings_key(&p,&o,M10V_KEY_OK);assert(saved.slots[0].film==33);
+ assert(m10v_ab_caption(12,298)==1128&&m10v_ab_caption(17,298)==1128);
+ const unsigned style[]={291,292,293,296,297};for(unsigned n=0;n<5;n++)assert(m10v_ab_caption(12,style[n])==1104+style[n]-291);
  return 0;
 }
 '''

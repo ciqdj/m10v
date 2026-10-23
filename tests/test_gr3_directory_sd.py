@@ -1,5 +1,5 @@
 """Execute the real ARM SD adapter against subset cards and exact directory IDs."""
-import struct,subprocess,unittest
+import struct,subprocess,unittest,gzip
 import tests.test_gr3_sd_camera as support
 ROOT=support.ROOT
 
@@ -26,6 +26,13 @@ class DirectorySDTests(unittest.TestCase):
   self.card=b'';self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   self.assertEqual(struct.unpack_from('<H',self.u.mem_read(0x5500a000,184),28)[0],298)
   self.assertEqual((self.opened,self.allocated),(0,0))
+
+ def test_authentic_old_full_card_maps_only_requested_identities(self):
+  self.card=gzip.decompress((ROOT/'tests/fixtures/gr3-pre-directory-films.m10.gz').read_bytes())
+  for index,expected in [(0,33),(4,0),(5,77),(7,37),(25,290),(29,65)]:
+   self.assertEqual(self.call('m10v_sd_camera_directory_item',index),expected)
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',4,298,2),0xffffffff)
+  self.assertEqual(self.calls,[]);self.assertEqual((self.opened,self.allocated),(0,0))
 
  def test_stale_identity_corrupt_record_and_close_failure_do_not_save(self):
   self.assertEqual(self.call('m10v_sd_camera_directory_install',4,77,2),0xffffffff)

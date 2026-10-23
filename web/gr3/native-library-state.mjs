@@ -19,6 +19,10 @@ export function normalizeConfiguration(value=defaultConfiguration()){
  if(!int(value.stamp,0,2)||!int(value.format,0,3)||!int(value.corner,0,3)||!int(value.color,0,3)||(value.filmNameStamp!==undefined&&typeof value.filmNameStamp!=='boolean'))throw Error('时间戳配置无效');
  return {slots:slots.filter((s,i,list)=>list.findIndex(v=>v.film===s.film)===i),stamp:value.stamp,format:value.format,corner:value.corner,color:value.color,filmNameStamp:value.filmNameStamp??false,hdf};
 }
+export function retainCatalogFilms(value,catalog){
+ const configuration=normalizeConfiguration(value),ids=new Set(catalog.map(f=>f.id));
+ configuration.slots=configuration.slots.filter(s=>ids.has(s.film));return configuration;
+}
 export function migrateSimulationSelection(ids,texture,catalog,current=defaultConfiguration()){
  const configuration=normalizeConfiguration(current),unresolved=[];
  configuration.slots=[];

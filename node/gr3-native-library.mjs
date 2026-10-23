@@ -66,6 +66,7 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
  const integration_source_sha256=integrationFingerprint();
  const reference=JSON.parse(readFileSync(path.join(root,'native/gr3/5207-reference.json'),'utf8'));
  const configuration=normalizeConfiguration(value);
+ if(film_library&&configuration.slots.some(s=>!directoryFilm(s.film)))throw Error('包含已停用的胶卷，请从当前目录重新选择');
  if(!appended_slots&&configuration.slots.length>5)throw Error('此机型仍使用五个胶卷位置，暂不支持导出超过 5 款胶卷');
  if(hdf_enabled===undefined)hdf_enabled=!film_library||configuration.hdf>0;
  if(typeof hdf_enabled!=='boolean'||(!hdf_enabled&&(configuration.hdf>0||!film_library)))throw Error('HDF 功能开关与配置不一致');

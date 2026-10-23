@@ -5,20 +5,20 @@ import {nativeCatalog,initialState} from './gr3-native-library.mjs';
 import {defaultConfiguration,selectNativeFilm,resetNativeTexture} from '../web/gr3/native-library-state.mjs';
 import {buildSdFilmPack,auditSdFilmPack,customFilmRecord} from './gr3-sd-film-pack.mjs';
 const ids=[291,292,293,294,295,296,297];
-test('seven style filters are selectable curated films without consuming custom IDs',async()=>{
+test('five retained style filters keep their identities and requested group names',async()=>{
  const c=await nativeCatalog();
- assert.deepEqual(c.films.filter(f=>ids.includes(f.id)).map(f=>f.name),['Leica Monochrome','Lomography','Polaroid','Fujifilm Velvia 50','Cyberpunk','Cyanotype','德系冷调']);
- for(const id of ids){
-  const f=c.films.find(f=>f.id===id);assert.equal(f.group,'M10V精选');assert.equal(f.camera_calibrated,false);
+ assert.deepEqual(c.films.filter(f=>ids.includes(f.id)).map(f=>f.name),['Lomography','Polaroid','Cyanotype','Leica Monochrome','German Cool']);
+ for(const id of [291,292,293,296,297]){
+  const f=c.films.find(f=>f.id===id);assert.equal(f.group,[291,297].includes(id)?'影像':id===292?'C41':'创意');assert.equal(f.camera_calibrated,false);
   const before=defaultConfiguration(),after=selectNativeFilm(before,0,id);
   assert.equal(after.slots[0].film,id);assert.equal(initialState(after).readUInt16LE(12),id);
   assert.deepEqual(after.slots.slice(1),before.slots.slice(1));
   assert.equal(resetNativeTexture(after,0).slots[0].film,id);
  }
- assert.throws(()=>selectNativeFilm(defaultConfiguration(),0,298));
+ assert.throws(()=>selectNativeFilm(defaultConfiguration(),0,299));
 });
 test('SD round trip includes sparse filter IDs and coexists with custom LUT records',()=>{
- const pack=buildSdFilmPack(ids);assert.deepEqual(auditSdFilmPack(pack).ids,ids);
+ const pack=buildSdFilmPack([291,292,293,296,297]);assert.deepEqual(auditSdFilmPack(pack).ids,[292,293,296,291,297]);
  const rgb=Buffer.alloc(6591,128),custom={name:'Own LUT',rgb,sha256:'a'.repeat(64)};
  assert.equal(customFilmRecord(custom,79).readUInt32LE(8),79);
  assert.deepEqual(auditSdFilmPack(buildSdFilmPack([33,291,297],[custom])).ids,[33,291,297,79]);

@@ -47,6 +47,12 @@ class NativeHostTests(adapter.ControllerLifetimeTests):
   u=self.begin();self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
   # The native icon setter receives the appended builtin resource.
   self.assertTrue(any(e[0]==0x533a1734 and 761 in e[1:] for e in self.ui))
+ def test_5213_slot_keeps_its_name_and_icon_in_ab_picker(self):
+  for film,caption,icon in [(298,1128,774),(291,1104,762),(292,1105,763),(296,1109,767),(297,1110,768)]:
+   self.fresh_films=[film,34,35,36,37]
+   u=self.begin();self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
+   self.assertTrue(any(e[0]==0x533a1734 and e[2]==icon for e in self.ui),film)
+   self.assertTrue(any(e[0]==0x533a1808 and e[2]==caption for e in self.ui),film)
 
  def test_menu_uses_native_adj_route_and_original_parent(self):
   u=self.begin();self.route=0x02000012;source=0x55051000

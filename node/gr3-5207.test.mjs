@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {nativeCatalog,initialState} from './gr3-native-library.mjs';
 import {defaultConfiguration,normalizeConfiguration} from '../web/gr3/native-library-state.mjs';
-test('5207 has its own curated ID while legacy 5207 stays intact',async()=>{
+test('5207 keeps its own identity while duplicate legacy 5207 is hidden',async()=>{
  const c=await nativeCatalog();assert.equal(c.films.find(f=>f.id===66)?.name,'5207');
- assert.equal(c.films.find(f=>f.id===66)?.group,'M10V精选');assert.equal(c.films.find(f=>f.id===64)?.name,'V3 5207');
+ assert.equal(c.films.find(f=>f.id===66)?.group,'ECN2');assert.equal(c.films.find(f=>f.id===64),undefined);
 });
 test('old web configuration migrates into v4 and validates effect ranges',()=>{
  const old=defaultConfiguration();old.slots[0].film=66;
