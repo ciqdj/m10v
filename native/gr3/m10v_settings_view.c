@@ -184,9 +184,9 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
     ((fn2)0x5339658cu)(v->widgets[ROW+i],g==s->focus?10:31);
     uint32_t n=0;if(g<M10V_DIRECTORY_GROUPS)n=m10v_directory_first[g+1]-m10v_directory_first[g];
     else for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film&&!m10v_directory_name(s->saved.slots[k].film))n++;
-    char count[3];uint32_t at=0;
-    if(n>=10)count[at++]=(char)('0'+n/10);count[at++]=(char)('0'+n%10);count[at]=0;
-    ((fn2)0x53390ef8u)(v->widgets[VALUE+i],ptr(count));
+    /* VALUE widgets are resource labels (type17), not ASCII text (type0).
+     * The ASCII setter interprets their resource fields as a string pointer. */
+    caption(v->widgets[VALUE+i],M10V_VIEW_COUNT_FIRST+n);
    }
   }
  }

@@ -524,6 +524,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         from scripts.generate_m10v_card_captions import resource as film_resource_id
         if sd_library:
             texts += ['5213']+[g['name'] for g in display_directory()]+['胶卷分类','上下选择 OK进入 MENU返回','清理已停用胶卷']
+            texts += [str(n) for n in range(31)]
             for g in display_directory():
                 for film in g['films']:texts[film_resource_id(film['id'])-786]=film['name']
         else:texts+=['5213']
