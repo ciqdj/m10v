@@ -18,7 +18,7 @@ test('GR IV uses the shared five-slot workbench and retains the reference editor
   const reference=await fetch(base+'/gr4/reference/');assert.equal(reference.status,200);assert.ok((await reference.text()).includes('/gr4/app.js'));
   const catalog=await(await fetch(base+'/api/gr4/native-library/catalog')).json();
   const gr3=await(await fetch(base+'/api/gr3/native-library/catalog')).json();
-  assert.deepEqual(catalog.films,gr3.films.filter(f=>f.id!==289&&f.id!==290).map((f,i)=>({...f,number:i+1})));assert.deepEqual(catalog.local_sources,['gr4']);
+  assert.deepEqual(catalog.films,gr3.films.filter(f=>f.id<289).map((f,i)=>({...f,number:i+1})));assert.deepEqual(catalog.local_sources,['gr4']);
   assert.equal((await fetch(base+'/api/gr4/native-library/import-official',{method:'POST',body:'{}'})).status,403);
   const status=await(await fetch(base+'/api/status')).json();
   const sdHtml=await(await fetch(base+'/gr4/sd-library.html')).text();assert.ok(sdHtml.includes('GR IV · SD 胶卷库'));assert.ok(!sdHtml.includes('已获用户真机确认'));assert.ok(!sdHtml.includes('GR IIIx 暂不支持'));assert.ok(sdHtml.includes('配套 GR IV 1.11'));

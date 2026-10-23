@@ -2,6 +2,9 @@
 #include "film_harman_data.h"
 extern const uint8_t *m10v_curated_table(uint32_t);
 extern const uint8_t *m10v_newstocks_table(uint32_t);
+extern const uint8_t *m10v_style_filters_0_table(uint32_t);
+extern const uint8_t *m10v_style_filters_1_table(uint32_t);
+static const uint8_t *style_table(uint32_t v){return v<4?m10v_style_filters_0_table(v):m10v_style_filters_1_table(v-4);}
 #if M10V_FILM_COLOR_CANDIDATE
 #include "m10v_film_color_candidates.h"
 #endif
@@ -9,6 +12,7 @@ static uint8_t clip(int x){return (uint8_t)(x<0?0:x>255?255:x);}
 #if M10V_TEXTURE_NEON
 const uint8_t *m10v_harman_texture_table(uint32_t variant){
     if(variant==14)return &m10v_harman_luts[4][0][0];
+    if(variant>=15)return variant<=21?style_table(variant-15):0;
     if(variant>13)return 0;
 #if M10V_FILM_COLOR_CANDIDATE
     if(variant==0)return &m10v_phoenix_ii_candidate_lut[0][0];
@@ -17,8 +21,8 @@ const uint8_t *m10v_harman_texture_table(uint32_t variant){
 }
 #endif
 void m10v_harman_rgb(uint32_t variant,const uint8_t rgb[3],uint8_t out[3]){
-    if(variant>14){for(uint32_t c=0;c<3;c++)out[c]=rgb[c];return;}
-    const uint8_t (*table)[3]=variant==14?m10v_harman_luts[4]:variant>=8?(const uint8_t (*)[3])m10v_newstocks_table(variant-8):variant>=4?(const uint8_t (*)[3])m10v_curated_table(variant-4):m10v_harman_luts[variant];
+    if(variant>21){for(uint32_t c=0;c<3;c++)out[c]=rgb[c];return;}
+    const uint8_t (*table)[3]=variant>=15?(const uint8_t (*)[3])style_table(variant-15):variant==14?m10v_harman_luts[4]:variant>=8?(const uint8_t (*)[3])m10v_newstocks_table(variant-8):variant>=4?(const uint8_t (*)[3])m10v_curated_table(variant-4):m10v_harman_luts[variant];
 #if M10V_FILM_COLOR_CANDIDATE
     if(variant==0)table=m10v_phoenix_ii_candidate_lut;
 #endif

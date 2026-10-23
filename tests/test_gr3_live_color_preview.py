@@ -24,7 +24,7 @@ class LiveColorPreviewTests(unittest.TestCase):
   e=StockISP(self.candidate);self.cache(e,film)
   e.make(12,1,True,actual_live=True);return e,0x60000000,0x60001400
  def test_installed_wrapper_matches_native_target_and_never_accumulates(self):
-  for film in (33,35,58,66,67,68):
+  for film in (33,35,58,66,67,68,290,291,292,293,294,295,296,297):
    e,obj,f=self.fixture(film);base=bytes(e.u.mem_read(f,0x9000));s=e.alloc(1600);gamma=struct.unpack('<I',e.u.mem_read(obj+0x17c,4))[0]
    e.call(self.snapshot['exports']['m10v_isp_native_look_prepare'],s,film,0,8)
    e.call(self.snapshot['exports']['m10v_isp_native_look_apply'],s,gamma,f,0);expected=bytes(e.u.mem_read(f,0x9000))

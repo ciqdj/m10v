@@ -77,6 +77,8 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
             append(blob);symbols.update(entries)
         module('native/gr3/film_curated.c','m10v_curated_')
         module('native/gr3/film_newstocks.c','m10v_newstocks_')
+        module('native/gr3/film_style_filters_0.c','m10v_style_filters_0_')
+        module('native/gr3/film_style_filters_1.c','m10v_style_filters_1_')
         module('native/gr3/film_harman.c','m10v_harman_')
         module('native/gr3/film_5207.c','m10v_5207_')
         module('native/gr3/m10v_library.c','m10v_library_',('-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial)),))

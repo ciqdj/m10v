@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.23.1",
+      "date": "2026-10-23",
+      "title": "新增七款 M10V 精选滤镜",
+      "changes": [
+        "GR III / IIIx：新增 Leica Monochrome、Lomography、Polaroid、Fujifilm Velvia 50、Cyberpunk、Cyanotype、德系冷调；精选及历史目录共55款，新增ID291–297，保留方块世界290。",
+        "接入七款成片LUT、ISP取景近似、胶卷卡片、菜单及SD配方；颗粒、光晕与漏光默认关闭。社区LUT保留来源和许可证；未经物理胶片标定，不承诺100%复刻。",
+        "用户已确认r3在GR III 2.10验证通过（BIN SHA-256 bf933a672cf570ddae5202c18faf79f1a9dc880427ab4f4ccde34026da21ac65）。GR IIIx本次未声明机身实测；r2用户更新SD包后需重新选择五槽，避免沿用试验编号。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.22.9",
       "date": "2026-10-22",
       "title": "修复 ADJ 方块世界胶卷图标缺失",
@@ -10,9 +23,9 @@
         "同时覆盖启用与关闭 SD 胶卷库的构建，保留原有胶卷编号、效果、五槽设置及自定义焦距；新增执行最终固件图标解码器的 ARM 回归。",
         "按用户授权完成离线回归后直接发布，尚未完成此次修复的机身实测。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "0818cfeb00d92b09c89a68d1795707560343c0de",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39801464128"
     },
     {
       "version": "2026.10.22.8",

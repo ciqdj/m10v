@@ -9,7 +9,7 @@ class NewStocksTests(unittest.TestCase):
   self.assertEqual(len(set(tables)),6)
  def test_native_tetrahedra_match_independent_reference(self):
   with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp)/'new.so';subprocess.run(['clang','-shared','-fPIC','-O2',str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),'-o',str(p)],check=True,capture_output=True)
+   p=Path(tmp)/'new.so';subprocess.run(['clang','-shared','-fPIC','-O2',str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),'-o',str(p)],check=True,capture_output=True)
    lib=C.CDLL(str(p));fn=lib.m10v_harman_rgb;fn.argtypes=[C.c_uint32,C.POINTER(C.c_uint8),C.POINTER(C.c_uint8)]
    stocks=json.loads((ROOT/'web/gr3/newstocks-luts.json').read_text())['stocks'];rng=random.Random(7378)
    cases=[(v,v,v) for v in range(256)]+[tuple(rng.randrange(256) for _ in range(3)) for _ in range(1024)]

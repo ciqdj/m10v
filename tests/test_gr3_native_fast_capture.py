@@ -58,6 +58,12 @@ class NativeFastCaptureTests(unittest.TestCase):
    h,u,c,y,uv,cache,frees,reads,writes=self.fixture(film,mask=0)
    self.assertEqual(h.call(u,'m10v_capture_library',c),0)
    self.assertTrue(cache);self.assertGreater(writes[0],0)
+ def test_style_filters_keep_cpu_lut_even_with_a_native_completion_mask(self):
+  for film,mask in ((291,3),(296,3),(297,0)):
+   h,u,c,y,uv,cache,frees,reads,writes=self.fixture(film,mask=mask)
+   self.assertEqual(h.call(u,'m10v_capture_library',c),0)
+   self.assertGreater(writes[0],0)
+   self.assertNotEqual((bytes(u.mem_read(0x55010000,len(y))),bytes(u.mem_read(0x55020000,len(uv)))),(bytes(y),bytes(uv)))
  def test_leak_remains_active_with_native_color_and_grain(self):
   h,u,c,y,uv,cache,frees,reads,writes=self.fixture(66,leak=8)
   self.assertEqual(h.call(u,'m10v_capture_library',c),0)

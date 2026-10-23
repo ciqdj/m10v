@@ -90,7 +90,7 @@ int m10v_library_valid(const m10v_library_state *state) {
         state->size != sizeof(*state) || (state->reserved & ~1u) || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
-        if (!state->slots[i].film || (state->slots[i].film > M10V_CUSTOM_MAX_ID && state->slots[i].film != M10V_CHAR_ID && state->slots[i].film != M10V_PIXEL_ID) ||
+        if (!state->slots[i].film || (state->slots[i].film > M10V_CUSTOM_MAX_ID && !M10V_BUILTIN(state->slots[i].film)) ||
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
             state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
     for(uint32_t i=0;i<5;i++){const m10v_film_effects *e=&state->effects[i];
@@ -101,6 +101,8 @@ int m10v_library_valid(const m10v_library_state *state) {
 const char *m10v_library_name(uint32_t id) {
     static const char appended_names[13][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200","CCD Classic","Fuji C200","ProImage 100","T-Max 100","Aerochrome","2460","5203"};
     if(id==M10V_PIXEL_ID)return "Pixel World";
+    static const char style_names[7][24]={"Leica Monochrome","Lomography","Polaroid","Fujifilm Velvia 50","Cyberpunk","Cyanotype","German Cool"};
+    if(M10V_STYLE(id))return style_names[id-M10V_STYLE_FIRST];
     if(id==M10V_CHAR_ID)return "Kodak Charmera";
     return !id || id>M10V_FILM_COUNT ? (const char *)0 : id>=66 ? appended_names[id-66] : id<=33 ? films[id-1].name : legacy_records[id-34].name;
 }
@@ -119,7 +121,7 @@ int m10v_library_reset(m10v_library_state *state,uint32_t slot,m10v_library_stor
         m10v_slot *v=&defaults.slots[slot];v->film=(uint16_t)id;
         v->grain=0;v->soft=0;
         v->halo_gain=0;v->halo_spread=3;v->halo_threshold=5;v->halo_profile=id==66?1:2;
-        m10v_film_effects e={id==67||id==69||id==70||id==72||id==74||id==75||id==77||id==78?0:1,0,0,4,0,0,{0,0}};defaults.effects[slot]=e;
+        m10v_film_effects e={id==67||id==69||id==70||id==72||id==74||id==75||id==77||id==78||M10V_STYLE(id)?0:1,0,0,4,0,0,{0,0}};defaults.effects[slot]=e;
     }
     defaults.slots[slot].grain=defaults.slots[slot].soft=defaults.slots[slot].halo_gain=0;
     defaults.effects[slot].leak_gain=0;
@@ -138,7 +140,7 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
     if(state->slots[slot].film!=id){
         m10v_slot *v=&next.slots[slot];v->grain=0;v->soft=0;v->halo_gain=0;
         v->halo_spread=3;v->halo_threshold=5;v->halo_profile=id==66?1:2;
-        m10v_film_effects e={id==67||id==69||id==70||id==72||id==74||id==75||id==77||id==78?0:1,0,0,4,0,0,{0,0}};next.effects[slot]=e;
+        m10v_film_effects e={id==67||id==69||id==70||id==72||id==74||id==75||id==77||id==78||M10V_STYLE(id)?0:1,0,0,4,0,0,{0,0}};next.effects[slot]=e;
     }
     if(id!=M10V_CHAR_ID)next.effects[slot].reserved[1]=0;
     if(id==M10V_CHAR_ID&&state->slots[slot].film!=id)next.slots[slot].grain=0;
@@ -195,7 +197,7 @@ int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,
     if(field==7?(state->slots[slot].film!=M10V_CHAR_ID||value>3):field==6?(state->slots[slot].film==67?value>1:state->slots[slot].film!=68||value>2):field==5?value!=0:value>limits[field])return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     if(field==5){
-        m10v_film_effects e={next.slots[slot].film==67||next.slots[slot].film==69||next.slots[slot].film==70||next.slots[slot].film==72||next.slots[slot].film==74||next.slots[slot].film==75||next.slots[slot].film==77||next.slots[slot].film==78?0:1,0,0,4,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
+        m10v_film_effects e={next.slots[slot].film==67||next.slots[slot].film==69||next.slots[slot].film==70||next.slots[slot].film==72||next.slots[slot].film==74||next.slots[slot].film==75||next.slots[slot].film==77||next.slots[slot].film==78||M10V_STYLE(next.slots[slot].film)?0:1,0,0,4,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
         next.effects[slot].reserved[0]=state->effects[slot].reserved[0];
         next.effects[slot].reserved[1]=state->effects[slot].reserved[1];
         next.slots[slot].grain=next.slots[slot].halo_gain=0;next.slots[slot].soft=0;
@@ -575,6 +577,11 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
         m10v_charmera_render(image,effects.reserved[1]);
         if(grain||effects.leak_gain)m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,0,0,texture_stats);
     }
+    else if(M10V_STYLE(choice->film)){
+        /* These styles always own still colour in the LUT path, even when an
+         * upstream mask contains native colour for another processing stage. */
+        m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,choice->film-M10V_STYLE_FIRST+17,color_memory,texture_stats);
+    }
     else if(completed&M10V_NATIVE_COLOR){
         uint32_t amount=grain<<8;
         if(choice->film==68){uint32_t exposure=effects.film_exposure;amount=grain*(exposure==1?218:exposure==2?307:256);}
@@ -583,7 +590,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     else if(choice->film==66){m10v_5207_texture_cached_stats_q8(image,&effects,grain<<8,seed,1,color_memory,texture_stats);}
     else if(choice->film>=67){
         uint32_t exposure=state->effects[slot].film_exposure;
-        m10v_5207_texture_cached_stats_q8(image,&effects,grain*(choice->film==68?(exposure==1?218:exposure==2?307:256):256),seed,choice->film>=69?choice->film-63:choice->film==67?(exposure?16:2):3+exposure,color_memory,texture_stats);
+        m10v_5207_texture_cached_stats_q8(image,&effects,grain*(choice->film==68?(exposure==1?218:exposure==2?307:256):256),seed,M10V_STYLE(choice->film)?choice->film-M10V_STYLE_FIRST+17:choice->film>=69?choice->film-63:choice->film==67?(exposure?16:2):3+exposure,color_memory,texture_stats);
     }
     else if(choice->film>33){if(legacy_color(image,choice->film,color_memory))return M10V_LIBRARY_INVALID;}
     else {

@@ -13,7 +13,7 @@ class CaptureAccelIntegrationTests(unittest.TestCase):
    if accel==2:
     spatial=Path(cls.tmp.name)/'reject-noise.c'
     spatial.write_text((ROOT/'native/gr3/m10v_spatial_accel.c').read_text().replace('int m10v_spatial_grain_noise8(', 'int unused_grain_noise8(')+'\nint m10v_spatial_grain_noise8(const uint32_t*a,uint32_t b,uint32_t c,uint32_t d,uint32_t*e,int32_t*f){(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;return -1;}\n')
-   subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',f'-DM10V_SPATIAL_NEON={int(accel>0)}','-DM10V_FILM_COLOR_CANDIDATE=1','-I',str(ROOT/'native/gr3'),str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(spatial),'-o',str(path)],check=True,capture_output=True)
+   subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',f'-DM10V_SPATIAL_NEON={int(accel>0)}','-DM10V_FILM_COLOR_CANDIDATE=1','-I',str(ROOT/'native/gr3'),str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),str(spatial),'-o',str(path)],check=True,capture_output=True)
    lib=C.CDLL(str(path));lib.m10v_5207_texture_q8.argtypes=[C.POINTER(Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];cls.libs.append(lib)
  def test_full_texture_tiles_tails_and_all_color_variants_are_exact(self):
   for width,height in ((2,1),(6,7),(8,3),(10,5),(18,9),(6000,2)):

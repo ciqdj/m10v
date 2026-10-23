@@ -7,7 +7,10 @@
 /* 79..288 are existing custom identities. Never reuse them. */
 #define M10V_CHAR_ID 289u
 #define M10V_PIXEL_ID 290u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID))
+#define M10V_STYLE_FIRST 291u
+#define M10V_STYLE_LAST 297u
+#define M10V_STYLE(id) ((id)>=M10V_STYLE_FIRST && (id)<=M10V_STYLE_LAST)
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || M10V_STYLE(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0
@@ -61,7 +64,7 @@ enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
 #define M10V_CPU_STAMP 32u
 static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,uint32_t slot,uint32_t completed){
     const m10v_slot *v=&state->slots[slot];
-    uint32_t stages=(v->film>M10V_FILM_COUNT||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
+    uint32_t stages=(M10V_CUSTOM(v->film)||v->film==M10V_CHAR_ID||v->film==M10V_PIXEL_ID||M10V_STYLE(v->film)||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
     if(v->grain&&!(completed&M10V_NATIVE_GRAIN))stages|=M10V_NATIVE_GRAIN;
     if((v->film==33||v->film==67)&&v->halo_gain&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
     if(state->effects[slot].leak_gain&&!(completed&M10V_NATIVE_LEAK))stages|=M10V_NATIVE_LEAK;
