@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.23.9",
+      "date": "2026-10-23",
+      "title": "修复机内胶卷库名称遮挡，改用右上角三角启用标记",
+      "changes": [
+        "修复 GR III / IIIx 胶卷库使用原厂大号文字造成名称截断、横向溢出及第二排与操作提示重叠；每卡使用独立的 28 像素名称带，保留中文原名和长名称的完整内容。",
+        "已启用胶卷改为右上角实心小三角，当前浏览胶卷继续使用黄色外框；重新安排两排卡片和底部提示，启用上限及保存错误改在标题区域提示。",
+        "固定名称字形与压缩资源，保持相同构建结果；同步位图尺寸、内存归属、构建清单和校验，不修改胶卷编号、启用容量、存档或成像参数。",
+        "按用户要求完成离线回归、正式固件导出及上线核验后直接发布；本次未进行相机实测。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.23.8",
       "date": "2026-10-23",
       "title": "上线 GR II 实验工作台，整合最新 GR III 十胶卷版本",
@@ -11,9 +25,9 @@
         "合并最新线上 main/develop，保留 GR III 十胶卷及 IIIx/IV 数量限制；GR II 固定独立五槽 v4 配置、渲染与 SD 合同，避免共享升级改变原生 ABI。",
         "GR II 为实验离线候选，完整相机更新、冷启动、缓存和拍摄仍待真机验证；不将网页构建成功当作实机通过。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "197a6f11814c066a1886f0ba7bd1b6e5928d68e5",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39923069723"
     },
     {
       "version": "2026.10.23.7",

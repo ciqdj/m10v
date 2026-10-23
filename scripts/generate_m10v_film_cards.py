@@ -1,5 +1,5 @@
 """Antialiased square film boxes, using the bundled OFL Noto Sans Bold font."""
-import json,re,sys,base64,hashlib
+import json,re,sys,base64,hashlib,struct
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -31,10 +31,57 @@ def generate():
  rows+=['};','static const uint8_t smooth_width[95]={']
  widths,glyphs,_=canonical_raster()
  rows.append(','.join(str(v) for v in widths)+'};')
- rows.append('static const uint8_t smooth_glyph[95][320]={')
- for i in range(95):rows.append('{'+','.join(str(v) for v in glyphs[i*320:(i+1)*320])+'},')
- rows+=['};','']
+ compressed=bytearray();glyph_offsets=[0]
+ for i in range(95):compressed.extend(packbits(glyphs[i*320:(i+1)*320]));glyph_offsets.append(len(compressed))
+ rows+=['static const uint16_t glyph_offsets[]={'+','.join(map(str,glyph_offsets))+'};',
+        'static const uint8_t glyph_data[]={'+','.join(map(str,compressed))+'};',
+        'static const char legacy_caption_names[32][32]={'+','.join(json.dumps(n) for n in names[:32])+'};']
+ offsets,packed=caption_data()
+ if len(offsets)!=len(specs)+1:raise ValueError('card caption inventory differs')
+ rows+=['#ifdef M10V_CARD_CAPTION_EXTERNAL',
+        'extern const uint32_t caption_offsets[];', 'extern const uint8_t caption_rle[];',
+        '#else','static const uint32_t caption_offsets[]={'+','.join(map(str,offsets))+'};',
+        'static const uint8_t caption_rle[]={']
+ rows += [','.join(map(str,packed[i:i+64]))+',' for i in range(0,len(packed),64)]
+ rows+=['};','#endif','']
  return '\n'.join(rows)
+
+def caption_data():
+ captions=json.loads((ROOT/'native/gr3/m10v_card_captions.json').read_text())
+ if captions['schema']!='m10v-card-captions/v1' or (captions['width'],captions['height'])!=(120,28):raise ValueError('card caption format differs')
+ packed=bytearray();offsets=[0]
+ films=[*range(1,79),*range(289,298)]
+ if len(captions['captions'])!=len(films):raise ValueError('card caption inventory differs')
+ for film,caption in zip(films,captions['captions']):
+  data=base64.b64decode(caption['rle'],validate=True)
+  if len(data)%2 or any(data[i]==0 for i in range(0,len(data),2)):raise ValueError('invalid caption runs')
+  raw=b''.join(bytes([data[i+1]])*data[i] for i in range(0,len(data),2))
+  if caption['film']!=film or len(raw)!=120*28 or hashlib.sha256(raw).hexdigest()!=caption['sha256']:raise ValueError('card caption identity or digest differs')
+  # Four antialias coverage levels, four pixels per byte, then PackBits.
+  # Keep full names within the existing firmware growth budget.
+  if film<=32:offsets.append(len(packed));continue # hidden legacy names use the shared lossless ASCII glyphs
+  quantized=[(value*3+127)//255 for value in raw]
+  pixels=bytes(sum(quantized[i+j]<<(j*2) for j in range(4)) for i in range(0,len(raw),4))
+  packed.extend(packbits(pixels));offsets.append(len(packed))
+ return offsets,packed
+
+def packbits(pixels):
+  packed=bytearray();i=0
+  while i<len(pixels):
+   run=1
+   while i+run<len(pixels) and pixels[i+run]==pixels[i] and run<128:run+=1
+   if run>=3:packed.extend((128+run-1,pixels[i]));i+=run
+   else:
+    start=i;i+=run
+    while i<len(pixels) and i-start<128:
+     if i+2<len(pixels) and pixels[i]==pixels[i+1]==pixels[i+2]:break
+     i+=1
+    packed.append(i-start-1);packed.extend(pixels[start:i])
+  return packed
+
+def caption_blob():
+ offsets,packed=caption_data()
+ return struct.pack('<'+str(len(offsets))+'I',*offsets)+packed
 
 def custom_icon():return canonical_raster()[2]
 if __name__=='__main__':

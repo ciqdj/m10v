@@ -27,13 +27,16 @@ class SettingsViewTests(unittest.TestCase):
    obj=Path(d)/'view.o'
    subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_settings_view.c'),'-o',str(obj)],check=True,capture_output=True)
    card=Path(d)/'card.o'
-   subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(card)],check=True,capture_output=True)
-   cls.card,entries=link_object(card.read_bytes(),BASE+0x4000,prefix='m10v_film_card_')
+   from scripts.generate_m10v_film_cards import caption_blob
+   cls.captions=caption_blob()
+   subprocess.run([cc,*FLAGS,'-DM10V_CARD_CAPTION_EXTERNAL=1','-c',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(card)],check=True,capture_output=True)
+   cls.card,entries=link_object(card.read_bytes(),BASE+0x4000,{'caption_offsets':BASE+0x20000,'caption_rle':BASE+0x20000+88*4},prefix='m10v_film_card_')
    cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,'m10v_zoom_title':0x540b0040,'m10v_zoom_bits':0x540b0044,'m10v_zoom_caption':0x540b0048,**entries},prefix='m10v_settings_view_',additional_exports=('m10v_settings_view_zoom',))
  def machine(self,fail_object=0,fail_cards=False,native_accessor=False,custom_names=None,catalog_ids=None):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   for addr,size in [(0x53000000,0x2000000),(0x55000000,0x1000000),(0x10000000,0x200000)]:u.mem_map(addr,size)
   u.mem_write(0x53000000,self.firmware);u.mem_write(BASE,self.code);u.mem_write(BASE+0x4000,self.card)
+  u.mem_write(BASE+0x20000,self.captions)
   u.mem_write(0x55000000,self.firmware[0x107b540:0x107b540+0x3a080])
   u.reg_write(UC_ARM_REG_C1_C0_2,0xf00000);u.reg_write(UC_ARM_REG_FPEXC,0x40000000)
   for address in (0x5536d074,0x55063d80,0x55063ed0):u.mem_write(address,struct.pack('<I',1))
@@ -47,7 +50,7 @@ class SettingsViewTests(unittest.TestCase):
    if a in (0x536af2a8,0x536af31c):
     size=uc.reg_read(UC_ARM_REG_R0)
     if size in (0xf0,0xf8,0x110):self.object_count+=1
-    if (fail_object and self.object_count==fail_object and size in (0xf0,0xf8,0x110)) or (fail_cards and size==470464):p=0
+    if (fail_object and self.object_count==fail_object and size in (0xf0,0xf8,0x110)) or (fail_cards and size==710580):p=0
     else:
      p=self.heap;self.heap+=(size+15)&~15;self.live[p]=size
     uc.reg_write(UC_ARM_REG_R0,p)

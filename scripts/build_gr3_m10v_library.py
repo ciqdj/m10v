@@ -403,11 +403,16 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             zoom_report['enabled']=custom_zoom
             image+=bytes(zoom_base-base-len(image))+zoom_code
             symbols.update(zoom_report['symbols'])
-            from scripts.generate_m10v_film_cards import generate as card_data
+            from scripts.generate_m10v_film_cards import generate as card_data,caption_blob
             if (ROOT/'native/gr3/m10v_film_card_data.h').read_text()!=card_data():raise ValueError('film card labels differ from catalog')
+            # Caption coverage is immutable resource data, not executable code.
+            # Keep the bounded ELF code budget and publish it like icon pixels.
+            captions=(base+len(image)+3)&~3
+            image+=bytes(captions-base-len(image))+caption_blob()
+            symbols.update(caption_offsets=captions,caption_rle=captions+88*4)
             for name,prefix in [('m10v_film_card.c','m10v_film_card_'),('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
                 obj_path=folder/(name+'.o')
-                subprocess.run([compiler,*compile_flags,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
+                subprocess.run([compiler,*compile_flags,'-DM10V_CARD_CAPTION_EXTERNAL=1',f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
                 start=(base+len(image)+15)&~15
                 code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix,
                     additional_exports=('m10v_settings_view_zoom',) if prefix=='m10v_settings_view_' else ())
@@ -516,6 +521,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if 786+len(texts)!=1111:raise ValueError('multiselect text base differs')
             texts+=['Custom LUT']*5+[f'胶卷库  已启用 {n}/10' for n in range(11)]+['已达启用上限，请先停用一卷']
         last_resource=786+len(texts)-1
+        if sd_library:
+            from scripts.generate_m10v_card_captions import resource as caption_resource
+            captions=json.loads((ROOT/'native/gr3/m10v_card_captions.json').read_text())
+            if any(row['name']!=texts[caption_resource(row['film'])-786] for row in captions['captions']):raise ValueError('card caption names differ from native resources')
         resource_base = (base + len(image) + 3) & ~3
         resources = bytearray(4 * len(texts)); descriptors = []
         for index, text in enumerate(texts):
@@ -746,7 +755,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'abi': 'M10V state184 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
     if sd_library:
-        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_film_font_raster.json','scripts/generate_m10v_film_cards.py','native/gr3/m10v_custom_icon.rgba','third_party/noto-sans/NotoSans-Bold.ttf','third_party/noto-sans/OFL.txt']})
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_film_font_raster.json','native/gr3/m10v_card_captions.json','scripts/generate_m10v_film_cards.py','scripts/generate_m10v_card_captions.py','native/gr3/m10v_custom_icon.rgba','third_party/noto-sans/NotoSans-Bold.ttf','third_party/noto-sans/OFL.txt','third_party/noto-cjk/OFL.txt']})
     manifest['appended_slots']=appended_report
     manifest['sources']['native/gr3/m10v_tone.h']=sha((ROOT/'native/gr3/m10v_tone.h').read_bytes())
     if appended_slots:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']})
@@ -809,7 +818,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':120,'height':120,'descriptor_storage':'view-owned-heap','descriptor_offset':576000,'directory_offset':576080,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':576180} if sd_library else None
+    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':120,'height':148,'artwork_height':120,'caption_height':28,'descriptor_storage':'view-owned-heap','descriptor_offset':710400,'directory_offset':710480,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':710580} if sd_library else None
     manifest['film_curated']=[]
     for i,payload in enumerate(curated_payloads):
         offset=bytes(image).find(payload)

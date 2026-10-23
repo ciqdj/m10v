@@ -137,3 +137,12 @@ not a manufacturer calibration for modern Polaroid 600 / i-Type film.
 project, licensed under the SIL Open Font License 1.1. The complete license
 and copyright notice are in `third_party/noto-sans/OFL.txt`. The square film
 icon PNGs and generated native glyph coverage use this font.
+
+## Noto Sans CJK SC
+
+The pinned card-caption coverage in `native/gr3/m10v_card_captions.json`
+is generated from Noto Sans CJK SC Regular, Copyright 2014-2021 Adobe
+(http://www.adobe.com/). The source URL
+and font SHA-256 are recorded in that file. The SIL Open Font License 1.1
+is retained in `third_party/noto-cjk/OFL.txt`. Normal builds use the pinned
+coverage and do not download fonts or use host font rasterization.

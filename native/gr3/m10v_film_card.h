@@ -1,7 +1,8 @@
 #ifndef M10V_FILM_CARD_H
 #define M10V_FILM_CARD_H
 #include <stdint.h>
-enum { M10V_CARD_WIDTH=120, M10V_CARD_HEIGHT=120, M10V_CARD_PIXELS=120*120,
+/* Square artwork plus an owned 28px name strip; no stock text overlay. */
+enum { M10V_CARD_WIDTH=120, M10V_CARD_HEIGHT=148, M10V_CARD_PIXELS=120*148,
        M10V_CARD_FIRST=749, M10V_CARD_COUNT=10 };
 #define M10V_CARD_ID(i) ((i)<5?749u+(i):769u+(i)-5)
 #define M10V_CARD_DESCRIPTOR_OFFSET (M10V_CARD_COUNT*M10V_CARD_PIXELS*4u)

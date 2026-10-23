@@ -11,15 +11,15 @@
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
-/* One film controller owns ten live bitmaps; timestamp views allocate none.
- * Reserved widgets[39] is storage, outside the 37 child-widget entries. */
+/* Ten live bitmaps own artwork and captions; timestamp views allocate none.
+ * The reserved heap word is outside the child-widget entries. */
 static uint32_t *card_descriptors(const m10v_settings_view *v){return (uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+M10V_CARD_DESCRIPTOR_OFFSET);}
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef uint32_t (*ctor)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 enum { ROOT, BACKGROUND, TITLE, NAME, FOOTER, ERROR_TEXT,
- FRAME=6, INNER=16, ICON=26, ROW_FRAME=36, ROW_INNER=40, ROW=44, VALUE=48, LABEL=52, PAGE=62, COUNT=M10V_VIEW_COUNT };
+ FRAME=6, INNER=16, ICON=26, ROW_FRAME=36, ROW_INNER=40, ROW=44, VALUE=48, PAGE=52, COUNT=M10V_VIEW_COUNT };
 static uint32_t ptr(const void *p){return (uint32_t)(uintptr_t)p;}
 static void visible(uint32_t w,uint32_t yes){((fn2)0x533ad3c0u)(w,yes);}
 static void color(uint32_t w,uint32_t c){((fn2)0x53393e00u)(w,c);}
@@ -47,17 +47,16 @@ int m10v_settings_view_create(m10v_settings_view *v){
  if(!v||v->count)return -1;
  for(uint32_t i=0;i<M10V_VIEW_CAPACITY;i++)v->widgets[i]=0;
  if(make(v,1,0,0,720,480)||make(v,11,0,0,720,480)||
-    make(v,17,20,12,680,42)||make(v,0,24,66,672,38)||
-    make(v,17,20,416,680,36)||make(v,17,20,378,680,32))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,11,24+(i%5)*136,100+(i/5)*150,128,148))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,11,26+(i%5)*136,102+(i/5)*150,124,144))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,10,28+(i%5)*136,104+(i/5)*150,120,120))goto fail;
+    make(v,17,20,12,580,42)||make(v,0,24,58,672,38)||
+    make(v,17,20,432,680,40)||make(v,17,20,378,680,40))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,11,24+(i%5)*136,96+(i/5)*160,128,156))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,11,26+(i%5)*136,98+(i/5)*160,124,152))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,10,28+(i%5)*136,100+(i/5)*160,120,M10V_CARD_HEIGHT))goto fail;
  /* Selection rectangles precede text in the child draw order. */
  for(uint32_t i=0;i<4;i++)if(make(v,11,24,84+i*72,672,64))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,11,30,90+i*72,660,52))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,36,90+i*72,300,52))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,350,90+i*72,330,52))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,17,24+(i%5)*136,226+(i/5)*150,128,22))goto fail;
  if(make(v,0,610,18,86,32))goto fail;
  color(v->widgets[BACKGROUND],1);
  for(uint32_t i=0;i<10;i++){
@@ -81,14 +80,6 @@ static uint32_t film(const m10v_settings *s,const m10v_settings_ops *o,uint32_t 
  }else id=s->saved.slots[i].film;
  return id&&(id<=M10V_CUSTOM_MAX_ID||M10V_BUILTIN(id))?id:0;
 }
-static uint32_t film_caption(uint32_t id){
- if(id==M10V_PIXEL_ID)return 1023;if(id==M10V_CHAR_ID)return 1012;
- if(M10V_STYLE(id))return 1104+id-M10V_STYLE_FIRST;
- if(id>=1&&id<=32)return 785+id;if(id==33)return 860;
- if(id>=34&&id<=65)return 879+id-34;if(id==66)return 911;
- if(id>=67&&id<=68)return 930+id-67;if(id>=69&&id<=78)return 978+id-69;
- return 1007;
-}
 static uint32_t valueres(uint32_t row,uint32_t value){
  static const uint16_t first[4]={M10V_VIEW_OFF,M10V_VIEW_YMD,M10V_VIEW_TOP_LEFT,M10V_VIEW_WHITE};
  return row<4&&value<(row?4u:3u)?first[row]+value:M10V_VIEW_OFF;
@@ -104,8 +95,10 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
    s->screen==M10V_SETTINGS_FILMS?M10V_VIEW_FILM_HELP:
    s->screen==M10V_SETTINGS_VALUE||name_page?M10V_VIEW_VALUE_HELP:M10V_VIEW_STAMP_HELP);
  visible(v->widgets[NAME],films);
- visible(v->widgets[ERROR_TEXT],s->error>=1&&s->error<=4);
- if(s->error>=1&&s->error<=4)caption(v->widgets[ERROR_TEXT],s->error==4?1127:M10V_VIEW_EMPTY+s->error-1);
+ uint32_t error=s->error>=1&&s->error<=4;
+ visible(v->widgets[ERROR_TEXT],!films&&error);
+ if(error)caption(v->widgets[films?TITLE:ERROR_TEXT],s->error==4?1127:M10V_VIEW_EMPTY+s->error-1);
+ ((fn2)0x5339658cu)(v->widgets[TITLE],films&&error?10:31);
  if(films&&!v->widgets[M10V_VIEW_HEAP])v->widgets[M10V_VIEW_HEAP]=((fn1)0x536af2a8u)(M10V_CARD_HEAP_BYTES);
  for(uint32_t i=0;i<10;i++){
   uint32_t id=films?film(s,o,i):0;
@@ -113,7 +106,6 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   visible(v->widgets[ICON+i],films&&id);
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
-  visible(v->widgets[LABEL+i],films&&id);
   uint32_t enabled=0;for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film==id&&id)enabled=1;
   if(id){
    uint32_t icon=M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
@@ -133,9 +125,6 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
     icon=M10V_CARD_ID(i);
    }
    ((fn2)0x5339a9a0u)(v->widgets[ICON+i],icon);
-   /* Existing resource captions preserve the catalogue names verbatim. */
-   if(M10V_BUILTIN(id))caption(v->widgets[LABEL+i],film_caption(id));
-   else caption(v->widgets[LABEL+i],1012-5);
 
   }
  }
@@ -215,7 +204,7 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
  visible(v->widgets[ERROR_TEXT],s->error!=0);
  if(s->error)caption(v->widgets[ERROR_TEXT],title+(s->error==2?6:5));
  for(uint32_t i=0;i<10;i++){
-  visible(v->widgets[LABEL+i],0);visible(v->widgets[FRAME+i],0);visible(v->widgets[INNER+i],0);visible(v->widgets[ICON+i],0);
+  visible(v->widgets[FRAME+i],0);visible(v->widgets[INNER+i],0);visible(v->widgets[ICON+i],0);
  }
  for(uint32_t i=0;i<4;i++){
   uint32_t selected=i<2&&i==s->focus;
