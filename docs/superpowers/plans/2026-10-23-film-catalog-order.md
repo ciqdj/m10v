@@ -1,6 +1,6 @@
 # Film Catalogue Order Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Exactly match the user's five groups and 30 names in the backend and camera, rebuilding 2460 from its own spectral model.
 
@@ -31,10 +31,10 @@
 
 **Interfaces:** `FILM_DIRECTORY`, `directoryFilm(id)`, `orderedFilmIds(ids)`; C `m10v_directory_*` inline accessors.
 
-- [ ] Write/run failing API and SD round-trip tests against the literal user list.
-- [ ] Add the shared directory and update consumers without changing stable IDs.
-- [ ] Generate labels/artwork metadata and compare Node/SD/C identities.
-- [ ] Run Node catalogue, picker, SD and native-name checks.
+- [x] Write/run failing API and SD round-trip tests against the literal user list.
+- [x] Add the shared directory and update consumers without changing stable IDs.
+- [x] Generate labels/artwork metadata and compare Node/SD/C identities.
+- [x] Run Node catalogue, picker, SD and native-name checks.
 
 ### Task 2: Spectral 2460 and independent 5213
 
@@ -42,10 +42,10 @@
 
 **Interfaces:** explicit mappings 77 -> KODAK_AEROCOLOR; 298 -> KODAK_5213; immutable LUTs and matching native profiles.
 
-- [ ] Write/run failing tests that reject the old 2460 approximation and wrong-stock substitutions.
-- [ ] Bake full spectral pipelines with pinned parameters, then fit native targets and report holdout errors.
-- [ ] Wire CPU, ISP, preview, SD and build validation to matching tables.
-- [ ] Verify deterministic provenance, LUT sampling and native/C endpoints.
+- [x] Write/run failing tests that reject the old 2460 approximation and wrong-stock substitutions.
+- [x] Bake full spectral pipelines with pinned parameters, then fit native targets and report holdout errors.
+- [x] Wire CPU, ISP, preview, SD and build validation to matching tables.
+- [x] Verify deterministic provenance, LUT sampling and native/C endpoints.
 
 ### Task 3: Grouped camera menu and final candidate
 
@@ -53,9 +53,11 @@
 
 **Interfaces:** ordered directory groups, group-bounded card pages; existing install/remove transaction retained.
 
-- [ ] Write/run failing navigation tests for all groups, page boundaries, cancel and full ten-slot state.
-- [ ] Implement grouped navigation and exact group/name captions.
-- [ ] Run affected Python/ARM tests, npm test, build and read back a GR III candidate.
-- [ ] Obtain a fresh whole-branch review, address important findings, and deliver an identifiable test package with limits.
+- [x] Write/run failing navigation tests for all groups, page boundaries, cancel and full ten-slot state.
+- [x] Implement grouped navigation and exact group/name captions.
+- [x] Run affected Python/ARM tests, npm test, build and read back a GR III candidate.
+- [x] Obtain a fresh whole-branch review, address important findings, and deliver an identifiable test package with limits.
 
 Baseline: origin/main `41f6f77`. Initial targeted 18 tests: 15 pass, 3 pre-existing failures (two old SD compatibility fixtures and one v4-offset style-filter journal test). Preserve this evidence separately from new failures.
+
+Delivery: code fdc09f9; scoped Node21/21, Python/ARM7/7; full npm has40 unchanged baseline failures. Final test candidate only, device validation pending. See docs/testing/gr3-film-directory-20261023.md.
