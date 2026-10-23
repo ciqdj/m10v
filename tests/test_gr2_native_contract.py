@@ -413,6 +413,16 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertEqual(module.probe_ui_text(code,0,1)['pointer'],module.probe_ui_text(code,0x350,1)['pointer'])
         with self.assertRaises(ValueError):module.probe_ui_text(code,106,21)
 
+    def test_original_effect_property_arrays_use_four_byte_elements_and_preserve_all_native_tones(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_effect_property_arrays'))
+        result=module.probe_effect_property_arrays(component('gr2','b01firm8'))
+        self.assertEqual([r['property'] for r in result['arrays']],[0x2e,0x46,0x5e,0x76,0x8e,0xa6,0xbe,0xd6])
+        self.assertTrue(all(r['width']==4 and r['count']==24 for r in result['arrays']))
+        self.assertTrue(all(r['values_match'] and r['scalar_reads']==list(range(r['property'],r['property']+24)) for r in result['arrays']))
+        self.assertEqual(result['out_of_range'],[0x80000001]*8)
+        self.assertTrue(result['invalid_indices_do_not_read']);self.assertTrue(result['stack_preserved'])
+        self.assertEqual(result['helpers_intercepted'],[])
+
     def test_original_indexed_effect_controls_roundtrip_every_native_option_without_gr3_ranges(self):
         module=self.implementation();self.assertTrue(hasattr(module,'probe_effect_parameter_options'))
         result=module.probe_effect_parameter_options(component('gr2','b01firm8'))

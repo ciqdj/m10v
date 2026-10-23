@@ -3049,6 +3049,37 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply']+(['private overlay event/destruction callbacks'] if overlay else [])+(['private settings backend callbacks'] if settings_overlay else []),hardware_tested=False,
                 scope='Six original graphics constructors and official Latin/monitor fonts initialized before detached stock effect page CREATE/INIT, then original list DRAW and property-mutating navigation. Synthetic display/active geometry, kernel and no-observer property fixtures; optional root transition starts with an empty active root and original draw dispatcher using an explicitly loaded low-address module; no real ROM filesystem, hardware state transition/display or custom M10V page installation.')
 
+def probe_effect_property_arrays(code:bytes)->dict:
+    """Execute original metadata and indexed reads on an initialized scalar bank."""
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);stop=0x5001f000;stack=0x50018000;out=0x50002000;reads=[];stacks=[]
+    word=lambda a:struct.unpack('>I',uc.mem_read(a,4))[0]
+    uc.mem_map(0x51000000,0x10000)
+    uc.mem_write(0x51000000,(bytes(20)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0x51006000,(bytes(4)+bytes.fromhex('ffffffff'))*0x383)
+    uc.mem_write(0xA0129C38,struct.pack('>4I',0xA0129ADC,0x51000000,0x50003000,0x383))
+    uc.mem_write(0x50003000,struct.pack('>6I',0,0x51006000,0x383,0x5000D000,0,0))
+    def observe(machine,address,size,unused):reads.append(machine.reg_read(r.UC_ARM_REG_R0))
+    uc.hook_add(UC_HOOK_CODE,observe,begin=0xA00E0E2E,end=0xA00E0E2E)
+    def run(entry,*args):
+        for reg,value in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1),args):uc.reg_write(reg,value)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1)
+        uc.emu_start(entry|1,stop,count=10000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop:raise RuntimeError('original indexed read budget exceeded')
+        stacks.append(uc.reg_read(r.UC_ARM_REG_SP)==stack);return uc.reg_read(r.UC_ARM_REG_R0)
+    arrays=[];outside=[];no_invalid_read=True
+    for base in (0x2e,0x46,0x5e,0x76,0x8e,0xa6,0xbe,0xd6):
+        width=run(0xA00DD8AC,base,out);count=word(out)
+        if width!=4 or count!=24:raise ValueError('original effect array metadata differs')
+        expected=[(0xffffff80+index) if index&1 else (base<<16|index) for index in range(count)]
+        for index,value in enumerate(expected):uc.mem_write(0x5000D000+4*(base+index),struct.pack('>I',value))
+        reads.clear();values=[run(0xA00E1158,base,index) for index in range(count)]
+        observed=list(reads);before=len(reads);outside.append(run(0xA00E1158,base,count))
+        no_invalid_read=no_invalid_read and len(reads)==before
+        arrays.append(dict(property=base,width=width,count=count,values_match=values==expected,scalar_reads=observed))
+    return dict(arrays=arrays,out_of_range=outside,invalid_indices_do_not_read=no_invalid_read,stack_preserved=all(stacks),helpers_intercepted=[],hardware_tested=False,
+                scope='Original metadata/indexed/scalar getters with a synthetic no-alias/no-observer property bank; all24 indices including signed word patterns. No I/O or original function effects substituted; no hardware/default persistence claim.')
+
 def probe_effect_parameter_options(code:bytes)->dict:
     """Execute original indexed effect control conversions at property boundaries.
 

@@ -108,3 +108,23 @@ permission to transplant the reference's storage or menu semantics. Our original
 boundaries. Four comparator behavior tests plus existing container/checksum
 checks pass together (8 tests in4.160s); no full firmware suite was repeated for
 this read-only analyzer. No third-party code or camera installation was executed.
+
+## Original property-array follow-up
+
+The reference's indexed-property hook led to original metadataA00DD8AC and
+indexed getterA00E1158→A00E10B0. A new original-code probe supplies a no-alias,
+no-observer scalar property bank and executes all24 indices of all8 groups,
+including signed32-bit patterns. Each group has width4/count24, reads exactly
+scalar property(base+index), and index24 returns80000001 without reading the
+scalar bank. No original function effects are substituted. Test passes in1.480s
+(`/tmp/gr2-effect-arrays-green.log`); this is an ABI proof, not saved defaults.
+
+Official numeric descriptors/text lookup distinguish the group captions:
+2E Saturation(text129),46 Contrast(130),5E Sharpness(132),76 Vignetting(134),
+8E Hue(145),A6 Toning Effect(138),BE Clarity(133),D6 Brilliance(158).
+In particular, do not labelBE high/low key orD6 Clarity by analogy withGR III.
+Numeric descriptor examples: A043A8E0 (Saturation/property2E/tone2), A043B970
+(Clarity/BE/tone16), A043BA30 (Brilliance/D6/tone17). These static field/name
+facts guide further range/default analysis; GR III's additional high/low-key
+and separate highlight/shadow controls are not yet implemented or proven
+unavailable onGR II.
