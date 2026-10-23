@@ -30,7 +30,7 @@ def build_isp_base(base,appended_slots=False):
         object_gate+='bne done;active:;'
         # Save scratch registers AND condition/status flags. In particular the
         # curve load sits between CMP and MOVNE/MOVEQ in the stock function.
-        tone_gate=(f'ldr r2,[sp,#{offset}];sub r2,r2,#25;cmp r2,#4;bhi done;nop;nop;' if appended_slots else f'ldr r2,[sp,#{offset}];cmp r2,#12;beq neutral;sub r2,r2,#18;cmp r2,#3;bhi done;')
+        tone_gate=(f'ldr r2,[sp,#{offset}];sub r2,r2,#25;cmp r2,#9;bhi done;nop;nop;' if appended_slots else f'ldr r2,[sp,#{offset}];cmp r2,#12;beq neutral;sub r2,r2,#18;cmp r2,#3;bhi done;')
         neutral_tone=25 if appended_slots and name=='parameters' else 11
         code = assembly(
             'push {r0-r3,ip,lr};mrs ip,cpsr;push {ip};'
@@ -44,6 +44,6 @@ def build_isp_base(base,appended_slots=False):
         patches.append({'address':address, 'expected':expected, 'entry':entry})
     return bytes(image), {'schema':'m10v-gr3-isp-base/v2', 'base':base,
                           'bytes':len(image), 'entries':entries, 'patches':patches,
-                          'carriers':[25,26,27,28,29] if appended_slots else [12,18,19,20,21], 'base_tone':11,
+                          'carriers':list(range(25,35)) if appended_slots else [12,18,19,20,21], 'base_tone':11,
                           'still_vtable':STILL_VTABLE, 'live_vtable':LIVE_VTABLE,
                           'live_view':'standard', 'still_plan_return':STILL_PLAN_RETURN}

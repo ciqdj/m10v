@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.23.7",
+      "date": "2026-10-23",
+      "title": "发布清晰方形胶卷图标，补齐十卷原生处理范围",
+      "changes": [
+        "统一机内胶卷库、影像控制和网页的清晰方形胶卷图标，胶卷名称保持不变，菜单描述中文化；GR III 支持两排多选，最多十卷追加到 Custom2 下方。",
+        "将 GR III 第6–10卷纳入原生 ISP、颗粒和详细参数表范围，保留 GR IIIx、GR IV 五卷容量与原机型边界。",
+        "上一候选因底层范围复核而撤回到原稳定版本；本次重新执行正式固件构建、导出回读与发布校验。按用户要求不运行本地测试套件，未进行本轮相机实测。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.23.6",
       "date": "2026-10-23",
       "title": "发布方形胶卷图标和多选菜单，补齐机型数量限制",
@@ -11,9 +24,9 @@
         "包含固定字体栅格数据，消除本机和 Linux 字体库差异；原资源、补丁、固件回读及部署校验保持。上一发布流程在最终兼容检查时取消，未作为上线成功。",
         "按用户要求跳过本地测试套件；完成构建与上线核验，不将本轮菜单与拍摄行为标记为实机验证。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "6a249af75d3b8ac4fe6b484eed8d4ace284d9c7f",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/6a249af75d3b8ac4fe6b484eed8d4ace284d9c7f"
     },
     {
       "version": "2026.10.23.5",

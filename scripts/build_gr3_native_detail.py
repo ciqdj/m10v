@@ -24,15 +24,15 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  def addr(reg,a):return f'movw {reg},#{a&65535};movt {reg},#{a>>16};'
  # Clone every stock kind, append only the current film's supported IDs.
  # Runtime validation selects the halo/common/RED table for each carrier.
- # Original stock tones outside the five carriers retain their original lists.
+ # Original stock tones outside the enabled carriers retain their original lists.
  # Dynamic resolution returns this table or the untouched stock table.
  # Previously this was restricted to one 800T
 
  tables={}
  for variant,ids in detail_ids.items():
   table=bytearray(STOCK_TABLE)
-  if appended_slots:table+=STOCK_TABLE[:40]
-  for i in range(41 if appended_slots else 36):
+  if appended_slots:table+=STOCK_TABLE[:80]
+  for i in range(46 if appended_slots else 36):
    a,n=struct.unpack_from('<II',table,i*8)
    raw=bytes.fromhex(STOCK_LISTS[a]);assert len(raw)==n*2
    if appended_slots:raw=b'';n=0
@@ -109,4 +109,4 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
  entries['reset']=stub('push {r4,lr};bl 0x532c282c;mov r1,r5;mov r0,#7;mov r2,#0;'+f'bl {hex(control)};pop {{r4,pc}}','preserve stock reset')
- return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':[FIELDS[id-18] for id in active_ids],'ids':active_ids,'native_grain':native_grain,'appended_slots':appended_slots,'variant_rows':41 if appended_slots else 36,'variant_ids':detail_ids,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,0,0,0,0,0,0,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'camera_tested':False}
+ return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':[FIELDS[id-18] for id in active_ids],'ids':active_ids,'native_grain':native_grain,'appended_slots':appended_slots,'variant_rows':46 if appended_slots else 36,'variant_ids':detail_ids,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,0,0,0,0,0,0,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'camera_tested':False}

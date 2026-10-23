@@ -249,8 +249,8 @@ function checkDetail(runtime,manifest,raw) {
  if(raw){
   need(captions.subarray(0,72).equals(raw.subarray(0xb34bd8,0xb34c20)),'native detail stock captions differ');
   for(const [variant,ids] of Object.entries(variants)){
-   const table=read(d.variant_tables[variant],manifest.appended_slots?328:288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
-   for(let i=0;i<(manifest.appended_slots?41:36);i++){
+   const table=read(d.variant_tables[variant],manifest.appended_slots?368:288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
+   for(let i=0;i<(manifest.appended_slots?46:36);i++){
     const old=0xb3488c+(i%36)*8,p=raw.readUInt32LE(old),n=manifest.appended_slots?0:raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
     need(table.readUInt32LE(i*8+4)===n+ids.length,'native detail count differs');
     const list=read(fresh,n*2+suffix.length);
@@ -287,7 +287,7 @@ function checkDetail(runtime,manifest,raw) {
 function checkIspBase(runtime,manifest) {
  const m=manifest.isp_base, base=manifest.base;
  need(m?.schema==='m10v-gr3-isp-base/v2'&&m.bytes===504&&m.base%16===0&&m.base>=base&&m.base+504<=base+runtime.length&&
-  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)===(manifest.appended_slots?'[25,26,27,28,29]':'[12,18,19,20,21]'), 'native ISP base contract differs');
+  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)===(manifest.appended_slots?'[25,26,27,28,29,30,31,32,33,34]':'[12,18,19,20,21]'), 'native ISP base contract differs');
  need(Object.keys(m.entries||{}).sort().join('|')===ispHooks.map(h=>h[4]).sort().join('|')&&m.patches?.length===5,'native ISP inventory differs');
  for(const [i,[address,expected,reg,object,name]] of ispHooks.entries()) {
   const at=m.base+i*104, off=4+reg*4, compare=name==='local_process'?0x53513620:0x53dbd8a0;
@@ -296,7 +296,7 @@ function checkIspBase(runtime,manifest) {
    movw(1,compare&65535),(0xe3401000|(((compare>>>16)&0xf000)<<4)|((compare>>>16)&0xfff))>>>0,
    0xe1500001,0x1a000007,0xe59d2000|off,0xe352000c,0x0a000002,0xe2422012,0xe3520003,0x8a000001,
    0xe3a0200b,0xe58d2000|off,0xe49dc004,0xe12cf00c,0xe8bd500f];
-  if(manifest.appended_slots){words.splice(11,5,0xe2422019,0xe3520004,0x8a000003,0xe320f000,0xe320f000);if(name==='parameters')words[16]=0xe3a02019;}
+  if(manifest.appended_slots){words.splice(11,5,0xe2422019,0xe3520009,0x8a000003,0xe320f000,0xe320f000);if(name==='parameters')words[16]=0xe3a02019;}
   if(name!=='local_process')words.splice(9,0,0x0a000003,movw(1,0xd938),0xe34513db,0xe1500001);
   words.push(branch(at+words.length*4,address+4));
   for(const [j,word] of words.entries())need(runtime.readUInt32LE(at-base+j*4)===(word>>>0),'native ISP instruction differs: '+name+'+'+j*4);
@@ -538,8 +538,8 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
     verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:5,film_count:manifest.film_library_enabled===false?0:87,active_slots:manifest.film_library_enabled===false?0:Array.from({length:10},(_,i)=>Buffer.from(manifest.initial_state_hex,'hex').readUInt16LE(12+i*8)).filter(Boolean).length,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:55,max_records:256,custom_lut:true,page_rows:10}:null,
     menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:Array.from({length:10},(_,i)=>25+i),stock_choices:12,shooting_choices:'12+enabled_films',capacity:10,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus up to ten selected M10V films':'12 stock entries only; no private IDs',
-    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
-    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
+    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
+    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
     camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color initialized at normal UI live entry; preview excludes grain/halo; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }

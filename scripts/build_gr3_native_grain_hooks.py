@@ -26,7 +26,7 @@ def build(out,base,exports,rtos=None,appended_slots=False):
         nonlocal code
         entry=base+len(code);fragment=assembly(".fpu neon\n"+text,entry);code+=fragment
         patches.append(dict(address=site,entry=entry,expected_hex=struct.pack('<I',SITES[site]).hex(),replacement_hex=struct.pack('<I',branch(site,entry,link=link)).hex()))
-    gate='sub r0,r0,#25;cmp r0,#4;bhi grain_gate_end;' if appended_slots else 'cmp r0,#12;beq grain_request;sub r0,r0,#18;cmp r0,#3;bhi grain_gate_end;'
+    gate='sub r0,r0,#25;cmp r0,#9;bhi grain_gate_end;' if appended_slots else 'cmp r0,#12;beq grain_request;sub r0,r0,#18;cmp r0,#3;bhi grain_gate_end;'
     emit(0x53513620,SAVE+'ldrb r0,[r5,#0x77c];'+gate+'grain_request:;mov r0,#1;strb r0,[r4,#0x24];grain_gate_end:;'+RESTORE+'mov r0,r4;b 0x53513624',False)
     for site,phase in ((0x535033d8,0),(0x53503aa0,1)):
         # The fixed sixteen-byte wrapper frame keeps SP aligned. Original
