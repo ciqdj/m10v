@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.23.5",
+      "date": "2026-10-23",
+      "title": "固定字体栅格数据，发布方形图标与十卷多选",
+      "changes": [
+        "包含清晰正方形胶卷图标、GR III 两排十卷多选和中文操作提示，胶卷名称不变；GR IIIx、GR IV 保留五卷容量并同步图标。",
+        "修复服务器与本机字体栅格库差异引起的生成资源校验失败：保存带字体来源及摘要校验的固定字形覆盖数据，构建时确定性生成；机内字形头文件和自定义图标像素与上一候选逐字节一致，不跳过资源校验。",
+        "上一提交在宝塔固件构建检查阶段失败并已自动回退，未作为上线成功；本次沿原发布流水线重新构建与核验。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.23.4",
       "date": "2026-10-23",
       "title": "统一清晰方形胶卷图标，GR III 支持十卷多选",
@@ -12,9 +25,9 @@
         "GR IIIx、GR IV 本次同步图标与存档兼容，仍保留原有五卷容量和各自机型菜单边界，不使用 GR III 的追加菜单地址。",
         "按用户要求跳过本地测试套件并直接发布；执行构建、固件回读及上线检查，菜单视觉与拍摄效果尚未进行本轮实机验证。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "ab3321dd28af03a6c8fc5342d48e56dce4df5fb9",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ab3321dd28af03a6c8fc5342d48e56dce4df5fb9"
     },
     {
       "version": "2026.10.23.3",

@@ -1,10 +1,19 @@
 """Antialiased square film boxes, using the bundled OFL Noto Sans Bold font."""
-import json,re,sys
+import json,re,sys,base64,hashlib
 from pathlib import Path
-from PIL import Image,ImageDraw,ImageFont
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from scripts.generate_m10v_icons import box_style,box_icon,FONT
+from scripts.generate_m10v_icons import box_style,FONT
+
+def canonical_raster():
+ """Pinned coverage avoids FreeType/RAQM differences across build hosts."""
+ data=json.loads((ROOT/'native/gr3/m10v_film_font_raster.json').read_text())
+ if data['schema']!='m10v-film-font-raster/v1' or hashlib.sha256(FONT.read_bytes()).hexdigest()!=data['font_sha256']:raise ValueError('font raster provenance differs')
+ glyphs=base64.b64decode(data['glyphs_base64'],validate=True)
+ custom=base64.b64decode(data['custom_icon_base64'],validate=True)
+ if len(data['widths'])!=95 or any(type(v)is not int or not 0<=v<=16 for v in data['widths']) or len(glyphs)!=95*320 or len(custom)!=6400:raise ValueError('font raster extent differs')
+ if hashlib.sha256(glyphs).hexdigest()!=data['glyphs_sha256'] or hashlib.sha256(custom).hexdigest()!=data['custom_icon_sha256']:raise ValueError('font raster digest differs')
+ return data['widths'],glyphs,custom
 
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
@@ -20,16 +29,14 @@ def generate():
   colors=','.join('0xff'+c[1:]+'u' for c in (header,paper,ink,accent))
   rows.append(' {"%s","%s","%s",%s},'%(brand,title,code,colors))
  rows+=['};','static const uint8_t smooth_width[95]={']
- font=ImageFont.truetype(str(FONT),14)
- rows.append(','.join(str(round(font.getlength(chr(c)))) for c in range(32,127))+'};')
+ widths,glyphs,_=canonical_raster()
+ rows.append(','.join(str(v) for v in widths)+'};')
  rows.append('static const uint8_t smooth_glyph[95][320]={')
- for c in range(32,127):
-  im=Image.new('L',(16,20));ImageDraw.Draw(im).text((0,0),chr(c),font=font,fill=255,anchor='lt')
-  rows.append('{'+','.join(str(v) for v in im.tobytes())+'},')
+ for i in range(95):rows.append('{'+','.join(str(v) for v in glyphs[i*320:(i+1)*320])+'},')
  rows+=['};','']
  return '\n'.join(rows)
 
-def custom_icon():return box_icon('Custom LUT',0).tobytes()
+def custom_icon():return canonical_raster()[2]
 if __name__=='__main__':
  (ROOT/'native/gr3/m10v_film_card_data.h').write_text(generate())
  (ROOT/'native/gr3/m10v_custom_icon.rgba').write_bytes(custom_icon())
