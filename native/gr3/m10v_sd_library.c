@@ -31,7 +31,7 @@ uint32_t m10v_sd_header(const uint8_t *p,uint32_t total){
  m10v_sd_u32(p+24)!=239||m10v_sd_u32(p+28)!=1||total!=4096+count*M10V_SD_RECORD_BYTES||m10v_sd_u32(p+12)!=total||
  m10v_sd_crc(p,4092)!=m10v_sd_u32(p+4092))return 0;
  for(uint32_t i=32;i<64;++i)if(p[i])return 0;
- for(uint32_t i=0;i<count;++i){uint32_t id=m10v_sd_u32(p+64+12*i);if(id<33||(id>(version==2?288u:M10V_FILM_COUNT)&&id!=M10V_CHAR_ID&&id!=M10V_PIXEL_ID)||m10v_sd_u32(p+72+12*i)!=1)return 0;
+ for(uint32_t i=0;i<count;++i){uint32_t id=m10v_sd_u32(p+64+12*i);if(id<33||(id>(version==2?288u:M10V_FILM_COUNT)&&!M10V_BUILTIN(id))||m10v_sd_u32(p+72+12*i)!=1)return 0;
   for(uint32_t j=0;j<i;++j)if(m10v_sd_u32(p+64+12*j)==id)return 0;}
  for(uint32_t i=64+count*12;i<4092;++i)if(p[i])return 0;
  return count;
@@ -47,7 +47,7 @@ static uint32_t custom_record(const uint8_t *p,uint32_t id){
  for(uint32_t i=44;i<64;++i)if(p[i])return 0;
  if(p[6655])return 0;
  for(uint32_t i=6688;i<8448;++i)if(p[i])return 0;
- uint32_t fresh=1,prior=1,previous=1,pre_pixel=1,texture_prior=1;for(uint32_t i=0;i<32;++i){if(p[8448+i]!=m10v_sd_texture_prior_renderer[i])texture_prior=0;if(p[8448+i]!=m10v_sd_pre_pixel_renderer[i])pre_pixel=0;if(p[8448+i]!=m10v_sd_renderer_hash[i])fresh=0;if(p[8448+i]!=m10v_sd_prior_renderer[i])prior=0;if(p[8448+i]!=m10v_sd_previous_renderer[i])previous=0;}if(!fresh&&!prior&&!previous&&!pre_pixel&&!texture_prior)return 0;
+ uint32_t fresh=1,prior=1,previous=1,recent=1,pre_styles=1,texture_prior=1;for(uint32_t i=0;i<32;++i){if(p[8448+i]!=m10v_sd_texture_prior_renderer[i])texture_prior=0;if(p[8448+i]!=m10v_sd_renderer_hash[i])fresh=0;if(p[8448+i]!=m10v_sd_prior_renderer[i])prior=0;if(p[8448+i]!=m10v_sd_previous_renderer[i])previous=0;if(p[8448+i]!=m10v_sd_recent_renderer[i])recent=0;if(p[8448+i]!=m10v_sd_pre_styles_renderer[i])pre_styles=0;}if(!fresh&&!prior&&!previous&&!recent&&!pre_styles&&!texture_prior)return 0;
  for(uint32_t i=8480;i<M10V_SD_RECORD_BYTES-4;++i)if(p[i])return 0;
  uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
  uint8_t buf[64];uint32_t used=0,bytes=0;
@@ -60,20 +60,21 @@ static uint32_t custom_record(const uint8_t *p,uint32_t id){
  return id;
 }
 uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
- if(!p||n!=M10V_SD_RECORD_BYTES||id<33||(id>288&&id!=M10V_CHAR_ID&&id!=M10V_PIXEL_ID)||m10v_sd_u32(p+8)!=id||m10v_sd_crc(p,n-4)!=m10v_sd_u32(p+n-4))return 0;
+ if(!p||n!=M10V_SD_RECORD_BYTES||id<33||(id>288&&!M10V_BUILTIN(id))||m10v_sd_u32(p+8)!=id||m10v_sd_crc(p,n-4)!=m10v_sd_u32(p+n-4))return 0;
  if(M10V_CUSTOM(id))return custom_record(p,id);
  uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
  for(uint32_t i=0;i<n;i+=64)block(h,p+i);
  uint8_t tail[64];for(uint32_t i=0;i<64;++i)tail[i]=0;tail[0]=128;
  uint32_t bits=n*8;for(uint32_t i=0;i<4;++i)tail[63-i]=(uint8_t)(bits>>(8*i));block(h,tail);
- uint32_t current=1,legacy=1,prior=1,previous=1,pre_pixel=1,texture_prior=1;
+ uint32_t current=1,legacy=1,prior=1,previous=1,recent=1,pre_styles=1,texture_prior=1;
  for(uint32_t i=0;i<32;++i){uint8_t v=(uint8_t)(h[i>>2]>>(24-8*(i&3)));
-  if(v!=m10v_sd_texture_prior_hashes[id==M10V_PIXEL_ID?47:id==M10V_CHAR_ID?46:id-33][i])texture_prior=0;
-  if(v!=m10v_sd_hashes[id==M10V_PIXEL_ID?47:id==M10V_CHAR_ID?46:id-33][i])current=0;
-  if(id==M10V_PIXEL_ID||v!=m10v_sd_pre_pixel_hashes[id==M10V_CHAR_ID?46:id-33][i])pre_pixel=0;
-  if(id==M10V_PIXEL_ID||v!=m10v_sd_previous_hashes[id==M10V_CHAR_ID?46:id-33][i])previous=0;
+  if(v!=m10v_sd_texture_prior_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])texture_prior=0;
+  if(v!=m10v_sd_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])current=0;
+  if(id>=M10V_PIXEL_ID||v!=m10v_sd_previous_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])previous=0;
+  if(id>=M10V_PIXEL_ID||v!=m10v_sd_recent_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])recent=0;
+  if(M10V_STYLE(id)||v!=m10v_sd_pre_styles_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_styles=0;
   if(id>72||v!=m10v_sd_legacy_hashes[id-33][i])legacy=0;
   if(id>78||v!=m10v_sd_prior_hashes[id-33][i])prior=0;}
- if(!current&&!legacy&&!prior&&!previous&&!pre_pixel&&!texture_prior)return 0;
+ if(!current&&!legacy&&!prior&&!previous&&!recent&&!pre_styles&&!texture_prior)return 0;
  return id;
 }

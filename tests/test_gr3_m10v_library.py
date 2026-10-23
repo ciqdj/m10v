@@ -41,7 +41,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         wrapper = Path(cls.tmp.name) / 'date_probe.c'
         wrapper.write_text('#include "' + str(ROOT / 'native/gr3/m10v_library.c') + '"\nuint32_t m10v_test_date(char *out,const m10v_library_date *date,uint32_t format,uint32_t mode){return date_text(out,date,format,mode); }\nvoid m10v_test_stamp(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name){stamp(image,state,date,name); }\nvoid m10v_test_line(m10v_library_image *image,const m10v_library_state *state,const char *text){stamp_line(image,state,text,1,0,0,108);}')
         subprocess.run([shutil.which('clang') or 'clang', '-O2', '-Wall', '-Wextra', '-Werror',
-                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'), '-o', str(out)],
+                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'), '-o', str(out)],
                        check=True, capture_output=True)
         cls.lib = C.CDLL(str(out))
         cls.lib.m10v_test_line.argtypes = [C.POINTER(Image), C.POINTER(State), C.c_char_p]
@@ -90,7 +90,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
             self.assertEqual(list(y),[96,96,176,176,240,240,91,92]*3)
             self.assertEqual(list(uv),([128]*6+[81,82])*3)
         before=bytes(state)
-        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,291,ok,None),-1)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,298,ok,None),-1)
         self.assertEqual(bytes(state),before)
 
     def test_charmera_colors_are_atomic_per_slot_and_render_preserves_padding(self):

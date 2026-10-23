@@ -7,7 +7,10 @@
 /* 79..288 are existing custom identities. Never reuse them. */
 #define M10V_CHAR_ID 289u
 #define M10V_PIXEL_ID 290u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID))
+#define M10V_STYLE_FIRST 291u
+#define M10V_STYLE_LAST 297u
+#define M10V_STYLE(id) ((id)>=M10V_STYLE_FIRST && (id)<=M10V_STYLE_LAST)
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || M10V_STYLE(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 5u
 #define M10V_LIBRARY_OK 0

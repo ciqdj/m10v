@@ -103,6 +103,17 @@ def generate():
  text(d,11,20,'PIXEL','#ffffff')
  raw=im.tobytes();im.save(out/'290.png');(ROOT/'native/gr3/m10v_pixel_world.rgba').write_bytes(raw)
  meta.append({'id':290,'name':'方块世界','title':'PIXEL','code':'WORLD','color':'#76a849','icon_url':'/gr3/film-icons/290.png','sha256':hashlib.sha256(raw).hexdigest()})
+ # Sparse styles append artwork without renumbering the 78 historical sprites.
+ styles=json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks'];style_pixels=bytearray()
+ for spec in styles:
+  im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
+  d.rounded_rectangle((8,3,32,36),radius=4,fill='#141d22');d.rectangle((10,8,30,31),fill=spec['color'])
+  d.rectangle((10,15,30,22),fill='#eee9dc');d.rectangle((17,0,23,3),fill='#aaaaaa')
+  for y,key,ink in [(16,'title','#202a30'),(25,'code','#ffffff')]:
+   value=spec[key];w=sum(len(GLYPHS[c][0])+1 for c in value)-1;text(d,21-w//2,y,value,ink)
+  raw=im.tobytes();style_pixels+=raw;im.save(out/f"{spec['id']}.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_style_filters.rgba').write_bytes(style_pixels)
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  sheet.save(ROOT/'docs/previews/m10v-film-icons.png')
  return meta

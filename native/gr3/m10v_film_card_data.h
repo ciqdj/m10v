@@ -79,6 +79,15 @@ static const struct { char main[6], sub[6]; uint32_t color, ink; } cards[78]={
  {"2460","AERO",0xff58a3a8u,0xfff3faf9u},
  {"50D","5203",0xffbfaa4cu,0xfff3faf9u},
 };
+static const struct { char main[6], sub[6]; uint32_t color, ink; } style_cards[7]={
+ {"LEICA","MONO",0xff71767au,0xfff3faf9u},
+ {"LOMO","400",0xffdf624bu,0xfff3faf9u},
+ {"POLAR","600",0xffd5bd9bu,0xfff3faf9u},
+ {"VELV","50",0xff74983cu,0xfff3faf9u},
+ {"CYBER","NEON",0xff9b4ad2u,0xfff3faf9u},
+ {"CYANO","BLUE",0xff275a91u,0xfff3faf9u},
+ {"COOL","DE",0xff6b8792u,0xfff3faf9u},
+};
 static const uint8_t card_glyphs[36][5]={
  {7,5,5,5,7},
  {2,6,2,2,7},

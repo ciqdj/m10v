@@ -718,5 +718,68 @@
     "color": "#76a849",
     "icon_url": "/gr3/film-icons/290.png",
     "sha256": "8dbf50dd0dea97a980c69d822ced7952af0802378df936372a8598feccde0e3d"
+  },
+  {
+    "id": 291,
+    "name": "Leica Monochrome",
+    "title": "LEICA",
+    "code": "MONO",
+    "color": "#71767a",
+    "icon_url": "/gr3/film-icons/291.png",
+    "sha256": "2eb8ea1d4f0b584ea529d85375488949a5f58b86c4cccf484115e2e5ba47098d"
+  },
+  {
+    "id": 292,
+    "name": "Lomography",
+    "title": "LOMO",
+    "code": "400",
+    "color": "#df624b",
+    "icon_url": "/gr3/film-icons/292.png",
+    "sha256": "823d8c54fe13d454c3d4c8c44591f847766d175bca0033f1de343be8889f4bb4"
+  },
+  {
+    "id": 293,
+    "name": "Polaroid",
+    "title": "POLAR",
+    "code": "600",
+    "color": "#d5bd9b",
+    "icon_url": "/gr3/film-icons/293.png",
+    "sha256": "5dbb5f69dc73ed100785451d399d8cff87ec2839307e6085e6b0a71f87bff88a"
+  },
+  {
+    "id": 294,
+    "name": "Fujifilm Velvia 50",
+    "title": "VELV",
+    "code": "50",
+    "color": "#74983c",
+    "icon_url": "/gr3/film-icons/294.png",
+    "sha256": "7b6639750174b8c4f7d09d03c1bfa5b7553d120e783d8b6325cb6def872c7eac"
+  },
+  {
+    "id": 295,
+    "name": "Cyberpunk",
+    "title": "CYBER",
+    "code": "NEON",
+    "color": "#9b4ad2",
+    "icon_url": "/gr3/film-icons/295.png",
+    "sha256": "f20b6d174f466dce62b42a7e3d6836e778fd20bc5bbfc4909603c981ae900463"
+  },
+  {
+    "id": 296,
+    "name": "Cyanotype",
+    "title": "CYANO",
+    "code": "BLUE",
+    "color": "#275a91",
+    "icon_url": "/gr3/film-icons/296.png",
+    "sha256": "946ae010da6eb1f069d9009e62412b9e36b6a2cf8d7fc0f19d58ac2164842f34"
+  },
+  {
+    "id": 297,
+    "name": "德系冷调",
+    "title": "COOL",
+    "code": "DE",
+    "color": "#6b8792",
+    "icon_url": "/gr3/film-icons/297.png",
+    "sha256": "4cdf67a6bfbe708e31cf23ace1e35d9e081cd2e696c8a5c0276a2cce647805b5"
   }
 ]

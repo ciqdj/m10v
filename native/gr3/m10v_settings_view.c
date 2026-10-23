@@ -77,7 +77,7 @@ static uint32_t film(const m10v_settings *s,const m10v_settings_ops *o,uint32_t 
   id=index<256&&o&&o->item?o->item(o->context,index):0;
   if(id<33)id=0;
  }else id=s->saved.slots[i].film;
- return id&&(id<=M10V_CUSTOM_MAX_ID||id==M10V_CHAR_ID||id==M10V_PIXEL_ID)?id:0;
+ return id&&(id<=M10V_CUSTOM_MAX_ID||M10V_BUILTIN(id))?id:0;
 }
 static uint32_t valueres(uint32_t row,uint32_t value){
  static const uint16_t first[4]={M10V_VIEW_OFF,M10V_VIEW_YMD,M10V_VIEW_TOP_LEFT,M10V_VIEW_WHITE};
@@ -104,7 +104,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
   if(id){
-   uint32_t icon=id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
+   uint32_t icon=M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[39]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[39]+i*M10V_CARD_PIXELS*4);
     if(M10V_CUSTOM(id)){

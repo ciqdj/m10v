@@ -7,7 +7,7 @@ import {buildSdFilmPack,auditSdFilmPack,customFilmRecord} from './gr3-sd-film-pa
 const ID=289;
 test('Charmera has an independent identity without stealing existing custom ID 79',async()=>{
  const c=await nativeCatalog();assert.equal(c.films.find(f=>f.id===ID)?.name,'Kodak Charmera');
- assert.deepEqual(c.films.map(f=>f.number),Array.from({length:48},(_,i)=>i+1));assert.equal(c.film_count,48);
+ assert.deepEqual(c.films.map(f=>f.number),Array.from({length:55},(_,i)=>i+1));assert.equal(c.film_count,55);
  assert.equal(customFilmRecord({name:'Existing',rgb:Buffer.alloc(6591)},79).readUInt32LE(8),79);
  assert.deepEqual(auditSdFilmPack(buildSdFilmPack([33,ID])).ids,[33,ID]);
 });

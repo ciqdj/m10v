@@ -16,13 +16,13 @@ function oldPack(custom=[]){
  }
  pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);return pack;
 }
-test('deleting texture processing retains all48 last-published film records',()=>{
+test('deleting texture processing retains all55 previous-revision film records',()=>{
  assert.deepEqual(auditSdFilmPack(oldPack()).ids,auditSdFilmPack(buildSdFilmPack()).ids);
 });
 test('prior renderer custom LUTs remain accepted while repaired-CRC tampering is rejected',()=>{
  const rgb=Buffer.alloc(6591),film={name:'Old LUT',rgb,sha256:sha(rgb)};
- const pack=oldPack([film]);assert.equal(auditSdFilmPack(pack).count,49);
+ const pack=oldPack([film]);assert.equal(auditSdFilmPack(pack).count,prior.ids.length+1);
  const r=pack.subarray(pack.length-12288);r[7000]=1;r.writeUInt32LE(sdCrc(r.subarray(0,-4)),12284);
- pack.writeUInt32LE(r.readUInt32LE(12284),68+48*12);pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);
+ pack.writeUInt32LE(r.readUInt32LE(12284),68+prior.ids.length*12);pack.writeUInt32LE(sdCrc(pack.subarray(0,4092)),4092);
  assert.throws(()=>auditSdFilmPack(pack));
 });

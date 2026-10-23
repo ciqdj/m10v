@@ -4,7 +4,7 @@
 static int ready(const m10v_settings_ops *o){return o&&o->load&&o->item&&o->install&&o->stamp&&o->film_name_stamp;}
 static uint32_t item(const m10v_settings_ops *o,uint32_t i){
  if(i>=CATALOG_LIMIT)return 0;
- uint32_t id=o->item(o->context,i);return id>=33&&(id<=M10V_CUSTOM_MAX_ID||id==M10V_CHAR_ID||id==M10V_PIXEL_ID)?id:0;
+ uint32_t id=o->item(o->context,i);return id>=33&&(id<=M10V_CUSTOM_MAX_ID||M10V_BUILTIN(id))?id:0;
 }
 static uint32_t value(const m10v_library_state *s,uint32_t field){
  return field==0?s->stamp:field==1?s->format:field==2?s->corner:field==3?s->color:s->reserved&1u;
@@ -15,7 +15,7 @@ int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t scre
  if(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP&&screen!=M10V_SETTINGS_NAME&&screen!=M10V_SETTINGS_AB)return -1;
  if(o->load(o->context,&p->saved)<0)return -1;
  if(p->saved.stamp>2||p->saved.format>3||p->saved.corner>3||p->saved.color>3)return -1;
- for(uint32_t i=0;i<5;i++)if(!p->saved.slots[i].film||(p->saved.slots[i].film>M10V_CUSTOM_MAX_ID&&p->saved.slots[i].film!=M10V_CHAR_ID&&p->saved.slots[i].film!=M10V_PIXEL_ID))return -1;
+ for(uint32_t i=0;i<5;i++)if(!p->saved.slots[i].film||(p->saved.slots[i].film>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(p->saved.slots[i].film)))return -1;
  p->focus=p->slot=p->index=p->expected=p->value=p->error=0;
  p->screen=screen;if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
 }

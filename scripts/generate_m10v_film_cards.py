@@ -61,6 +61,9 @@ def generate():
   if name=='哈曼 RED':main,sub,color='RED','125','#e04439'
   ink='0xff244975u' if name=='Gold 200' else '0xfff3faf9u'
   rows.append(f' {{"{main}","{sub}",0xff{color[1:]}u,{ink}}},')
+ rows+=['};','static const struct { char main[6], sub[6]; uint32_t color, ink; } style_cards[7]={']
+ for spec in json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']:
+  rows.append(' {"%s","%s",0xff%su,0xfff3faf9u},'%(spec['title'],spec['code'],spec['color'][1:]))
  rows+=['};','static const uint8_t card_glyphs[36][5]={']
  for char in '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ':
   rows.append(' {'+','.join(str(int(row,2)) for row in GLYPHS[char])+'},')

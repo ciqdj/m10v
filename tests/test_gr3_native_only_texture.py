@@ -34,7 +34,7 @@ class NativeOnlyTextureTests(unittest.TestCase):
     def test_imported_texture_is_ignored_even_when_color_halo_or_stamp_runs(self):
         ok=STORE(lambda _,value:0)
         self.lib.m10v_library_render_native.argtypes=self.lib.m10v_library_render.argtypes+[C.c_uint32]
-        for film in [1,33,40,66,67,68,78,289,290]:
+        for film in [1,33,40,66,67,68,78,289,290,*range(291,298)]:
             for completed in [0,1,31]:
                 with self.subTest(film=film,completed=completed):
                     state=self.state(); self.lib.m10v_library_select(C.byref(state),0,film,ok,None)
@@ -81,13 +81,13 @@ class NativeOnlyTextureTests(unittest.TestCase):
             for index,(source,flags) in enumerate(sources):
                 out=td/(str(index)+'.dylib')
                 subprocess.run(['clang','-O2','-Wall','-Wextra','-Werror','-dynamiclib','-I',str(native),*flags,str(source),
-                    *[str(native/f) for f in ['film_harman.c','film_curated.c','film_newstocks.c']],
+                    *[str(native/f) for f in ['film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c']],
                     *([str(native/'m10v_texture_accel.c')] if flags else []),'-o',str(out)],check=True,capture_output=True)
                 lib=C.CDLL(str(out));lib.m10v_5207_texture_q8.argtypes=[C.POINTER(harness.Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];libs.append(lib)
             rng=random.Random(481)
             for width in [2,6,8,10,30,128]:
                 size=(width+8)*9; source=[rng.randbytes(size) for _ in range(2)]
-                for color in range(17):
+                for color in range(24):
                     results=[]
                     for lib in libs:
                         y=(C.c_uint8*size).from_buffer_copy(source[0]);uv=(C.c_uint8*size).from_buffer_copy(source[1])

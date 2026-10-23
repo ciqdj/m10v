@@ -122,7 +122,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         u=self.machine()
         for film in range(1,79):
             tone=144+film-1 if film<=32 else 213 if film==33 else 344+film-69 if film>=69 else 288+film-66 if film>=66 else 256+film-34
-            self.assertEqual(self.call(u,'m10v_menu_icon',0,tone),755 if film==290 else 749 if film==289 else 670+film)
+            self.assertEqual(self.call(u,'m10v_menu_icon',0,tone),762+film-291 if 291<=film<=297 else 755 if film==290 else 749 if film==289 else 670+film)
         state=0x55008000
         self.call(u,'m10v_library_init',state)
         self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,65),0)
@@ -291,7 +291,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         red=pixels[32*6400+(8*40+20)*4:32*6400+(8*40+20)*4+4]
         self.assertGreater(red[0],red[1]*2)
 
-    def test_official_list_consumer_allocates_50_rows_and_renders_48_visible_films(self):
+    def test_official_list_consumer_allocates_57_rows_and_renders_55_visible_films(self):
         # The raw instruction fixture comes from the official decompression,
         # not a reimplementation of its row count/loop.
         from subprocess import check_output
@@ -310,18 +310,18 @@ class FilmLibraryArmTests(unittest.TestCase):
         def view(uc,address,size,data):
             if address == 0x5320b67c: uc.reg_write(UC_ARM_REG_R0,0x55007000)
             elif address == 0x53394758:
-                index=uc.reg_read(UC_ARM_REG_R1);rows.append(index);self.assertLess(index,50)
+                index=uc.reg_read(UC_ARM_REG_R1);rows.append(index);self.assertLess(index,57)
                 uc.reg_write(UC_ARM_REG_R0,0x55008000+index*4)
             elif address != 0x533a1734: return
             uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
         u.hook_add(UC_HOOK_CODE,view)
         u.reg_write(UC_ARM_REG_SP,0x550fe000);u.reg_write(UC_ARM_REG_LR,0x550ff000)
         u.emu_start(0x531abc18,0x550ff000,count=100000)
-        self.assertEqual(u.reg_read(UC_ARM_REG_R0),50)
+        self.assertEqual(u.reg_read(UC_ARM_REG_R0),57)
         u.mem_write(0x5506821d,b'\x02');u.mem_write(0x550051a9,b'\x2d')
         u.reg_write(UC_ARM_REG_SP,0x550fe000);u.reg_write(UC_ARM_REG_LR,0x550ff000);u.reg_write(UC_ARM_REG_R0,0x55005000)
         u.emu_start(0x531ab7e4,0x550ff000,count=100000)
-        self.assertEqual(rows,list(range(50)))
+        self.assertEqual(rows,list(range(57)))
 
     def test_compiled_browser_defaults_initialize_exact_arm_state(self):
         initial = bytearray(104)
@@ -417,7 +417,7 @@ class FilmLibraryArmTests(unittest.TestCase):
 
         self.assertEqual(self.call(u, 'm10v_menu_count', model), 4)
         self.focus = 0; self.call(u, 'm10v_menu_confirm', controller)
-        self.assertEqual(self.call(u, 'm10v_menu_count', model), 48)
+        self.assertEqual(self.call(u, 'm10v_menu_count', model), 55)
         self.call(u, 'm10v_menu_focus', controller, 45)
         self.assertFalse(self.files); self.assertFalse(self.native_tones)
         self.focus = 45; self.call(u, 'm10v_menu_confirm', controller)
@@ -430,15 +430,15 @@ class FilmLibraryArmTests(unittest.TestCase):
     def test_visible_catalog_index_names_and_icons_are_consistent(self):
         u=self.machine(); model=0x55068200
         u.mem_write(model+0x1d,b'\x02')
-        self.assertEqual(self.call(u,'m10v_menu_max_count'),48)
-        self.assertEqual(self.call(u,'m10v_menu_count',model),48)
-        ids=[33,66,67,68,69,70,71,72,73,74,75,76,77,78,289]+list(range(34,66))+[290]
+        self.assertEqual(self.call(u,'m10v_menu_max_count'),55)
+        self.assertEqual(self.call(u,'m10v_menu_count',model),55)
+        ids=[33,66,67,68,69,70,71,72,73,74,75,76,77,78,289]+list(range(34,66))+[290]+list(range(291,298))
         for index,film in enumerate(ids):
             tone=self.call(u,'m10v_menu_index',model,index)
-            self.assertEqual(tone,360 if film==290 else 354 if film==289 else 213 if film==33 else 344+film-69 if film>=69 else 288+film-66 if film>=66 else 256+film-34)
-            self.assertEqual(self.call(u,'m10v_menu_name',0,tone),953 if film==290 else 947 if film==289 else 860 if film==33 else 937+film-69 if film>=69 else 930+film-67 if film>=67 else 911 if film==66 else 879+film-34)
-            self.assertEqual(self.call(u,'m10v_menu_icon',0,tone),755 if film==290 else 749 if film==289 else 670+film)
-        self.assertEqual(self.call(u,'m10v_menu_index',model,48),0)
+            self.assertEqual(tone,400+film-291 if 291<=film<=297 else 360 if film==290 else 354 if film==289 else 213 if film==33 else 344+film-69 if film>=69 else 288+film-66 if film>=66 else 256+film-34)
+            self.assertEqual(self.call(u,'m10v_menu_name',0,tone),954+film-291 if 291<=film<=297 else 953 if film==290 else 947 if film==289 else 860 if film==33 else 937+film-69 if film>=69 else 930+film-67 if film>=67 else 911 if film==66 else 879+film-34)
+            self.assertEqual(self.call(u,'m10v_menu_icon',0,tone),762+film-291 if 291<=film<=297 else 755 if film==290 else 749 if film==289 else 670+film)
+        self.assertEqual(self.call(u,'m10v_menu_index',model,55),0)
         self.assertFalse(self.files);self.assertFalse(self.native_tones)
 
     def test_legacy_simulation_really_executes_on_arm_with_pixel_exact_host_output(self):
@@ -579,8 +579,8 @@ class FilmLibraryArmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.manifest=build(Path(tmp),sd_library=True)
             self.code=(Path(tmp)/'m10v-library-arm.bin').read_bytes()
-        self.assertEqual(self.manifest['resources']['last_id'],1103)
-        self.assertEqual(len(self.manifest['resources']['descriptors']),1103-786+1)
+        self.assertEqual(self.manifest['resources']['last_id'],1110)
+        self.assertEqual(len(self.manifest['resources']['descriptors']),1110-786+1)
         self.test_private_utf16_resource_hooks_preserve_stock_fallback_and_locale()
 
     def test_v2_journal_migrates_to_v3_and_keeps_old_bytes_on_failed_save(self):

@@ -24,7 +24,7 @@ if(!result.manifest.capture_lifecycle?.snapshot?.live_color||!result.manifest.ap
 const pack=buildSdFilmPack();auditSdFilmPack(pack);
 const json=x=>Buffer.from(JSON.stringify(x,null,2)+'\n'),sources={};
 for(const p of Object.keys(result.manifest.sources))sources[p]=await readFile(p);
-for(const p of ['LICENSE','THIRD_PARTY_NOTICES.md','third_party/curated-film-luts/LICENSE','third_party/spectral-film-lut/LICENSE',
+for(const p of ['LICENSE','THIRD_PARTY_NOTICES.md','third_party/curated-film-luts/LICENSE','third_party/spectral-film-lut/LICENSE','third_party/style-filter-luts/film-luts-license','third_party/style-filter-luts/street-license',
  'native/gr3/m10v_aspect.c','native/gr3/m10v_aspect_dng.c','native/gr3/m10v_aspect_hooks.S','scripts/gr3_aspect_overlay.py',
  'node/gr3-native-library.mjs','node/gr3-m10v-native-build.mjs','node/gr3-integrated-components.mjs','node/gr3-native-budget.mjs',
  'node/gr3-runtime.mjs','node/gr3-runtime-worker.py','node/gr3-raw-nr.mjs','node/gr3-stock-presets.mjs','node/gr3x-native-port.mjs',
@@ -44,6 +44,8 @@ const files={'README.txt':await readFile('docs/testing/gr3-native-grain-20261023
  'LICENSE':sources.LICENSE,'THIRD_PARTY_NOTICES.md':sources['THIRD_PARTY_NOTICES.md'],
  'licenses/curated-film-luts.txt':sources['third_party/curated-film-luts/LICENSE'],
  'licenses/spectral-film-lut.txt':sources['third_party/spectral-film-lut/LICENSE'],
+ 'licenses/style-film-luts.txt':sources['third_party/style-filter-luts/film-luts-license'],
+ 'licenses/style-street.txt':sources['third_party/style-filter-luts/street-license'],
  'gr3/fwdc239b.bin':result.candidate,'gr3/receipt.json':json(result.receipt),'gr3/manifest.json':json(result.manifest),
  'gr3/configuration.json':json(plan.configuration),'SD/M10V/FILMS.M10':pack,
  'evidence/provenance.json':json(provenance),'evidence/source-snapshot.zip':encodeZip(sources),
