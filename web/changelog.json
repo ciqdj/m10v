@@ -2,7 +2,7 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
-      "version": "2026.10.23.2",
+      "version": "2026.10.23.3",
       "date": "2026-10-23",
       "title": "颗粒统一原厂原生处理，移除漏光及软件质感回退",
       "changes": [
@@ -17,6 +17,19 @@
       "evidence_url": null
     },
     {
+      "version": "2026.10.23.2",
+      "date": "2026-10-23",
+      "title": "发布七款精选滤镜，兼容服务器编译体积",
+      "changes": [
+        "包含七款精选滤镜ID291–297，保留方块世界290；r3已获用户GR III2.10验收并授权发布。",
+        "修复服务器Ubuntu clang完整调试构建比原1088KiB上限多992字节而被拒绝的问题；仅将独立审计预算增加16KiB至1104KiB，保留全部指令、只读映射、段边界及非目标字节校验。",
+        "上一提交首次部署失败并回退，未作为上线成功；本次不修改滤镜参数、相机代码或编译选项，重新构建核对验收固件字节一致。"
+      ],
+      "commit": "f4066416ab9bbf6fd91a344dfa4e4e7bb94dc91f",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/f4066416ab9bbf6fd91a344dfa4e4e7bb94dc91f"
+    },
+    {
       "version": "2026.10.23.1",
       "date": "2026-10-23",
       "title": "新增七款 M10V 精选滤镜",
@@ -27,7 +40,7 @@
       ],
       "commit": "78b681c1134ebd1069415a548a7fb8e8a74883b8",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/78b681c1134ebd1069415a548a7fb8e8a74883b8"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39898185062"
     },
     {
       "version": "2026.10.22.9",
