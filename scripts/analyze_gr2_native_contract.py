@@ -3049,6 +3049,52 @@ def probe_effect_view_draw(code:bytes,disk:bytes,*,frame_out:Path|None=None,nati
                 stack_preserved=uc.reg_read(r.UC_ARM_REG_SP)==stack,helpers_intercepted=['bounded original ROM-resource file read','palette backend upload/apply']+(['private overlay event/destruction callbacks'] if overlay else [])+(['private settings backend callbacks'] if settings_overlay else []),hardware_tested=False,
                 scope='Six original graphics constructors and official Latin/monitor fonts initialized before detached stock effect page CREATE/INIT, then original list DRAW and property-mutating navigation. Synthetic display/active geometry, kernel and no-observer property fixtures; optional root transition starts with an empty active root and original draw dispatcher using an explicitly loaded low-address module; no real ROM filesystem, hardware state transition/display or custom M10V page installation.')
 
+def probe_effect_parameter_options(code:bytes)->dict:
+    """Execute original indexed effect control conversions at property boundaries.
+
+    These are the model's toning/hue/vignette option lists, not a claim that
+    every GR III recipe parameter or range is available on this camera.
+    """
+    from unicorn import UC_HOOK_CODE,arm_const as r
+    uc=runtime_machine(code);stop=0x5001f000;stack=0x50018000
+    word=lambda pointer:struct.unpack('>I',uc.mem_read(pointer,4))[0]
+    base=word(0xA0396C24);reads=[];writes=[];value=[0];preserved=[];stack_ok=[]
+    def property_boundary(machine,address,size,unused):
+        a,b,c=[machine.reg_read(reg) for reg in (r.UC_ARM_REG_R0,r.UC_ARM_REG_R1,r.UC_ARM_REG_R2)]
+        if address==0xA00E1158:reads.append((a,b));result=value[0]
+        else:writes.append((a,b,c));result=0
+        machine.reg_write(r.UC_ARM_REG_R0,result);machine.reg_write(r.UC_ARM_REG_PC,machine.reg_read(r.UC_ARM_REG_LR))
+    for address in (0xA00E1158,0xA03A0378):uc.hook_add(UC_HOOK_CODE,property_boundary,begin=address,end=address)
+    def run(entry,*args):
+        saved=[0x12340000+i for i in range(8)]
+        registers=(r.UC_ARM_REG_R4,r.UC_ARM_REG_R5,r.UC_ARM_REG_R6,r.UC_ARM_REG_R7,r.UC_ARM_REG_R8,r.UC_ARM_REG_R9,r.UC_ARM_REG_R10,r.UC_ARM_REG_R11)
+        for register,initial in zip(registers,saved):uc.reg_write(register,initial)
+        for register,initial in zip((r.UC_ARM_REG_R0,r.UC_ARM_REG_R1),args):uc.reg_write(register,initial)
+        uc.reg_write(r.UC_ARM_REG_SP,stack);uc.reg_write(r.UC_ARM_REG_LR,stop|1)
+        uc.emu_start(entry|1,stop,count=10000)
+        if uc.reg_read(r.UC_ARM_REG_PC)!=stop:raise RuntimeError('indexed effect control did not return within bounded budget')
+        stack_ok.append(uc.reg_read(r.UC_ARM_REG_SP)==stack)
+        preserved.append([uc.reg_read(register) for register in registers]==saved)
+        return uc.reg_read(r.UC_ARM_REG_R0)
+    controls=[]
+    for definition in range(103,126):
+        row=struct.unpack('>16I',uc.mem_read(base+definition*64,64));count=row[3]>>16
+        if row[1]!=0xffffffff or not 1<=count<=8 or not row[13] or not row[14]:raise ValueError('original indexed control definition differs')
+        values=[word(row[4]+12*i) for i in range(count)];indices=[];pair=None
+        for index,raw in enumerate(values):
+            reads.clear();writes.clear();value[0]=raw
+            indices.append(run(row[14],definition))
+            if len(reads)!=1:raise RuntimeError('indexed getter must read one property element')
+            if pair is None:pair=reads[0]
+            if reads!=[pair]:raise RuntimeError('indexed getter changed its property/index')
+            run(row[13],definition,index)
+            if writes!=[(*pair,raw)]:raise RuntimeError('original setter conversion differs from original option table')
+        controls.append(dict(definition=definition,title_id=row[0],property=pair[0],index=pair[1],values=values,display_indices=indices,
+                             getter=hex(row[14]),setter=hex(row[13]),option_table=hex(row[4])))
+    return dict(controls=controls,stack_preserved=all(stack_ok),callee_saved_preserved=all(preserved),
+                helpers_intercepted=['indexed property read','UI indexed property write'],hardware_tested=False,
+                scope='Exact original option/getter/setter conversion with explicit property read/write boundaries; no physical property persistence, recipe defaults, IQ or image equivalence claim.')
+
 def probe_effect_key_routes(code:bytes)->dict:
     """Execute original actions from the MONSETEFFECTMODE state event table.
 

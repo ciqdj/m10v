@@ -413,6 +413,21 @@ class Gr2NativeContractTests(unittest.TestCase):
         self.assertEqual(module.probe_ui_text(code,0,1)['pointer'],module.probe_ui_text(code,0x350,1)['pointer'])
         with self.assertRaises(ValueError):module.probe_ui_text(code,106,21)
 
+    def test_original_indexed_effect_controls_roundtrip_every_native_option_without_gr3_ranges(self):
+        module=self.implementation();self.assertTrue(hasattr(module,'probe_effect_parameter_options'))
+        result=module.probe_effect_parameter_options(component('gr2','b01firm8'))
+        controls={row['definition']:row for row in result['controls']}
+        self.assertEqual(sorted(controls),list(range(103,126)))
+        for definition,prop,tone in ((103,0xa6,6),(104,0xa6,12),(105,0xa6,16),(107,0x46,7),(108,0x8e,8),(109,0x8e,10)):
+            self.assertEqual(controls[definition]['property'],prop)
+            self.assertEqual(controls[definition]['index'],tone)
+        self.assertEqual(controls[107]['values'],[0x7fffffff,0xffffffff,0xfffffffe])
+        self.assertEqual(controls[103]['values'],[1,2,3,4,5])
+        self.assertTrue(all(row['display_indices']==list(range(len(row['values']))) for row in controls.values()))
+        self.assertTrue(result['stack_preserved']);self.assertTrue(result['callee_saved_preserved'])
+        self.assertEqual(result['helpers_intercepted'],['indexed property read','UI indexed property write'])
+        self.assertFalse(result['hardware_tested'])
+
     def test_effect_screen_key_actions_preserve_payload_and_distinct_guarded_routes(self):
         module=self.implementation();report=module.probe_effect_key_routes(component('gr2','b01firm8'))
         routes=report['routes'];self.assertEqual(len(routes),17)
