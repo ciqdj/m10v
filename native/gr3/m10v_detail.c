@@ -17,7 +17,7 @@ static int slot(uint32_t ui){
  if(!ram(ui,0x1a0))return -1;
  const uint8_t *m=(const uint8_t *)(uintptr_t)ui;
  if(m[0x199]>2||m[0x19a]>=M10V_TONE_CHOICES||m[0x19b]||m[0x19d])return -1;
- for(uint32_t i=0;i<5;i++)if(m[0x198]==m10v_slot_tone(i))return (int)i;
+ for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(m[0x198]==m10v_slot_tone(i))return (int)i;
  return -1;
 }
 static int load(uint32_t ui,m10v_library_state *s){

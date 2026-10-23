@@ -71,7 +71,7 @@ function checkRuntime(runtime, manifest) {
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 87 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
+  need(manifest.film_count === 87 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
@@ -132,7 +132,7 @@ function checkRuntime(runtime, manifest) {
     need(w.id===291+i&&m.film_id===w.id&&payload.length===10125&&m.bytes===payload.length&&m.sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'style compiled payload differs');
   }
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
-  need(init.length === 104 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+104).equals(init), 'native initial settings readback differs');
+  need(init.length === 184 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+184).equals(init), 'native initial settings readback differs');
   const quietDebugSinks=!!manifest.capture_lifecycle&&manifest.experimental_capture?.native_color===true&&['m10v_debug_log','m10v_debug_batch'].every(name=>{const at=manifest.symbols?.[name]-BASE;return Number.isInteger(at)&&at>=0&&at+8<=runtime.length&&runtime.readUInt32LE(at)===0xe3a00000&&runtime.readUInt32LE(at+4)===0xe12fff1e;});
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
     manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
@@ -147,8 +147,8 @@ function checkRuntime(runtime, manifest) {
   }
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,769*4],[icons.descriptors,98*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+769*4&&icons.pixels===icons.descriptors+98*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(const [address,length] of [[icons.table,774*4],[icons.descriptors,103*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+774*4&&icons.pixels===icons.descriptors+103*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
   for(let i=0;i<78;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
@@ -189,14 +189,14 @@ function checkRuntime(runtime, manifest) {
       runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
     need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
-    need(c?.first_id===749&&c.last_id===753&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===749&&c.last_id===773&&c.width===120&&c.height===120&&c.heap_bytes===576180&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===576000&&c.directory_offset===576080&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?325:175;
+  const resourceCount=manifest.sd_library?342:175;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -305,7 +305,7 @@ function checkIspBase(runtime,manifest) {
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
  const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
- need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x50f0&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
+ need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x5140&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
  const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],
   ...[0x535153ec,0x53516e14,0x53516ebc,0x5351897c,0x5351af20,0x5351feb4].map(a=>[a,0x535216d0,'m10v_save_trace_recipe_allocate']),
   ...[0x5351703c,0x535170cc,0x535182f8,0x5351f3a8,0x5351fd50].map(a=>[a,0x53521d14,'m10v_save_trace_recipe_release'])];
@@ -339,7 +339,7 @@ function lifecyclePatches(manifest,runtime){
   expected.push({address:0x53521e18,expected:0xe58d5008,replacement:branch(0x53521e18,target),name:'raw pool dispatch return'});
  }
  if(m.snapshot){
-  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1716&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
+  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1796&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
   need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ae44,'snapshot must freeze current recipe at submission');
   for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351ae44,0xe59000f0,false],...(m.snapshot.shared_hdf?[[2,0x5351aed4,0xe59420f0,false],[3,0x5351b068,0xe59420f0,false]]:[])]){
    const row=m.snapshot.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid snapshot hook');
@@ -351,7 +351,7 @@ function lifecyclePatches(manifest,runtime){
   words.forEach((word,i)=>need(runtime.readUInt32LE(at-manifest.base+i*4)===(word>>>0),'snapshot submission wrapper instruction differs'));
  }
  if(m.snapshot?.live_color){
-  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x19bc,'preview requires owned parameter cache');
+  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x223c,'preview requires owned parameter cache');
   const row=m.snapshot.patches.at(-1);need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
   expected.push({address:0x53dbd954,expected:0x536ddecc,replacement:row.entry,name:'native Live Make color'});
   const at=row.entry,ex=m.snapshot.exports;
@@ -384,26 +384,34 @@ function lifecyclePatches(manifest,runtime){
 }
 function appendedSlotPatches(runtime,manifest,raw) {
  const m=manifest.appended_slots;if(!m)return [];
- need(manifest.sd_library&&manifest.film_library_enabled!==false&&m.schema==='m10v-gr3-appended-slots/v1'&&
-  JSON.stringify(m.tones)==='[25,26,27,28,29]'&&m.stock_choices===12&&m.shooting_choices===17&&
-  m.library_index===19&&m.stock_parameter_proxy===false&&m.state_version===4,'invalid appended slot contract');
+ need(manifest.sd_library&&manifest.film_library_enabled!==false&&m.schema==='m10v-gr3-appended-slots/v2'&&
+  JSON.stringify(m.tones)==='[25,26,27,28,29,30,31,32,33,34]'&&m.stock_choices===12&&m.shooting_choices==='12+enabled_films'&&m.shooting_choices_max===22&&
+  m.library_index==='14+enabled_films'&&m.stock_parameter_proxy===false&&m.state_version===5,'invalid appended slot contract');
  const read=(at,n)=>{need(Number.isInteger(at)&&!(at&3)&&at>=manifest.base&&at+n<=manifest.base+runtime.length,'appended code outside runtime');return runtime.subarray(at-manifest.base,at-manifest.base+n);};
  read(m.base,m.bytes);
  const rows=[[0x532c2a9c,0xe1a0c00d,'count'],[0x532c2c80,0xe1a0c00d,'index'],
   [0x532c2f08,0xe1a0c00d,'position'],[0x532c2b7c,0xe30d3368,'maximum'],
   [0x5326c240,branch(0x5326c240,0x5326c2a0),'display']];
+ const dynamicCount=manifest.symbols.m10v_camera_library_shooting_count;read(dynamicCount,4);
+ const exact=(name,words)=>{const body=read(m.entries[name],words.length*4);need(words.every((w,i)=>body.readUInt32LE(i*4)===(w>>>0)),'appended '+name+' instructions differ');};
+ const at=(name,i)=>m.entries[name]+i*4;
+ exact('count',[0xe5d0c01b,0xe35c0000,0x1a000002,0xe92d4010,branch(at('count',4),dynamicCount,true),0xe8bd8010,0xe1a0c00d,branch(at('count',7),0x532c2aa0)]);
+ exact('index',[0xe5d0c01b,0xe35c0000,0x1a00000c,0xe92d4070,0xe1a04000,0xe1a05001,branch(at('index',6),dynamicCount,true),0xe355000c,0x3a000003,0xe1550000,0x3245000c,0x32800019,0x38bd8070,0xe1a00004,0xe1a01005,0xe8bd4070,0xe1a0c00d,branch(at('index',17),0x532c2c84)]);
+ exact('position',[0xe5d0c01b,0xe35c0000,0x1a00000b,0xe92d4070,0xe1a04000,0xe1a05001,branch(at('position',6),dynamicCount,true),0xe240000c,0xe245c019,0xe15c0000,0x328c000c,0x38bd8070,0xe1a00004,0xe1a01005,0xe8bd4070,0xe1a0c00d,branch(at('position',16),0x532c2f0c)]);
+ exact('maximum',[branch(at('maximum',0),dynamicCount)]);
+ exact('display',[0xe2430019,0xe350000a,0x31a00003,((branch(at('display',3),0x5326c22c)&0x0fffffff)|0x30000000),branch(at('display',4),0x5326c2a0)]);
  const patches=rows.map(([address,expected,name])=>{read(m.entries[name],4);return {address,expected,replacement:branch(address,m.entries[name]),name:'appended '+name};});
  for(const [address,old,name] of [[0x531ab7a8,0x532a985c,'menu_name'],[0x531ab894,0x532a9988,'menu_icon'],[0x531ab8bc,0x532a9988,'menu_icon'],[0x531a05ac,0x532c2c80,'index'],[0x531a070c,0x532c2c80,'index'],[0x531a0588,0x532a985c,'adj_name'],[0x531a06e0,0x532a9988,'adj_icon']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:branch(address,old,true),replacement:branch(address,to,true),name:'appended visible '+name});}
  for(const [address,name] of [[0x531abe0c,'menu_matches'],[0x531a1500,'adj_matches'],[0x531a0ba0,'adj_select']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:0xe1a0c00d,replacement:branch(address,to),name:'appended visible '+name});}
- need(m.exif_bytes===68,'appended EXIF capacity differs');
- const table=read(m.exif_table,68);
+ need(m.exif_bytes===88,'appended EXIF capacity differs');
+ const table=read(m.exif_table,88);
  if(raw)need(table.subarray(0,48).equals(raw.subarray(0xd2b6f4,0xd2b724)),'stock EXIF pairs changed');
- for(let i=0;i<5;i++)need(table.readUInt32LE(48+i*4)===((0x10c+i)<<16|25+i),'appended EXIF mapping differs');
+ for(let i=0;i<10;i++)need(table.readUInt32LE(48+i*4)===((0x10c+i)<<16|25+i),'appended EXIF mapping differs');
  const movt=(r,v)=>(0xe3400000|((v&0xf000)<<4)|(r<<12)|(v&0xfff))>>>0;
  for(const [address,expected,replacement] of [
-  [0x53599df4,0xe3a00030,0xe3a00044],[0x53599e20,0xe30bc6f4,movw(12,m.exif_table&65535)],
-  [0x53599e2c,0xe345c3d2,movt(12,m.exif_table>>>16)],[0x53599e30,0xe2801030,0xe2801044],
-  [0x53599e4c,0xe353000c,0xe3530011],[0x53599e60,0xe2800030,0xe2800044],
+  [0x53599df4,0xe3a00030,0xe3a00058],[0x53599e20,0xe30bc6f4,movw(12,m.exif_table&65535)],
+  [0x53599e2c,0xe345c3d2,movt(12,m.exif_table>>>16)],[0x53599e30,0xe2801030,0xe2801058],
+  [0x53599e4c,0xe353000c,0xe3530016],[0x53599e60,0xe2800030,0xe2800058],
  ])patches.push({address,expected,replacement,name:'appended EXIF '+address.toString(16)});
  need(m.patches.length===patches.length&&patches.every((p,i)=>p.address===m.patches[i].address&&p.expected===m.patches[i].expected&&p.replacement===m.patches[i].replacement),'appended patch inventory differs');
  return patches;
@@ -418,7 +426,7 @@ function patchList(manifest,runtime) {
       else p.replacement=0xe1a00000;
     }
   }
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?761:755),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?773:773),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){
@@ -528,8 +536,8 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:87,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:55,max_records:256,custom_lut:true,page_rows:8}:null,
-    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:[25,26,27,28,29],stock_choices:12,shooting_choices:17,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus five independent M10V film slots':'12 stock entries only; no private IDs',
+    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:5,film_count:manifest.film_library_enabled===false?0:87,active_slots:manifest.film_library_enabled===false?0:Array.from({length:10},(_,i)=>Buffer.from(manifest.initial_state_hex,'hex').readUInt16LE(12+i*8)).filter(Boolean).length,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:55,max_records:256,custom_lut:true,page_rows:10}:null,
+    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:Array.from({length:10},(_,i)=>25+i),stock_choices:12,shooting_choices:'12+enabled_films',capacity:10,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus up to ten selected M10V films':'12 stock entries only; no private IDs',
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',

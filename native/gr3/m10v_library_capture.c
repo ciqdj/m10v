@@ -19,8 +19,8 @@
 #if M10V_RAW_LIFETIME
 #include "m10v_save_trace.h"
 #endif
-#if M10V_RECIPE_SNAPSHOT
 #include "m10v_isp_recipe_color.h"
+#if M10V_RECIPE_SNAPSHOT
 #endif
 #if M10V_CAPTURE_PROFILE
 int m10v_library_render_profiled(m10v_library_image *,const m10v_library_state *,uint32_t,const m10v_library_date *,uint32_t,uint8_t *,uint32_t,m10v_capture_profile *);
@@ -228,9 +228,9 @@ int m10v_capture_library(uint32_t context) {
         *(const uint32_t *)(uintptr_t)request != 0x53d0fe60u) REJECT(-3,5,request,shooting);
     const uint8_t *req = (const uint8_t *)(uintptr_t)request;
     if (req[12] != 1 || req[13] > 1 || ((const uint8_t *)(uintptr_t)jpeg)[16] != 1) REJECT(-4,6,req[12],req[13]);
-    uint32_t tone = ((const uint8_t *)(uintptr_t)shooting)[0x77c], slot = 5;
+    uint32_t tone = ((const uint8_t *)(uintptr_t)shooting)[0x77c], slot = M10V_SLOT_COUNT;
 
-    for (uint32_t i = 0; i < 5; ++i) if (m10v_slot_tone(i) == tone) slot = i;
+    for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) if (m10v_slot_tone(i) == tone) slot = i;
     /* A committed per-exposure selection can precede the backend SI tone.
      * Authenticate the owned snapshot before rejecting that first stock frame.
      * No snapshot means ordinary stock/RAW frames keep their original gates. */
@@ -238,15 +238,16 @@ int m10v_capture_library(uint32_t context) {
     int settings_source=-1;
 #if M10V_RECIPE_SNAPSHOT
     const m10v_isp_recipe_color *snapshot=(const m10v_isp_recipe_color *)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
+    if(ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)&&snapshot->magic==M10V_ISP_RECIPE_COLOR_MAGIC&&snapshot->status==M10V_ISP_RECIPE_MUTATING)REJECT(-5,16,M10V_ISP_RECIPE_MUTATING,0);
     if(ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)&&m10v_isp_frame_recipe_state((void *)(uintptr_t)recipe,&state)){
         settings_source=4;
         if(snapshot->selected_tone){
-            uint32_t selected=snapshot->selected_tone;slot=5;
-            for(uint32_t i=0;i<5;i++)if(m10v_slot_tone(i)==selected)slot=i;
+            uint32_t selected=snapshot->selected_tone;slot=M10V_SLOT_COUNT;
+            for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(m10v_slot_tone(i)==selected)slot=i;
         }
     }
 #endif
-    if (slot == 5) REJECT(-4,7,tone,0);
+    if (slot == M10V_SLOT_COUNT) REJECT(-4,7,tone,0);
     const uint32_t *desc = (const uint32_t *)(uintptr_t)descriptor;
     const uint16_t *dims = (const uint16_t *)(uintptr_t)(descriptor + 16);
     uint32_t width = dims[0], height = dims[1], stride = dims[2], allocated = dims[3];
@@ -293,6 +294,8 @@ int m10v_capture_library(uint32_t context) {
     if(settings_source!=4)settings_source=m10v_camera_library_load(&state);
     M10V_PROFILE(3);
     if (settings_source < 0) REJECT(-5,16,(uint32_t)settings_source,0);
+    if(state.reserved&510u)REJECT(-5,16,M10V_ISP_RECIPE_MUTATING,0);
+    if(!state.slots[slot].film) REJECT(-4,7,tone,slot);
     uint32_t completed=0;
 #if M10V_ISP_NATIVE_LOOK
     completed=m10v_isp_frame_recipe_completed((void *)(uintptr_t)recipe,shooting,tone,&state);

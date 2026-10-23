@@ -130,3 +130,10 @@ YahiaAngelo/Film-Luts at af957b631a304e6be94778b96cb3395de3438e9f, MIT,
 copyright (c) 2024 Yahia. The full notice is retained as
 `third_party/style-filter-luts/film-luts-license`. PX-680 is a historical proxy,
 not a manufacturer calibration for modern Polaroid 600 / i-Type film.
+
+## Noto Sans Bold
+
+`third_party/noto-sans/NotoSans-Bold.ttf` is Noto Sans Bold from the Noto
+project, licensed under the SIL Open Font License 1.1. The complete license
+and copyright notice are in `third_party/noto-sans/OFL.txt`. The square film
+icon PNGs and generated native glyph coverage use this font.

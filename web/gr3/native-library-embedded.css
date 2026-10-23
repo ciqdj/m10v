@@ -6,13 +6,13 @@
 /* M10V cartridge family, shared with the embedded 40×40 camera sprites. */
 #native-editor .film{min-height:194px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;overflow:hidden;background:linear-gradient(155deg,#242824,#191d1a)}
 #native-editor .film small{align-self:flex-start;letter-spacing:1.2px;font-size:9px;color:#939d92}
-#native-editor .film-icon{display:block;width:96px;height:96px;object-fit:contain;image-rendering:pixelated;flex-shrink:0;filter:drop-shadow(0 7px 7px #0004);transition:transform .18s ease}
+#native-editor .film-icon{display:block;width:96px;height:96px;object-fit:contain;image-rendering:auto;flex-shrink:0;filter:drop-shadow(0 7px 7px #0004);transition:transform .18s ease}
 #native-editor .film:hover .film-icon{transform:translateY(-3px) rotate(-3deg)}
 #native-editor .film strong{margin-top:8px;font-size:13px;line-height:1.4}
 #native-editor .film[aria-pressed=true]{border-color:#dfba78;background:linear-gradient(150deg,#3a3527,#24261f);box-shadow:inset 0 0 0 1px #dfba7833}
 #native-editor .film .check{position:absolute;right:12px;top:12px;border-radius:50%;width:22px;height:22px;background:#dfba78;color:#21251d;display:grid;place-items:center;font-size:12px}
 #native-editor .slot .film-icon{width:56px;height:56px;margin:0 auto 5px}
-#native-editor .slot{min-height:166px}.shared-slots .film-icon{width:64px;height:64px;display:block;margin:8px auto;image-rendering:pixelated}
+#native-editor .slot{min-height:166px}.shared-slots .film-icon{width:64px;height:64px;display:block;margin:8px auto;image-rendering:auto}
 @media(max-width:760px){#native-editor .film{min-height:184px}#native-editor .film-icon{width:88px;height:88px}#native-editor .slot{min-height:156px}}
 @media(prefers-reduced-motion:reduce){#native-editor .film-icon{transition:none}#native-editor .film:hover .film-icon{transform:none}}
 
@@ -30,3 +30,8 @@
 @media(min-width:1450px){#native-editor .film-browser-panel .catalog{grid-template-columns:repeat(3,minmax(0,1fr))}#native-editor .film-parameters-panel .texture{grid-template-columns:1fr 1fr}}
 @media(max-width:700px){#native-editor .workspace{grid-template-columns:1fr;gap:14px}#native-editor .film-browser-panel,#native-editor .film-parameters-panel{grid-column:1}#native-editor .film-browser-panel .catalog{max-height:320px;grid-template-columns:repeat(3,minmax(0,1fr))}#native-editor .film-browser-panel .search{grid-template-columns:1fr 1fr}#native-editor .film-parameters-panel .texture{grid-template-columns:1fr 1fr}#native-editor .slots{grid-template-columns:repeat(3,minmax(0,1fr))}#native-editor .slot:last-child{grid-column:auto;display:block}#native-editor .slot{min-height:114px}#native-editor .workspace>.section-head{align-items:start;flex-direction:column;gap:3px}}
 @media(max-width:400px){#native-editor .film-browser-panel .catalog{grid-template-columns:repeat(2,minmax(0,1fr))}#native-editor .film-browser-panel .search,#native-editor .film-parameters-panel .texture{grid-template-columns:1fr}}
+
+#native-editor .slots{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(2,minmax(112px,auto));align-content:start}#native-editor .slot:last-child{grid-column:auto;display:block}#native-editor .film[data-selected=true]{border-color:var(--gold);background:#2c2a22}#native-editor .film>input[type=checkbox]{position:absolute;right:10px;top:10px;width:18px;height:18px;accent-color:var(--gold)}#native-editor .film{cursor:pointer}#native-editor .film-icon{image-rendering:auto}
+
+#native-editor .slots{grid-template-rows:none;grid-auto-rows:minmax(152px,auto)}#native-editor .slot .film-icon{width:72px;height:72px;margin:0 auto 8px;display:block}#native-editor .slot{text-align:center}#native-editor .film{position:relative}
+@media(max-width:700px){#native-editor .slots{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -3,7 +3,7 @@
 #include "m10v_settings.h"
 #include "m10v_zoom_menu.h"
 /* GR III 2.10 only. Unintegrated view; caller owns route and root lifetime. */
-enum { M10V_VIEW_CAPACITY=40, M10V_VIEW_COUNT=37 };
+enum { M10V_VIEW_CAPACITY=66, M10V_VIEW_COUNT=63, M10V_VIEW_HEAP=65 };
 typedef struct { uint32_t widgets[M10V_VIEW_CAPACITY]; uint32_t count; } m10v_settings_view;
 enum {
  M10V_VIEW_FILMS=937, M10V_VIEW_STAMP, M10V_VIEW_FILM_HELP,

@@ -12,13 +12,15 @@
 #define M10V_STYLE(id) ((id)>=M10V_STYLE_FIRST && (id)<=M10V_STYLE_LAST)
 #define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || M10V_STYLE(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
-#define M10V_SLOT_COUNT 5u
+#define M10V_SLOT_COUNT 10u
+#define M10V_CUSTOM_IMMUTABLE_FIRST 21u
+#define M10V_CUSTOM_MAX_BANK 254u
 #define M10V_LIBRARY_OK 0
 #define M10V_LIBRARY_INVALID -1
 #define M10V_LIBRARY_STORE_FAILED -2
 
 typedef struct { uint16_t film; uint8_t grain, soft, halo_gain, halo_spread, halo_threshold, halo_profile; } m10v_slot;
-/* Retired grain_size/leak_* bytes retain the published 104-byte journal ABI. */
+/* Retired grain_size/leak_* bytes retain their per-film layout. */
 typedef struct { uint8_t grain_size, leak_gain, leak_position, leak_spread, leak_variation, film_exposure, reserved[2]; } m10v_film_effects;
 typedef struct {
     uint32_t magic;
@@ -40,6 +42,9 @@ int m10v_library_effects(m10v_library_state *,uint32_t slot,uint32_t field,uint3
 int m10v_camera_library_effects(m10v_library_state *,uint32_t slot,uint32_t field,uint32_t value);
 int m10v_library_reset(m10v_library_state *,uint32_t slot,m10v_library_store,void *);
 int m10v_camera_library_reset(m10v_library_state *,uint32_t slot);
+uint32_t m10v_library_count(const m10v_library_state *);
+int m10v_library_remove(m10v_library_state *,uint32_t,m10v_library_store,void *);
+int m10v_camera_library_remove(m10v_library_state *,uint32_t);
 void m10v_library_init(m10v_library_state *);
 int m10v_library_valid(const m10v_library_state *);
 const char *m10v_library_name(uint32_t film);
@@ -64,6 +69,7 @@ enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
  * color retains its exact fallback. Grain is native-only and leak is retired. */
 #define M10V_CPU_STAMP 32u
 static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,uint32_t slot,uint32_t completed){
+    if(!state||slot>=M10V_SLOT_COUNT||!state->slots[slot].film)return 0;
     const m10v_slot *v=&state->slots[slot];
     uint32_t stages=(v->film>M10V_FILM_COUNT||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
     if((v->film==33||v->film==67)&&v->halo_gain&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
@@ -80,6 +86,10 @@ int m10v_library_render(m10v_library_image *, const m10v_library_state *, uint32
 /* Nonnegative load provenance: 0=new journal, 1=defaults, 2=v2 migration,
  * 3=v1 migration. All are usable validated states; negative is failure. */
 int m10v_camera_library_preview(m10v_library_state *);
+int m10v_camera_library_reconcile_legacy_selection(uint32_t model);
+int m10v_camera_library_mutation_begin(void);
+void m10v_camera_library_mutation_end(const m10v_library_state *);
+int m10v_camera_library_mutation_busy(void);
 void m10v_camera_library_preview_init(uint32_t);
 void m10v_camera_library_preview_clear(uint32_t);
 int m10v_camera_library_load(m10v_library_state *);

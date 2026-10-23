@@ -1,6 +1,6 @@
 import {zoomSources} from './gr3-zoom.mjs';
 // Independent readback contract for the two owned settings controllers.
-export const settingsSources=[...zoomSources,'native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_custom_icon.rgba','scripts/generate_m10v_film_cards.py','native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','native/gr3/m10v_ab.h','native/gr3/m10v_ab_camera.inc','native/gr3/m10v_ab_host.inc','scripts/build_gr3_settings_hooks.py'];
+export const settingsSources=[...zoomSources,'native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_custom_icon.rgba','scripts/generate_m10v_film_cards.py','third_party/noto-sans/NotoSans-Bold.ttf','third_party/noto-sans/OFL.txt','native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','native/gr3/m10v_ab.h','native/gr3/m10v_ab_camera.inc','native/gr3/m10v_ab_host.inc','scripts/build_gr3_settings_hooks.py'];
 const need=(c,m)=>{if(!c)throw Error('independent settings: '+m);};
 const movw=(r,v)=>(0xe3000000|((v&0xf000)<<4)|(r<<12)|(v&0xfff))>>>0;
 const movt=(r,v)=>(movw(r,v)|0x00400000)>>>0;
@@ -10,7 +10,7 @@ export function settingsPatches(m){
  if(!m.sd_library)return [];
  need(typeof m.zoom?.enabled==='boolean','explicit zoom enabled contract');
  const zoom=m.zoom.enabled,count=zoom?4:3;
- const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.live_color?0x19bc:0x193c;
+ const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.live_color?0x223c:0x213c;
  need(d&&d.owner_bytes===ownerBytes&&JSON.stringify(d.private_routes)===JSON.stringify([33616128,33616129,33616131,33616132,...(zoom?[33616133]:[])])&&d.rows?.length===count,'missing route/owner contract');
  const patches=[];
  for(const [a,e,n,l] of [[0x5316f3b8,0xe300313b,'factory',false],[0x5319667c,0xe1a0c00d,'top_dtor',false],[0x5316fcf8,0xeb00ab5a,'top_ctor',true],[0x53221a4c,0xeb001c7e,'key_route',true]])patches.push({address:a,expected:e,replacement:branch(a,s['m10v_settings_controller_'+n],l),name:'settings '+n});
@@ -38,7 +38,7 @@ export function abPatches(m){
  const d=m.settings_menu,s=m.symbols;
  const sites=[['selector',0x53221a1c],['mapper',0x5320c844],['live_enter',0x5317696c],['live_leave',0x53176de4],['live_destroy',0x53170b50],['live_event',0x531771c0],['adj_event',0x531a4db8],['adj_refresh',0x531a4114],['adj_exit',0x531a3e88],['adj_destroy',0x5319ff24],['adj_changed',0x531a4cfc],['dispatch',0x5316d5dc]];
  need(d?.ab_hooks?.length===12,'missing A/B hooks');
- need(d.ab_host?.stage==='compare'&&d.ab_host.route===0x02000000&&d.ab_host.menu_parent===0x02000012&&d.ab_host.custom_root===false&&d.ab_host.tone_changes===true&&d.ab_host.root_rows===0&&d.ab_host.direct_pair===true&&d.ab_host.live_ui===false&&d.ab_host.picker_page_rows===6&&d.ab_host.choices===(m.appended_slots?17:12),'native comparison host contract');
+ need(d.ab_host?.stage==='compare'&&d.ab_host.route===0x02000000&&d.ab_host.menu_parent===0x02000012&&d.ab_host.custom_root===false&&d.ab_host.tone_changes===true&&d.ab_host.root_rows===0&&d.ab_host.direct_pair===true&&d.ab_host.live_ui===false&&d.ab_host.picker_page_rows===6&&d.ab_host.choices===(m.appended_slots?22:12),'native comparison host contract');
  return sites.map(([name,address],i)=>{
   const p={address,expected:name==='adj_event'?0xe1d130b0:name==='adj_exit'?0xe5d02270:0xe1a0c00d,replacement:branch(address,s['m10v_settings_controller_ab_'+name]),name:'A/B '+name};
   need(['address','expected','replacement'].every(k=>p[k]===d.ab_hooks[i][k]),'A/B hook differs');return p;

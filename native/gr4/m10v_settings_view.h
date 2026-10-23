@@ -1,6 +1,6 @@
 #ifndef M10V_SETTINGS_VIEW_H
 #define M10V_SETTINGS_VIEW_H
-#include "../gr3/m10v_settings.h"
+#include "m10v_settings.h"
 /* GR IV 1.11 only. Unintegrated view; caller owns route and root lifetime. */
 enum { M10V_VIEW_CAPACITY=40, M10V_VIEW_COUNT=37 };
 typedef struct { uint32_t widgets[M10V_VIEW_CAPACITY]; uint32_t count; } m10v_settings_view;

@@ -15,18 +15,17 @@ static uint32_t ab_host_page_size(m10v_native_ab_host *h){
  uint32_t list=ab_host_word(h->controller,0x1f0),first=ab_host_word(list,0xf4),end=ab_host_word(list,0xf8);
  return end>=first&&end-first>=24?6:3;
 }
-static uint32_t ab_host_start_row(uint32_t focus,uint32_t size){if(size==6)return focus<6?0:focus<12?6:12;
- return focus<3?0:focus<6?3:focus<9?6:focus<12?9:focus<15?12:15;}
-static uint32_t ab_host_film(m10v_native_ab_host *h,uint32_t choice){uint32_t slot=m10v_ab_slot(choice);return slot<5?h->films[slot]:0;}
+static uint32_t ab_host_start_row(uint32_t focus,uint32_t size){uint32_t start=0;for(uint32_t i=0;i<8;i++){if(start+size>focus)break;start+=size;}return start;}
+static uint32_t ab_host_film(m10v_native_ab_host *h,uint32_t choice){uint32_t slot=m10v_ab_slot(choice);return slot<M10V_SLOT_COUNT?h->films[slot]:0;}
 static uint32_t ab_host_icon(m10v_native_ab_host *h,uint32_t choice){
  uint32_t id=ab_host_film(h,choice);
- if(m10v_ab_slot(choice)<5)return M10V_CUSTOM(id)?754:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:id>=1&&id<=78?670+id:0;
+ if(m10v_ab_slot(choice)<M10V_SLOT_COUNT)return M10V_CUSTOM(id)?754:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:id>=1&&id<=78?670+id:0;
  return ((fn2)0x532a9988u)(0,m10v_ab_tone(choice));
 }
 static void ab_host_name(m10v_native_ab_host *h,uint32_t choice,char *out,uint32_t prefix){
  const char *name=m10v_ab_stock_name(choice);char custom[24];m10v_library_state fresh;
  uint32_t slot=m10v_ab_slot(choice),id=ab_host_film(h,choice),n=0;
- if(slot<5){
+ if(slot<M10V_SLOT_COUNT){
   name=m10v_library_name(id);
   if(M10V_CUSTOM(id)&&m10v_camera_library_load(&fresh)>=0&&fresh.slots[slot].film==id&&
      m10v_sd_camera_custom_name(&fresh,slot,custom,sizeof(custom)))name=custom;
@@ -37,8 +36,9 @@ static void ab_host_name(m10v_native_ab_host *h,uint32_t choice,char *out,uint32
 }
 static void ab_host_render(m10v_settings_controller *p){
  m10v_native_ab_host *h=&p->host;uint32_t c=h->controller,list=ab_host_word(c,0x1f0);
+ uint32_t available=m10v_camera_library_shooting_count();if(h->focus>=available)h->focus=0;
  uint32_t size=ab_host_page_size(h),start=ab_host_start_row(h->focus,size);
- uint32_t rows=M10V_TONE_CHOICES-start;if(rows>size)rows=size;
+ uint32_t rows=available-start;if(rows>size)rows=size;
  h->rebuilding=1;((fn2)0x53394e8cu)(list,rows);
  for(uint32_t i=0;i<rows;i++){
   uint32_t row=((fn2)0x53394758u)(list,i),choice=start+i;
@@ -90,9 +90,11 @@ static void ab_host_open(m10v_settings_controller *p,uint32_t c,uint32_t origin)
  for(uint32_t i=0;i<sizeof(*h);i++)((uint8_t *)h)[i]=0;
  h->mode=1;h->origin=origin;h->source=c;p->pending_source=c;
  if(!p->ab.enabled)ab_pair(&p->ab);h->a=p->ab.a;h->b=p->ab.b;
+ uint32_t available=m10v_camera_library_shooting_count();
+ if(h->a>=available)h->a=0;if(h->b>=available)h->b=1;
  h->level=1;h->focus=h->a;
  m10v_library_state fresh;if(m10v_camera_library_load(&fresh)<0)h->error=945;
- else for(uint32_t i=0;i<5;i++)h->films[i]=fresh.slots[i].film;
+ else for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)h->films[i]=fresh.slots[i].film;
  if(origin==0x02000000u)ab_host_attach(p,c);
  else ((fn3)0x5316c9d8u)(c,0x02000000u,0x02000012u);
 }
@@ -108,14 +110,14 @@ static void ab_host_live(m10v_settings_controller *p,uint32_t c){
 static void ab_host_start(m10v_settings_controller *p,uint32_t c){
  m10v_native_ab_host *h=&p->host;m10v_library_state fresh;
  if(h->a==h->b){h->error=1018;ab_host_render(p);return;}
- if(h->a>=M10V_TONE_CHOICES||h->b>=M10V_TONE_CHOICES||m10v_camera_library_load(&fresh)<0){h->error=945;ab_host_render(p);return;}
+ if(h->a>=m10v_camera_library_shooting_count()||h->b>=m10v_camera_library_shooting_count()||m10v_camera_library_load(&fresh)<0){h->error=945;ab_host_render(p);return;}
  uint32_t sa=m10v_ab_slot(h->a),sb=m10v_ab_slot(h->b);
- if((sa<5&&(!fresh.slots[sa].film||fresh.slots[sa].film!=h->films[sa]))||
-    (sb<5&&(!fresh.slots[sb].film||fresh.slots[sb].film!=h->films[sb]))||ab_save(h->a,h->b)||ab_apply(h->a)){
+ if((sa<M10V_SLOT_COUNT&&(!fresh.slots[sa].film||fresh.slots[sa].film!=h->films[sa]))||
+    (sb<M10V_SLOT_COUNT&&(!fresh.slots[sb].film||fresh.slots[sb].film!=h->films[sb]))||ab_save(h->a,h->b)||ab_apply(h->a)){
   h->error=945;ab_host_render(p);return;
  }
  ab_clear(&p->ab);
- m10v_ab_start(&p->ab,h->a,h->b,h->a,sa<5?fresh.slots[sa].film:0,sb<5?fresh.slots[sb].film:0);
+ m10v_ab_start(&p->ab,h->a,h->b,h->a,sa<M10V_SLOT_COUNT?fresh.slots[sa].film:0,sb<M10V_SLOT_COUNT?fresh.slots[sb].film:0);
  ab_host_live(p,c);
 }
 static int ab_host_event(m10v_settings_controller *p,uint32_t c,uint32_t event){
@@ -133,12 +135,12 @@ static int ab_host_event(m10v_settings_controller *p,uint32_t c,uint32_t event){
  if(key==8){h->back_pending=0;return 0;}
  if(key==0xd8&&h->back_pending){h->back_pending=0;return 1;}
  if(key==0xd0||key==0xd4||key==0xd1||key==0xd5){
-  uint32_t count=M10V_TONE_CHOICES;
+  uint32_t count=m10v_camera_library_shooting_count();
   h->focus=(key==0xd0||key==0xd4)?(h->focus?h->focus-1:count-1):ab_host_wrap(h->focus+1,count);
   h->error=0;ab_host_render(p);return 1;
  }
  if(key==0xce||key==0xcf){
-  uint32_t n=ab_host_page_size(h);h->focus=ab_host_wrap(h->focus+M10V_TONE_CHOICES+(key==0xce?M10V_TONE_CHOICES-n:n),M10V_TONE_CHOICES);
+  uint32_t n=ab_host_page_size(h);h->focus=ab_host_wrap(h->focus+m10v_camera_library_shooting_count()+(key==0xce?m10v_camera_library_shooting_count()-n:n),m10v_camera_library_shooting_count());
   h->error=0;ab_host_render(p);return 1;
  }
  if(key==0xd8){
@@ -172,7 +174,7 @@ uint32_t m10v_settings_controller_ab_adj_changed(uint32_t c){
  if(ab_host_owned(h,c)){
   uint32_t cursor=((fn1)0x53394820u)(ab_host_word(c,0x1f0)),size=ab_host_page_size(h);
   uint32_t next=ab_host_start_row(h->focus,size)+cursor;
-  if(next<M10V_TONE_CHOICES){h->focus=next;h->error=0;ab_host_render(ab_owner());}return 0;
+  if(next<m10v_camera_library_shooting_count()){h->focus=next;h->error=0;ab_host_render(ab_owner());}return 0;
  }
  return m10v_ab_adj_changed_original(c);
 }

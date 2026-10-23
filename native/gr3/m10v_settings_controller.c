@@ -18,20 +18,25 @@ extern uint32_t m10v_settings_controller_vtable(void);
 static int load(void *ctx,m10v_library_state *s){(void)ctx;return m10v_camera_library_load(s);}
 static uint32_t item(void *ctx,uint32_t i){(void)ctx;return m10v_sd_camera_item(i/8,i%8);}
 static int install(void *ctx,uint32_t i,uint32_t id,uint32_t slot){
- (void)ctx;
- int r=m10v_sd_camera_install(i/8,i%8,id,slot);
- if(!r){
-
-  uint32_t root=((uint32_t (*)(void))0x5320ad88u)();
-  uint32_t model=((fn1)0x5320ba9cu)(root);
-  /* Setup has no ImageControl enter/leave lifecycle. Its model may still
-   * describe playback or RAW development. Scope the stock setter to shooting
-   * and restore that borrowed context before returning. */
-  uint8_t *m=(uint8_t *)(uintptr_t)model;uint8_t prior=m[0x1b];m[0x1b]=0;
+ (void)ctx;m10v_library_state state;
+ if(m10v_camera_library_load(&state)<0||!m10v_camera_library_mutation_begin())return -1;
+ int result=m10v_sd_camera_install(i/8,i%8,id,slot);
+ m10v_camera_library_load(&state);m10v_camera_library_mutation_end(&state);return result;
+}
+static int remove_film(void *ctx,uint32_t slot){
+ (void)ctx;m10v_library_state fresh;
+ if(m10v_camera_library_load(&fresh)<0)return -1;
+ if(!m10v_camera_library_mutation_begin())return -1;
+ int r=m10v_camera_library_remove(&fresh,slot);
+ if(r){m10v_camera_library_mutation_end(&fresh);return r;}
+ uint32_t root=((uint32_t (*)(void))0x5320ad88u)(),model=((fn1)0x5320ba9cu)(root);
+ uint8_t *m=(uint8_t *)(uintptr_t)model;uint8_t prior=m[0x1b];m[0x1b]=0;
+ uint32_t tone=((fn1)0x532bd6b4u)(model),bank=((fn1)0x532bd6d4u)(model),active=m10v_tone_slot(tone);
+ if(!bank&&active<M10V_SLOT_COUNT&&active>=slot){
   if(M10V_APPENDED_SLOTS)((fn2)0x532bd61cu)(model,0);
-  ((fn2)0x532c26c0u)(model,m10v_slot_tone(slot));m[0x1b]=prior;
+  ((fn2)0x532c26c0u)(model,active==slot?11:m10v_slot_tone(active-1));
  }
- return r;
+ m[0x1b]=prior;m10v_camera_library_mutation_end(&fresh);return 0;
 }
 static int stamp(void *ctx,uint32_t enabled,uint32_t format,uint32_t corner,uint32_t color){
  (void)ctx;m10v_library_state fresh;
@@ -44,12 +49,12 @@ static int film_name_stamp(void *ctx,uint32_t enabled){
  return m10v_camera_library_film_name_stamp(&fresh,enabled);
 }
 static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;}
-static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
+static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->remove=remove_film;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
 #include "m10v_ab_camera.inc"
-uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?128u:0u);}
+uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?256u:0u);}
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
  ((fn1)0x5319aa68u)(owner);
  for(uint32_t i=0;i<2;i++){
@@ -186,7 +191,7 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
     else{
      for(uint32_t i=0;i<sizeof(fresh);i++)((uint8_t *)&p->state.saved)[i]=((const uint8_t *)&fresh)[i];
      uint32_t sa=m10v_ab_slot(a),sb=m10v_ab_slot(b);
-     m10v_ab_start(&p->ab,a,b,target,sa<5?fresh.slots[sa].film:0,sb<5?fresh.slots[sb].film:0);
+     m10v_ab_start(&p->ab,a,b,target,sa<M10V_SLOT_COUNT?fresh.slots[sa].film:0,sb<M10V_SLOT_COUNT?fresh.slots[sb].film:0);
      p->state.screen=M10V_SETTINGS_CLOSED;
     }
    }
@@ -212,10 +217,10 @@ uint32_t m10v_settings_controller_key_route(uint32_t model){
 uint32_t m10v_settings_controller_card_directory(void){
  if(!(*(const volatile uint32_t *)0x55063910u&1u))return 0;
  uint32_t owner=*(const volatile uint32_t *)0x55063988u;
- if((owner&3)||owner<0x55000000u||owner>0x80000000u-0x193cu)return 0;
+ if((owner&3)||owner<0x55000000u||owner>0x80000000u-0x213cu)return 0;
  m10v_settings_controller *p=page(owner,0);
  if(*(uint32_t *)p!=m10v_settings_controller_vtable()||p->view.count!=M10V_VIEW_COUNT)return 0;
- uint32_t heap=p->view.widgets[39];
- if((heap&3)||heap<0x55000000u||heap>0x80000000u-470464u)return 0;
- return heap+470440u-M10V_CARD_FIRST*4u;
+ uint32_t heap=p->view.widgets[M10V_VIEW_HEAP];
+ if((heap&3)||heap<0x55000000u||heap>0x80000000u-M10V_CARD_HEAP_BYTES)return 0;
+ return heap+M10V_CARD_DIRECTORY_OFFSET-M10V_CARD_FIRST*4u;
 }

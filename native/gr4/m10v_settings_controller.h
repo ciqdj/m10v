@@ -10,7 +10,7 @@ typedef struct {
  uint32_t page;
 } m10v_settings_controller;
 #define M10V_SETTINGS_OWNER_BYTES 0x13ecu
-#define M10V_SETTINGS_CONTROLLER_BYTES 0x2c0u
+#define M10V_SETTINGS_CONTROLLER_BYTES 0x320u
 _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,"controller tail capacity");
 #define M10V_SETTINGS_FILMS_ROUTE 0x0200f100u
 #define M10V_SETTINGS_STAMP_ROUTE 0x0200f101u

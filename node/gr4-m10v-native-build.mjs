@@ -14,6 +14,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 export function validateGr4Source(source){if(!Buffer.isBuffer(source)||hash(source)!==GR4_OFFICIAL_SHA256)throw Error('GR IV 官方固件摘要不匹配');}
 export function normalizeGr4Request(value={}){
  const configuration=normalizeConfiguration(value.configuration),extensions=normalizeExtensions(value.extensions);
+ if(configuration.slots.length>5)throw Error('GR IV 暂不支持导出超过 5 款胶卷');
  if(configuration.slots.some(s=>s.grain>0))throw Error('颗粒仅支持 GR III 原厂原生成像管线，请关闭颗粒后导出 GR IV');
  if(configuration.hdf)throw Error('数字 HDF 模拟当前仅支持普通 GR III');
  if(configuration.filmNameStamp)throw Error('胶卷名称水印当前仅支持 GR III / GR IIIx');

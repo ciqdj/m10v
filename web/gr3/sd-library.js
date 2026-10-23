@@ -51,5 +51,5 @@ try{
    label.className='sd-film';check.type='checkbox';check.value=f.id;check.checked=true;check.onchange=()=>{check.checked?selected.add(f.id):selected.delete(f.id);update();};icon.src=f.icon_url;icon.alt='';icon.width=40;icon.height=40;text.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;label.append(check,icon,text);grid.append(label);}
   $('sd-films').append(section);
  }
- $('sd-films').setAttribute('aria-busy','false');update();status('可全选或多选，不改变固件工作台的五槽配置。');
+ $('sd-films').setAttribute('aria-busy','false');update();status('可全选或多选，不改变固件工作台的已选胶卷。');
 }catch(e){$('sd-films').setAttribute('aria-busy','false');$('sd-count').textContent='目录暂不可用';status(e.message,true);}

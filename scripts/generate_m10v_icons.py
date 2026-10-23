@@ -1,7 +1,7 @@
 """Original M10V cartridge art. One RGBA source for web and camera, no borrowed assets."""
 from pathlib import Path
 import re,json,hashlib
-from PIL import Image,ImageDraw
+from PIL import Image,ImageDraw,ImageFont
 ROOT=Path(__file__).resolve().parents[1]
 GLYPHS={'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],'2':['111','001','111','100','111'],'3':['111','001','111','001','111'],'4':['101','101','111','001','001'],'5':['111','100','111','001','111'],'6':['111','100','111','101','111'],'7':['111','001','010','010','010'],'8':['111','101','111','101','111'],'9':['111','101','111','001','111'],'M':['10001','11011','10101','10001','10001'],'V':['101','101','101','101','010'],'T':['111','010','010','010','010'],'E':['111','100','110','100','111'],'G':['111','100','101','101','111'],'P':['110','101','110','100','100'],'H':['101','101','111','101','101'],'D':['110','101','101','101','110'],'C':['111','100','100','100','111'],'F':['111','100','110','100','100'],'L':['100','100','100','100','111']}
 # Compact original 3×5 capitals, sized for the camera's 40px sprites.
@@ -56,6 +56,44 @@ def text(d,x,y,s,c):
     if v=='1':d.point((x+xx,y+yy),fill=c)
   x+=len(rows[0])+1
 
+FONT=ROOT/'third_party/noto-sans/NotoSans-Bold.ttf'
+def box_style(name,i):
+ title,code,color=label(name,i)
+ brand='M10V';header=color;paper='#eee9d9';ink='#25363b';accent=color
+ if any(k in name for k in ('Portra','Gold','Ektar','ProImage','Vision3','V3 ','520','T-Max','2460','Aerochrome','Charmera')):
+  brand='KODAK';header='#ffcf32';paper='#6556ae' if 'Portra' in name else '#efbe32' if 'Gold' in name else '#b92538' if 'Ektar' in name else '#252628'
+  ink='#f8f4e8' if paper!='#efbe32' else '#9e2335';accent='#ffcf32'
+ elif any(k in name for k in ('富士','Pro 400H','Superia','Reversal')):
+  brand='FUJIFILM';header='#00956a';paper='#ede9d8';ink='#245346';accent='#188caa'
+ elif name=='800T':brand='CINESTILL';header='#22272a';paper='#d9bf69';ink='#22272a';accent='#d93b36'
+ elif '哈曼' in name:brand='HARMAN';header='#c12f3b';paper='#e9e5d8';ink='#a62936'
+ elif '凤凰' in name:brand='HARMAN';header='#e4a738';paper='#317bb5';ink='#fff0d6'
+ elif '乐凯' in name:brand='LUCKY';header='#cf343a';paper='#eadb9c';ink='#9f2836'
+ if name.startswith('Portra '):title='PORTRA'
+ if name=='Gold 200':title='GOLD'
+ if name=='Kodak Charmera':title,code='CHARMERA','PIXEL'
+ if name=='方块世界':title,code,header,paper,ink,accent='PIXEL','WORLD','#52783d','#a0ba6f','#233c23','#815b3b'
+ if name=='Custom LUT':title,code='CUSTOM','LUT'
+ return brand,title,code,header,paper,ink,accent
+
+def box_icon(name,i,size=40,spec=None):
+ brand,title,code,header,paper,ink,accent=box_style(name,i)
+ if spec:title,code,paper,ink=spec['title'],spec['code'],spec['color'],'#ffffff'
+ scale=4;side=size*scale
+ im=Image.new('RGBA',(side,side));d=ImageDraw.Draw(im)
+ def rect(b,c):d.rectangle(tuple(round(v*side/40) for v in b),fill=c)
+ rect((1,1,38.5,38.5),'#92968b');rect((1.6,1.6,37.9,37.9),paper)
+ rect((1.6,1.6,37.9,10.8),header);rect((1.6,11,37.9,11.3),'#f3eedc')
+ def centered(value,y,points,color):
+  f=ImageFont.truetype(str(FONT),round(points*side/40))
+  while d.textlength(value,font=f)>side*.84:f=ImageFont.truetype(str(FONT),f.size-1)
+  d.text((side/2,y*side/40),value,font=f,fill=color,anchor='mt')
+ centered(brand,4,4.4,'#ae2636' if brand=='KODAK' else '#fff8e5')
+ centered(title,16,5.8,ink)
+ if code:centered(code,25,6.5 if len(code)<=4 else 4.7,ink)
+ rect((1.6,35.3,37.9,37.9),accent)
+ return im.resize((size,size),Image.Resampling.LANCZOS)
+
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
  names += [v['name'] for v in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]
@@ -70,51 +108,35 @@ def generate():
  pixels=bytearray();meta=[];sheet=Image.new('RGBA',(10*120,8*130),'#171a18')
  out=ROOT/'web/gr3/film-icons';out.mkdir(exist_ok=True)
  for i,name in enumerate(names,1):
-  title,code,color=label(name,i);im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
-  d.rounded_rectangle((8,3,31,36),radius=4,fill='#121c20')
-  d.rectangle((16,0,22,3),fill='#a6afb0');d.rectangle((17,0,21,1),fill='#e7e8dc')
-  d.rounded_rectangle((10,7,31,32),radius=2,fill=color)
-  d.rectangle((8,6,10,32),fill='#475253');d.line((9,10,9,29),fill='#697775')
-  d.polygon([(11,12),(31,8),(31,18),(11,22)],fill='#f1e9d0')
-  title_width=sum(len(GLYPHS[c][0])+1 for c in title)-1
-  if title_width>19:raise ValueError('icon title too wide: '+name)
-  text(d,21-title_width//2,13,title,'#243133')
-  w=sum(len(GLYPHS[c][0])+1 for c in code)-1
-  if w>19:raise ValueError('icon code too wide: '+name)
-  text(d,21-w//2,25,code,'#fff4dc')
-  d.rectangle((11,33,30,35),fill='#2b383b');d.line((12,34,29,34),fill='#88908b')
-  d.polygon([(31,14),(35,15),(35,30),(32,32),(32,17)],fill='#303d3b');d.line((34,17,34,27),fill=color)
+  title,code,color=label(name,i);im=box_icon(name,i)
   rgba=im.tobytes();pixels+=rgba;im.save(out/f'{i:02d}.png',optimize=True)
-  meta.append({'id':i,'name':name,'title':title,'code':code,'color':color,'icon_url':f'/gr3/film-icons/{i:02d}.png','sha256':hashlib.sha256(rgba).hexdigest()})
+  box_icon(name,i,160).save(out/f'{i:02d}-large.png',optimize=True)
+  meta.append({'id':i,'name':name,'title':title,'code':code,'color':color,'icon_url':f'/gr3/film-icons/{i:02d}-large.png','sha256':hashlib.sha256(rgba).hexdigest()})
   big=im.resize((120,120),Image.Resampling.NEAREST);sheet.alpha_composite(big,((i-1)%10*120,(i-1)//10*130))
  (ROOT/'native/gr3/m10v_icons.rgba').write_bytes(pixels)
  # Append the noncontiguous Charmera identity without moving historical pixels.
- im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
- d.rounded_rectangle((8,3,32,36),radius=4,fill='#141414');d.rectangle((10,8,30,31),fill='#fad84e')
- d.rectangle((10,15,30,23),fill='#ff0000');d.rectangle((17,0,23,3),fill='#aaaaaa')
- text(d,12,10,'KODA','#000000');text(d,12,25,'PIXEL','#000000')
+ im=box_icon('Kodak Charmera',289)
+ box_icon('Kodak Charmera',289,160).save(out/'289-large.png')
  raw=im.tobytes();im.save(out/'289.png');(ROOT/'native/gr3/m10v_charmera.rgba').write_bytes(raw)
- meta.append({'id':289,'name':'Kodak Charmera','title':'KODA','code':'PIXEL','color':'#fad84e','icon_url':'/gr3/film-icons/289.png','sha256':hashlib.sha256(raw).hexdigest()})
- # Original grass/earth voxel cartridge, rendered on the established 40px grid.
- im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
- d.rectangle((8,5,32,35),fill='#243629');d.rectangle((16,1,23,4),fill='#b3bbb0')
- d.rectangle((10,8,30,18),fill='#76a849');d.rectangle((10,19,30,32),fill='#815b3b')
- for x,y,c in [(10,8,'#a3ca65'),(18,12,'#557c35'),(26,8,'#8bb852'),(10,23,'#63432f'),(22,27,'#a37a51')]:d.rectangle((x,y,x+4,y+3),fill=c)
- text(d,11,20,'PIXEL','#ffffff')
+ meta.append({'id':289,'name':'Kodak Charmera','title':'KODA','code':'PIXEL','color':'#fad84e','icon_url':'/gr3/film-icons/289-large.png','sha256':hashlib.sha256(raw).hexdigest()})
+ im=box_icon('方块世界',290)
+ box_icon('方块世界',290,160).save(out/'290-large.png')
  raw=im.tobytes();im.save(out/'290.png');(ROOT/'native/gr3/m10v_pixel_world.rgba').write_bytes(raw)
- meta.append({'id':290,'name':'方块世界','title':'PIXEL','code':'WORLD','color':'#76a849','icon_url':'/gr3/film-icons/290.png','sha256':hashlib.sha256(raw).hexdigest()})
+ meta.append({'id':290,'name':'方块世界','title':'PIXEL','code':'WORLD','color':'#76a849','icon_url':'/gr3/film-icons/290-large.png','sha256':hashlib.sha256(raw).hexdigest()})
  # Sparse styles append artwork without renumbering the 78 historical sprites.
  styles=json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks'];style_pixels=bytearray()
  for spec in styles:
-  im=Image.new('RGBA',(40,40));d=ImageDraw.Draw(im)
-  d.rounded_rectangle((8,3,32,36),radius=4,fill='#141d22');d.rectangle((10,8,30,31),fill=spec['color'])
-  d.rectangle((10,15,30,22),fill='#eee9dc');d.rectangle((17,0,23,3),fill='#aaaaaa')
-  for y,key,ink in [(16,'title','#202a30'),(25,'code','#ffffff')]:
-   value=spec[key];w=sum(len(GLYPHS[c][0])+1 for c in value)-1;text(d,21-w//2,y,value,ink)
+  im=box_icon(spec['name'],spec['id'],spec=spec)
+  box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
   raw=im.tobytes();style_pixels+=raw;im.save(out/f"{spec['id']}.png",optimize=True)
-  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}.png",sha256=hashlib.sha256(raw).hexdigest()))
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_style_filters.rgba').write_bytes(style_pixels)
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
+ # Include every sparse identity and custom artwork in the visual inventory.
+ sheet=Image.new('RGBA',(1200,1170),'#171a18')
+ for n,m in enumerate(meta):sheet.alpha_composite(Image.open(out/f"{m['id']:02d}.png").resize((120,120),Image.Resampling.LANCZOS),(n%10*120,n//10*130))
+ box_icon('Custom LUT',0,120).save(out/'custom.png')
+ sheet.alpha_composite(box_icon('Custom LUT',0,120),(len(meta)%10*120,len(meta)//10*130))
  sheet.save(ROOT/'docs/previews/m10v-film-icons.png')
  return meta
 if __name__=='__main__':generate()

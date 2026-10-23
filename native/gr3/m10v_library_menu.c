@@ -40,19 +40,21 @@ static uint32_t slot(const uint8_t *m) {
     /* Byte 0x1e is padding after the stock last member at 0x1c. Keep
      * the original m[0] entry snapshot intact for stock cancellation. */
     uint32_t tone = mode(m) && m[0x1e] ? m[0x1e] : m[0];
-    for (uint32_t i = 0; i < 5; ++i) if (tone == m10v_slot_tone(i)) return i;
+    for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) if (tone == m10v_slot_tone(i)) return i;
     return 0;
 }
 static uint32_t root_rows(const uint8_t *m,uint32_t index){
     m10v_library_state state;uint32_t film=0;
     if(m10v_camera_library_load(&state)>=0)film=state.slots[slot(m)].film;
-    uint32_t rows[5],n=0;rows[n++]=129;
+    uint32_t rows[5],n=0;
     if(M10V_ISP_NATIVE_GRAIN_MODE&&film!=M10V_CHAR_ID&&film!=M10V_PIXEL_ID)rows[n++]=130;
-    rows[n++]=132;rows[n++]=133;
+    rows[n++]=132;
     if(film==33||film==67||film==68||film==M10V_CHAR_ID)rows[n++]=film==M10V_CHAR_ID?359:film==68?340:film==67?339:214;
     return index==0xffffffffu?n:index<n?rows[index]:0;
 }
 static uint32_t group_count(uint32_t group,const uint8_t *m){
+    if(group==0)return m10v_camera_library_shooting_count()+1;
+    if(group==6){m10v_library_state state;m10v_camera_library_load(&state);return m10v_library_count(&state);}
     if(group==1)return root_rows(m,0xffffffffu);
     if(group==3){m10v_library_state state;if(!M10V_ISP_NATIVE_GRAIN_MODE||m10v_camera_library_load(&state)<0||state.slots[slot(m)].film==M10V_CHAR_ID||state.slots[slot(m)].film==M10V_PIXEL_ID)return 0;}
     return counts[group];
@@ -68,13 +70,15 @@ uint32_t m10v_menu_index(uint32_t address, uint32_t index) {
     if (!supported(m)) return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address, index);
     uint32_t group = mode(m);
     if (!group) {
-        if(index==M10V_LIBRARY_INDEX)return 128;
+        if(index==m10v_camera_library_menu_index())return 128;
         if(M10V_APPENDED_SLOTS&&index>=12&&index<14)return 23+index-12;
-        if(M10V_APPENDED_SLOTS&&index>=14&&index<19)return 25+index-14;
+        if(M10V_APPENDED_SLOTS&&index>=14&&index<m10v_camera_library_menu_index())return 25+index-14;
         return ((call2_fn)(M10V_NATIVE_BASE + 0x90u))(address,index);
     }
     if (index >= group_count(group,m)) return 0;
     static const uint8_t first[15] = {0,129,144,176,180,184,208,192,196,200,218,224,224,224,233};
+    if(group==0)return m10v_camera_library_shooting_count()+1;
+    if(group==6){m10v_library_state state;m10v_camera_library_load(&state);return m10v_library_count(&state);}
     if(group==1)return root_rows(m,index);
     if(group==22)return 355+index;
     if(group==2&&index==47)return 360;
@@ -105,7 +109,7 @@ static uint32_t resource(uint32_t tone) {
     if(tone>=233&&tone<237)return 875+tone-233;
     if (tone == 213) return 860;
     if (tone >= 144 && tone < 176) return 786 + tone - 144;
-    for (uint32_t i = 0; i < 5; ++i) if (tone == m10v_slot_tone(i)) return 818 + i;
+    for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) if (tone == m10v_slot_tone(i)) return i<5?818+i:818;
     if (tone == 128) return 825;
     if (tone >= 129 && tone < 134) return 826 + tone - 129;
     if (tone >= 176 && tone < 180) return 831 + tone - 176;
@@ -131,15 +135,15 @@ static uint32_t film_resource(uint32_t film) {
 }
 uint32_t m10v_menu_name(uint32_t translator, uint32_t tone) {
     if(M10V_APPENDED_SLOTS&&(tone==23||tone==24))return ((call2_fn)(M10V_NATIVE_BASE+0x20u))(translator,tone);
-    for (uint32_t i = 0; i < 5; ++i) {
-        if ((tone == m10v_slot_tone(i) || tone == 208 + i) && (M10V_APPENDED_SLOTS||supported(model()))) {
+    for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) {
+        if ((tone == m10v_slot_tone(i) || (i<5&&tone == 208 + i)) && (M10V_APPENDED_SLOTS||supported(model()))) {
             m10v_library_state state;
             /* Load initializes the compiled defaults even when storage is
              * unavailable. Never index a catalog with an unchecked journal. */
             m10v_camera_library_load(&state);
             if (m10v_library_valid(&state)) {
 #if M10V_SD_LIBRARY
-                if(M10V_CUSTOM(state.slots[i].film))return 1007+i;
+                if(M10V_CUSTOM(state.slots[i].film))return i<5?1007+i:1111+i-5;
 #endif
                 return film_resource(state.slots[i].film);
             }
@@ -149,7 +153,7 @@ uint32_t m10v_menu_name(uint32_t translator, uint32_t tone) {
     return id ? id : ((call2_fn)(M10V_NATIVE_BASE + 0x10u))(translator, tone);
 }
 uint32_t m10v_menu_value_name(uint32_t translator, uint32_t value) {
-    if(M10V_APPENDED_SLOTS&&m10v_tone_slot(value)<5)return m10v_menu_name(translator,value);
+    if(M10V_APPENDED_SLOTS&&m10v_tone_slot(value)<M10V_SLOT_COUNT)return m10v_menu_name(translator,value);
     if (mode(model()) && (value == 23 || value == 24)) return value == 23 ? 858 : 859;
     return ((call2_fn)(M10V_NATIVE_BASE + 0x20u))(translator, value);
 }
@@ -164,7 +168,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
     if(tone==213)return 703;
     if(tone>=256 && tone<288)return 704+tone-256;
     uint8_t *m=model();
-    if(M10V_APPENDED_SLOTS||supported(m))for(uint32_t i=0;i<5;i++)if(tone==m10v_slot_tone(i) || tone==208+i){
+    if(M10V_APPENDED_SLOTS||supported(m))for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(tone==m10v_slot_tone(i) || (i<5&&tone==208+i)){
         m10v_library_state state;
         if(m10v_camera_library_load(&state)>=0){
 #if M10V_SD_LIBRARY
@@ -177,21 +181,21 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
     return tone==128?671:tone>=128?0x224:((call2_fn)(M10V_NATIVE_BASE + 0x30u))(translator, tone);
 }
 uint32_t m10v_menu_value_icon(uint32_t translator, uint32_t value) {
-    if(M10V_APPENDED_SLOTS&&m10v_tone_slot(value)<5)return m10v_menu_icon(translator,value);
+    if(M10V_APPENDED_SLOTS&&m10v_tone_slot(value)<M10V_SLOT_COUNT)return m10v_menu_icon(translator,value);
     return ((call2_fn)(M10V_NATIVE_BASE + 0x40u))(translator, value);
 }
 uint32_t m10v_menu_focus(uint32_t controller, uint32_t index) {
     uint8_t *m = model();
     M10V_LOG(30,controller,index,m[0],(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
     uint32_t result=0;
-    if(M10V_APPENDED_SLOTS&&supported(m)&&!mode(m)&&index>=12&&index<19){
+    if(M10V_APPENDED_SLOTS&&supported(m)&&!mode(m)&&index>=12&&index<m10v_camera_library_menu_index()){
         ((call2_fn)0x532bd61cu)((uint32_t)(uintptr_t)m,index<14?index-11:0);
         if(index>=14){uint32_t tone=25+index-14;
             if(((get_fn)0x532bd6b4u)((uint32_t)(uintptr_t)m)!=tone)
                 ((call2_fn)0x532c26c0u)((uint32_t)(uintptr_t)m,tone);
         }return 0;
     }
-    if (!(supported(m) && (mode(m) || index == M10V_LIBRARY_INDEX)))
+    if (!(supported(m) && (mode(m) || index == m10v_camera_library_menu_index())))
         result=((call2_fn)(M10V_NATIVE_BASE + 0xa0u))(controller, index);
     M10V_LOG(31,controller,index,result,(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
     return result;
@@ -239,12 +243,12 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
     uint32_t index = ((get_fn)0x53394820u)(view), group = mode(m);
     if((group>=15&&group<=20)||group==4)return 0;
     if (!group) {
-        if (index != M10V_LIBRARY_INDEX) return ((get_fn)(M10V_NATIVE_BASE + 0x60u))(controller);
+        if (index != m10v_camera_library_menu_index()) return ((get_fn)(M10V_NATIVE_BASE + 0x60u))(controller);
         /* The stock entry snapshot at m[0] does not follow live browsing.
          * Capture the actual tone before switching to the private menu. */
         uint32_t active = ((get_fn)0x532bd6b4u)((uint32_t)(uintptr_t)m);
         m[0x1e] = 0;
-        for (uint32_t i = 0; i < 5; ++i) if (active == m10v_slot_tone(i)) m[0x1e] = (uint8_t)active;
+        for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) if (active == m10v_slot_tone(i)) m[0x1e] = (uint8_t)active;
         m[0x1d] = 1; redraw(controller); return 0;
     }
     if (index == group_count(group,m)) {
