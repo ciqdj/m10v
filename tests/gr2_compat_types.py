@@ -19,4 +19,3 @@ class Image(C.Structure):
 
 class Date(C.Structure):
     _fields_ = [('year', C.c_uint16)] + [(n, C.c_uint8) for n in ('month', 'day', 'hour', 'minute')]
-
