@@ -1,11 +1,7 @@
 """Fit live-preview surrogates; still JPEGs retain the full spectral LUT."""
 import sys,json,hashlib
 from pathlib import Path
-import numpy as np
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
-from scripts.fit_gr3_native_film_targets import fit,quantize,render_quantized
-from scripts.analyze_gr3_film_color_targets import metrics
-from scripts.build_gr3_harman_reference import sample_tetrahedral
 
 def native_header(manifest):
  arr=lambda x:'{'+','.join(map(str,x))+'}'
@@ -16,6 +12,10 @@ def native_header(manifest):
  return '/* Generated from spectral-reference.json; live approximation, never still completion. */\nstatic const m10v_isp_frame_target native_spectral_frame[2]={'+','.join(frames)+'};\nstatic const int16_t native_spectral_hue[2][108]={'+','.join(hues)+'};\n'
 
 def generate():
+ import numpy as np
+ from scripts.fit_gr3_native_film_targets import fit,quantize,render_quantized
+ from scripts.analyze_gr3_film_color_targets import metrics
+ from scripts.build_gr3_harman_reference import sample_tetrahedral
  manifest=json.loads((ROOT/'native/gr3/spectral-reference.json').read_text());web=json.loads((ROOT/'web/gr3/spectral-luts.json').read_text())
  base=np.array(json.loads((ROOT/'native/gr3/native-film-fit-targets.json').read_text())['base_gamma_q14'])/16384
  train=np.random.default_rng(77298).uniform(0,1,(4096,3));grey=np.repeat(np.linspace(0,1,256)[:,None],3,axis=1)
