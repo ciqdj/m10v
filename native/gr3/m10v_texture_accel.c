@@ -10,9 +10,6 @@ static V clamp(V v){v=sel(v<0,(V){0,0,0,0},v);return sel(v>255,(V){255,255,255,2
 static V round16(V v){V sign=v>>31,a=(v^sign)-sign;return (((a+32768)>>16)^sign)-sign;}
 /* Exact floor /255 for nonnegative v<=65534, including LUT sum+127. */
 static V div255(V v){return (v+1+(v>>8))>>8;}
-/* Denominators are3*2^18 and3*2^14. Abs then shift then /3 is
- * exact truncation; quotient input<=105 or8. Reciprocal21846 is exact here. */
-static V truncgrain(V v,int shift){V sign=v>>31,a=(v^sign)-sign;a=a>>shift;return ((((a*21846)>>16)^sign)-sign);}
 static __attribute__((always_inline)) inline void gather3(const uint8_t *lut,V ix,V out[3]){
 #if defined(__arm__)
  uint8x8x3_t v={{vdup_n_u8(0),vdup_n_u8(0),vdup_n_u8(0)}};
@@ -26,28 +23,25 @@ static __attribute__((always_inline)) inline void gather3(const uint8_t *lut,V i
 #endif
 }
 static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache,uint32_t chroma_enabled){
- if(!y||!uv||!p||((uintptr_t)p&3)||p->grain_q8>1024||((uintptr_t)cache&3))return -1;
- for(unsigned i=0;i<8;i++)if(p->noise[i]<-170||p->noise[i]>169)return -1;
+ if(!y||!uv||!p||((uintptr_t)p&3)||((uintptr_t)cache&3))return -1;
  int hits=0;
+ if(!lut)return 0;
+ (void)chroma_enabled;
  V mapped[2][3];
  for(unsigned half=0;half<2;half++){
-  V yy,cb,cr,light,hash,noise;
+  V yy,cb,cr;
 #if defined(__arm__)
-  uint8x8_t y8=vld1_u8(y),uv8=vld1_u8(uv),l8=vld1_u8(p->light);
+  uint8x8_t y8=vld1_u8(y),uv8=vld1_u8(uv);
   uint8x8_t cbi={0,0,2,2,4,4,6,6},cri={1,1,3,3,5,5,7,7};
-  uint16x8_t y16=vmovl_u8(y8),cb16=vmovl_u8(vtbl1_u8(uv8,cbi)),cr16=vmovl_u8(vtbl1_u8(uv8,cri)),l16=vmovl_u8(l8);
+  uint16x8_t y16=vmovl_u8(y8),cb16=vmovl_u8(vtbl1_u8(uv8,cbi)),cr16=vmovl_u8(vtbl1_u8(uv8,cri));
   yy=(V)vmovl_u16(half?vget_high_u16(y16):vget_low_u16(y16));
   cb=(V)vmovl_u16(half?vget_high_u16(cb16):vget_low_u16(cb16));cb-=128;
   cr=(V)vmovl_u16(half?vget_high_u16(cr16):vget_low_u16(cr16));cr-=128;
-  light=(V)vmovl_u16(half?vget_high_u16(l16):vget_low_u16(l16));
-  hash=(V)vld1q_u32(p->hashes+half*4);noise=(V)vld1q_s32(p->noise+half*4);
 #else
-  for(unsigned k=0;k<4;k++){unsigned i=half*4+k;yy[k]=y[i];cb[k]=(int)uv[i&~1u]-128;cr[k]=(int)uv[(i&~1u)+1]-128;light[k]=p->light[i];hash[k]=(int32_t)p->hashes[i];noise[k]=p->noise[i];}
+  for(unsigned k=0;k<4;k++){unsigned i=half*4+k;yy[k]=y[i];cb[k]=(int)uv[i&~1u]-128;cr[k]=(int)uv[(i&~1u)+1]-128;}
 #endif
   V rgb[3]={clamp(yy+round16(cr*91881)),clamp(yy-round16(cb*22554+cr*46802)),clamp(yy+round16(cb*116130))};
-  V original[3]={rgb[0],rgb[1],rgb[2]};
-  const int t[3]={256,112,36};V f[3],pos[3];
-  for(unsigned c=0;c<3;c++)rgb[c]=clamp(rgb[c]+((light*t[c]*(255-rgb[c]))>>16));
+  V f[3],pos[3];
   if(lut){
   V keys=rgb[0]|(rgb[1]<<8)|(rgb[2]<<16);uint32_t *slots[4];int halfhits=0;
   if(cache){
@@ -74,17 +68,10 @@ static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,c
   }
   }
   }else for(unsigned c=0;c<3;c++)mapped[half][c]=rgb[c];
-  if(p->grain_q8){
-  V lum=(mapped[half][0]*54+mapped[half][1]*183+mapped[half][2]*19)>>8;
-  V weight=32+sel(lum<128,lum,255-lum);V delta=truncgrain(noise*(int)p->grain_q8*weight,18);
-  for(unsigned c=0;c<3;c++){V fine=((hash>>(c*8))&255)-128;mapped[half][c]=clamp(mapped[half][c]+delta+truncgrain(fine*(int)p->grain_q8,14));}
-  }
-  if(!lut)for(unsigned c=0;c<3;c++)mapped[half][c]-=original[c];
   V out=round16(mapped[half][0]*19595+mapped[half][1]*38470+mapped[half][2]*7471);
-  out=clamp(lut?out:yy+out);
+  out=clamp(out);
   for(unsigned k=0;k<4;k++)y[half*4+k]=(uint8_t)out[k];
  }
- if(!lut&&!chroma_enabled)return hits;
  V pair[3];
  for(unsigned c=0;c<3;c++){
   V even=__builtin_shufflevector(mapped[0][c],mapped[1][c],0,2,4,6);
@@ -95,7 +82,6 @@ static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,c
  V sign=cb>>31,a=(cb^sign)-sign;cb=((((a+65536)>>17)^sign)-sign);
  sign=cr>>31;a=(cr^sign)-sign;cr=((((a+65536)>>17)^sign)-sign);
  V basecb={128,128,128,128},basecr={128,128,128,128};
- if(!lut)for(unsigned k=0;k<4;k++){basecb[k]=uv[k*2];basecr[k]=uv[k*2+1];}
  cb=clamp(basecb+cb);cr=clamp(basecr+cr);
  for(unsigned k=0;k<4;k++){uv[k*2]=(uint8_t)cb[k];uv[k*2+1]=(uint8_t)cr[k];}
  return hits;

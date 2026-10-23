@@ -7,6 +7,8 @@ export const SD_MAX_FILMS=256;
 const CUSTOM_FIRST_ID=79;
 const read=p=>readFileSync(new URL('../'+p,import.meta.url));
 const looks=JSON.parse(read('web/gr3/film-catalog.json')).looks;
+const styleFilters=JSON.parse(read('web/gr3/style-filters-luts.json')).stocks;
+const styleId=id=>Number.isInteger(id)&&id>=291&&id<=297;
 const icons=read('native/gr3/m10v_icons.rgba');
 const source=read('native/gr3/m10v_library.c').toString();
 // Fingerprint the complete renderer and recursively included local data/headers.
@@ -17,17 +19,28 @@ function collectRenderer(path){
  const bytes=read(path);rendererFiles.set(path,bytes);
  for(const match of bytes.toString().matchAll(/^#include "([^"\n]+)"/gm))collectRenderer(path.slice(0,path.lastIndexOf('/')+1)+match[1]);
 }
-for(const path of ['native/gr3/m10v_library.c','native/gr3/film_5207.c','native/gr3/film_harman.c','native/gr3/film_curated.c','native/gr3/film_newstocks.c','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_texture_accel.c'])collectRenderer(path);
+for(const path of ['native/gr3/m10v_library.c','native/gr3/film_5207.c','native/gr3/film_harman.c','native/gr3/film_curated.c','native/gr3/film_newstocks.c','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_texture_accel.c'])collectRenderer(path);
 const rendererHash=createHash('sha256');
 for(const [path,bytes] of [...rendererFiles].sort(([a],[b])=>a.localeCompare(b))){rendererHash.update(path+'\0'+bytes.length+'\0').update(bytes);}
 const rendererContract=rendererHash.digest();
 // Freeze the final v1 record digests. The film-name renderer changes its source
 // fingerprint, but the original built-in recipes remain supported on the card.
+const preMultiselectContract=JSON.parse(read('node/gr3-sd-pre-multiselect-contract.json'));
+const preMultiselectHash=id=>preMultiselectContract.hashes[preMultiselectContract.ids.indexOf(id)];
+const texturePriorContract=JSON.parse(read('node/gr3-sd-texture-prior-contract.json'));
+const texturePriorHash=id=>texturePriorContract.hashes[texturePriorContract.ids.indexOf(id)];
+const priorContract=JSON.parse(read('node/gr3-sd-prior-contract.json'));
+const previousContract=JSON.parse(read('node/gr3-sd-20261021-contract.json'));
+const preStylesContract=JSON.parse(read('node/gr3-sd-pre-styles-contract.json'));
+const preStylesHash=id=>preStylesContract.hashes[preStylesContract.ids.indexOf(id)];
+const recentContract=JSON.parse(read('node/gr3-sd-20261023-contract.json'));
+const recentHash=id=>recentContract.hashes[recentContract.ids.indexOf(id)];
+const previousHash=id=>previousContract.hashes[previousContract.ids.indexOf(id)];
 const legacyHashes=JSON.parse(read('node/gr3-sd-v1-legacy-hashes.json'));
 needLegacyHashes();
 function needLegacyHashes(){if(legacyHashes.length!==40||legacyHashes.some(h=>!/^[a-f0-9]{64}$/.test(h)))throw Error('旧版 SD 配方摘要无效');}
-export const SD_FILM_IDS=Object.freeze(Array.from({length:46},(_,i)=>33+i));
-const appendedNames=['5207','Phoenix II','HARMAN RED','Portra 160','Fuji Industrial 100','Lucky C200','CCD Classic','Fuji C200','Kodak ProImage 100','T-Max 100','Aerochrome III 1443','Aerocolor IV 2460','VISION3 50D 5203'];
+export const SD_FILM_IDS=Object.freeze([...Array.from({length:46},(_,i)=>33+i),289,290,...styleFilters.map(s=>s.id)]);
+const appendedNames=['5207','Phoenix II','HARMAN RED','Portra 160','Fuji Industrial 100','Lucky C200','CCD Classic','Fuji C200','ProImage 100','T-Max 100','Aerochrome','2460','5203'];
 const engineRecipeContracts=[
  createHash('sha256').update(read('native/gr3/film_5207_data.h')).digest(),
  ...[0,1].map(variant=>createHash('sha256').update(read('native/gr3/film_harman_data.h')).update(Buffer.from([variant])).digest()),
@@ -39,11 +52,11 @@ const need=(ok,message)=>{if(!ok)throw Error(message);};
 export function sdCrc(bytes){let c=0xffffffff;for(const v of bytes){c^=v;for(let i=0;i<8;i++)c=(c>>>1)^(0xedb88320&-(c&1));}return ~c>>>0;}
 const digest=b=>createHash('sha256').update(b).digest('hex');
 export function sdFilmRecord(id){
- need(Number.isInteger(id)&&id>=33&&id<=78,'胶卷不在当前平台目录中');
+ need(Number.isInteger(id)&&id>=33&&(id<=78||id===289||id===290||styleId(id)),'胶卷不在当前平台目录中');
  need(originals.length===33&&looks.length===32&&icons.length===78*6400,'胶卷源目录不一致');
  const b=Buffer.alloc(SD_RECORD_BYTES),look=id>=34&&id<=65?looks[id-34]:null;
  b.write('M10VREC1');b.writeUInt32LE(id,8);b.writeUInt32LE(id===33?1:id<=65?2:3,12);
- const name=id>=66?appendedNames[id-66]:look?.name||originals[32][1];need(Buffer.byteLength(name,'ascii')<24&&/^[\x20-\x7e]+$/.test(name),'胶卷名称不支持');
+ const name=id===290?'Pixel World':styleId(id)?styleFilters[id-291].ascii_name:id===289?'Kodak Charmera':id>=66?appendedNames[id-66]:look?.name||originals[32][1];need(Buffer.byteLength(name,'ascii')<24&&/^[\x20-\x7e]+$/.test(name),'胶卷名称不支持');
  b.write(name,16,'ascii');b.write('M10V',40,'ascii');
  if(id===33)originals[32].slice(2).map(Number).forEach((v,i)=>b.writeInt16LE(v,64+i*2));
  else if(look){
@@ -54,8 +67,11 @@ export function sdFilmRecord(id){
  // Kind 3 is an identity snapshot of an engine builtin LUT, not a portable LUT.
  // Bytes 64..95 bind the complete source LUT data (all RED exposure variants),
  // while the renderer digest also locks interpolation, texture and defaults.
- if(id>=66)engineRecipeContracts[id-66].copy(b,64);
- icons.copy(b,2048,(id-1)*6400,id*6400);
+ if(styleId(id)){const stock=styleFilters[id-291];createHash('sha256').update(Buffer.from(stock.values)).digest().copy(b,64);}
+ else if(id===290)createHash('sha256').update(read('native/gr3/m10v_pixel_world.h')).digest().copy(b,64);
+ else if(id===289)createHash('sha256').update(read('native/gr3/m10v_charmera.h')).digest().copy(b,64);
+ else if(id>=66)engineRecipeContracts[id-66].copy(b,64);
+ if(styleId(id))read('native/gr3/m10v_style_filters.rgba').copy(b,2048,(id-291)*6400,(id-290)*6400);else if(id===290)read('native/gr3/m10v_pixel_world.rgba').copy(b,2048);else if(id===289)read('native/gr3/m10v_charmera.rgba').copy(b,2048);else icons.copy(b,2048,(id-1)*6400,id*6400);
  // Bind the color/energy renderer as well as its parameters: old engines must
  // reject new records even when a particular numeric recipe is unchanged.
  rendererContract.copy(b,8448);
@@ -71,12 +87,12 @@ export function customFilmRecord(film,id){
 }
 export function sdExpectedHeader(){
  const table=hashes=>hashes.map(h=>'{'+[...Buffer.from(h,'hex')].join(',')+'}').join(',\n');
- return '/* Generated by scripts/generate_gr3_sd_contract.mjs; complete recipe SHA-256. */\nstatic const unsigned char m10v_sd_hashes[46][32]={\n'+table(Array.from({length:46},(_,i)=>digest(sdFilmRecord(i+33))))+'\n};\nstatic const unsigned char m10v_sd_legacy_hashes[40][32]={\n'+table(legacyHashes)+'\n};\nstatic const unsigned char m10v_sd_renderer_hash[32]={'+[...rendererContract].join(',')+'};\n';
+ return '/* Generated by scripts/generate_gr3_sd_contract.mjs; complete recipe SHA-256. */\nstatic const unsigned char m10v_sd_hashes[55][32]={\n'+table(SD_FILM_IDS.map(id=>digest(sdFilmRecord(id))))+'\n};\nstatic const unsigned char m10v_sd_pre_multiselect_hashes[55][32]={\n'+table(preMultiselectContract.hashes)+'\n};\nstatic const unsigned char m10v_sd_pre_multiselect_renderer[32]={'+[...Buffer.from(preMultiselectContract.renderer,'hex')].join(',')+'};\nstatic const unsigned char m10v_sd_texture_prior_hashes[55][32]={\n'+table(texturePriorContract.hashes)+'\n};\nstatic const unsigned char m10v_sd_texture_prior_renderer[32]={'+[...Buffer.from(texturePriorContract.renderer,'hex')].join(',')+'};\nstatic const unsigned char m10v_sd_pre_styles_hashes[48][32]={\n'+table(preStylesContract.hashes)+'\n};\nstatic const unsigned char m10v_sd_pre_styles_renderer[32]={'+[...Buffer.from(preStylesContract.renderer,'hex')].join(',')+'};\nstatic const unsigned char m10v_sd_recent_hashes[47][32]={\n'+table(recentContract.hashes)+'\n};\nstatic const unsigned char m10v_sd_recent_renderer[32]={'+[...Buffer.from(recentContract.renderer,'hex')].join(',')+'};\nstatic const unsigned char m10v_sd_prior_hashes[46][32]={\n'+table(priorContract.hashes)+'\n};\nstatic const unsigned char m10v_sd_previous_hashes[47][32]={\n'+table(previousContract.hashes)+'\n};\nstatic const unsigned char m10v_sd_previous_renderer[32]={'+[...Buffer.from(previousContract.renderer,'hex')].join(',')+'};\nstatic const unsigned char m10v_sd_prior_renderer[32]={'+[...Buffer.from(priorContract.renderer,'hex')].join(',')+'};\nstatic const unsigned char m10v_sd_legacy_hashes[40][32]={\n'+table(legacyHashes)+'\n};\nstatic const unsigned char m10v_sd_renderer_hash[32]={'+[...rendererContract].join(',')+'};\n';
 }
-export function buildSdFilmPack(ids=Array.from({length:46},(_,i)=>i+33),customFilms=[]){
+export function buildSdFilmPack(ids=[...SD_FILM_IDS],customFilms=[]){
  need(Array.isArray(customFilms)&&Array.isArray(ids)&&ids.length+customFilms.length>0&&ids.length+customFilms.length<=SD_MAX_FILMS,'请选择至少一款胶卷');
  need(new Set(ids).size===ids.length,'胶卷不能重复');
- need(Array.from(ids).every(id=>Number.isInteger(id)&&id>=33&&id<=78),'胶卷不在当前平台目录中');
+ need(Array.from(ids).every(id=>Number.isInteger(id)&&id>=33&&(id<=78||id===289||id===290||styleId(id))),'胶卷不在当前平台目录中');
  need(new Set(customFilms.map(f=>f.name.toLowerCase())).size===customFilms.length,'自定义胶卷名称不能重复');
  need(new Set(customFilms.map(f=>f.sha256)).size===customFilms.length,'自定义 LUT 不能重复');
  // Stable partition: every exported card library opens with M10V curated stocks.
@@ -99,7 +115,7 @@ export function auditSdFilmPack(bytes){
  // Reconstruct the canonical header from the indexed record CRCs. This rejects
  // changed reserved fields, duplicate identities and reordered built-ins.
  if(version===1){
-  need(ids.every(id=>id>=33&&id<=78)&&new Set(ids).size===ids.length,'胶卷 ID 无效或重复');
+  need(ids.every(id=>id>=33&&(id<=78||id===289||id===290||styleId(id)))&&new Set(ids).size===ids.length,'胶卷 ID 无效或重复');
   const ordered=[...ids.filter(id=>id===33||id>=66),...ids.filter(id=>id!==33&&id<66)];
   need(ids.every((id,i)=>id===ordered[i]),'胶卷顺序无效');
   const canonical=Buffer.from(buildSdFilmPack(ids).subarray(0,4096));
@@ -109,7 +125,7 @@ export function auditSdFilmPack(bytes){
   ids.forEach((id,i)=>{
    const record=bytes.subarray(4096+i*SD_RECORD_BYTES,4096+(i+1)*SD_RECORD_BYTES);
    need(record.readUInt32LE(SD_RECORD_BYTES-4)===bytes.readUInt32LE(68+i*12)&&sdCrc(record.subarray(0,-4))===record.readUInt32LE(SD_RECORD_BYTES-4),'记录校验不一致');
-   need([digest(sdFilmRecord(id)),legacyHashes[id-33]].includes(digest(record)),'胶卷包校验失败或配方版本不兼容');
+   need([digest(sdFilmRecord(id)),legacyHashes[id-33],priorContract.hashes[id-33],previousHash(id),recentHash(id),preStylesHash(id),texturePriorHash(id),preMultiselectHash(id)].includes(digest(record)),'胶卷包校验失败或配方版本不兼容');
   });
  } else {
   need(sdCrc(bytes.subarray(0,4092))===bytes.readUInt32LE(4092),'胶卷包头校验失败');
@@ -118,15 +134,16 @@ export function auditSdFilmPack(bytes){
   ids.forEach((id,i)=>{
    const record=bytes.subarray(4096+i*SD_RECORD_BYTES,4096+(i+1)*SD_RECORD_BYTES);
    need(record.readUInt32LE(SD_RECORD_BYTES-4)===bytes.readUInt32LE(68+i*12),'记录校验不一致');
-   if(id<=78)need(record.equals(sdFilmRecord(id)),'胶卷包校验失败或配方版本不兼容');
+   if(id<=78||id===289||id===290||styleId(id))need(record.equals(sdFilmRecord(id))||[priorContract.hashes[id-33],previousHash(id),recentHash(id),preStylesHash(id),texturePriorHash(id),preMultiselectHash(id)].includes(digest(record)),'胶卷包校验失败或配方版本不兼容');
    else {
     need(id>=79&&id<=288&&record.subarray(0,8).equals(Buffer.from('M10VREC2'))&&record.readUInt32LE(8)===id&&record.readUInt32LE(12)===4,'自定义胶卷记录无效');
     const name=record.subarray(16,40).toString('ascii').split('\0')[0],rgb=record.subarray(64,6655);
     need(/^[\x20-\x7e]{1,23}$/.test(name)&&!names.has(name.toLowerCase()),'自定义胶卷名称无效或重复');names.add(name.toLowerCase());
     const hash=createHash('sha256').update(name+'\0').update(rgb).digest('hex');
     need(record.subarray(6656,6688).toString('hex')===hash&&!hashes.has(hash),'自定义 LUT 摘要无效或重复');hashes.add(hash);
-    need(record.subarray(8448,8480).equals(rendererContract)&&sdCrc(record.subarray(0,-4))===record.readUInt32LE(SD_RECORD_BYTES-4),'自定义 LUT 配方版本不兼容');
-    need(record.equals(customFilmRecord({name,rgb},id)),'自定义 LUT 保留字段无效');
+    need((record.subarray(8448,8480).equals(rendererContract)||[priorContract.renderer,previousContract.renderer,recentContract.renderer,preStylesContract.renderer,texturePriorContract.renderer,preMultiselectContract.renderer].includes(record.subarray(8448,8480).toString('hex')))&&sdCrc(record.subarray(0,-4))===record.readUInt32LE(SD_RECORD_BYTES-4),'自定义 LUT 配方版本不兼容');
+    const canonical=customFilmRecord({name,rgb},id);record.copy(canonical,8448,8448,8480);canonical.writeUInt32LE(sdCrc(canonical.subarray(0,-4)),SD_RECORD_BYTES-4);
+    need(record.equals(canonical),'自定义 LUT 保留字段无效');
    }
   });
  }

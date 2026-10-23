@@ -24,7 +24,7 @@ class Gr2CaptureTests(unittest.TestCase):
         import subprocess
         from tests.test_unity_update import ROOT
         runtime=self.build();self.assertIn('gr2_frame_freeze_custom',runtime['symbols'])
-        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Frozen LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
+        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Frozen LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
         from scripts.analyze_gr2_native_contract import probe_image_object_pools
         from tests.test_unity_update import component
         cloned=probe_image_object_pools(component('gr2','b01firm8'),extra=128+12288,native_runtime=runtime,custom_record=record)
@@ -68,10 +68,10 @@ class Gr2CaptureTests(unittest.TestCase):
         rendered=bytes(u.mem_read(0x60000000,256));self.assertNotEqual(rendered,planar)
         import ctypes as C,shutil,tempfile
         from pathlib import Path
-        from tests.test_gr3_m10v_library import State,Image
+        from tests.gr2_compat_types import State,Image
         with tempfile.TemporaryDirectory() as folder:
             library=Path(folder)/'custom.dylib';sources=['m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks']
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',*[str(ROOT/f'native/gr3/{name}.c') for name in sources],'-o',str(library)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',*[str(ROOT/f'compat/gr2-v1/native/gr3/{name}.c') for name in sources],'-o',str(library)],check=True,capture_output=True)
             host=C.CDLL(str(library));host.m10v_library_render_custom.argtypes=[C.POINTER(Image),C.POINTER(State),C.c_uint32,C.c_void_p,C.c_uint32,C.c_void_p,C.c_uint32,C.c_uint32,C.c_void_p,C.c_char_p]
             expected_state=State();host.m10v_library_init(C.byref(expected_state));expected_state.slots[0].film=79;expected_state.effects[0][6]=1;expected_state.crc=zlib.crc32(bytes(expected_state)[:100])
             expected_y=(C.c_uint8*128).from_buffer_copy(y);expected_uv=(C.c_uint8*128).from_buffer_copy(uv);lut=(C.c_uint8*6591).from_buffer_copy(record[64:6655]);image=Image(expected_y,expected_uv,128,128,32,4,32)

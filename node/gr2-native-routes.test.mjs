@@ -6,7 +6,7 @@ import os from 'node:os';
 import {createServer} from './server.mjs';
 import {Store} from './storage.mjs';
 import {Gr4Runtime} from './gr4-runtime.mjs';
-import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
+import {defaultConfiguration} from '../web/gr2/native-library-state.mjs';
 test('GR2 HTTP import, authenticated preparation, native download and SD pack',async()=>{
  const folder=await mkdtemp(path.join(os.tmpdir(),'m10v-gr2-http-')),server=createServer(new Store(folder),undefined,new Gr4Runtime(path.join(folder,'gr4')));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+server.address().port;

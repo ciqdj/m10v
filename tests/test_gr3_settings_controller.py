@@ -12,7 +12,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
-from scripts.build_gr3_m10v_library import FLAGS, link_object
+from scripts.build_gr3_m10v_library import FLAGS, link_object, AB_CONTROLLER_EXPORTS
 from scripts.analyze_gr3_settings import read_firmware
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
 from unicorn.arm_const import *
@@ -29,6 +29,8 @@ SCREEN=SAVED_STATE+104
 
 class ControllerLifetimeTests(unittest.TestCase):
  debug=False
+ native_host=False
+ appended_slots=False
  @classmethod
  def setUpClass(cls):
   p=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/tmp/m10v-sd-research/rtos.bin'))
@@ -38,7 +40,9 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_settings_controller_vtable','m10v_settings_view_create',
          'm10v_settings_view_draw','m10v_settings_view_destroy',
          'm10v_camera_library_load','m10v_sd_camera_item','m10v_sd_camera_install',
-         'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log']
+         'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log','m10v_debug_batch','m10v_library_name','m10v_sd_camera_custom_name',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event']]]
+  names += [f'm10v_ab_adj_{n}_original' for n in ('refresh','exit','destroy','changed')]
+  names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -46,8 +50,8 @@ class ControllerLifetimeTests(unittest.TestCase):
    blobs=[]
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
-    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
-    blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_')
+    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+    blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',additional_exports=AB_CONTROLLER_EXPORTS if 'controller' in file else ())
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs
 
@@ -61,6 +65,7 @@ class ControllerLifetimeTests(unittest.TestCase):
   u.mem_write(0x5536d074,struct.pack('<II',1,struct.unpack_from('<I',self.firmware,0x6b7058)[0]))
   self.events=[];self.executed=set();self.load_fail=False;self.view_fail=False
   self.install_fail=False
+  self.ab_tone=12;self.ab_files={};self.ab_storage_fail=False;self.ab_clock=1000
   self.route=0x0200f100;self.fallback=0x10008000
   reverse={a:n for n,a in self.externals.items() if STUB<=a<STUB+0x100}
   def hook(m,a,n,_):
@@ -69,8 +74,15 @@ class ControllerLifetimeTests(unittest.TestCase):
    name=reverse.get(a)
    if name:
     self.events.append((name,*r,*([self.word(m,m.reg_read(UC_ARM_REG_SP))] if name=='m10v_debug_log' else [])))
+    if name=='m10v_ab_live_event_original' and getattr(self,'native_event_callback',None):self.native_event_callback(m)
     result=0
-    if name=='m10v_settings_factory_original':result=OWNER if r[1]==0x0200004a else self.fallback
+    if name=='m10v_debug_batch':
+     for i in range(r[1]):self.events.append(('m10v_debug_log',*struct.unpack('<5I',m.mem_read(r[0]+20*i,20))))
+    if name=='m10v_ab_dispatch_original' and getattr(self,'real_dispatch',False):
+     m.reg_write(UC_ARM_REG_PC,0x5316d5dc);return
+    if name=='m10v_settings_factory_original' and getattr(self,'real_factory',False):
+     m.reg_write(UC_ARM_REG_PC,0x5316f3b8);return
+    if name=='m10v_settings_factory_original':result=getattr(self,'stock_owner',OWNER) if r[1]==0x0200004a else self.fallback
     elif name=='m10v_settings_top_dtor_original':result=r[0]
     elif name=='m10v_settings_controller_vtable':result=STUB+0x800
     elif name=='m10v_settings_view_create':
@@ -80,21 +92,44 @@ class ControllerLifetimeTests(unittest.TestCase):
     elif name=='m10v_camera_library_load':
      result=0xffffffff if self.load_fail else 0
      state=bytearray(104)
-     for i in range(5):struct.pack_into('<H',state,12+8*i,33+i)
+     for i in range(5):struct.pack_into('<H',state,12+8*i,getattr(self,'fresh_films',[33,34,35,36,37])[i])
      m.mem_write(r[0],bytes(state))
     elif name=='m10v_sd_camera_item':result=33+r[0]*8+r[1]
     elif name=='m10v_sd_camera_install':result=0xffffffff if self.install_fail else 0
     m.reg_write(UC_ARM_REG_R0,result)
    elif a==0x5320ad88:m.reg_write(UC_ARM_REG_R0,0x55007000)
    elif a==0x5320ba9c:m.reg_write(UC_ARM_REG_R0,0x55008000)
-   elif a==0x532c26c0:self.events.append(('activate_tone',*r))
+   elif a==0x5320afbc:m.reg_write(UC_ARM_REG_R0,0) # debug-only navigation-gate observation
+   elif a==0x5320aefc:m.reg_write(UC_ARM_REG_R0,0x55008000)
+   elif a==0x532c26c0:
+    self.assertEqual(bytes(m.mem_read(r[0]+0x1b,1)),b'\0','Setup must activate shooting context, regardless of stale ImageControl context')
+    self.events.append(('activate_tone',*r))
+    if not getattr(self,'ab_set_fail',False):self.ab_tone=r[1]
+   elif a==0x532bd61c:self.events.append(('negative.clear',*r));m.reg_write(UC_ARM_REG_R0,0)
+   elif a==0x532bd6b4:m.reg_write(UC_ARM_REG_R0,self.ab_tone)
+   elif a==0x53050b7c:
+    m.mem_write(r[0],struct.pack('<II',self.ab_clock//1000,(self.ab_clock%1000)*1000));m.reg_write(UC_ARM_REG_R0,0)
+   elif a==0x53828014:
+    m.mem_write(0x55009008,struct.pack('<I',0x55009020));m.mem_write(0x55009020,struct.pack('<I',0x55009100));m.mem_write(0x55009120,b'\1')
+    m.reg_write(UC_ARM_REG_R0,0x55009000)
+   elif a in (0x53825648,0x53825fa8):
+    name=bytes(m.mem_read(r[1],12)).split(b'\0')[0].decode()
+    if a==0x53825fa8:
+     if not self.ab_storage_fail:self.ab_files[name]=bytes(m.mem_read(r[3],r[2]))
+     m.reg_write(UC_ARM_REG_R0,int(not self.ab_storage_fail))
+    else:
+     data=self.ab_files.get(name)
+     if data:m.mem_write(r[3],data)
+     m.reg_write(UC_ARM_REG_R0,int(bool(data)))
    elif a==0x5319aa68:
     self.events.append(('stock_top_ctor',r[0]));m.mem_write(r[0],bytes(0x13bc))
    elif a==0x5316d354:
     self.events.append(('register',*r));self.assertEqual(self.word(m,r[0]+4),0)
     m.mem_write(r[0]+4,struct.pack('<I',r[2]))
    elif a==0x533abc5c:self.events.append(('unregister',r[0]))
-   elif a==0x5316c9d8:self.events.append(('dispatch',*r))
+   elif a==0x5316c9d8:
+    self.events.append(('dispatch',*r))
+    if getattr(self,'real_navigation',False):return
    elif a==0x53228c4c:m.reg_write(UC_ARM_REG_R0,self.route)
    elif a in (0x536af2e4,0x536af358):self.fail('unexpected free of embedded controller/object '+hex(r[0]))
    elif a in (0x536b93d0,0x53820074):self.fail('original assertion '+hex(a))
@@ -115,6 +150,18 @@ class ControllerLifetimeTests(unittest.TestCase):
   return u.reg_read(UC_ARM_REG_R0)
  def count(self,name):return sum(e[0]==name for e in self.events)
  def setup_owner(self,u):self.call(u,'top_ctor',OWNER)
+
+ def test_zoom_route_reuses_first_owner_and_avoids_film_state(self):
+  u=self.machine();self.setup_owner(u)
+  self.assertEqual(self.call(u,'factory',0x55123400,0x0200f105),PAGE)
+  self.assertEqual(self.call(u,'ready',PAGE,0x0200f105),1)
+  self.assertEqual(self.count('m10v_zoom_menu_open'),1)
+  self.assertEqual(self.count('m10v_camera_library_load'),0)
+  self.call(u,'enter',PAGE,0x0200f105,0)
+  self.assertEqual(self.count('m10v_settings_view_zoom'),1)
+  u.mem_write(0x10000100,struct.pack('<H',0xd8));self.call(u,'key',PAGE,0x10000100)
+  self.assertEqual(self.count('m10v_zoom_menu_key'),1)
+  self.assertEqual(self.count('m10v_settings_view_draw'),0)
 
  def test_dynamic_card_ids_resolve_all_five_owned_descriptors(self):
   u=self.machine();owner=0x55040000;page=owner+0x13bc;heap=0x55080000
@@ -140,7 +187,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    self.assertEqual(self.events[-1][:3],('m10v_settings_factory_original',0x55123400,route))
 
  def test_independent_install_binds_catalog_id_and_activates_exact_slot_tone(self):
-  for slot,tone in enumerate((12,18,19,20,21)):
+  for slot,tone in enumerate((25,26,27,28,29) if self.appended_slots else (12,18,19,20,21)):
    u=self.machine();self.setup_owner(u);p=PAGE
    self.call(u,'ready',p,0x0200f100)
    u.mem_write(p+SCREEN+4,struct.pack('<I',slot))
@@ -151,9 +198,11 @@ class ControllerLifetimeTests(unittest.TestCase):
    self.install_fail=True;key(0xd8)
    self.assertEqual(self.word(u,p+SCREEN),2)
    self.assertEqual(self.count('activate_tone'),0)
+   u.mem_write(0x5500801b,b'\x01')
    self.install_fail=False;key(0xd8)
    installs=[e[1:] for e in self.events if e[0]=='m10v_sd_camera_install']
    self.assertEqual(installs,[(4,3,68,slot)]*2)
+   self.assertEqual(bytes(u.mem_read(0x5500801b,1)),b'\x01')
    self.assertEqual(self.word(u,p+SCREEN),1)
    self.assertEqual([e[2] for e in self.events if e[0]=='activate_tone'],[tone])
 
@@ -229,9 +278,9 @@ class ControllerLifetimeTests(unittest.TestCase):
 
  def test_key_alias_only_translates_private_route_return_value(self):
   u=self.machine()
-  for route in (0x0200f100,0x0200f101,0x0200004e,0x08000000,0x0200ffff):
+  for route in (0x0200f100,0x0200f101,0x0200f103,0x0200004e,0x08000000,0x0200ffff):
    self.route=route
-   self.assertEqual(self.call(u,'key_route',0x55012300),0x0200004a if route in (0x0200f100,0x0200f101) else route)
+   self.assertEqual(self.call(u,'key_route',0x55012300),0x0200004a if route in (0x0200f100,0x0200f101,0x0200f103) else route)
    self.assertEqual(self.route,route)
 
 class ControllerDebugTests(ControllerLifetimeTests):

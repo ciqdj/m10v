@@ -1,5 +1,5 @@
 #include "m10v_storage.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 #define RECORD M10V_SD_RECORD_BYTES
 static int disjoint(const void *a,uint32_t an,const void *b,uint32_t bn){
     uintptr_t av=(uintptr_t)a,bv=(uintptr_t)b;

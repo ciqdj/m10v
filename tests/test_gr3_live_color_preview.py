@@ -16,7 +16,7 @@ class LiveColorPreviewTests(unittest.TestCase):
   cls.code=(Path(cls.tmp.name)/'m10v-library-arm.bin').read_bytes();cls.rom=(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
   candidate=bytearray(cls.rom);at=cls.manifest['base']-BASE;candidate.extend(bytes(max(0,at+len(cls.code)-len(candidate))));candidate[at:at+len(cls.code)]=cls.code
   for p in cls.manifest['isp_base']['patches']:struct.pack_into('<I',candidate,p['address']-BASE,branch(p['address'],p['entry']))
-  cls.candidate=bytes(candidate);cls.snapshot=cls.manifest['capture_lifecycle']['snapshot'];cls.entry=cls.snapshot['patches'][3]['entry']
+  cls.candidate=bytes(candidate);cls.snapshot=cls.manifest['capture_lifecycle']['snapshot'];cls.entry=next(p['entry'] for p in cls.snapshot['patches'] if p['address']==0x53dbd954)
  def cache(self,e,film,ready=True,version=2):
   e.w32(0x55063910,1);e.w32(0x55063988,0x550d0000)
   e.w32(0x550d193c,0x3856504d if ready else 0);e.w32(0x550d1940,version);e.u.mem_write(0x550d1944,state((film,)*5))
@@ -24,7 +24,7 @@ class LiveColorPreviewTests(unittest.TestCase):
   e=StockISP(self.candidate);self.cache(e,film)
   e.make(12,1,True,actual_live=True);return e,0x60000000,0x60001400
  def test_installed_wrapper_matches_native_target_and_never_accumulates(self):
-  for film in (33,35,66,67,68):
+  for film in (33,35,58,66,67,68,290,291,292,293,294,295,296,297):
    e,obj,f=self.fixture(film);base=bytes(e.u.mem_read(f,0x9000));s=e.alloc(1600);gamma=struct.unpack('<I',e.u.mem_read(obj+0x17c,4))[0]
    e.call(self.snapshot['exports']['m10v_isp_native_look_prepare'],s,film,0,8)
    e.call(self.snapshot['exports']['m10v_isp_native_look_apply'],s,gamma,f,0);expected=bytes(e.u.mem_read(f,0x9000))
@@ -39,6 +39,19 @@ class LiveColorPreviewTests(unittest.TestCase):
   e.u.hook_add(UC_HOOK_CODE,lambda u,a,n,d:observed.append((u.reg_read(A.UC_ARM_REG_R1),u.reg_read(A.UC_ARM_REG_R2))) if a==prepare else None)
   e.call(self.entry,obj,f)
   self.assertEqual(observed,[(67,1)])
+ def test_charmera_four_colors_change_live_banks_without_accumulation_or_shooting_writes(self):
+  e,obj,f=self.fixture(289);si=struct.unpack('<I',e.u.mem_read(f+0x82d0,4))[0]
+  shooting=bytes(e.u.mem_read(si,0x80000));outputs=[]
+  for color in range(4):
+   data=bytearray(state((289,)*5));data[63]=color
+   struct.pack_into('<I',data,100,zlib.crc32(data[:100]));e.u.mem_write(0x550d1944,bytes(data))
+   e.call(self.entry,obj,f);outputs.append(bytes(e.u.mem_read(f,0x9000)))
+   e.call(self.entry,obj,f);self.assertEqual(bytes(e.u.mem_read(f,0x9000)),outputs[-1])
+   self.assertEqual(bytes(e.u.mem_read(si,0x80000)),shooting)
+  self.assertEqual(len(set(outputs)),4)
+  self.cache(e,35,version=4);e.call(self.entry,obj,f);other=bytes(e.u.mem_read(f,0x9000))
+  ref,o,i=self.fixture(35);ref.call(self.entry,o,i)
+  self.assertEqual(other,bytes(ref.u.mem_read(i,0x9000)))
  def test_empty_busy_or_destroyed_cache_keeps_stock_liveview(self):
   for ready,version in ((False,2),(True,1),(True,0)):
    e,obj,f=self.fixture();before=bytes(e.u.mem_read(f,0x9000));self.cache(e,35,ready,version)
@@ -73,8 +86,65 @@ class LiveColorPreviewTests(unittest.TestCase):
    regs=[e.u.reg_read(getattr(A,'UC_ARM_REG_R'+str(i)))for i in range(13)]
    results.append((regs,e.u.reg_read(A.UC_ARM_REG_SP),e.u.reg_read(A.UC_ARM_REG_CPSR)&0xf0000000,[e.u.reg_read(getattr(A,'UC_ARM_REG_D'+str(i)))for i in range(32)],e.u.reg_read(A.UC_ARM_REG_FPSCR)))
   self.assertEqual(*results)
+ def test_live_enter_initializes_and_reloads_preview_without_opening_film_library(self):
+  capture.M10VCaptureTests.setUpClass();self.addCleanup(capture.M10VCaptureTests.doClassCleanups)
+  c=capture.M10VCaptureTests();c.manifest=self.manifest;c.code=self.code
+  h,u,*_=c.fixture(film=66,raw=1,stamp=0)
+  owner=0x550d0000;settings=self.manifest['settings_menu']['exports']
+  # Original UI enter and factory are OS/UI service boundaries. The actual
+  # preview initializer, durable journal loader, publisher and reader run ARM.
+  factory_calls=[]
+  def ui_boundary(uc,at,n,data):
+   if at==settings['m10v_ab_live_enter_original']:result=37
+   elif at==settings['m10v_settings_factory_original']:
+    factory_calls.append(at);uc.mem_write(0x55063988,struct.pack('<I',owner));result=owner
+   else:return
+   uc.reg_write(A.UC_ARM_REG_R0,result);uc.reg_write(A.UC_ARM_REG_PC,uc.reg_read(A.UC_ARM_REG_LR))
+  # These stubs are intercepted before their original prologues are fetched.
+  for at in (settings['m10v_ab_live_enter_original'],settings['m10v_settings_factory_original']):
+   if not any(lo<=at<=hi for lo,hi,_ in u.mem_regions()):u.mem_map(at&~4095,4096)
+  u.hook_add(UC_HOOK_CODE,ui_boundary)
+  h.call(u,'m10v_camera_library_preview_init',owner)
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,bytes(4))
+  h.file_calls.clear()
+  h.call(u,'m10v_settings_controller_ab_live_enter',0x550c0000,0x02000012,0)
+  self.assertEqual(factory_calls,[]);self.assertEqual(h.file_calls,[])
+  # A temporarily unavailable filesystem must not publish compile-time
+  # defaults over the user's saved film. A later UI entry retries the load.
+  u.mem_write(0x55004220,b'\0')
+  self.assertEqual(h.call(u,'m10v_settings_controller_ab_live_enter',0x550c0000,0x08000000,0),37)
+  self.assertEqual(h.call(u,'m10v_camera_library_preview',0x55002000),0)
+  u.mem_write(0x55004220,b'\1')
+  self.assertEqual(h.call(u,'m10v_settings_controller_ab_live_enter',0x550c0000,0x08000000,0),37)
+  self.assertTrue(factory_calls)
+  self.assertEqual(h.call(u,'m10v_camera_library_preview',0x55002000),1)
+  self.assertEqual(struct.unpack('<H',u.mem_read(0x55002000+20,2))[0],66)
+  h.file_calls.clear()
+  self.assertEqual(h.call(u,'m10v_settings_controller_ab_live_enter',0x550c0000,0x08000000,0),37)
+  self.assertEqual(h.file_calls,[],'ready preview must not reload at every return')
+  h.call(u,'m10v_camera_library_preview_clear',owner)
+  h.call(u,'m10v_camera_library_preview_init',owner)
+  h.call(u,'m10v_settings_controller_ab_live_enter',0x550c0000,0x08000000,0)
+  self.assertEqual(h.call(u,'m10v_camera_library_preview',0x55002000),1)
  def test_noncarrier_liveview_is_unchanged(self):
   for tone in (11,13,17,22):
    e=StockISP(self.candidate);self.cache(e,66);base,_,_=e.make(tone,1,True,actual_live=True)
    e.call(self.entry,0x60000000,0x60001400)
    self.assertEqual(bytes(e.u.mem_read(0x60001400,0x9000)),base,tone)
+
+ def test_producer_freezes_validated_preview_without_per_shot_storage_reads(self):
+  capture.M10VCaptureTests.setUpClass();self.addCleanup(capture.M10VCaptureTests.doClassCleanups)
+  c=capture.M10VCaptureTests();c.manifest=self.manifest;c.code=self.code
+  h,u,context,*_=c.fixture(film=66,raw=1,stamp=0)
+  u.mem_map(0x55345000,4096) # Uninitialized committed-tone backend guard.
+  owner=0x550d0000;recipe=context-0x9b8
+  h.call(u,'m10v_camera_library_preview_init',owner)
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner))
+  h.call(u,'m10v_camera_library_load',0x55001000)
+  u.mem_write(recipe,struct.pack('<I',0x53d0fc90));u.mem_write(recipe+0x4778,struct.pack('<I',0x31545653))
+  h.manifest={**h.manifest,'symbols':{**h.manifest['symbols'],**self.snapshot['exports']}}
+  h.file_calls.clear()
+  self.assertEqual(h.call(u,'m10v_isp_frame_recipe_producer',recipe),1)
+  self.assertEqual(h.file_calls,[])
+  self.assertEqual(h.call(u,'m10v_isp_frame_recipe_state',recipe,0x55002000),1)
+  self.assertEqual(struct.unpack('<H',u.mem_read(0x55002000+20,2))[0],66)

@@ -3,7 +3,7 @@
 #include "m10v_hdf_configuration.h"
 #include "m10v_sd.h"
 #include "m10v_storage.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 #define CONFIG_MAGIC 0x47524346u
 typedef struct {
     uint32_t magic,bytes;

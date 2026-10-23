@@ -41,7 +41,7 @@ class DebugLogArmTests(unittest.TestCase):
         elif address==0x536af2e4: result=0
         elif address==0x53900100:
             name=bytes(u.mem_read(args[1],16)).split(b'\0')[0].decode()
-            self.assertIn(name,('C:\\M10VMN0.BIN','C:\\M10VMN1.BIN','C:\\M10VCP0.BIN','C:\\M10VCP1.BIN','C:\\M10VIO0.BIN','C:\\M10VIO1.BIN'))
+            self.assertIn(name,('C:\\M10VMN0.BIN','C:\\M10VMN1.BIN','C:\\M10VCP0.BIN','C:\\M10VCP1.BIN','C:\\M10VIO0.BIN','C:\\M10VIO1.BIN','C:\\M10VAK0.BIN','C:\\M10VAK1.BIN'))
             self.assertIn(args[2],(0,1)); self.calls.append(('open',name,args[2]))
             result=int(args[2]==0 or name in self.files)
             if result:
@@ -186,6 +186,14 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(records[0]['arguments'],[0x55005000,11,21,33])
         self.assertEqual(result['build_ids'],['12345678'])
         self.assertEqual(sum(c[0]=='close' for c in self.calls),self.successful_opens)
+
+    def test_ab_diagnostics_use_a_separate_persistent_history(self):
+        self.assertEqual(self.log(88,a=0x37),1)
+        for i in range(3):self.assertEqual(self.log(20,b=i),1)
+        rows=self.decoded()['records']
+        ab=[r for r in rows if r['channel']=='ab']
+        self.assertEqual([(r['event'],r['arguments'][0]) for r in ab],[(88,0x37)])
+        self.assertTrue(any('M10VAK' in name for name in self.files))
 
     def test_bounded_ring_and_capture_channel_keep_separate_histories(self):
         for i in range(70):self.assertEqual(self.log(30,b=i),1)

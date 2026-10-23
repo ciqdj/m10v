@@ -61,7 +61,7 @@ class Gr2PlanarLayoutTests(unittest.TestCase):
         import subprocess
         from tests.test_unity_update import ROOT
         from tests.test_gr2_capture import Gr2CaptureTests
-        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Padded LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
+        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Padded LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
         u.mem_map(0x51000000,0x20000);u.mem_map(0x64000000,0x4000);u.mem_map(0x65000000,4096)
         context=0x51000008;u.mem_write(context-8,b'IMG '+bytes(4));Gr2CaptureTests.owner_pool(self,u,extra=128+12288+16)
         state[52]=0;state[62]=1;struct.pack_into('>H',state,12,79);struct.pack_into('>I',state,100,zlib.crc32(state[:100]));u.mem_write(0x50001000,bytes(state));u.mem_write(0x64000000,record)

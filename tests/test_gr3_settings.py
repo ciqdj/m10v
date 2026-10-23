@@ -44,17 +44,30 @@ int main(void){
   m10v_settings_key(&p,&ops,M10V_KEY_DOWN);
  }
  for(unsigned i=0;i<sizeof(saved.effects);i++)assert(((unsigned char*)saved.effects)[i]==7);
- unsigned before=writes; m10v_settings_key(&p,&ops,M10V_KEY_OK);m10v_settings_key(&p,&ops,M10V_KEY_LEFT);
+ assert(p.focus==3); /* Time page has exactly four fields. */
+ assert(m10v_settings_open(&p,&ops,5)==0); /* Independent film-name page. */
+ unsigned before=writes; m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);
  m10v_settings_key(&p,&ops,M10V_KEY_BACK);assert(writes==before);
- m10v_settings_key(&p,&ops,M10V_KEY_OK);m10v_settings_key(&p,&ops,M10V_KEY_LEFT);fail=1;
- m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(writes==before&&p.screen==M10V_SETTINGS_VALUE&&p.error==M10V_SETTINGS_SAVE_FAILED);
- fail=0;m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);m10v_settings_key(&p,&ops,M10V_KEY_OK);
- assert(saved.reserved==1&&p.screen==M10V_SETTINGS_STAMP&&writes==before+1);
+ assert(m10v_settings_open(&p,&ops,5)==0);
+ m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);fail=1;
+ m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(writes==before&&p.screen==5&&p.error==M10V_SETTINGS_SAVE_FAILED);
+ fail=0;m10v_settings_key(&p,&ops,M10V_KEY_OK);
+ assert(saved.reserved==1&&p.screen==M10V_SETTINGS_CLOSED&&writes==before+1);
  ids[0]=73;assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
  m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(p.screen==M10V_SETTINGS_CATALOG&&p.expected==73);
  m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(saved.slots[0].film==73&&p.screen==M10V_SETTINGS_FILMS);
  assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
  assert(m10v_settings_open(&p,&ops,99)<0);
+ assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_FILMS)==0);
+ assert(m10v_settings_open(&p,&ops,M10V_SETTINGS_AB)==0);
+ assert(p.screen==6&&p.slot==1&&p.index==5&&p.focus==0);
+ m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);assert(p.slot==2);
+ m10v_settings_key(&p,&ops,M10V_KEY_DOWN);assert(p.focus==1);
+ m10v_settings_key(&p,&ops,M10V_KEY_RIGHT);assert(p.index==6);
+ m10v_settings_key(&p,&ops,M10V_KEY_DOWN);
+ m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(p.value==1&&p.screen==6);
+ m10v_settings_key(&p,&ops,M10V_KEY_DOWN);m10v_settings_key(&p,&ops,M10V_KEY_OK);assert(p.value==2);
+ m10v_settings_key(&p,&ops,M10V_KEY_BACK);assert(p.screen==M10V_SETTINGS_CLOSED);
  return 0;
 }
 '''

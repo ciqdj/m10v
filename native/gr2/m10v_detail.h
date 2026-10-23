@@ -1,6 +1,6 @@
 #ifndef M10V_GR2_DETAIL_H
 #define M10V_GR2_DETAIL_H
-#include "../gr3/m10v_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_library.h"
 /* UI owner only. Same field IDs and immediate journal semantics as GR3,
  * with no dependency on its little-endian ImageControl widget layout. */
 typedef struct {

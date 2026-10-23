@@ -6,8 +6,8 @@ import {promisify} from 'node:util';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {normalizeConfiguration,defaultConfiguration} from '../web/gr3/native-library-state.mjs';
-import {initialState} from './gr3-native-library.mjs';
+import {normalizeConfiguration,defaultConfiguration} from '../web/gr2/native-library-state.mjs';
+import {initialState} from '../compat/gr2-v1/node/gr3-native-library.mjs';
 import {readUnityModelComponent} from './unity-firmware.mjs';
 import {packGr2Candidate} from './gr2-candidate-container.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url)),run=promisify(execFile);
@@ -21,8 +21,8 @@ export async function gr2BuildFingerprint(){
   if(entry.isDirectory())await walk(name);
   else if(entry.isFile()){h.update(name+'\0');h.update(await readFile(path.join(root,name)));}
  }}
- for(const dir of ['native/gr2','native/gr3','scripts','node'])await walk(dir);
- for(const file of ['web/gr3/native-library-state.mjs','web/gr3/5207-lut.json','web/gr3/harman-luts.json','web/gr3/curated-luts.json','web/gr3/newstocks-luts.json']){h.update(file+'\0');h.update(await readFile(path.join(root,file)));}
+ for(const dir of ['native/gr2','compat/gr2-v1','scripts','node'])await walk(dir);
+ for(const file of ['web/gr2/native-library-state.mjs','web/gr3/5207-lut.json','web/gr3/harman-luts.json','web/gr3/curated-luts.json','web/gr3/newstocks-luts.json']){h.update(file+'\0');h.update(await readFile(path.join(root,file)));}
  return h.digest('hex');
 }
 export async function prepareGr2Native(source,value=defaultConfiguration()){

@@ -46,8 +46,17 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   self.assertEqual(observed,[(67,1)])
  def test_unsupported_3d_lut_and_wrong_si_leave_frame_stock(self):
   e,r,o,i,c,si=self.fixture();self.snapshot(e,r,state((67,)*5));self.callback(e,o,i,c);self.assertEqual(self.status(e,r),2)
+ def test_charmera_live_profile_never_authorizes_skipping_exact_still_color(self):
+  for color in range(4):
+   e,r,o,i,c,si=self.fixture();data=bytearray(state((289,)*5));data[63]=color
+   struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.assertEqual(self.snapshot(e,r,data)[0],1)
+   self.callback(e,o,i,c);self.assertNotEqual(self.status(e,r),2)
+   out=e.alloc(104);e.call(self.manifest['exports']['m10v_isp_frame_recipe_state'],r,out)
+   self.assertEqual(bytes(e.u.mem_read(out,104)),bytes(data))
+   e.call(self.manifest['exports']['m10v_isp_frame_recipe_completed'],r,si,12,out)
+   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0)&1,0)
  def test_installed_native_apply_has_exact_per_shot_completion_identity(self):
-  for film in (33,35,66,67,68):
+  for film in (33,35,58,59,60,66,67,68):
    for tone in (12,18,19,20,21):
     with self.subTest(film=film,tone=tone):
      e,r,o,i,c,si=self.fixture(tone);self.snapshot(e,r,state((film,)*5));self.callback(e,o,i,c);self.assertEqual(self.status(e,r),2)
@@ -55,6 +64,21 @@ class NativeRecipeHandoffTests(unittest.TestCase):
      e.call(completed,r,si,tone,data);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
      e.call(completed,r,si+4,tone,data);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
      e.u.mem_write(data,state((film,)*5,sequence=9));e.call(completed,r,si,tone,data);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
+ def test_pixel_world_defers_grain_until_after_spatial_rendering(self):
+  e,r,o,i,c,si=self.fixture();data=bytearray(state((290,)*5));data[14]=2
+  struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.assertEqual(self.snapshot(e,r,data)[0],1)
+  self.callback(e,o,i,c);self.assertNotEqual(self.status(e,r),2)
+  digital=r+0x4320;e.u.mem_write(digital,bytes(e.u.mem_read(c,0x40)));e.w32(digital,0x53d0fc60)
+  params=e.alloc(0x40);values=e.alloc(12);e.w32(params+0x10,values);source=e.alloc(104);e.u.mem_write(source,bytes(data))
+  for execution in (0,1):
+   e.u.mem_write(values+4,struct.pack('<h',3))
+   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_settings'],digital,params,execution)
+   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
+   self.assertEqual(struct.unpack('<h',e.u.mem_read(values+4,2))[0],0)
+  e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_done'],digital,params,1)
+  e.call(self.manifest['exports']['m10v_isp_frame_recipe_completed'],r,si,12,source)
+  self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),0)
+
  def test_grain_completion_requires_matching_plan_execution_and_native_success(self):
   import struct,zlib
   e,r,o,i,c,si=self.fixture();data=bytearray(state((67,)*5));data[14]=2;data[56]=1;struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.snapshot(e,r,data);self.callback(e,o,i,c)
@@ -66,7 +90,7 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   e.call(done,c,params,1);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
   e.call(settings,c,params,1);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
   e.call(done,c,params,0);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
-  e.call(settings,c,params,1);noise=e.alloc(256);e.u.mem_write(noise,bytes(range(256)));e.u.mem_write(0x5effff00,struct.pack('<II',16,16));e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_noise'],c,noise,256,16);e.call(done,c,params,1);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),3)
+  e.call(settings,c,params,1);e.call(done,c,params,1);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),3)
 
  def test_foreign_destination_cannot_publish_native_completion_for_source_recipe(self):
   e,r,o,i,c,si=self.fixture();self.snapshot(e,r,state((67,)*5));foreign=e.alloc(0x100);e.u.mem_write(foreign,bytes(e.u.mem_read(c,0x100)));before=bytes(e.u.mem_read(i,0x9000));self.callback(e,o,i,foreign)
@@ -79,11 +103,10 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   params=e.alloc(0x40);values=e.alloc(12);e.w32(params+0x10,values);noise=e.alloc(256);source=e.alloc(104);e.u.mem_write(source,bytes(data))
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_settings'],digital,params,0)
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_settings'],digital,params,1)
-  e.u.mem_write(0x5effff00,struct.pack('<II',16,16));e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_noise'],digital,noise,256,16)
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_done'],digital,params,1)
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_completed'],r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),2)
 
- def test_successful_native_grain_is_not_reapplied_when_size_hook_was_unavailable(self):
+ def test_successful_stock_grain_has_no_cpu_size_hook_or_software_reapplication(self):
   import struct,zlib
   e,r,o,i,c,si=self.fixture();data=bytearray(state((67,)*5));data[14]=2;data[56]=1;struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.snapshot(e,r,data)
   digital=r+0x4320;e.u.mem_write(digital,bytes(e.u.mem_read(c,0x40)));e.w32(digital,0x53d0fc60)

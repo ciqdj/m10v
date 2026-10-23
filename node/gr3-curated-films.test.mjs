@@ -12,7 +12,7 @@ test('new curated stocks retain stable identities and precede legacy simulations
   const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'M10V精选');
   assert.equal(f.camera_calibrated,false);assert.equal(f.film_calibrated,false);
  }
- assert.equal(c.films.length,46);
+ assert.equal(c.films.length,55);
 });
 test('SD library places curated stocks first even when input is interleaved',()=>{
  const a=auditSdFilmPack(buildSdFilmPack([35,71,34,70,69,33]));
@@ -22,11 +22,11 @@ test('SD library places curated stocks first even when input is interleaved',()=
 test('SD priority partition cannot silently discard malformed identities',()=>{
  for(const ids of [[NaN],[undefined],Array(1),[33,undefined]])assert.throws(()=>buildSdFilmPack(ids));
 });
-test('new film defaults are independent, fine grained for Portra and Fuji, medium for Lucky',()=>{
+test('new film defaults keep textures off and retain per-film grain size',()=>{
  const old=selectNativeFilm(defaultConfiguration(),0,68);old.slots[0].effects.filmExposure=2;
- for(const [film,grain] of [[69,1],[70,1],[71,2]]){
+ for(const [film,grain] of [[69,0],[70,0],[71,0]]){
   const c=selectNativeFilm(old,0,film);assert.equal(c.slots[0].grain,grain);
-  assert.equal(c.slots[0].effects.grainSize,film===71?1:0);
+  assert.equal(c.slots[0].effects.grainSize,0);
   assert.equal(c.slots[0].effects.filmExposure,0);assert.equal(c.slots[0].halo.gain,0);
   assert.deepEqual(c.slots.slice(1),old.slots.slice(1));
   assert.deepEqual(resetNativeTexture(c,0).slots[0],c.slots[0]);

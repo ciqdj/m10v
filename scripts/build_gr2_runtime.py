@@ -13,6 +13,7 @@ import zlib
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.analyze_unity_update import official_profile
 ROOT=Path(__file__).resolve().parents[1]
+COMPAT=ROOT/'compat/gr2-v1'
 BASE=0xA0798000
 LIMIT=0xA0800000
 FLAGS=['--target=armeb-none-eabi','-march=armv4t','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-vectorize','-fno-slp-vectorize','-Wall','-Wextra','-Werror']
@@ -167,7 +168,7 @@ def configuration_state(configuration:dict)->tuple[dict,bytes,bytes]:
     if not isinstance(configuration,dict):raise ValueError('five-slot configuration object required')
     node=shutil.which('node')
     if not node:raise RuntimeError('Node.js required for the shared page configuration contract')
-    script="import {readFileSync} from 'node:fs';import {defaultConfiguration,normalizeConfiguration} from './web/gr3/native-library-state.mjs';import {initialState} from './node/gr3-native-library.mjs';const value=JSON.parse(readFileSync(0,'utf8'));const configuration=normalizeConfiguration(Object.keys(value).length?value:defaultConfiguration());console.log(JSON.stringify({configuration,wire:initialState(configuration).toString('hex')}));"
+    script="import {readFileSync} from 'node:fs';import {defaultConfiguration,normalizeConfiguration} from './web/gr2/native-library-state.mjs';import {initialState} from './compat/gr2-v1/node/gr3-native-library.mjs';const value=JSON.parse(readFileSync(0,'utf8'));const configuration=normalizeConfiguration(Object.keys(value).length?value:defaultConfiguration());console.log(JSON.stringify({configuration,wire:initialState(configuration).toString('hex')}));"
     result=subprocess.run([node,'--input-type=module','-e',script],input=json.dumps(configuration),cwd=ROOT,text=True,capture_output=True,timeout=15)
     if result.returncode:
         message=next((line[6:].strip() for line in result.stderr.splitlines() if line.startswith('Error:')),'shared normalizer rejected the configuration')
@@ -189,7 +190,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     from scripts.verify_gr3_harman_reference import verify as verify_harman
     from scripts.verify_gr3_curated_reference import verify as verify_curated
     from scripts.verify_gr3_newstocks_reference import verify as verify_newstocks
-    for check in (verify,verify_harman,verify_curated,verify_newstocks):check(ROOT)
+    for check in (verify,verify_harman,verify_curated,verify_newstocks):check(COMPAT)
     out_dir=Path(out_dir);out_dir.mkdir(parents=True,exist_ok=True)
     obj=out_dir/'model.o';elf=out_dir/'model.elf';script=out_dir/'model.ld'
     script.write_text('ENTRY(gr2_post_load)\nPHDRS { image PT_LOAD FLAGS(7); }\nSECTIONS { . = 0xA0798000; .text : { *(.text*) } :image .rodata : { *(.rodata*) } :image .data : { *(.data*) . = ALIGN(4); } :image .bss (NOLOAD) : { *(.bss*) *(COMMON) } :image /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) } }\n')
@@ -256,7 +257,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
-        subprocess.run([clang,*FLAGS,*initial_flags,'-c',str(ROOT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
+        subprocess.run([clang,*FLAGS,*initial_flags,'-c',str(COMPAT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())

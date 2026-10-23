@@ -5,16 +5,17 @@
  * Backend load must provide a validated journal (including compiled defaults).
  * Backend install must recheck expected ID and commit before returning zero. */
 enum { M10V_SETTINGS_CLOSED, M10V_SETTINGS_FILMS, M10V_SETTINGS_CATALOG,
-       M10V_SETTINGS_STAMP, M10V_SETTINGS_VALUE };
+       M10V_SETTINGS_STAMP, M10V_SETTINGS_VALUE, M10V_SETTINGS_NAME, M10V_SETTINGS_AB };
 enum { M10V_KEY_LEFT, M10V_KEY_RIGHT, M10V_KEY_UP, M10V_KEY_DOWN,
-       M10V_KEY_OK, M10V_KEY_BACK, M10V_KEY_PREVIOUS, M10V_KEY_NEXT };
+       M10V_KEY_OK, M10V_KEY_BACK, M10V_KEY_PREVIOUS, M10V_KEY_NEXT, M10V_KEY_DISP };
 enum { M10V_SETTINGS_NO_ERROR, M10V_SETTINGS_EMPTY, M10V_SETTINGS_CHANGED,
-       M10V_SETTINGS_SAVE_FAILED };
+       M10V_SETTINGS_SAVE_FAILED, M10V_SETTINGS_FULL };
 typedef struct {
  void *context;
  int (*load)(void *, m10v_library_state *);
  uint32_t (*item)(void *, uint32_t index);
  int (*install)(void *, uint32_t index,uint32_t expected,uint32_t slot);
+ int (*remove)(void *,uint32_t slot);
  int (*stamp)(void *,uint32_t mode,uint32_t format,uint32_t corner,uint32_t color);
  int (*film_name_stamp)(void *,uint32_t enabled);
 } m10v_settings_ops;

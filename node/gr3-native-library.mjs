@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {normalizeConfiguration,normalizeExtensions,activeExtensions} from '../web/gr3/native-library-state.mjs';
 import {inspectOfficial} from './firmware.mjs';
 import {buildNativeLibrary,nativeSourceFingerprint} from './gr3-m10v-native-build.mjs';
-import {buildCameraComponents,composeNative,integrationFingerprint} from './gr3-integrated-components.mjs';
+import {buildCameraComponents,composeNative,integrationFingerprint,cameraComponentBase} from './gr3-integrated-components.mjs';
 import {normalizeVersionUnlock,applyVersionUnlock} from './gr3-version-unlock.mjs';
 import {portNativeToGr3x} from './gr3x-native-port.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url));
@@ -27,12 +27,16 @@ export async function nativeCatalog(){
  films.push({id:67,key:'harman-phoenix-ii-200',name:'蓝凤凰',stock:'PhoenixII200',group:'M10V精选',camera_calibrated:false,film_calibrated:false},{id:68,key:'harman-red-125',name:'哈曼 RED',stock:'RED125',group:'M10V精选',camera_calibrated:false,film_calibrated:false});
  films.push(...[{id:69,key:'portra-160',name:'Portra 160'},{id:70,key:'fuji-industrial-100',name:'富士业务用 100'},{id:71,key:'lucky-c200-new',name:'乐凯 C200'},{id:72,key:'ccd-classic',name:'CCD Classic'}].map(f=>({...f,group:'M10V精选',camera_calibrated:false,film_calibrated:false})));
  films.push(...JSON.parse(readFileSync(path.join(root,'web/gr3/newstocks-luts.json'),'utf8')).stocks.map(({values,...f})=>({...f,group:'M10V精选',camera_calibrated:false,film_calibrated:false})));
+ films.push({id:289,key:'kodak-charmera',name:'Kodak Charmera',group:'M10V精选',camera_calibrated:false,approximation:true,colors:['红','黄','蓝','灰']});
+ films.push({id:290,key:'pixel-world',name:'方块世界',ascii_name:'Pixel World',group:'M10V精选',camera_calibrated:false,approximation:true,description:'方块像素与有限色阶，适合草地、天空与建筑；仅静态 JPEG，需更新固件。'});
+ films.push(...JSON.parse(readFileSync(path.join(root,'web/gr3/style-filters-luts.json'),'utf8')).stocks.map(({values,...f})=>({...f,group:'M10V精选'})));
  const icons=JSON.parse(await readFile(path.join(root,'web/gr3/film-icons/catalog.json'),'utf8'));
  if(icons.length!==films.length||icons.some((v,i)=>v.id!==films[i].id||v.name!==films[i].name))throw Error('M10V 图标目录与胶卷不同步');
  films.forEach((f,i)=>Object.assign(f,{icon_url:icons[i].icon_url,icon_color:icons[i].color}));
  let available=false;try{available=hash(await readFile(path.join(root,'fwdc239b-offical.bin')))===officialHash;}catch{}
- return {local_sources:['gr3','gr3x'],films:films.filter(f=>f.id>=33).sort((a,b)=>(a.group==='M10V精选'?0:1)-(b.group==='M10V精选'?0:1)),external_film_pack:true,camera_tested:false,local_source_available:available,
-  scope:'保存的静态 JPEG 胶卷效果；取景使用 Standard 基底，尚无实时胶卷色彩；机内 RAW 再开发未接入',slot_tone_ids:[12,18,19,20,21]};
+ const visibleFilms=films.filter(f=>f.id>=33).sort((a,b)=>(a.group==='M10V精选'?0:1)-(b.group==='M10V精选'?0:1)).map((f,i)=>({...f,number:i+1}));
+ return {film_count:visibleFilms.length,local_sources:['gr3','gr3x'],films:visibleFilms,external_film_pack:true,camera_tested:false,local_source_available:available,
+  scope:'GR III 新增最多十个独立胶卷位置，原厂预设保留；JPEG 与已接入的原生色调预览，RAW 再开发未接入。IIIx 保持原有五槽映射。',slot_tone_ids:Array.from({length:10},(_,i)=>25+i)};
 }
 export async function readNativeOfficial(model='gr3'){
  const profiles={gr3:['bin/fwdc239b-gr3-official.bin',officialHash],gr3x:['bin/fwdc243b-gr3x-official.bin','708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7']};
@@ -40,38 +44,45 @@ export async function readNativeOfficial(model='gr3'){
  const [file,expected]=profiles[model];const b=await readFile(path.join(root,file));if(hash(b)!==expected)throw Error('本地官方固件摘要不匹配');return b;
 }
 export function initialState(configuration){
- const c=normalizeConfiguration(configuration),b=Buffer.alloc(104);b.writeUInt32LE(0x5630314d);b.writeUInt16LE(4,4);b.writeUInt16LE(104,6);
- c.slots.forEach((s,i)=>{b.writeUInt16LE(s.film,12+i*8);b[14+i*8]=s.grain;b[15+i*8]=s.soft;b[16+i*8]=s.halo.gain;b[17+i*8]=s.halo.spread;b[18+i*8]=s.halo.threshold;b[19+i*8]=s.halo.profile;const e=s.effects;b[56+i*8]=e.grainSize;b[57+i*8]=e.leakGain;b[58+i*8]=e.leakPosition;b[59+i*8]=e.leakSpread;b[60+i*8]=e.leakVariation;b[61+i*8]=e.filmExposure;});
- b[52]=c.stamp;b[53]=c.format;b[54]=c.corner;b[55]=c.color;
- b.writeUInt32LE(c.filmNameStamp?1:0,96);
- let crc=0xffffffff;for(const byte of b.subarray(0,100)){crc^=byte;for(let k=0;k<8;k++)crc=(crc>>>1)^(0xedb88320&-(crc&1));}
- b.writeUInt32LE(~crc>>>0,100);return b;
+ const c=normalizeConfiguration(configuration),b=Buffer.alloc(184);b.writeUInt32LE(0x5630314d);b.writeUInt16LE(5,4);b.writeUInt16LE(184,6);
+ c.slots.forEach((s,i)=>{b.writeUInt16LE(s.film,12+i*8);b[14+i*8]=s.grain;b[15+i*8]=s.soft;b[16+i*8]=s.halo.gain;b[17+i*8]=s.halo.spread;b[18+i*8]=s.halo.threshold;b[19+i*8]=s.halo.profile;const e=s.effects;b[96+i*8]=e.grainSize;b[97+i*8]=e.leakGain;b[98+i*8]=e.leakPosition;b[99+i*8]=e.leakSpread;b[100+i*8]=e.leakVariation;b[101+i*8]=e.filmExposure;b[103+i*8]=e.charmeraColor??0;});
+ b[92]=c.stamp;b[93]=c.format;b[94]=c.corner;b[95]=c.color;
+ b.writeUInt32LE(c.filmNameStamp?1:0,176);
+ let crc=0xffffffff;for(const byte of b.subarray(0,180)){crc^=byte;for(let k=0;k<8;k++)crc=(crc>>>1)^(0xedb88320&-(crc&1));}
+ b.writeUInt32LE(~crc>>>0,180);return b;
 }
-export function prepareNative(source,value,{debug_mode=false,extensions:requestedExtensions,version_unlock:requestedUnlock,film_library=true,hdf_enabled,live_color}={}){
+export function prepareNative(source,value,{debug_mode=false,extensions:requestedExtensions,version_unlock:requestedUnlock,film_library=true,hdf_enabled,live_color,appended_slots}={}){
  const report=inspectOfficial(source),extensions=normalizeExtensions(requestedExtensions),version_unlock=normalizeVersionUnlock(requestedUnlock,report.model==='GR IIIx'?'gr3x':'gr3');
  if(typeof film_library!=='boolean')throw Error('胶卷库开关必须为布尔值');
+ if(appended_slots===undefined)appended_slots=report.model==='GR III'&&film_library;
+ if(typeof appended_slots!=='boolean')throw Error('追加胶卷槽开关必须为布尔值');
+ if(appended_slots&&(report.model!=='GR III'||!film_library))throw Error('追加胶卷槽仅支持 GR III 胶卷库');
  if(!film_library&&(value?.stamp||value?.filmNameStamp))throw Error('独立 HDF 暂不可组合胶卷时间戳，请关闭时间戳后构建');
  if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');
  const integration_source_sha256=integrationFingerprint();
  const reference=JSON.parse(readFileSync(path.join(root,'native/gr3/5207-reference.json'),'utf8'));
  const configuration=normalizeConfiguration(value);
+ if(!appended_slots&&configuration.slots.length>5)throw Error('此机型仍使用五个胶卷位置，暂不支持导出超过 5 款胶卷');
  if(hdf_enabled===undefined)hdf_enabled=!film_library||configuration.hdf>0;
  if(typeof hdf_enabled!=='boolean'||(!hdf_enabled&&(configuration.hdf>0||!film_library)))throw Error('HDF 功能开关与配置不一致');
  if(hdf_enabled&&report.model!=='GR III')throw Error('HDF 当前仅支持普通 GR III');
  if(live_color===undefined)live_color=report.model==='GR III'&&film_library;
  if(typeof live_color!=='boolean'||(live_color&&(report.model!=='GR III'||!film_library)))throw Error('原生色调预览仅支持 GR III 胶卷方案');
  const capture_pipeline=live_color?'gr3-native-v8':hdf_enabled?'gr3-native-hdf':debug_mode&&report.model==='GR III'?'gr3-native-v7':'software';
- const runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,film_library,hdf_enabled,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256,capture_pipeline}));
- return {schema:'m10v-native-library-plan/v1',ready:true,extensions,version_unlock,integration_source_sha256,film_library,hdf_enabled,features:[...(film_library?['film','800t','5207','phoenix-ii-200','harman-red-125','grain','timestamp']:[]),...(hdf_enabled?['digitalHdf']:[]),...activeExtensions(extensions)],source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
-  capture_pipeline,live_color,debug_mode,debug_log:debug_mode?{schema:'m10v-gr3-sd-debug/v1',build_id:configuration_sha256.slice(0,8),files:['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN'],page_bytes:4096,records_per_channel:63}:null,
-  stock_detail:{ids:Array.from({length:11},(_,i)=>18+i),fields:['gain','spread','threshold','grain','retiredSoft','grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'],films:'all',halation_films:[33,67],film_exposure:{films:{67:[200,120],68:[125,64,250]}},slots:5,lifecycle:'stock immediate callback'},
-  initial_state_hex:initialState(configuration).toString('hex'),film_5207_reference:{table_sha256:reference.table_sha256,table_size:reference.table_size,table_bits:reference.table_bits,input:reference.input,camera_calibrated:false,film_calibrated:false,halation:false},film_count:film_library?78:0,active_slots:film_library?5:0,camera_tested:false,external_film_pack:film_library,
-  scope:film_library&&live_color?'原厂 ISP 胶卷色彩、取景色调预览、颗粒与静态照片效果；光晕与 HDF 不提供实时取景。':film_library?(hdf_enabled?'静态 JPEG 胶卷、颗粒与时间戳；HDF 使用独立机内菜单。取景与 RAW 再开发未接入。':'静态 JPEG 胶卷、颗粒与时间戳；取景与 RAW 再开发未接入。'):'独立数字 HDF 菜单与静态 JPEG 柔焦；原厂影像控制、名称、图标及 RAW 像素保持原样。',
+ const native_grain=report.model==='GR III'&&film_library&&['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline);
+ if(configuration.slots.some(s=>s.grain>0)&&!native_grain)throw Error('颗粒仅支持 GR III 原厂原生成像管线，请关闭颗粒后导出此方案');
+ if(configuration.slots.some(s=>s.grain>0&&[289,290].includes(s.film)))throw Error('Charmera / 方块世界暂不支持原厂颗粒，请关闭该槽位颗粒');
+ const runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,film_library,appended_slots,hdf_enabled,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256,capture_pipeline}));
+ return {schema:'m10v-native-library-plan/v1',ready:true,extensions,version_unlock,integration_source_sha256,film_library,appended_slots,slot_tone_ids:appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],hdf_enabled,features:[...(film_library?['film','800t','5207','phoenix-ii-200','harman-red-125',...(native_grain?['grain']:[]),'timestamp']:[]),...(hdf_enabled?['digitalHdf']:[]),...activeExtensions(extensions)],source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',
+  capture_pipeline,live_color,debug_mode,debug_log:debug_mode?{schema:'m10v-gr3-sd-debug/v1',build_id:configuration_sha256.slice(0,8),files:['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'],page_bytes:4096,records_per_channel:63}:null,
+  stock_detail:{ids:[18,19,20,...(native_grain?[21]:[]),28,29],fields:['gain','spread','threshold',...(native_grain?['grain']:[]),'filmExposure','charmeraColor'],films:'all',halation_films:[33,67],charmera_color:{film:289,colors:['红','黄','蓝','灰']},film_exposure:{films:{67:[200,120],68:[125,64,250]}},slots:appended_slots?10:5,lifecycle:'stock immediate callback'},
+  initial_state_hex:initialState(configuration).toString('hex'),film_5207_reference:{table_sha256:reference.table_sha256,table_size:reference.table_size,table_bits:reference.table_bits,input:reference.input,camera_calibrated:false,film_calibrated:false,halation:false},visible_film_count:film_library?55:0,film_count:film_library?87:0,active_slots:film_library?configuration.slots.length:0,camera_tested:false,external_film_pack:film_library,
+  scope:film_library&&live_color?'原厂 ISP 胶卷色彩、取景色调预览、颗粒与静态照片效果；光晕与 HDF 不提供实时取景。':film_library?(hdf_enabled?'静态 JPEG 胶卷与时间戳；HDF 使用独立机内菜单。取景与 RAW 再开发未接入。':'静态 JPEG 胶卷与时间戳；取景与 RAW 再开发未接入。'):'独立数字 HDF 菜单与静态 JPEG 柔焦；原厂影像控制、名称、图标及 RAW 像素保持原样。',
   initial_settings_policy:'首次无有效 M10V 记录时使用网页默认值；已有机内 M10V 记录优先。'};
 }
 let building=false;
-export async function generateNative(source,value,accepted,{signal,debug_mode=false,extensions,version_unlock,film_library=true,hdf_enabled,live_color}={}){
- const plan=prepareNative(source,value,{debug_mode,extensions,version_unlock,film_library,hdf_enabled,live_color});if(accepted!==plan.configuration_sha256)throw Error('配置已变化，请重新预检');
+export async function generateNative(source,value,accepted,{signal,debug_mode=false,extensions,version_unlock,film_library=true,hdf_enabled,live_color,appended_slots}={}){
+ const plan=prepareNative(source,value,{debug_mode,extensions,version_unlock,film_library,hdf_enabled,live_color,appended_slots});if(accepted!==plan.configuration_sha256)throw Error('配置已变化，请重新预检');
  if(building)throw Error('另一个 M10V 原生固件正在构建，请稍后重试');
  building=true;let folder;
  try{
@@ -84,8 +95,10 @@ export async function generateNative(source,value,accepted,{signal,debug_mode=fa
   const buildEnv={...process.env,M10V_NODE:process.execPath,PATH:toolPaths.join(path.delimiter),...(compiler?{M10V_LLVM_CLANG:compiler}:{})};
   const commonSource=plan.model==='GR IIIx'?await readNativeOfficial('gr3'):source;
   const component=await buildCameraComponents(commonSource,plan.extensions,{signal});
-  await run(python,['scripts/build_gr3_m10v_library.py','--base',component?'0x540ba000':'0x540b6000','--out',folder,'--initial-state-hex',plan.initial_state_hex,'--sd-library','--hdf-default',String(plan.configuration.hdf),...(film_library?[]:['--hdf-only']),...(plan.hdf_enabled?['--with-hdf']:['--no-hdf']),...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[]),...(plan.live_color?['--live-color']:[]),...(['gr3-native-v7','gr3-native-v8'].includes(plan.capture_pipeline)?[...(debug_mode?['--profile']:[]),'--candidate-color','--spatial-neon','--texture-neon','--lifecycle-trace','--save-chain-trace','--recipe-snapshot','--native-color','--native-grain','--view-deferred']:[])],{cwd:root,signal,env:buildEnv,timeout:120000,maxBuffer:2*1024*1024});
+  await run(python,['scripts/build_gr3_m10v_library.py','--base','0x'+cameraComponentBase(commonSource,component).toString(16),'--out',folder,'--initial-state-hex',plan.initial_state_hex,'--sd-library',...(plan.model==='GR IIIx'?['--no-custom-zoom']:[]),...(plan.appended_slots?['--appended-slots']:[]),'--hdf-default',String(plan.configuration.hdf),...(film_library?[]:['--hdf-only']),...(plan.hdf_enabled?['--with-hdf']:['--no-hdf']),...(debug_mode?['--debug','--debug-build-id','0x'+plan.debug_log.build_id]:[]),...(plan.live_color?['--live-color']:[]),...(['gr3-native-v7','gr3-native-v8'].includes(plan.capture_pipeline)?[...(debug_mode?['--profile']:[]),'--candidate-color','--spatial-neon','--texture-neon','--lifecycle-trace','--save-chain-trace','--recipe-snapshot','--native-color','--native-grain','--view-deferred']:[])],{cwd:root,signal,env:buildEnv,timeout:120000,maxBuffer:2*1024*1024});
   const manifest=JSON.parse(await readFile(path.join(folder,'m10v-library-arm.json'),'utf8'));
+  if(manifest.zoom?.enabled!==(plan.model==='GR III'&&film_library))throw Error('ARM 自定义焦距机型隔离回读不同');
+  if(!!manifest.appended_slots!==plan.appended_slots)throw Error('ARM 胶卷槽布局回读不同');
   if(manifest.initial_state_hex!==plan.initial_state_hex||manifest.hdf_default!==plan.configuration.hdf||manifest.hdf_enabled!==plan.hdf_enabled)throw Error('ARM 初始配置回读不同');
   if(!!manifest.capture_lifecycle?.snapshot?.live_color!==plan.live_color)throw Error('ARM 取景色彩接入回读不同');
   if(manifest.debug_mode!==debug_mode||(debug_mode&&manifest.debug_log?.build_id!==plan.debug_log.build_id))throw Error('ARM 调试模式回读不同');

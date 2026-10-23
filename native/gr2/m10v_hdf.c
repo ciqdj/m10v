@@ -1,7 +1,7 @@
 /* GR II BE32 coefficient primitive. Original Clarity still owns all pixels. */
 #include "m10v_hdf.h"
 #include "m10v_capture.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 static const uint16_t gains[3][GR2_HDF_BANDS]={
  {820,740,700,700,740,840,940,1024,1024,1024,1024},
  {680,560,500,500,540,680,860,960,1024,1024,1024},

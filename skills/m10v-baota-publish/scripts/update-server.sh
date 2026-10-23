@@ -99,11 +99,12 @@ for model in gr3 gr3x gr4; do
     build_args=(scripts/check_gr4_release.mjs)
   fi
   # Bound the entire compiler/Python/Node process tree, not just the JS heap.
-  # 900 MiB + 64 MiB swap leaves room for the web service and host daemons.
+  # Reclaim above 600 MiB; cap resident build memory at 700 MiB so the
+  # ~1.6 GiB host retains headroom. Swap stays bounded by the existing 1 GiB pool.
   active_unit="m10v-build-${expected:0:12}-$$-$model.service"
-  printf 'FIRMWARE_BUILD_START model=%s unit=%s memory=900M timeout=600s\n' "$model" "$active_unit"
+  printf 'FIRMWARE_BUILD_START model=%s unit=%s memory_high=600M memory=700M swap=384M timeout=600s\n' "$model" "$active_unit"
   systemd-run --quiet --wait --pipe --collect --unit="$active_unit" \
-    --property=MemoryMax=900M --property=MemorySwapMax=64M \
+    --property=MemoryHigh=600M --property=MemoryMax=700M --property=MemorySwapMax=384M \
     --property=CPUQuota=100% --property=TasksMax=64 \
     --property=RuntimeMaxSec=600 --property=OOMPolicy=kill \
     --property=KillMode=control-group --property=TimeoutStopSec=10 \

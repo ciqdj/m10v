@@ -1,3 +1,4 @@
+import {previewPixelWorld} from './pixel-world.mjs';
 // Browser approximation from the film tables read from the supplied firmware.
 const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
 
@@ -32,7 +33,7 @@ export function previewFilmPixels(source, look) {
 }
 
 // RGB colour approximation only: these tables do not simulate spatial halation,
-// grain, diffusion or leaks, and do not establish a camera/film calibration.
+// grain or diffusion, and do not establish a camera/film calibration.
 export function previewHarmanPixels(source, lut, film, filmExposure=0) {
   if(![67,68].includes(film)||!Number.isInteger(filmExposure)||filmExposure<0||filmExposure>2||(film===67&&filmExposure>1))throw new RangeError('Harman 胶卷或模拟曝光EI无效');
   const size=lut.size,table=lut.stocks[film===67?(filmExposure===1?4:0):filmExposure+1]?.values;
@@ -45,6 +46,10 @@ export function previewCuratedPixels(source,lut,film){
 export function previewNewStocksPixels(source,lut,film){
   if(!Number.isInteger(film)||film<73||film>78)throw new RangeError('新增胶卷无效');
   return previewRgbLutPixels(source,lut,lut.stocks[film-73]?.values);
+}
+export function previewStyleFiltersPixels(source,lut,film){
+  if(!Number.isInteger(film)||film<291||film>297)throw new RangeError('精选滤镜无效');
+  return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.values);
 }
 function previewRgbLutPixels(source,lut,table){
   const size=lut.size;
@@ -62,9 +67,22 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
-let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise;
-export async function renderPreviewPixels(source, look) {
+let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise;
+export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=291&&film<=297){
+    styleFiltersTablesPromise??=fetch(new URL('./style-filters-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('精选滤镜预览色表载入失败');return r.json();}).catch(e=>{styleFiltersTablesPromise=undefined;throw e;});
+    return previewStyleFiltersPixels(source,await styleFiltersTablesPromise,film);
+  }
+  if(film===290)return previewPixelWorld(source,width,height);
+  if(film===289){
+    const color=look.effects?.charmeraColor??0,palette=[[253,1,0],[249,211,78],[1,0,249],[224,224,224]];
+    if(!Number.isInteger(color)||color<0||color>3)throw new RangeError('Charmera 颜色无效');
+    const out=new Uint8ClampedArray(source.length);
+    for(let i=0;i<source.length;i+=4){const on=((77*source[i]+150*source[i+1]+29*source[i+2]+128)>>8)>=128;
+      for(let c=0;c<3;c++)out[i+c]=on?palette[color][c]:0;out[i+3]=source[i+3];}
+    return out;
+  }
   if(Number.isInteger(film)&&film>=73&&film<=78){
     newstocksTablesPromise??=fetch(new URL('./newstocks-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('新增胶卷预览色表载入失败');return r.json();}).catch(error=>{newstocksTablesPromise=undefined;throw error;});
     return previewNewStocksPixels(source,await newstocksTablesPromise,film);

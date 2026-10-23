@@ -1,7 +1,7 @@
 #include "m10v_sd.h"
 #include "m10v_model.h"
 #include "m10v_storage.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 static const char path[]="H:/M10V/FILMS.M10";
 uint32_t gr2_pack_fetch(const gr2_pack_io *io,uint32_t index,uint32_t expected,uint8_t *memory,uint32_t full){
     if(!io||!io->size||!io->read_at||!memory||index>=M10V_SD_MAX_FILMS||full>1||

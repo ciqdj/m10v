@@ -20,10 +20,10 @@ class NativeRenderHandoffTests(unittest.TestCase):
   for film in (33,35,66,67,68):
    state,im,y,uv,scratch=self.fixture(film,soft=2,halo=4,leak=6);before=(bytes(y),bytes(uv),bytes(state))
    self.assertEqual(self.native(state,im,None,31),0);self.assertEqual((bytes(y),bytes(uv),bytes(state)),before)
- def test_color_completion_preserves_requested_grain_and_leak(self):
+ def test_color_completion_ignores_retired_cpu_grain_and_leak(self):
   for film in (66,67,68):
    state,im,y,uv,scratch=self.fixture(film,grain=2,leak=6);before=(bytes(y),bytes(uv),bytes(state))
-   self.assertEqual(self.native(state,im,scratch,1),0);self.assertNotEqual((bytes(y),bytes(uv)),before[:2]);self.assertEqual(bytes(state),before[2])
+   self.assertEqual(self.native(state,im,scratch,1),0);self.assertEqual((bytes(y),bytes(uv)),before[:2]);self.assertEqual(bytes(state),before[2])
  def test_remaining_soft_and_halo_are_not_erased_by_color_and_grain_completion(self):
   for effect,mask in (('soft',1|2|8|16),('halo',1|2|4|16)):
    state,im,y,uv,scratch=self.fixture(67,grain=0,soft=2 if effect=='soft' else 0,halo=4 if effect=='halo' else 0)

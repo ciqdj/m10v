@@ -30,8 +30,8 @@ uint32_t m10v_detail_table(uint32_t ui){
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
  if(field==0)return v->halo_gain;if(field==1)return v->halo_spread;
- if(field==2)return v->halo_threshold;if(field==3)return v->grain;if(field==4)return v->soft;
- return ((const uint8_t *)&s->effects[target])[field-5];
+ if(field==2)return v->halo_threshold;
+ return field==10?s->effects[target].film_exposure:0;
 }
 static uint32_t limit(uint32_t field){
  static const uint8_t limits[11]={8,8,8,3,3,2,8,5,8,1,2};return limits[field];
@@ -40,9 +40,9 @@ static void defaults(m10v_library_state *s,uint32_t target,uint32_t film){
  m10v_library_init(s);
  if(s->slots[target].film==film)return;
  m10v_slot *v=&s->slots[target];v->film=(uint16_t)film;
- v->grain=film==72?0:film==68||film==71?2:film>=66?1:0;v->soft=0;
+ v->grain=0;v->soft=0;
  v->halo_gain=film==33?3:film==67?2:0;v->halo_spread=3;v->halo_threshold=5;
- m10v_film_effects e={film==67||film==69||film==70||film==72||film==74||film==75||film==77||film==78?0:1,0,0,4,0,0,{0,0}};s->effects[target]=e;
+ m10v_film_effects e={0,0,0,4,0,0,{0,0}};s->effects[target]=e;
 }
 uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  /* Every visible row passes this operation before the original ID switch.
@@ -65,7 +65,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==4)field=((fn1)0x531ca630u)(ui)-19;
  uint32_t film=s.slots[target].film;
  if(op==9)return film==67?1:2;
- if(op!=7&&(field>10||(field<3&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
+ if(op!=7&&(field>10||(field>=3&&field<=9)||(field<3&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
  if(op==4){m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
  const m10v_slot *old=&s.slots[target];
  if(op==1)return value(&s,(uint32_t)target,field);
@@ -76,7 +76,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   if(op==7)result=m10v_camera_library_reset(&s,(uint32_t)target);
   else if(op==2&&field>=5)result=m10v_camera_library_effects(&s,(uint32_t)target,field==10?6:field-5,v);
   else {
-   uint32_t gain=old->halo_gain,spread=old->halo_spread,threshold=old->halo_threshold,grain=old->grain,soft=old->soft;
+   uint32_t gain=old->halo_gain,spread=old->halo_spread,threshold=old->halo_threshold,grain=0,soft=old->soft;
    if(field==0)gain=v;else if(field==1)spread=v;else if(field==2)threshold=v;else if(field==3)grain=v;else soft=v;
    if(film==33)result=m10v_camera_library_detail(&s,(uint32_t)target,gain,spread,threshold,grain,soft);
    else if(field<3)result=m10v_camera_library_halation(&s,(uint32_t)target,gain,spread,threshold,old->halo_profile);

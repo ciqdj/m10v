@@ -14,7 +14,9 @@ HTTPS Webhook 方案因 GitHub Actions 到本站 TLS 连接重置暂不启用，
 
 ### 发布构建资源隔离
 
-服务器仅约 1.6 GiB 可用物理内存；Node 的 `--max-old-space-size` 不限制固件 Buffer、Python 或 clang。每个机型现在在独立 systemd transient service 内顺序执行：`MemoryMax=900M`、`MemorySwapMax=64M`、`CPUQuota=100%`、`TasksMax=64`、`RuntimeMaxSec=600`。OOM 或超时终止整个控制组；SSH 中断也显式停止当前单元并回滚。Actions 总窗口为 35 分钟，以覆盖三个各 10 分钟的阶段。不要通过取消三机型检查或无限扩大交换来绕过失败。
+服务器仅约 1.6 GiB 可用物理内存；Node 的 `--max-old-space-size` 不限制固件 Buffer、Python 或 clang。每个机型现在在独立 systemd transient service 内顺序执行：`MemoryHigh=600M`、`MemoryMax=700M`、`MemorySwapMax=384M`、`CPUQuota=100%`、`TasksMax=64`、`RuntimeMaxSec=600`。600 MiB 以上先回收内存，700 MiB 为构建物理内存硬限；有限交换空间缓冲固件封包峰值，给主机与服务保留更多物理内存。2026-10-20 两次 GR III 构建期间 SSH 失联，失联前全机 available 最低约 73 MiB，尚未取得内核 OOM 证据，因此不将内存压力写成唯一根因。OOM 或超时终止整个控制组；SSH 中断也显式停止当前单元并回滚。Actions 总窗口为 35 分钟，以覆盖三个各 10 分钟的阶段。不要通过取消三机型检查或无限扩大交换来绕过失败。
+
+2026-10-20 第三次尝试拿到内核 `global_oom` 记录：网站服务与发布构建的 Python 进程先后被杀，构建峰值约 626.5 MiB、swap 峰值仍为 0。主机 `/etc/sysctl.conf` 将 `vm.swappiness` 设为 0；已备份该配置并改为 60，同时用 `sysctl -w vm.swappiness=60` 生效。1 GiB swap 仍保留原大小，不无限扩容。重新建机时核对 `sysctl vm.swappiness` 和 `swapon --show`，不要把“已配置 swap”当作它正在参与回收的证据。
 
 查看 `FIRMWARE_BUILD_START` 对应 unit 的 `journalctl -u UNIT` 和 `systemctl show UNIT -p MemoryPeak -p Result`；成功仍必须以确切 SHA 的 `DEPLOY_OK` 为准。修改脚本后先通过既有管理员连接更新 `/usr/local/lib/m10v-deploy/update-server.sh` 的 root 拷贝并校验摘要。
 

@@ -86,6 +86,34 @@ writeFileSync(dir+'/rtos.bin',d.subarray(at+16,at+16+d.readUInt32LE(at+12)));
                     self.assertLess(tone,128)
                     if index==12:self.assertEqual((writes,backs,tone),([],[1],18))
 
+    def test_stock_high_contrast_bw_and_installed_film_use_the_real_tone_setter(self):
+        for index,expected in ((1,12),(5,16),(1,12),(5,16)):
+            with self.subTest(index=index):
+                writes,backs,tone=self.probe(index)
+                self.assertEqual(writes,[expected])
+                self.assertEqual(backs,[0]) # normal stock confirmation, not private return
+                self.assertEqual(tone,expected)
+
+    def test_imagecontrol_reentry_snapshots_the_new_stock_filter_not_the_old_film(self):
+        u=machine(self.stock);model=0x55068200;controller=0x55005000
+        u.mem_write(model,bytes([12])+bytes(31))
+        u.mem_write(0x55006000,struct.pack('<I',0x55007000))
+        calls=[]
+        def boundary(uc,address,size,_):
+            if address==0x5320ad88:result=0x55006000
+            elif address==0x5320ba9c:result=model
+            elif address==0x53525d5c:result=0x55006000
+            elif address==0x53549ee8:result=16
+            elif address==0x532bd6d4:result=0
+            elif address in (0x531ab4d0,0x531ac0b0,0x531ac074,0x531ab750,0x531ab324,0x5316d354):result=0
+            elif address==0x532c26c0:self.fail('reentry must not reapply the previous film')
+            else:return
+            calls.append(address);uc.reg_write(UC_ARM_REG_R0,result);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE,boundary)
+        u.reg_write(UC_ARM_REG_R0,controller);run(u,0x531ac140)
+        self.assertEqual(bytes(u.mem_read(model,1)),b'\x10')
+        self.assertIn(0x53549ee8,calls)
+
     def test_detail_callback_uses_stock_table_even_with_stale_library_mode(self):
         for group in range(15):
             u=machine(self.code)
@@ -125,15 +153,16 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
     # not required. Override the base class's inherited skip marker.
     __unittest_skip__ = not OFFICIAL.exists()
     __unittest_skip_why__ = 'official firmware unavailable'
-    visible_film_count = 46
-    choose_slot_index = 3
+    visible_film_count = 55
+    choose_slot_index = 2
+    root_menu_rows = 6
     slot_five_film_index = 0
-    slot_one_film_index = 14
+    slot_one_film_index = 15
 
     def test_reopening_legacy_stock_focuses_its_actual_row_after_curated_stocks(self):
         self.call('m10v_library_init',0x55009000)
         initial=bytes(self.u.mem_read(0x55009000,104))
-        for film,want in [(34,14),(50,30),(65,45)]:
+        for film,want in [(34,15),(50,31),(65,46)]:
             with self.subTest(film=film):
                 payload=bytearray(initial);struct.pack_into('<H',payload,20,film)
                 struct.pack_into('<I',payload,100,zlib.crc32(payload[:100]))
@@ -144,7 +173,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.assertEqual(self.call(0x53394820,redraw.VIEW),want)
 
     def test_curated_first_and_last_rows_confirm_into_real_stock_slot(self):
-        for index,film,tone in ((0,33,213),(1,66,288),(2,67,289),(3,68,290),(4,69,344),(13,78,353),(14,34,256),(45,65,287)):
+        for index,film,tone in ((0,33,213),(1,66,288),(2,67,289),(3,68,290),(4,69,344),(13,78,353),(14,289,354),(15,34,256),(46,65,287),(47,290,360),(48,291,400),(54,297,406)):
             with self.subTest(index=index):
                 self.files.clear()
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
@@ -173,7 +202,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
                 self.call(0x531ac074,redraw.CONTROLLER)
                 self.focus(0);self.call('m10v_menu_confirm',redraw.CONTROLLER)
-                self.assertEqual(self.call(0x53394820,redraw.VIEW),film-20 if film>=34 else 0)
+                self.assertEqual(self.call(0x53394820,redraw.VIEW),film-19 if film>=34 else 0)
                 self.assertEqual(self.files,before)
                 self.assertEqual(self.tone,18)
 
@@ -190,6 +219,8 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
     def setUpClass(cls):
         AdjArmTests.setUpClass.__func__(cls)
         cls.firmware = cls.code
+        cls.choose_slot_index=3 if cls.manifest["detail"]["native_grain"] else 2
+        cls.root_menu_rows=7 if cls.manifest["detail"]["native_grain"] else 6
 
     @classmethod
     def tearDownClass(cls): cls.folder.cleanup()

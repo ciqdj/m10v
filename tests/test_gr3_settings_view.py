@@ -29,8 +29,8 @@ class SettingsViewTests(unittest.TestCase):
    card=Path(d)/'card.o'
    subprocess.run([cc,*FLAGS,'-c',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(card)],check=True,capture_output=True)
    cls.card,entries=link_object(card.read_bytes(),BASE+0x4000,prefix='m10v_film_card_')
-   cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,**entries},prefix='m10v_settings_view_')
- def machine(self,fail_object=0,fail_cards=False,native_accessor=False):
+   cls.code,cls.symbols=link_object(obj.read_bytes(),BASE,{'m10v_library_name':0x540b0000,'m10v_sd_camera_catalog_name':0x540b0020,'m10v_sd_camera_custom_name':0x540b0030,'m10v_zoom_title':0x540b0040,'m10v_zoom_bits':0x540b0044,'m10v_zoom_caption':0x540b0048,**entries},prefix='m10v_settings_view_',additional_exports=('m10v_settings_view_zoom',))
+ def machine(self,fail_object=0,fail_cards=False,native_accessor=False,custom_names=None,catalog_ids=None):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   for addr,size in [(0x53000000,0x2000000),(0x55000000,0x1000000),(0x10000000,0x200000)]:u.mem_map(addr,size)
   u.mem_write(0x53000000,self.firmware);u.mem_write(BASE,self.code);u.mem_write(BASE+0x4000,self.card)
@@ -55,10 +55,17 @@ class SettingsViewTests(unittest.TestCase):
     p=uc.reg_read(UC_ARM_REG_R0)
     if p:self.assertIn(p,self.live);del self.live[p]
    elif a==0x540b60e0 and not native_accessor:uc.reg_write(UC_ARM_REG_R0,0x10004000)
+   elif a==0x540b0040:uc.reg_write(UC_ARM_REG_R0,1024)
+   elif a==0x540b0044:pass # Numeric mm boundary mock for this view test.
+   elif a==0x540b0048:uc.reg_write(UC_ARM_REG_R0,1031+uc.reg_read(UC_ARM_REG_R0)-28)
    elif a==0x540b0000:uc.reg_write(UC_ARM_REG_R0,0x10000800)
    elif a==0x540b0010:
-    index=uc.reg_read(UC_ARM_REG_R1);uc.reg_write(UC_ARM_REG_R0,33+index if index<7 else 0)
-   elif a in (0x540b0020,0x540b0030):uc.reg_write(UC_ARM_REG_R0,0)
+    index=uc.reg_read(UC_ARM_REG_R1);uc.reg_write(UC_ARM_REG_R0,catalog_ids.get(index,0) if catalog_ids is not None else 33+index if index<7 else 0)
+   elif a in (0x540b0020,0x540b0030):
+    index=uc.reg_read(UC_ARM_REG_R0 if a==0x540b0020 else UC_ARM_REG_R1)
+    name=(custom_names or {}).get(index)
+    if name:uc.mem_write(uc.reg_read(UC_ARM_REG_R2),name.encode()+b'\0')
+    uc.reg_write(UC_ARM_REG_R0,int(name is not None))
    elif a in (0x536b93d0,0x53820074):self.fail('original assertion '+hex(a))
    else:return
    uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
@@ -96,6 +103,17 @@ class SettingsViewTests(unittest.TestCase):
   self.state(u);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([struct.unpack('<H',u.mem_read(w[16+i]+0xea,2))[0] for i in range(5)],[703,704,705,706,707])
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+ def test_charmera_is_visible_in_slot_catalog_and_small_icon_fallback(self):
+  for screen in (1,2):
+   for fail_cards in (False,True):
+    u=self.machine(fail_cards=fail_cards,catalog_ids={0:289});self.call(u,'create',0x10001000);w=self.widgets(u)
+    self.state(u,screen,0);u.mem_write(0x10002000+12,struct.pack('<H',289))
+    ops=0x10003000;u.mem_write(ops,struct.pack('<7I',0,0,0x540b0010,0,0,0,0))
+    self.call(u,'draw',0x10001000,0x10002000,ops)
+    self.assertEqual(struct.unpack('<H',u.mem_read(w[16]+0xea,2))[0],755 if fail_cards else 749)
+    text=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+    self.assertIn('PORTRA',bytes(u.mem_read(text,40)).decode('utf-16le').split('\0')[0])
+    self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
  def test_linked_runtime_owns_and_clears_the_actual_live_descriptors(self):
   from scripts.build_gr3_m10v_library import build
   with tempfile.TemporaryDirectory() as folder:
@@ -112,6 +130,70 @@ class SettingsViewTests(unittest.TestCase):
    self.assertIn(p,range(0x10100000,self.heap))
    self.call(u,'destroy',0x10001000)
    self.assertEqual(bytes(u.mem_read(0x10001000,164)),bytes(164));self.assertFalse(self.live)
+ def test_ab_live_paths_never_allocate_attach_or_destroy_native_views(self):
+  from tests import test_gr3_settings_controller as adapter
+  adapter.ControllerLifetimeTests.setUpClass()
+  a=adapter.ControllerLifetimeTests
+  u=self.machine();self.heap=0x55110000
+  self.call(u,'create',0x10001000);root=self.widgets(u)[0];baseline=dict(self.live)
+  for at,blob in a.blobs:
+   u.mem_write(at,blob);u.ctl_remove_cache(at,at+len(blob))
+  owner=0x55040000;page=owner+0x13bc;ab=page+0x284;live=0x55050000
+  u.mem_write(page,struct.pack('<I',adapter.STUB+0x800))
+  u.mem_write(ab,struct.pack('<11I',1,5,1,0,1,34,0,0,0,0,0))
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner))
+  u.mem_write(live+0x15c,struct.pack('<I',root));clock=[1000];tone=[12]
+  reverse={addr:name for name,addr in a.externals.items() if adapter.STUB<=addr<adapter.STUB+0x100}
+  def hook(m,at,n,_):
+   name=reverse.get(at)
+   if name=='m10v_settings_controller_vtable':m.reg_write(UC_ARM_REG_R0,adapter.STUB+0x800)
+   elif name=='m10v_library_name':m.reg_write(UC_ARM_REG_R0,0x10000800)
+   elif name=='m10v_camera_library_load':
+    fresh=bytearray(104);struct.pack_into('<H',fresh,12,34);m.mem_write(m.reg_read(UC_ARM_REG_R0),bytes(fresh));m.reg_write(UC_ARM_REG_R0,0)
+   elif name and name.startswith('m10v_ab_'):m.reg_write(UC_ARM_REG_R0,0)
+   elif at==0x532bd6b4:m.reg_write(UC_ARM_REG_R0,tone[0])
+   elif at==0x53050b7c:
+    m.mem_write(m.reg_read(UC_ARM_REG_R0),struct.pack('<II',clock[0]//1000,(clock[0]%1000)*1000));m.reg_write(UC_ARM_REG_R0,0)
+   else:return
+   m.reg_write(UC_ARM_REG_PC,m.reg_read(UC_ARM_REG_LR))
+  u.hook_add(UC_HOOK_CODE,hook)
+  def call(name,*args):
+   for reg,val in zip((UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2),args):u.reg_write(reg,val)
+   u.reg_write(UC_ARM_REG_SP,0x100f0000);u.reg_write(UC_ARM_REG_LR,0x10000000)
+   try:u.emu_start(a.externals['m10v_settings_controller_ab_'+name],0x10000000,count=1000000)
+   except Exception as e:raise AssertionError((hex(u.reg_read(UC_ARM_REG_PC)),hex(u.reg_read(UC_ARM_REG_LR)),hex(u.reg_read(UC_ARM_REG_R0)))) from e
+   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x10000000)
+  canvas=bytes(u.mem_read(root,0xf8));heap=self.heap
+  for key in (5,26):
+   call('live_enter',live,0x08000000,0)
+   self.assertEqual(self.live,baseline);self.assertEqual(self.heap,heap)
+   self.assertEqual(bytes(u.mem_read(root,0xf8)),canvas)
+   for phase,repeats in ((1,1),(2,0)):
+    u.mem_write(0x10000100,struct.pack('<HHI',key,0,0x55000120))
+    u.mem_write(0x55000120,struct.pack('<II',phase,repeats))
+    call('live_event',live,0x10000100)
+   # Even if legacy words contain a real native canvas address, they are
+   # retired state, never owned pointers to detach/hide/delete.
+   u.mem_write(ab+28,struct.pack('<4I',root,root,0,0));call('live_leave',live)
+   self.assertEqual(bytes(u.mem_read(ab+28,16)),bytes(16))
+   self.assertEqual(self.live,baseline);self.assertEqual(self.heap,heap)
+   self.assertEqual(bytes(u.mem_read(root,0xf8)),canvas)
+  tone[0]=16;call('live_enter',live,0x08000000,0)
+  self.assertEqual(struct.unpack('<I',u.mem_read(ab+8,4))[0],0)
+  u.mem_write(ab+8,struct.pack('<I',1));u.mem_write(ab+16,struct.pack('<I',5))
+  call('live_enter',live,0x08000000,0);call('live_destroy',live)
+  self.assertEqual(self.live,baseline);self.assertEqual(self.heap,heap)
+  self.assertEqual(bytes(u.mem_read(root,0xf8)),canvas)
+ def test_ab_choices_include_actual_stock_high_contrast_black_and_white(self):
+  u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u)
+  self.state(u,6,1)
+  u.mem_write(0x10002000+112,struct.pack('<II',1,5))
+  self.call(u,'draw',0x10001000,0x10002000,0)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[33]+0xea,2))[0],860) # installed 800T
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[34]+0xea,2))[0],272) # native Hi-Contrast BW
+  p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(p,32)),'Hi-Contrast B&W\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
  def test_original_tree_film_selection_and_teardown(self):
   u=self.machine();self.assertEqual(self.call(u,'create',0x10001000),0)
   w=self.widgets(u);self.assertEqual(struct.unpack('<I',u.mem_read(0x100010a0,4))[0],37)
@@ -157,16 +239,31 @@ class SettingsViewTests(unittest.TestCase):
    self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[int(i==focus) for i in range(4)])
    self.assertEqual([u.mem_read(w[21+i]+0xea,1)[0] for i in range(4)],[6]*4)
    self.assertEqual([u.mem_read(w[6+i]+0x9e,1)[0] for i in range(5)],[0]*5)
-  self.state(u,3,4);self.call(u,'draw',0x10001000,0x10002000,0)
-  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0]*4)
-  p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
-  self.assertEqual(bytes(u.mem_read(p,34)),'> Film Name: OFF\0'.encode('utf-16le'))
+  self.state(u,5,0);self.call(u,'draw',0x10001000,0x10002000,0)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],990)
+  self.assertEqual(struct.unpack('<H',u.mem_read(w[29]+0xea,2))[0],989)
+  self.assertEqual([u.mem_read(w[29+i]+0x9e,1)[0] for i in range(4)],[1,0,0,0])
   self.state(u,1,4);self.call(u,'draw',0x10001000,0x10002000,0)
   self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0]*4)
   self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(5)],[1,1,1,1,6])
   outer=struct.unpack('<4I',u.mem_read(w[6]+0x20,16));inner=struct.unpack('<4I',u.mem_read(w[11]+0x20,16))
   self.assertEqual(outer,(24,102,128,204));self.assertEqual(inner,(26,104,124,200))
   self.assertEqual(struct.unpack('<4I',u.mem_read(w[16]+0x20,16)),(28,106,120,196))
+ def test_zoom_two_rows_draft_error_and_no_film_allocation(self):
+  u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u);heap=self.heap
+  # saved state, editor, focus/editing/closed/error
+  u.mem_write(0x10002000,struct.pack('<IHH7I',9,35,50,9,1,49,1,1,0,1))
+  self.call(u,'zoom',0x10001000,0x10002000)
+  self.assertEqual(self.heap,heap)
+  self.assertEqual([u.mem_read(w[29+i]+0x9e,1)[0] for i in range(4)],[1,1,0,0])
+  self.assertEqual([u.mem_read(w[33+i]+0x9e,1)[0] for i in range(4)],[1,1,0,0])
+  self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[0]*5)
+  self.assertEqual([u.mem_read(w[21+i]+0x9e,1)[0] for i in range(4)],[0,1,0,0])
+  cap=lambda index:struct.unpack('<H',u.mem_read(w[index]+0xea,2))[0]
+  self.assertEqual([cap(i) for i in (2,4,5,29,30,33,34)],[1024,1028,1029,1025,1026,1038,1052])
+  self.assertEqual(u.mem_read(w[5]+0x9e,1)[0],1)
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+
  def test_catalog_highlights_actual_index_and_hides_empty_last_page_entries(self):
   u=self.machine();self.call(u,'create',0x10001000);w=self.widgets(u);self.state(u,2,4)
   u.mem_write(0x10002000+116,struct.pack('<I',6))
@@ -177,5 +274,43 @@ class SettingsViewTests(unittest.TestCase):
   self.assertEqual(struct.unpack('<H',u.mem_read(w[2]+0xea,2))[0],969)
   p=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
   self.assertEqual(bytes(u.mem_read(p,20)),'7  PORTRA\0'.encode('utf-16le'))
+
+
+
+ def test_film_names_do_not_alias_watermark_captions(self):
+  from scripts.build_gr3_m10v_library import build
+  with tempfile.TemporaryDirectory() as folder:
+   m=build(Path(folder),sd_library=True)
+   texts=m['resources']['texts']
+   self.assertEqual(texts[978-786:988-786],['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203'])
+
+ def test_custom_slot_cards_use_each_saved_name_and_safe_fallback_icon(self):
+  names={0:'LOMO',1:'Portra 400',2:'Night LUT',3:'My Film',4:'CUSTOM'}
+  u=self.machine(custom_names=names);self.call(u,'create',0x10001000);self.state(u,1,0)
+  for i in range(5):u.mem_write(0x10002000+12+8*i,struct.pack('<H',79+i))
+  self.call(u,'draw',0x10001000,0x10002000,0)
+  w=self.widgets(u);heap=w[39];images=[]
+  for i in range(5):images.append(bytes(u.mem_read(heap+i*120*196*4,120*196*4)))
+  self.assertEqual(len(set(images)),5)
+  text=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,24)),'1 / 5  LOMO\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+  u=self.machine(fail_cards=True);self.call(u,'create',0x10001000);self.state(u,1,0)
+  u.mem_write(0x10002000+12,struct.pack('<H',79));self.call(u,'draw',0x10001000,0x10002000,0)
+  w=self.widgets(u);self.assertEqual(struct.unpack('<H',u.mem_read(w[16]+0xea,2))[0],754)
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+
+ def test_custom_catalog_page_uses_each_absolute_index_and_complete_focus_name(self):
+  u=self.machine(custom_names={5:'LOMO',6:'Night LUT'},catalog_ids={5:79,6:80})
+  self.call(u,'create',0x10001000);self.state(u,2,0)
+  u.mem_write(0x10002000+116,struct.pack('<I',6))
+  u.mem_write(0x10003000,struct.pack('<5I',0,0,0x540b0010,0,0))
+  self.call(u,'draw',0x10001000,0x10002000,0x10003000)
+  w=self.widgets(u);heap=w[39]
+  self.assertNotEqual(bytes(u.mem_read(heap,120*196*4)),bytes(u.mem_read(heap+120*196*4,120*196*4)))
+  self.assertEqual([u.mem_read(w[16+i]+0x9e,1)[0] for i in range(5)],[1,1,0,0,0])
+  text=struct.unpack('<I',u.mem_read(w[3]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,26)),'7  Night LUT\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
 
 if __name__=='__main__':unittest.main()

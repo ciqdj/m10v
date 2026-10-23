@@ -10,13 +10,11 @@ def oracle(y,uv,lut,light,grain,hashes,noise):
  for i in range(8):
   cb,cr=uv[i&~1]-128,uv[(i&~1)+1]-128
   rgb=[clip(y[i]+rq(91881*cr,16)),clip(y[i]-rq(22554*cb+46802*cr,16)),clip(y[i]+rq(116130*cb,16))]
-  rgb=[clip(v+(light[i]*t*(255-v)>>16)) for v,t in zip(rgb,[256,112,36])]
   q=[v*14 for v in rgb];p=[min(v//255,13) for v in q];f=[q[j]-p[j]*255 for j in range(3)]
   axes=sorted(range(3),key=lambda j:-f[j]);s=[225,15,1];fs=[f[j] for j in axes];idx=(p[0]*15+p[1])*15+p[2]
   ix=[idx,idx+s[axes[0]],idx+s[axes[0]]+s[axes[1]],idx+241];w=[255-fs[0],fs[0]-fs[1],fs[1]-fs[2],fs[2]]
   rgb=[(sum(lut[a*3+c]*b for a,b in zip(ix,w))+127)//255 for c in range(3)]
-  lum=(54*rgb[0]+183*rgb[1]+19*rgb[2])>>8;weight=32+min(lum,255-lum);delta=trunc(noise[i]*grain*weight,128*24*256)
-  out.append([clip(rgb[c]+delta+trunc(((hashes[i]>>(c*8)&255)-128)*grain,192*256)) for c in range(3)])
+  out.append(rgb)
  yo=[clip(rq(19595*r+38470*g+7471*b,16)) for r,g,b in out];uo=[]
  for i in range(0,8,2):
   r,g,b=[out[i][c]+out[i+1][c] for c in range(3)]
@@ -58,9 +56,8 @@ class TextureTests(unittest.TestCase):
    lib=Path(td)/'a.dylib';subprocess.run(['clang','-O2','-dynamiclib',str(ROOT/'native/gr3/m10v_texture_accel.c'),'-o',str(lib)],check=True,capture_output=True);fn=C.CDLL(str(lib)).m10v_texture_block8;fn.argtypes=[C.c_void_p]*4
    y=C.create_string_buffer(bytes(range(8)));uv=C.create_string_buffer(bytes(range(8)));lut=C.create_string_buffer(bytes(10125));p=(C.c_uint32*19)()
    before=bytes(y),bytes(uv)
-   for grain,noise in [(1025,0),(0,170),(0,-171)]:
-    p[2]=grain;p[11]=noise&0xffffffff
-    self.assertEqual(fn(y,uv,lut,p),-1);self.assertEqual((bytes(y),bytes(uv)),before)
+   for args in [(None,uv,lut,p),(y,None,lut,p),(y,uv,None,p)]:
+    self.assertEqual(fn(*args),-1);self.assertEqual((bytes(y),bytes(uv)),before)
    self.assertEqual(fn(y,uv,lut,None),-1);self.assertEqual((bytes(y),bytes(uv)),before)
  def test_cached_full_keys_collisions_and_repeat_hits_host_arm(self):
   import struct
@@ -82,7 +79,6 @@ class TextureTests(unittest.TestCase):
     for i in range(8):
      cb,cr=uv[i&~1]-128,uv[(i&~1)+1]-128
      rgb=[clip(ys[i]+rq(91881*cr,16)),clip(ys[i]-rq(22554*cb+46802*cr,16)),clip(ys[i]+rq(116130*cb,16))]
-     rgb=[clip(v+(light[i]*t*(255-v)>>16)) for v,t in zip(rgb,[256,112,36])]
      keys8.append(rgb[0]|rgb[1]<<8|rgb[2]<<16)
     grain=[0,921,1024][it%3];hashes=[rng.getrandbits(32) for _ in range(8)];noise=[rng.randrange(-170,170) for _ in range(8)];p=Params((C.c_uint8*8)(*light),grain,(C.c_uint32*8)(*hashes),(C.c_int32*8)(*noise))
     # Reset because LUT/capture selection changed; poison all slots with valid

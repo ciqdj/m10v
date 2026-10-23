@@ -1,5 +1,5 @@
 #include "m10v_storage.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 _Static_assert(sizeof(m10v_library_state)==104,"GR II state ABI changed");
 static uint16_t u16(const uint8_t *p){return (uint16_t)(p[0]|((uint16_t)p[1]<<8));}
 static void put16(uint8_t *p,uint16_t v){p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8);}

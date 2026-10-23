@@ -41,7 +41,7 @@ class Gr2StorageTests(unittest.TestCase):
         from tests.test_unity_update import ROOT
         from unicorn import UC_HOOK_CODE,arm_const as r
         report=self.build();self.assertIn('gr2_custom_snapshot_store',report['symbols']);self.assertIn('gr2_custom_snapshot_read',report['symbols'])
-        raw=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';for(const id of [79,80])process.stdout.write(customFilmRecord({name:'LUT '+id,rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i+id)%256))},id));"],cwd=ROOT)
+        raw=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';for(const id of [79,80])process.stdout.write(customFilmRecord({name:'LUT '+id,rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i+id)%256))},id));"],cwd=ROOT)
         records=[raw[:12288],raw[12288:]];u=self.machine(report);u.mem_map(0x52000000,0x4000);u.mem_map(0x53000000,0x4000)
         io=0x50000000;state=0x50001000;bank=0x50002000;work=0x53000000;record=0x52000000
         u.mem_write(io,struct.pack('>2I',0x5001d000,0x5001d004));files={};writes=[];behavior={'short':False,'trailing':False}
@@ -96,7 +96,7 @@ class Gr2StorageTests(unittest.TestCase):
         import subprocess
         from tests.test_unity_update import ROOT
         report=self.build();u=self.machine(report)
-        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
+        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
         u.mem_write(0x50001000,pack[:4096])
         self.assertEqual(self.call(u,report['symbols']['m10v_sd_header'],[0x50001000,len(pack)]),46)
         for i in range(46):
@@ -202,7 +202,7 @@ class Gr2StorageTests(unittest.TestCase):
         from tests.test_unity_update import ROOT
         from unicorn import UC_HOOK_CODE,arm_const as r
         report=self.build();self.assertTrue('gr2_pack_fetch' in report['symbols']);u=self.machine(report)
-        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
+        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
         source={'bytes':pack};requests=[];size_fn=0x5001d000;read_fn=0x5001d004
         u.mem_write(0x50000000,struct.pack('>2I',size_fn,read_fn))
         def io(uc,address,size,context):
@@ -231,7 +231,7 @@ class Gr2StorageTests(unittest.TestCase):
         from tests.test_unity_update import ROOT
         from unicorn import UC_HOOK_CODE,arm_const as r
         report=self.build();self.assertTrue('gr2_pack_manifest_load' in report['symbols']);u=self.machine(report)
-        program="import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';import {parseCustomCube} from './node/gr3-custom-lut.mjs';const cube='LUT_3D_SIZE 2\\n0 0 0\\n1 0 0\\n0 1 0\\n1 1 0\\n0 0 1\\n1 0 1\\n0 1 1\\n1 1 1\\n';for(const name of ['FIRST','SECOND'])process.stdout.write(buildSdFilmPack([],[parseCustomCube(Buffer.from(cube),'identity.cube',name)]));"
+        program="import {buildSdFilmPack} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';import {parseCustomCube} from './node/gr3-custom-lut.mjs';const cube='LUT_3D_SIZE 2\\n0 0 0\\n1 0 0\\n0 1 0\\n1 1 0\\n0 0 1\\n1 0 1\\n0 1 1\\n1 1 1\\n';for(const name of ['FIRST','SECOND'])process.stdout.write(buildSdFilmPack([],[parseCustomCube(Buffer.from(cube),'identity.cube',name)]));"
         packs=subprocess.check_output(['node','--input-type=module','-e',program],cwd=ROOT);first,second=packs[:16384],packs[16384:]
         self.assertEqual(len(second),16384);self.assertEqual(struct.unpack_from('<I',first,64)[0],79);self.assertEqual(struct.unpack_from('<I',second,64)[0],79)
         source={'bytes':first};size_fn=0x5001d000;read_fn=0x5001d004;u.mem_write(0x50000000,struct.pack('>2I',size_fn,read_fn))

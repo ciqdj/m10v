@@ -12,14 +12,14 @@ from tests.test_unity_update import ROOT,component
 class Gr2RendererTests(unittest.TestCase):
     def test_big_endian_catalog_render_matches_host_reference_pixels(self):
         from scripts.build_gr2_runtime import build_gr2_runtime
-        from tests.test_gr3_m10v_library import State,Image
+        from tests.gr2_compat_types import State,Image
         from unicorn import Uc,UC_ARCH_ARM,UC_MODE_ARM,UC_MODE_BIG_ENDIAN,arm_const as r
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)
             report=build_gr2_runtime(component('gr2','b01firm8'),{},path)
             self.assertIn('m10v_library_render',report['symbols'],'GR II runtime lacks the shared scalar renderer')
             library=path/'host.dylib';sources=['m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks']
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',*[str(ROOT/f'native/gr3/{name}.c') for name in sources],'-o',str(library)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',*[str(ROOT/f'compat/gr2-v1/native/gr3/{name}.c') for name in sources],'-o',str(library)],check=True,capture_output=True)
             host=C.CDLL(str(library));host.m10v_library_init.argtypes=[C.POINTER(State)]
             host.m10v_library_render.argtypes=[C.POINTER(Image),C.POINTER(State),C.c_uint32,C.c_void_p,C.c_uint32,C.c_void_p,C.c_uint32]
             u=Uc(UC_ARCH_ARM,UC_MODE_ARM|UC_MODE_BIG_ENDIAN);u.mem_map(report['base'],0x68000);u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']));u.mem_map(0x50000000,0x20000)
@@ -74,7 +74,7 @@ class Gr2RendererTests(unittest.TestCase):
             path=Path(folder);report=build_gr2_runtime(component('gr2','b01firm8'),{},path)
             self.assertTrue('gr2_film_card_rgba' in report['symbols'])
             library=path/'cards.dylib'
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(library)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',str(ROOT/'compat/gr2-v1/native/gr3/m10v_film_card.c'),'-o',str(library)],check=True,capture_output=True)
             host=C.CDLL(str(library));host.m10v_film_card_render.argtypes=[C.POINTER(C.c_uint32),C.c_uint32,C.c_uint32,C.c_uint32]
             u=runtime_tests.Gr2RuntimeBuildTests.machine(self,report);u.mem_map(0x60000000,0x20000);size=120*196*4;address=0x60000004
             for film,slot,selected in ((1,0,0),(33,4,1),(66,2,0),(67,1,1),(68,3,1),(78,4,0)):

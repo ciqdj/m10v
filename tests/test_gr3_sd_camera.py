@@ -65,11 +65,38 @@ class SdCameraTests(unittest.TestCase):
   u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.manifest['symbols'][name],0x550ff000,count=10000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x550ff000);return u.reg_read(UC_ARM_REG_R0)
  def test_pages_and_final_record(self):
-  for page,row,expected in [(0,0,33),(0,1,66),(0,2,67),(0,3,68),(0,4,69),(0,5,70),(0,6,71),(0,7,72),(1,0,73),(1,1,74),(1,2,75),(1,3,76),(1,4,77),(1,5,78),(1,6,34),(5,4,64),(5,5,65),(32,0,0),(0,8,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),expected)
+  for page,row,expected in [(0, 0, 33), (0, 1, 66), (0, 2, 67), (0, 3, 68), (0, 4, 69), (0, 5, 70), (0, 6, 71), (0, 7, 72), (1, 0, 73), (1, 1, 74), (1, 2, 75), (1, 3, 76), (1, 4, 77), (1, 5, 78), (1, 6, 289), (1, 7, 290), (2, 0, 291), (2, 1, 292), (2, 2, 293), (2, 3, 294), (2, 4, 295), (2, 5, 296), (2, 6, 297), (2, 7, 34), (3, 0, 35), (3, 1, 36), (3, 2, 37), (3, 3, 38), (3, 4, 39), (3, 5, 40), (3, 6, 41), (3, 7, 42), (4, 0, 43), (4, 1, 44), (4, 2, 45), (4, 3, 46), (4, 4, 47), (4, 5, 48), (4, 6, 49), (4, 7, 50), (5, 0, 51), (5, 1, 52), (5, 2, 53), (5, 3, 54), (5, 4, 55), (5, 5, 56), (5, 6, 57), (5, 7, 58), (6, 0, 59), (6, 1, 60), (6, 2, 61), (6, 3, 62), (6, 4, 63), (6, 5, 64), (6, 6, 65), (32, 0, 0), (0, 8, 0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),expected)
   self.assertEqual((self.opened,self.allocated),(0,0));self.assertEqual(self.calls,[])
+ def test_sparse_style_snapshots_use_distinct_names_and_survive_without_card(self):
+  for page,row,film in [(2, 0, 291), (2, 1, 292), (2, 2, 293), (2, 3, 294), (2, 4, 295), (2, 5, 296), (2, 6, 297)]:
+   self.card=self.pack;self.calls.clear()
+   self.assertEqual(self.call('m10v_sd_camera_install',page,row,film,2),0)
+   self.assertEqual(self.calls[0],('save','M10VS%02d.bin'%(film-289),12288))
+   self.card=b'';self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+   self.assertEqual(struct.unpack_from('<H',self.u.mem_read(0x5500a000,104),28)[0],film)
+  self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_charmera_installs_as_builtin_and_retains_color_without_sd(self):
+  self.assertEqual(self.call('m10v_sd_camera_install',1,6,289,2),0)
+  self.assertEqual(self.calls[0],('save','M10VS00.bin',12288))
+  self.card=b'';state=0x5500a000
+  self.assertEqual(self.call('m10v_camera_library_load',state),0)
+  self.assertEqual(struct.unpack_from('<H',self.u.mem_read(state,104),28)[0],289)
+  self.assertEqual(self.call('m10v_camera_library_effects',state,2,7,3),0)
+  self.assertEqual(self.call('m10v_camera_library_load',state),0)
+  saved=bytes(self.u.mem_read(state,104));self.assertEqual(saved[79],3);self.assertEqual(saved[78],0)
+  self.assertEqual((self.opened,self.allocated),(0,0))
+
+ def test_pixel_world_installs_as_builtin_without_overwriting_charmera(self):
+  self.assertEqual(self.call('m10v_sd_camera_install',1,7,290,2),0)
+  self.assertEqual(self.calls[0],('save','M10VS01.bin',12288))
+  self.card=b'';state=0x5500a000
+  self.assertEqual(self.call('m10v_camera_library_load',state),0)
+  self.assertEqual(struct.unpack_from('<H',self.u.mem_read(state,104),28)[0],290)
+  self.assertEqual((self.opened,self.allocated),(0,0))
+
  def test_install_persists_complete_recipe_before_slot_and_survives_no_card(self):
-  self.assertEqual(self.call('m10v_sd_camera_install',5,5,65,2),0)
-  self.assertEqual(self.calls[0],('save','M10VS65.bin',12288));self.assertEqual(self.files['M10VS65.bin'],self.pack[4096+45*12288:4096+46*12288])
+  self.assertEqual(self.call('m10v_sd_camera_install',6,6,65,2),0)
+  self.assertEqual(self.calls[0],('save','M10VS65.bin',12288));self.assertEqual(self.files['M10VS65.bin'],self.pack[4096+54*12288:4096+55*12288])
   self.card=b'';self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   state=bytes(self.u.mem_read(0x5500a000,104));self.assertEqual(struct.unpack_from('<H',state,28)[0],65)
   self.assertEqual((self.opened,self.allocated),(0,0))
@@ -88,6 +115,20 @@ class SdCameraTests(unittest.TestCase):
   self.card=b''
   self.assertEqual(self.call('m10v_sd_camera_custom_name',0x5500a000,0,0x5500c000,24),1)
   self.assertEqual(self.string(0x5500c000),'My Film')
+  def model(uc,pc,size,data):
+   if pc in (0x5320ad88,0x5320ba9c):
+    uc.reg_write(UC_ARM_REG_R0,0x55006000 if pc==0x5320ad88 else 0x55068200)
+    uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+  self.u.hook_add(UC_HOOK_CODE,model)
+  self.u.mem_write(0x55068200,bytes([12])+bytes(31))
+  self.assertEqual(self.call('m10v_menu_name',0,12),1007)
+  self.assertEqual(self.call('m10v_menu_name',0,208),1007)
+  self.assertEqual(self.call('m10v_menu_icon',0,12),754)
+  self.assertEqual(self.call('m10v_menu_icon',0,208),754)
+  self.assertEqual(self.call('m10v_menu_custom_resource',1007,0x5500c000),0x5500c000)
+  header=bytes(self.u.mem_read(0x5500c000,8));text=self.n(0x5500c004)
+  self.assertEqual(bytes(self.u.mem_read(text,header[0]*2)).decode('utf-16le'),'My Film\0')
+  self.assertEqual((self.opened,self.allocated),(0,0))
   self.card=custom_pack
   self.fail_state=True
   self.assertNotEqual(self.call('m10v_sd_camera_install',0,0,79,0),0)
@@ -138,16 +179,16 @@ class SdCameraTests(unittest.TestCase):
     self.assertEqual((self.opened,self.allocated),(0,0))
     setattr(self,flag,False)
  def test_state_write_failure_preserves_previous_slots_and_reuses_verified_snapshot(self):
-  self.assertEqual(self.call('m10v_sd_camera_install',1,6,34,1),0)
+  self.assertEqual(self.call('m10v_sd_camera_install',2,7,34,1),0)
   self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   before=bytes(self.u.mem_read(0x5500a000,104))
   self.fail_state=True
-  self.assertNotEqual(self.call('m10v_sd_camera_install',5,5,65,4),0)
+  self.assertNotEqual(self.call('m10v_sd_camera_install',6,6,65,4),0)
   self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   self.assertEqual(bytes(self.u.mem_read(0x5500a000,104)),before)
   self.assertIn('M10VS65.bin',self.files)
   self.fail_state=False;self.calls=[]
-  self.assertEqual(self.call('m10v_sd_camera_install',5,5,65,4),0)
+  self.assertEqual(self.call('m10v_sd_camera_install',6,6,65,4),0)
   self.assertFalse(any(name=='M10VS65.bin' for _,name,_ in self.calls))
   self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
   after=bytes(self.u.mem_read(0x5500a000,104))
@@ -172,7 +213,7 @@ class SdCameraTests(unittest.TestCase):
   for offset,y,c in [(0xb0,0x55060000,0x55062000),(0x110,0x55090000,0x550a0000)]:
    u.mem_write(recipe+offset,struct.pack('<4I8H',1,y,c,0,64,32,64,32,0,0,2,0))
   outputs=[]
-  for page,row,film in [(0,7,72),(1,6,34),(5,5,65)]:
+  for page,row,film in [(0,7,72),(2,7,34),(6,6,65)]:
    self.card=self.pack;self.assertEqual(self.call('m10v_sd_camera_install',page,row,film,1),0)
    self.card=b'';u.mem_write(0x55060000,bytes([64])*2048);u.mem_write(0x55062000,bytes([128])*2048)
    self.assertEqual(self.call('m10v_capture_library',context),0)
@@ -220,3 +261,25 @@ class SdCameraTests(unittest.TestCase):
   self.fail_stat=False;self.card=b''
   self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
   self.assertEqual((self.opened,self.allocated),(0,0))
+
+ def test_custom_resource_adapters_keep_descriptor_alive_and_original_registers(self):
+  from unicorn.arm_const import UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12
+  regs=[UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12]
+  for name,target,outreg in [('primary',0x53396700,UC_ARM_REG_R7),('secondary',0x5339710c,UC_ARM_REG_R3)]:
+   for resource in range(1007,1007):
+    u=self.u;seen=[];sp=0x550fe000
+    def stop(uc,pc,size,data):
+     if pc==target:seen.append(pc);uc.emu_stop()
+    handle=u.hook_add(UC_HOOK_CODE,stop)
+    for i,r in enumerate(regs):u.reg_write(r,0x55080000+i*256)
+    u.reg_write(UC_ARM_REG_R7,resource);u.reg_write(UC_ARM_REG_SP,sp);u.reg_write(UC_ARM_REG_LR,0x550ff000)
+    before={r:u.reg_read(r) for r in regs}
+    u.emu_start(self.manifest['symbols']['m10v_resource_'+name],0x550ff000,count=1000000)
+    u.hook_del(handle);self.assertEqual(seen,[target])
+    self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp-80)
+    ptr=u.reg_read(outreg);self.assertEqual(ptr,sp-64)
+    header=bytes(u.mem_read(ptr,8));text=self.n(ptr+4)
+    self.assertEqual(bytes(u.mem_read(text,header[0]*2)).decode('utf-16le'),'Custom LUT\0')
+    for r in regs:
+     if r not in ([UC_ARM_REG_R0,UC_ARM_REG_R3,UC_ARM_REG_R7,UC_ARM_REG_R8] if name=='primary' else [UC_ARM_REG_R3]):self.assertEqual(u.reg_read(r),before[r])
+    self.assertEqual((self.opened,self.allocated),(0,0));self.assertEqual(self.calls,[])

@@ -93,7 +93,7 @@ class Gr2HdfTests(unittest.TestCase):
         import subprocess
         from scripts.build_gr2_runtime import build_gr2_runtime
         from scripts.analyze_gr2_native_contract import probe_image_object_pools
-        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'HDF LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
+        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'HDF LUT',rgb:Buffer.from(Array.from({length:6591},(_,i)=>(i*7+83)%256))},79));"],cwd=ROOT)
         code=component('gr2','b01firm8')
         with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(code,{},Path(folder))
         result=probe_image_object_pools(code,extra=128+12288+16,native_runtime=runtime,custom_record=record,hdf_snapshot=(2,9))

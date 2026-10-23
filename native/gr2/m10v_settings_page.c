@@ -3,7 +3,7 @@
 #include "m10v_settings_backend.h"
 #include "m10v_ui.h"
 #include "m10v_model.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 #include "m10v_settings_labels.h"
 #include "m10v_detail_labels.h"
 #define DETAIL_SCREEN 5u

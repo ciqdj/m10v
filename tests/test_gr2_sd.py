@@ -14,7 +14,7 @@ class Gr2SdTests(unittest.TestCase):
         from unicorn import UC_HOOK_CODE,arm_const as r
         import zlib
         report=self.build();self.assertIn('gr2_sd_install',report['symbols']);self.assertIn('gr2_sd_custom_record',report['symbols'])
-        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([],[{name:'Native LUT',rgb:Buffer.alloc(6591,83),sha256:'a'.repeat(64)}]));"],cwd=ROOT)
+        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([],[{name:'Native LUT',rgb:Buffer.alloc(6591,83),sha256:'a'.repeat(64)}]));"],cwd=ROOT)
         u=runtime_machine(component('gr2','b01firm8'));u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']));u.mem_map(0x52000000,0x2000);u.mem_map(0x53000000,0x4000)
         table=0x50007000;u.mem_write(0xa00b5bfe,struct.pack('>H',1));u.mem_write(0xa00b5be0,struct.pack('>I',table));u.mem_write(table,struct.pack('>h',-2));self.call(u,0xa0024bcb,[])
         word=lambda p:struct.unpack('>I',u.mem_read(p,4))[0]
@@ -173,7 +173,7 @@ class Gr2SdTests(unittest.TestCase):
         import zlib
         report=self.build();self.assertIn('gr2_pack_install',report['symbols'])
         u=runtime_tests.Gr2RuntimeBuildTests.machine(self,report);u.mem_map(0x51000000,0x2000);u.mem_map(0x52000000,0x8000)
-        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([],[{name:'Install LUT',rgb:Buffer.alloc(6591,83),sha256:'a'.repeat(64)}]));"],cwd=ROOT)
+        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([],[{name:'Install LUT',rgb:Buffer.alloc(6591,83),sha256:'a'.repeat(64)}]));"],cwd=ROOT)
         files={};writes=[];fail={'journal':False};storage=0x50000000;pack_io=0x50000008;state=0x50001000;wire=0x50002000;manifest=0x51000000;work=0x52000000
         u.mem_write(storage,struct.pack('>4I',0x5001d000,0x5001d004,0x5001d008,0x5001d00c))
         def boundary(uc,address,size,unused):
@@ -203,13 +203,13 @@ class Gr2SdTests(unittest.TestCase):
         self.assertEqual(struct.unpack('>H',u.mem_read(state+12,2))[0],79);self.assertEqual(bytes(u.mem_read(state+62,1)),b'\x01')
         writes.clear();pack=pack[:4096]+bytes([pack[4096]^1])+pack[4097:]
         self.assertNotEqual(install(),0);self.assertEqual(writes,[])
-        self.assertEqual(files['H:/M10VC00.bin'],subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Install LUT',rgb:Buffer.alloc(6591,83)},79));"],cwd=ROOT))
+        self.assertEqual(files['H:/M10VC00.bin'],subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Install LUT',rgb:Buffer.alloc(6591,83)},79));"],cwd=ROOT))
 
     def test_native_sd_fetch_uses_real_pool_and_stock_file_wrappers_without_retained_handles(self):
         from scripts.analyze_gr2_native_contract import runtime_machine
         from unicorn import UC_HOOK_CODE,arm_const as r
         report=self.build();u=runtime_machine(component('gr2','b01firm8'));u.mem_write(report['base'],bytes.fromhex(report['runtime_hex']))
-        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
+        pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
         table=0x50007000;u.mem_write(0xA00B5BFE,struct.pack('>H',1));u.mem_write(0xA00B5BE0,struct.pack('>I',table));u.mem_write(table,struct.pack('>h',-2))
         self.call(u,0xA0024BCB,[])
         word=lambda p:struct.unpack('>I',u.mem_read(p,4))[0]

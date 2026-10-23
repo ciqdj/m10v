@@ -1,6 +1,6 @@
 #include "m10v_hdf_storage.h"
 #include "m10v_boot.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 static const char names[2][16]={"H:/M10VHD0.BIN","H:/M10VHD1.BIN"};
 typedef struct {uint32_t sequence,strength,bank;} record;
 static int span(const void *p,uint32_t n){uintptr_t a=(uintptr_t)p;return a&&!(a&3u)&&a<=UINT32_MAX-n;}

@@ -13,7 +13,7 @@ class FilmCardTests(unittest.TestCase):
   cls.draw.argtypes=[C.POINTER(C.c_uint32),C.c_uint32,C.c_uint32,C.c_uint32];cls.draw.restype=C.c_int
  def test_all_films_fit_the_owned_buffer_and_emit_rgba(self):
   count=120*196;buffer=(C.c_uint32*(count+2))();pixels=C.cast(C.byref(buffer,4),C.POINTER(C.c_uint32))
-  for film in range(1,79):
+  for film in list(range(1,79))+[289,290]:
    for slot in range(5):
     buffer[0]=buffer[-1]=0x12345678
     self.assertEqual(self.draw(pixels,film,slot,slot==2),0)
@@ -27,3 +27,18 @@ class FilmCardTests(unittest.TestCase):
   for film,slot in [(0,0),(79,0),(1,5),(0xffffffff,0)]:
    self.assertEqual(self.draw(pixels,film,slot,0),-1);self.assertEqual(bytes(pixels),before)
   self.assertEqual(self.draw(None,1,0,0),-1)
+
+ def test_custom_names_produce_distinct_bounded_art_without_builtin_alias(self):
+  draw=self.lib.m10v_film_card_custom
+  draw.argtypes=[C.POINTER(C.c_uint32),C.c_char_p,C.c_uint32,C.c_uint32]
+  count=120*196;b=(C.c_uint32*(count+2))();p=C.cast(C.byref(b,4),C.POINTER(C.c_uint32))
+  images=[]
+  for name in [b'LOMO',b'Portra 400',b'12345678901234567890123',b'!@#$%^&*()_+-=[]{}:;,.?']:
+   b[0]=b[-1]=0x12345678
+   self.assertEqual(draw(p,name,1,1),0)
+   self.assertEqual((b[0],b[-1]),(0x12345678,0x12345678));images.append(bytes(b))
+  self.assertNotEqual(images[0],images[1])
+  self.draw(p,33,1,1);self.assertNotEqual(images[0],bytes(b))
+  before=bytes(b)
+  for name in [None,b'',b'A'*24]:
+   self.assertEqual(draw(p,name,1,1),-1);self.assertEqual(bytes(b),before)

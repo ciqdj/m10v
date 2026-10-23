@@ -24,5 +24,17 @@ class Gr4ConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'film name stamp'):
                 initial_state(config)
 
+    def test_nonzero_grain_requires_the_gr3_native_pipeline(self):
+        c=self.configuration();c['slots'][0]['grain']=1
+        with self.assertRaisesRegex(ValueError,'grain.*GR III'):
+            initial_state(c)
+
+    def test_legacy_retired_effects_are_neutral_without_losing_stamp_or_halo(self):
+        c=self.configuration();c['stamp']=2
+        c['slots'][0]['effects'].update(grainSize=2,leakGain=8,leakPosition=5,leakSpread=8,leakVariation=1)
+        state=initial_state(c)
+        self.assertEqual(state[56:61],bytes([0,0,0,4,0]))
+        self.assertEqual(state[52],2);self.assertEqual(state[16],3)
+
 
 if __name__=='__main__':unittest.main()

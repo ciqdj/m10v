@@ -3,6 +3,7 @@
  * its unchanged pyramid. Only settings values and coefficient rows change.
  * Standalone uses a16-byte tail; combined builds use the sole trace allocator
  * and its explicitly reserved per-shot words. */
+#include "m10v_tone.h"
 #include <stdint.h>
 #ifndef M10V_HDF_DEFAULT
 #define M10V_HDF_DEFAULT 0u
@@ -96,7 +97,7 @@ void m10v_hdf_gate(uint32_t recipe,uint32_t request,uint32_t si){
      * Tone20 uses Standard ISP only when installed as a film carrier. Stock
      * Soft Monotone retains its own native graph; device image QA is pending. */
     uint32_t tone=*(const uint8_t *)(uintptr_t)(si+0x77c);
-    if(tone<11||tone>22||tone==14)return;
+    if(!m10v_tone_valid(tone)||tone==14)return;
     s->si=si;s->ready|=2u;
     *(uint8_t *)(uintptr_t)(request+0x24)=1;
 }

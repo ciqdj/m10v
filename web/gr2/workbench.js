@@ -1,4 +1,4 @@
-import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture} from '/gr3/native-library-state.mjs';
+import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture} from '/gr2/native-library-state.mjs';
 import {enhanceFilmSelect} from '/gr3/film-picker.mjs';
 const $=id=>document.getElementById(id),levels=['关闭','弱','中','强'];
 let configuration=defaultConfiguration(),active=0,project,plan,token,controller,busy=false,ready=false,films=[],past=[],future=[],urls=[];
@@ -54,7 +54,7 @@ $('sd-export').onclick=()=>action(async()=>{if(!project)throw Error('请先导�
 $('undo-edit').onclick=()=>{if(!past.length)return;future.push(JSON.stringify(configuration));configuration=normalizeConfiguration(JSON.parse(past.pop()));invalidate();render();};$('redo-edit').onclick=()=>{if(!future.length)return;past.push(JSON.stringify(configuration));configuration=normalizeConfiguration(JSON.parse(future.pop()));invalidate();render();};
 $('filmNameStamp').onchange=()=>edit(()=>configuration.filmNameStamp=$('filmNameStamp').checked);
 summary();
-try{const [service,catalog,markup]=await Promise.all([fetch('/api/status').then(r=>r.json()),fetch('/api/gr2/native-library/catalog').then(r=>{if(!r.ok)throw Error('胶卷目录加载失败');return r.json();}),fetch('/gr3/native-library-controls.html').then(r=>{if(!r.ok)throw Error('胶卷控件加载失败');return r.text();})]);token=service.session_token;films=catalog.films;
+try{const [service,catalog,markup]=await Promise.all([fetch('/api/status').then(r=>r.json()),fetch('/api/gr2/native-library/catalog').then(r=>{if(!r.ok)throw Error('胶卷目录加载失败');return r.json();}),fetch('/gr2/native-library-controls.html').then(r=>{if(!r.ok)throw Error('胶卷控件加载失败');return r.text();})]);token=service.session_token;films=catalog.films;
  const doc=new DOMParser().parseFromString(markup,'text/html'),workspace=doc.querySelector('.workspace');if(!workspace)throw Error('胶卷控件不完整');$('native-editor').replaceChildren(workspace);ready=true;
  configuration.slots.forEach((s,i)=>{if(!films.some(f=>f.id===s.film))s.film=[34,35,36,37,33][i];});
  for(const group of [...new Set(films.map(f=>f.group))])$('film-group').append(new Option(group,group));enhanceFilmSelect($('film-group'),{caption:'胶卷分类',searchable:false});$('search').oninput=renderFilms;$('film-group').onchange=renderFilms;

@@ -1,8 +1,8 @@
 import {encodeZip} from './gr3-sd-film-export.mjs';
-import {buildSdFilmPack} from './gr3-sd-film-pack.mjs';
+import {buildSdFilmPack} from '../compat/gr2-v1/node/gr3-sd-film-pack.mjs';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
-import {nativeCatalog} from './gr3-native-library.mjs';
+import {nativeCatalog} from '../compat/gr2-v1/node/gr3-native-library.mjs';
 import {readModelOfficial} from './model-firmware.mjs';
 import {readUnityModelComponent} from './unity-firmware.mjs';
 import {prepareGr2Native,generateGr2Native} from './gr2-native-library.mjs';
@@ -11,7 +11,7 @@ export async function handleGr2NativeRequest({request,response,runtime,token,rea
  const prefix='/api/gr2/native-library/';if(!request.url?.startsWith(prefix))return false;
  const route=request.url.slice(prefix.length),file=path.join(runtime.root,'..','gr2','inputs',identity+'.frm');
  try{
-  if(request.method==='GET'&&route==='catalog'){send(response,200,{...await nativeCatalog(),local_sources:['gr2'],hardware_verified:false});return true;}
+  if(request.method==='GET'&&route==='catalog'){send(response,200,{...await nativeCatalog(),local_sources:['gr2'],local_source_available:await readModelOfficial('gr2').then(()=>true,()=>false),hardware_verified:false});return true;}
   if(request.headers['x-m10v-token']!==token||(request.headers.origin&&request.headers.origin!==origin)){send(response,403,{error:'authorization failed'});return true;}
   if(request.method!=='POST'){send(response,405,{error:'POST required'});return true;}
   const body=await readBody(request,route==='import'?64*1024*1024:16384);

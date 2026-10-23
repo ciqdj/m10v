@@ -1,6 +1,6 @@
 #ifndef M10V_GR2_SETTINGS_PAGE_H
 #define M10V_GR2_SETTINGS_PAGE_H
-#include "../gr3/m10v_settings.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_settings.h"
 #include "m10v_detail.h"
 /* Existing UI owner and initialized graphics/fonts only. NULL ops binds the
  * native journal/SD backend; external callback context must outlive the page. */

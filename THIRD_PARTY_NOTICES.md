@@ -115,3 +115,25 @@ upstream as a G'MIC film LUT. Its MIT license and original cube header are
 retained in `third_party/curated-film-luts/`. ProImage 100 uses M10V's manual
 reading of Kodak E-4L curves. These are approximate display interpretations,
 not manufacturer-supplied transforms or measured camera/film calibration.
+
+## Seven curated style filters (2026-10-23)
+
+Street Monochrome Eerie LUT by Ivan Bogachev (sfi0zy), copyright 2026,
+https://github.com/sfi0zy/street-monochrome at commit 3f915315da4f43dd86af304273615b3a54939a94,
+licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Full license and attribution are retained in `third_party/style-filter-luts/`.
+M10V changes: neutralisation, resampling to a 15³ lattice, 8-bit quantisation,
+and a separate approximate native ISP profile. No endorsement is implied.
+
+Fuji Velvia 50 and Polaroid PX-680 community LUTs are from
+YahiaAngelo/Film-Luts at af957b631a304e6be94778b96cb3395de3438e9f, MIT,
+copyright (c) 2024 Yahia. The full notice is retained as
+`third_party/style-filter-luts/film-luts-license`. PX-680 is a historical proxy,
+not a manufacturer calibration for modern Polaroid 600 / i-Type film.
+
+## Noto Sans Bold
+
+`third_party/noto-sans/NotoSans-Bold.ttf` is Noto Sans Bold from the Noto
+project, licensed under the SIL Open Font License 1.1. The complete license
+and copyright notice are in `third_party/noto-sans/OFL.txt`. The square film
+icon PNGs and generated native glyph coverage use this font.

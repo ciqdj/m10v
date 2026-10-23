@@ -1,6 +1,6 @@
 #ifndef M10V_GR2_STORAGE_H
 #define M10V_GR2_STORAGE_H
-#include "../gr3/m10v_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_library.h"
 typedef struct {
     int32_t (*read)(const char *,uint8_t *,uint32_t);
     int32_t (*write)(const char *,const uint8_t *,uint32_t);

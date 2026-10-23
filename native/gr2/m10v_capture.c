@@ -1,6 +1,6 @@
 #include "m10v_capture.h"
 #include "m10v_hdf.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 _Static_assert(sizeof(m10v_gr2_frame)==128,"GR II inline frame ABI changed");
 static int valid(uint32_t p,uint32_t n){return p&&n&&n<=UINT32_MAX-p;}
 static int overlaps(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}

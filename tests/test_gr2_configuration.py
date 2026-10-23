@@ -74,7 +74,7 @@ class Gr2ConfigurationTests(unittest.TestCase):
         set_task(1);self.assertEqual(invoke('publish',state,records),0);self.assertEqual(free(),resident)
         self.assertEqual(invoke('freeze',context,1234),0);self.assertEqual(bytes(u.mem_read(context+0xfb0c,128)),bytes(128))
         set_task(2);self.assertEqual(self.call(u,0xa00671b8,[1]),0);set_task(1)
-        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Published LUT',rgb:Buffer.alloc(6591,83)},79));"],cwd=ROOT)
+        record=subprocess.check_output(['node','--input-type=module','-e',"import {customFilmRecord} from './compat/gr2-v1/node/gr3-sd-film-pack.mjs';process.stdout.write(customFilmRecord({name:'Published LUT',rgb:Buffer.alloc(6591,83)},79));"],cwd=ROOT)
         custom=bytearray(initial);struct.pack_into('>H',custom,12,79);custom[62]=1;struct.pack_into('>I',custom,100,zlib.crc32(custom[:100]));u.mem_write(state,bytes(custom))
         self.assertEqual(invoke('publish',state,records),0)
         u.mem_write(0x52000000,record);u.mem_write(records,struct.pack('>5I',0x52000000,0,0,0,0));self.assertEqual(invoke('publish',state,records),1)

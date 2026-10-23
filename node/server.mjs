@@ -236,12 +236,12 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled};
+        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
         if(nativeMatch[2]==='prepare')return send(response,200,powerPreparation);
         if(input.accepted_configuration_sha256!==powerPreparation.configuration_sha256)throw Error('方案已变化，请重新核验图片与固件');
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
-        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled});
+        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,appended_slots:input.appended_slots});
         const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
         const receipt={...nativeResult.receipt,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));

@@ -1,4 +1,4 @@
-"""Preserve the previous texture bytes while bounding hash work at 24MP scale."""
+"""Retired texture performs no hash work and preserves exact color/padding."""
 import ctypes as C
 import random
 import shutil
@@ -24,7 +24,7 @@ unsigned probe(m10v_library_image *im,const m10v_film_effects *e,unsigned grain,
 }
 ''')
             out=path.with_suffix('.dylib')
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-I',str(ROOT/'native/gr3'),str(path),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),'-o',str(out)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-I',str(ROOT/'native/gr3'),str(path),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),'-o',str(out)],check=True,capture_output=True)
             lib=C.CDLL(str(out));lib.probe.argtypes=[C.POINTER(Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];cls.libs.append(lib)
 
     def run_texture(self,width,height,size,gain=0,color=1,grain=768,seed=42,position=5):
@@ -32,20 +32,20 @@ unsigned probe(m10v_library_image *im,const m10v_film_effects *e,unsigned grain,
         initial=(rng.randbytes(n)+bytes([173])*32,rng.randbytes(n)+bytes([197])*32)
         e=(C.c_uint8*8)(size,gain,position,8,1,0,0,0)
         outputs=[];counts=[]
-        for lib in self.libs:
+        for index,lib in enumerate(self.libs):
             y=(C.c_uint8*len(initial[0])).from_buffer_copy(initial[0]);uv=(C.c_uint8*len(initial[1])).from_buffer_copy(initial[1])
             image=Image(y,uv,n,n,width,height,stride)
-            counts.append(lib.probe(C.byref(image),e,grain,seed,color));outputs.append((bytes(y),bytes(uv)))
+            counts.append(lib.probe(C.byref(image),(C.c_uint8*8)() if index==0 else e,0 if index==0 else grain,seed,color));outputs.append((bytes(y),bytes(uv)))
         self.assertEqual(outputs[0],outputs[1])
         return counts[1]
 
-    def test_texture_hashes_reuse_grain_lattice_without_changing_full_width_pixels(self):
+    def test_retired_grain_hash_work_is_zero_at_full_width(self):
         for size in (0,1,2):
             with self.subTest(size=size):
                 calls=self.run_texture(6000,2,size)
-                self.assertLessEqual(calls,3*6000*2+16)
+                self.assertEqual(calls,0)
 
-    def test_texture_reference_matches_color_grain_leak_and_partial_rows(self):
+    def test_legacy_texture_args_preserve_exact_color_and_partial_rows(self):
         for width,height in ((2,1),(18,7),(128,96),(6000,2)):
             for size in (0,1,2):
                 for color in (0,1,2,3,4,5):
@@ -55,8 +55,8 @@ unsigned probe(m10v_library_image *im,const m10v_film_effects *e,unsigned grain,
         for position in range(6):
             self.run_texture(38,9,2,gain=8,color=0,grain=0,position=position)
 
-    def test_leak_field_hash_work_is_bounded_by_normalized_coordinates(self):
+    def test_retired_leak_hash_work_is_zero(self):
         # A full-width crop: leak coordinates repeat many times, but the exact
         # field needs at most 256 rows of 256 cells (plus randomized position).
         calls=self.run_texture(6000,400,2,gain=8,color=1,grain=0)
-        self.assertLessEqual(calls,5*256*256)
+        self.assertEqual(calls,0)

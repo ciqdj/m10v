@@ -23,12 +23,12 @@ def sha(b):return hashlib.sha256(b).hexdigest()
 
 def initial_state(configuration):
     required={'slots','stamp','format','corner','color'}
-    if not isinstance(configuration,dict) or not required<=set(configuration) or set(configuration)-required-{'hdf','filmNameStamp'}:raise ValueError('complete five-slot configuration required')
+    if not isinstance(configuration,dict) or not required<=set(configuration) or set(configuration)-required-{'hdf','filmNameStamp'}:raise ValueError('complete selected-film configuration required')
     if configuration.get('hdf',0)!=0:raise ValueError('digital HDF is only supported on GR III')
     if type(configuration.get('filmNameStamp',False)) is not bool or configuration.get('filmNameStamp',False):raise ValueError('film name stamp is only supported on GR III / GR IIIx')
     slots=configuration['slots']
-    if not isinstance(slots,list) or len(slots)!=5:raise ValueError('five slots required')
-    b=bytearray(default_state())
+    if not isinstance(slots,list) or len(slots)>5:raise ValueError('GR4 supports zero to five selected films')
+    b=bytearray(184);struct.pack_into('<IHHI',b,0,0x5630314d,5,184,0)
     def integer(v,maximum):
         if type(v)is not int or not 0<=v<=maximum:raise ValueError('invalid configuration field')
         return v
@@ -38,12 +38,14 @@ def initial_state(configuration):
         if set(h)!={'gain','spread','threshold','profile'} or set(e)!={'grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'}:raise ValueError('invalid effect fields')
         film=integer(s['film'],78)
         if not film:raise ValueError('film zero is invalid')
-        struct.pack_into('<H6B',b,12+i*8,film,integer(s['grain'],3),integer(s['soft'],3),
+        if integer(s['grain'],3):raise ValueError('grain requires the GR III original native pipeline')
+        struct.pack_into('<H6B',b,12+i*8,film,0,integer(s['soft'],3),
             integer(h['gain'],8) if integer(h['profile'],3) else 0,integer(h['spread'],8),integer(h['threshold'],8),h['profile'])
-        b[56+i*8:64+i*8]=bytes([integer(e['grainSize'],2),integer(e['leakGain'],8),integer(e['leakPosition'],5),
+        b[96+i*8:104+i*8]=bytes([integer(e['grainSize'],2),integer(e['leakGain'],8),integer(e['leakPosition'],5),
             integer(e['leakSpread'],8),integer(e['leakVariation'],1),integer(e['filmExposure'],2),0,0])
-    b[52:56]=bytes(integer(configuration[k],2 if k=='stamp' else 3) for k in ['stamp','format','corner','color'])
-    struct.pack_into('<I',b,100,zlib.crc32(b[:100]));return validate_state(bytes(b))
+        b[96+i*8:101+i*8]=bytes([0,0,0,4,0])
+    b[92:96]=bytes(integer(configuration[k],2 if k=='stamp' else 3) for k in ['stamp','format','corner','color'])
+    struct.pack_into('<I',b,180,zlib.crc32(b[:180]));return validate_state(bytes(b))
 
 def install_resources(patch,icons):
     labels=catalog_texts();text_end=1024+len(labels)
@@ -186,7 +188,7 @@ def prepare(source,config,out):
         'source_sha256':OFFICIAL_SHA,'runtime_source_sha256':sha(json.dumps(source_files,sort_keys=True).encode()),
         'runtime':manifest,'resources':resources,'patches':applied,'extensions':extensions,
         'update_policy_requested':True,'update_policy_installation':update_policy,
-        'configuration':config['configuration'],'film_count':78,'active_slots':5,'external_film_pack':True,
+        'configuration':config['configuration'],'film_count':78,'active_slots':len(config['configuration']['slots']),'external_film_pack':True,
         'features':['film','800t','5207','phoenix-ii-200','harman-red-125','fuji-c200','kodak-proimage-100','kodak-tmax-100','aerochrome-iii-1443','aerocolor-iv-2460','vision3-50d-5203','grain','soft','timestamp'],
         'camera_tested':False,'validation':{'offline':'passed','hardware':'not_tested','canonical_source_recovered':True}}
 

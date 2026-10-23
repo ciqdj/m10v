@@ -58,11 +58,11 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
     def test_complete_page_configuration_compiles_to_be32_state_and_roundtrips_shared_wire_contract(self):
         import json,subprocess
         from scripts.build_gr2_runtime import build_gr2_runtime
-        script="import {defaultConfiguration} from './web/gr3/native-library-state.mjs';const c=defaultConfiguration();[67,68,33,66,78].forEach((film,i)=>{c.slots[i].film=film;c.slots[i].grain=i%4;c.slots[i].soft=3;});c.slots[0].effects.filmExposure=1;c.slots[1].effects.filmExposure=2;c.stamp=2;c.format=3;c.corner=2;c.color=1;c.filmNameStamp=true;console.log(JSON.stringify(c));"
+        script="import {defaultConfiguration} from './web/gr2/native-library-state.mjs';const c=defaultConfiguration();[67,68,33,66,78].forEach((film,i)=>{c.slots[i].film=film;c.slots[i].grain=i%4;c.slots[i].soft=3;});c.slots[0].effects.filmExposure=1;c.slots[1].effects.filmExposure=2;c.stamp=2;c.format=3;c.corner=2;c.color=1;c.filmNameStamp=true;console.log(JSON.stringify(c));"
         configuration=json.loads(subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT))
         with tempfile.TemporaryDirectory() as folder:
             report=build_gr2_runtime(component('gr2','b01firm8'),configuration,Path(folder))
-        expected=subprocess.check_output(['node','--input-type=module','-e',"import {readFileSync} from 'node:fs';import {initialState} from './node/gr3-native-library.mjs';process.stdout.write(initialState(JSON.parse(readFileSync(0,'utf8'))));"],input=json.dumps(configuration).encode(),cwd=ROOT)
+        expected=subprocess.check_output(['node','--input-type=module','-e',"import {readFileSync} from 'node:fs';import {initialState} from './compat/gr2-v1/node/gr3-native-library.mjs';process.stdout.write(initialState(JSON.parse(readFileSync(0,'utf8'))));"],input=json.dumps(configuration).encode(),cwd=ROOT)
         u=self.machine(report);state=0x50001000;wire=0x50002000
         self.call(u,report['symbols']['m10v_library_init'],[state])
         self.assertEqual(self.call(u,report['symbols']['m10v_library_valid'],[state]),1)

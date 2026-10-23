@@ -1,6 +1,6 @@
 #include "m10v_hdf_graph.h"
 #include "m10v_hdf.h"
-#include "../gr3/m10v_sd_library.h"
+#include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 typedef struct {uint32_t magic,context,control,sequence,workspace,geometry,crc,reserved[9];} graph_owner;
 _Static_assert(sizeof(graph_owner)==64,"HDF workspace header");
 #define MAGIC 0x47324857u

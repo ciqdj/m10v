@@ -13,6 +13,7 @@ import {normalizeExtensions,activeExtensions} from '../web/gr3/native-library-st
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const LOAD=0x53000000, COMPONENT_BASE=0x540b6000, COMPONENT_END=0x540ba000;
+const ASPECT_END=0x540be000, verifiedComponents=new WeakMap();
 const pins={
  aspect:'c89c128aada72194d7282355a5f2f06409515ce8cea3a0da97e047bc9e046b82',
  level:'52a7c4d254cb6f117b2c891373c99ad6357a5df94519e038481c68f4661307ed',
@@ -27,7 +28,7 @@ const resourceAdaptations=[
  [0x540b8c14,0xe3003311,0xe30033a8],
 ];
 export function integrationFingerprint(){
- return sha(JSON.stringify(['gr3-native-budget.mjs','gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3x-native-port.mjs','gr3-candidate-audit.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
+ return sha(JSON.stringify(['gr3-native-budget.mjs','gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3x-native-port.mjs','gr3-candidate-audit.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../scripts/gr3_aspect_overlay.py','../native/gr3/m10v_aspect.c','../native/gr3/m10v_aspect_hooks.S','../native/gr3/m10v_aspect_dng.c','../web/gr3/native-library-state.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
 }
 function parts(source,candidate){
  const report=inspectOfficial(source),decoded=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
@@ -45,23 +46,32 @@ const variant=e=>[e.aspect?'aspect':null,e.level?'level':null].filter(Boolean).j
 export async function buildCameraComponents(source,requested,{signal}={}){
  const e=normalizeExtensions(requested),key=variant(e);if(!key)return null;
  need(inspectOfficial(source).model==='GR III','组合扩展当前仅支持 GR III');
- const {candidate}=await runGr3Runtime(source,createStorePlan({variant:'street',features:key.split('-')}),'build',undefined,{signal});
+ const {candidate,receipt}=await runGr3Runtime(source,createStorePlan({variant:'street',features:key.split('-')}),'build',undefined,{signal});
+ if(e.aspect){
+  need(receipt.m10v_aspect?.schema==='m10v-gr3-aspect/v1'&&receipt.m10v_aspect.raw_id===5,'crop extension build receipt missing');
+  const p=parts(source,candidate);
+  need(p.rtos.length===ASPECT_END-LOAD&&receipt.m10v_aspect.module_range?.[0]===0x540bc000&&sha(p.rtos.subarray(0x540bc000-LOAD))===receipt.m10v_aspect.module_sha256,'crop module readback differs');
+  verifiedComponents.set(candidate,sha(p.rtos));
+ }
  validateComponent(source,candidate,e);return candidate;
 }
+export function cameraComponentBase(source,component){return component?LOAD+parts(source,component).rtos.length:COMPONENT_BASE;}
 function validateComponent(source,component,e){
  const key=variant(e);if(!key){need(component===null,'unexpected camera component');return null;}
  need(Buffer.isBuffer(component),'camera component missing');
  const structural=auditGr3Candidate(source,component);
  need(structural.changedSections.join('|')==='RTOS','camera component changed unrelated section');
  const p=parts(source,component);
- need(p.rtos.length===COMPONENT_END-LOAD&&sha(p.rtos)===pins[key],'camera component source pin differs');
+ need((p.rtos.length===COMPONENT_END-LOAD&&sha(p.rtos)===pins[key])||
+  (e.aspect&&p.rtos.length===ASPECT_END-LOAD&&sha(p.rtos)===verifiedComponents.get(component)),'camera component source pin differs');
  return p;
 }
 function expectedImage(source,nativeCandidate,runtime,manifest,component,requested){
  const e=normalizeExtensions(requested),nativeReceipt=auditNativeLibrary(source,nativeCandidate,runtime,manifest);
  need(inspectOfficial(source).model==='GR III'||!activeExtensions(e).length,'组合扩展当前仅支持 GR III');
  const original=parts(source,source),native=parts(source,nativeCandidate),c=validateComponent(source,component,e);
- need(manifest.base===(c?COMPONENT_END:COMPONENT_BASE),'composition native placement differs');
+ const componentEnd=c?LOAD+c.rtos.length:COMPONENT_BASE;
+ need(manifest.base===componentEnd,'composition native placement differs');
  const target=Buffer.from(native.decoded),rtos=target.subarray(native.sections.RTOS.offset,native.sections.RTOS.offset+native.sections.RTOS.size);
  let stockWords=0;
  if(c){
@@ -69,16 +79,32 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
    const stock=original.rtos.subarray(off,off+4),addition=c.rtos.subarray(off,off+4);
    if(addition.equals(stock))continue;
    const current=rtos.subarray(off,off+4),address=LOAD+off;
+   if(e.aspect&&address===0x536a2a30&&manifest.zoom?.enabled===true&&manifest.film_library_enabled!==false){
+    const hook=manifest.zoom.patches.find(p=>p.address===address);
+    const aspectBranch=(0xea000000|(((0x540b9450-address-8)>>2)&0xffffff))>>>0;
+    need(stock.readUInt32LE()===0xeddf7af8&&addition.readUInt32LE()===aspectBranch&&
+      hook&&current.readUInt32LE()===hook.replacement&&
+      manifest.zoom.bindings.m10v_zoom_original_resolution===0x540b9450,'zoom/aspect resolution chain differs');
+    // Zoom delegates canonical dimensions to the existing aspect dispatcher.
+    // Preserve the verified zoom entry; the component body is copied below.
+    stockWords++;continue;
+   }
    const nativeBound=(0xe3003000|manifest.resources.last_id)>>>0;
    const router=e.aspect&&[0x533966d4,0x533970ec].includes(address);
    need(current.equals(stock)||(router&&current.readUInt32LE()===nativeBound),'camera components overlap native patch at '+address.toString(16));
    addition.copy(rtos,off);stockWords++;
   }
-  need(rtos.subarray(original.rtos.length,COMPONENT_END-LOAD).every(v=>v===0),'camera component allocation overlaps native module');
+  need(rtos.subarray(original.rtos.length,componentEnd-LOAD).every(v=>v===0),'camera component allocation overlaps native module');
   c.rtos.subarray(original.rtos.length).copy(rtos,original.rtos.length);
   if(e.aspect){
    need(rtos.readUInt32LE(0x540b97e8-LOAD)===2,'component must disable its timestamp renderer');
    for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');const id=manifest.resources.last_id+(after===0xe30033a8?0:1);rtos.writeUInt32LE(((after&0xfffff000)|id)>>>0,off);}
+   if(componentEnd===ASPECT_END){
+    const marker=Buffer.from('413752362b03000011030000','hex');
+    const at=rtos.indexOf(marker,COMPONENT_END-LOAD);
+    need(at>=COMPONENT_END-LOAD&&at+marker.length<=ASPECT_END-LOAD&&rtos.indexOf(marker,at+1)===-1,'6x7 resource binding differs');
+    rtos.writeUInt32LE(manifest.resources.last_id+2,at+4);rtos.writeUInt32LE(manifest.resources.last_id,at+8);
+   }
   }
  }
  if(e.negativeGrain){
@@ -94,9 +120,10 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
  target.writeUInt32LE(0,target.length-4);target.writeUInt32LE(-sum32(target)>>>0,target.length-4);
  return {target,nativeReceipt,composition:{schema:'m10v-gr3-integrated-components/v1',verified:true,extensions:e,
   component_variant:variant(e)||null,component_rtos_sha256:c?sha(c.rtos):null,
-  component_range:c?[COMPONENT_BASE,COMPONENT_END]:null,native_range:[manifest.base,manifest.base+runtime.length],
+  component_range:c?[COMPONENT_BASE,componentEnd]:null,native_range:[manifest.base,manifest.base+runtime.length],
   native_resource_range:[786,manifest.resources.last_id],aspect_resource_id:e.aspect?manifest.resources.last_id+1:null,
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
+  six_by_seven_resource_id:e.aspect&&componentEnd===ASPECT_END?manifest.resources.last_id+2:null,
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
   raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,
    patched_bytes:rawEdits.reduce((n,p)=>n+p.replacementHex.length/2,0),

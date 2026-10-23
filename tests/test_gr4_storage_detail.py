@@ -1,7 +1,7 @@
 """GR IV storage ABI and native detail controls, executed as ARM code.
 Filesystem services are controlled substitutes; this is not a camera test.
 """
-import hashlib,json,os,struct,subprocess,tempfile,unittest
+import hashlib,json,os,struct,subprocess,tempfile,unittest,zlib
 from pathlib import Path
 from scripts.build_gr3_m10v_library import build,link_object,FLAGS
 from scripts.build_gr4_native_detail import build_detail,RTOS_SHA256
@@ -86,7 +86,7 @@ class Gr4StorageDetailTests(unittest.TestCase):
   u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.symbols.get(name,name),0x550ff000,count=10000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x550ff000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),sp);return u.reg_read(UC_ARM_REG_R0)
  def test_sd_pages_exact_read_and_handle_cleanup(self):
-  for page,row,want in [(0,0,33),(0,3,68),(4,7,59),(5,5,65),(5,6,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
+  for page,row,want in [(0,0,33),(0,3,68),(4,7,57),(5,7,65),(6,0,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
   self.short=True;self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
   self.assertEqual((self.opened,self.allocations),(0,0))
  def test_complete_sd_snapshot_before_journal_and_without_card(self):
@@ -100,24 +100,43 @@ class Gr4StorageDetailTests(unittest.TestCase):
   for attribute in ['bad_load','fail_save']:
    setattr(self,attribute,True);self.assertNotEqual(self.call('m10v_sd_camera_install',0,3,68,2),0);setattr(self,attribute,False)
   self.assertFalse(any(name.startswith('M10V5') for name in self.files))
- def test_detail_journals_effects_and_restores_failed_slider(self):
+ def prepare_detail(self):
   ui=0x5500b000;self.u.mem_write(ui+0x19c,bytes([36,0,0,0,0,0]));self.w(ui+0x168,0x5500c000);self.w(ui+0x164,0x5500d000)
-  for field,value in [(3,2),(4,3),(5,2),(6,8),(7,5),(8,8),(9,1)]:
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),1)
+  self.assertEqual(self.call('m10v_camera_library_select',0x5500a000,0,33),0)
+  return ui
+ def test_detail_journals_halation_and_restores_failed_slider(self):
+  ui=self.prepare_detail()
+  for field,value in [(0,2),(1,3),(2,5)]:
    self.assertEqual(self.call('m10v_detail_control',2,ui,(field<<8)|value),1)
    self.assertEqual(self.call('m10v_detail_control',1,ui,field),value)
-  self.fail_save=True;self.assertEqual(self.call('m10v_detail_control',2,ui,(3<<8)|1),0)
+  before=dict(self.files)
+  for field in range(3,10):
+   self.assertEqual(self.call('m10v_detail_control',2,ui,(field<<8)|1),0)
+  self.assertEqual(self.files,before)
+  self.fail_save=True;self.assertEqual(self.call('m10v_detail_control',2,ui,1),0)
   self.assertIn(('slider_restore',2),self.calls)
-  self.assertEqual(self.call('m10v_detail_control',1,ui,3),2)
+  self.assertEqual(self.call('m10v_detail_control',1,ui,0),2)
+ def test_halation_edit_clears_legacy_grain_without_changing_other_slots(self):
+  ui=self.prepare_detail();self.call('m10v_camera_library_load',0x5500a000)
+  old=bytearray(self.u.mem_read(0x5500a000,104));old[14]=3
+  struct.pack_into('<I',old,8,100);struct.pack_into('<I',old,100,zlib.crc32(old[:100]))
+  self.files['M10V5A.bin']=bytes(old)
+  self.assertEqual(self.call('m10v_detail_control',2,ui,6),1)
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+  saved=bytes(self.u.mem_read(0x5500a000,104))
+  self.assertEqual((saved[16],saved[14]),(6,0));self.assertEqual(saved[20:52],old[20:52])
+
  def test_native_selector_uses_gr4_private_ids(self):
-  ui=0x5500b000;self.u.mem_write(ui+0x19c,bytes([36,0,0,0,0,0]));self.w(ui+0x198,0x5500d000)
-  # Native list's get-selected method returns [list+0x110], not an invented C dispatcher.
+  ui=self.prepare_detail();self.w(ui+0x198,0x5500d000)
+  # The first private row follows the untouched nine official rows.
   self.w(0x5500d110,9)
-  self.assertEqual(self.call(0x531ca630,ui),22)
+  self.assertEqual(self.call(0x531ca630,ui),19)
  def test_real_stock_slider_setup_keeps_range_and_handles_allocation_failure(self):
-  ui=0x5500b000;self.u.mem_write(ui+0x19c,bytes([36,0,0,0,0,0]));self.w(ui+0x198,0x5500d000);self.w(ui+0x168,0x5500c000);self.w(0x5500d110,9)
+  ui=self.prepare_detail();self.w(ui+0x198,0x5500d000);self.w(0x5500d110,9)
   self.fail_allocate=True
   self.call(0x531cab84,ui)
-  self.assertIn(('range',0,3,120),self.calls)
+  self.assertIn(('range',0,8,45),self.calls)
   self.assertTrue(any(row[0]=='default' for row in self.calls))
   self.assertEqual(self.allocations,0)
  def test_patch_preimages_and_all_80_stock_lists_are_preserved(self):
