@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.24.4",
+      "date": "2026-10-24",
+      "title": "D76新增七款独立黑白胶卷，保持原分组名称和顺序",
+      "changes": [
+        "D76在T-Max 100后依次增加Tri-X 400、Ilford Delta 100、Ilford Pan 400、Rollei Infrared 400、Ilford SFX 200、Fomapan 400、CatLABS X Film 80；CatLABS参考MKII，显示名保持原样。目录共37款，机内直接平铺，每页最多10款。",
+        "新增七款独立LUT、机内卡片、ADJ图标和存档编号299至305。原30款LUT不变；保留旧SD包和十槽存档，图标查询上限同步扩展至781。",
+        "Tri-X 400、Delta 100、Rollei Infrared 400使用固定版本同型号社区LUT；其余按官方可得资料制作独立风格近似。两个红外款采用用户确认的滤镜风格近似，RGB不能恢复真实红外反射；所有效果均未标定为100%实体胶片还原。",
+        "每款8192独立样本的目标LUT插值ΔE00 P95为0.12至0.54；这是实现误差，不是真实胶片还原率。按用户直接发布授权上线；本候选未进行相机实测。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.24.3",
       "date": "2026-10-24",
       "title": "精简已下架图标资源，保留当前30款及原固件空间检查",
@@ -10,9 +24,9 @@
         "释放204800字节只读资源，适应服务器与本地编译差异；保持原有RTOS空间上限、完整功能及校验。",
         "包含5213 ADJ图标修复和2460官方独立R/G/B曲线修正。依据用户直接发布授权上线；未以模型误差冒充实体胶片100%还原或真机验收。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "526f56969ad8db9d99795f3a96ab5765fd127fe9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39988893836"
     },
     {
       "version": "2026.10.24.2",

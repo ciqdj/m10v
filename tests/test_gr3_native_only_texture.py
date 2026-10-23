@@ -81,7 +81,7 @@ class NativeOnlyTextureTests(unittest.TestCase):
             for index,(source,flags) in enumerate(sources):
                 out=td/(str(index)+'.dylib')
                 subprocess.run(['clang','-O2','-Wall','-Wextra','-Werror','-dynamiclib','-I',str(native),*flags,str(source),
-                    *[str(native/f) for f in ['film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c']],
+                    *[str(native/f) for f in ['film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c']],
                     *([str(native/'m10v_texture_accel.c')] if flags else []),'-o',str(out)],check=True,capture_output=True)
                 lib=C.CDLL(str(out));lib.m10v_5207_texture_q8.argtypes=[C.POINTER(harness.Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];libs.append(lib)
             rng=random.Random(481)

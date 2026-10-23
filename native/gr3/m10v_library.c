@@ -599,6 +599,10 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     else if(choice->film==77||choice->film==M10V_5213_ID){
         m10v_5207_texture_cached_stats_q8(image,&effects,0,0,choice->film==77?14:24,color_memory,texture_stats);
     }
+    else if(M10V_D76(choice->film)){
+        /* Still JPEG always owns the complete monochrome LUT. */
+        m10v_5207_texture_cached_stats_q8(image,&effects,0,0,choice->film-M10V_D76_FIRST+25,color_memory,texture_stats);
+    }
     else if(M10V_STYLE(choice->film)){
         /* These styles always own still colour in the LUT path, even when an
          * upstream mask contains native colour for another processing stage. */

@@ -21,7 +21,7 @@ def generate():
  names += ['5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
  if len(names)!=78:raise ValueError('film catalog differs')
  styles=json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']
- specs=[(i,name,None) for i,name in enumerate(names,1)]+[(289,'Kodak Charmera',None),(290,'方块世界',None)]+[(v['id'],v['name'],v) for v in styles]+[(298,'5213',None)]
+ specs=[(i,name,None) for i,name in enumerate(names,1)]+[(289,'Kodak Charmera',None),(290,'方块世界',None)]+[(v['id'],v['name'],v) for v in styles]+[(298,'5213',None)]+[(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']]
  rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent; } box_cards[]={'];palette=[];words=[]
  # Camera-only artwork identities. Stable 40px icons, renderer records and LUTs
  # retain their existing byte identities.

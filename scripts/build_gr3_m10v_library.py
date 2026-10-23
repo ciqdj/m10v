@@ -125,6 +125,8 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_5207_': {'m10v_5207_rgb','m10v_5207_render','m10v_5207_texture','m10v_5207_texture_q8','m10v_5207_texture_cached_q8','m10v_5207_texture_cached_stats_q8'},
         'm10v_curated_': {'m10v_curated_table'},
         'm10v_newstocks_': {'m10v_newstocks_table'},
+        'm10v_d76_0_': {'m10v_d76_0_table'},
+        'm10v_d76_1_': {'m10v_d76_1_table'},
         'm10v_style_filters_0_': {'m10v_style_filters_0_table'},
         'm10v_style_filters_1_': {'m10v_style_filters_1_table'},
         'm10v_harman_': {'m10v_harman_rgb'},
@@ -196,7 +198,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 empty=True
                 if any(initial[12+i*8:20+i*8]) or any(initial[96+i*8:104+i*8]):raise ValueError('disabled film must be empty')
                 continue
-            if empty or film in seen or not (1<=film<=78 or 289<=film<=298) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>3:raise ValueError('invalid enabled film')
+            if empty or film in seen or not (1<=film<=78 or 289<=film<=305) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>3:raise ValueError('invalid enabled film')
             seen.add(film)
         if initial[92]>2 or any(v>3 for v in initial[93:96]) or struct.unpack_from('<I',initial,176)[0] not in (0,1) or struct.unpack_from('<I',initial,180)[0]!=zlib.crc32(initial[:180]):raise ValueError('invalid initial settings/checksum')
     if not native_grain and any(initial[14+i*8] for i in range(10)):raise ValueError('Grain requires the GR III native processing pipeline')
@@ -223,6 +225,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     newstocks_payloads=verify_newstocks(ROOT)
     from scripts.verify_gr3_style_filters_reference import verify as verify_styles
     style_payloads=verify_styles(ROOT)
+    from scripts.verify_gr3_d76_reference import verify as verify_d76
+    d76_payloads=verify_d76(ROOT)
     if base & 4095: raise ValueError('runtime base must be page aligned')
     configured = os.environ.get('M10V_LLVM_CLANG')
     candidates = [configured] if configured else [
@@ -264,6 +268,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             subprocess.run([compiler,*render_flags,'-c',str(ROOT/f'native/gr3/film_style_filters_{bank}.c'),'-o',str(style_obj)],check=True,capture_output=True)
             style,style_symbols=link_object(style_obj.read_bytes(),style_base,prefix=f'm10v_style_filters_{bank}_')
             spatial+=bytes(style_base-spatial_base-len(spatial))+style;spatial_symbols.update(style_symbols)
+        for bank in range(2):
+            d76_base=(spatial_base+len(spatial)+15)&~15
+            d76_obj=folder/f'd76-{bank}.o'
+            subprocess.run([compiler,*render_flags,'-c',str(ROOT/f'native/gr3/film_d76_{bank}.c'),'-o',str(d76_obj)],check=True,capture_output=True)
+            d76,d76_symbols=link_object(d76_obj.read_bytes(),d76_base,prefix=f'm10v_d76_{bank}_')
+            spatial+=bytes(d76_base-spatial_base-len(spatial))+d76;spatial_symbols.update(d76_symbols)
         harman_base=(spatial_base+len(spatial)+15)&~15
         harman_obj=folder/'harman.o'
         subprocess.run([compiler,*render_flags,*color_flags,'-c',str(ROOT/'native/gr3/film_harman.c'),'-o',str(harman_obj)],check=True,capture_output=True)
@@ -519,9 +529,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         from scripts.generate_m10v_card_captions import resource as film_resource_id
         if sd_library:
             texts += ['5213','Fn清旧卷 OK启停 MENU返回 DISP拍摄']
+            texts += [s['name'] for s in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']]
             for g in display_directory():
                 for film in g['films']:texts[film_resource_id(film['id'])-786]=film['name']
-        else:texts+=['5213']
+        else:texts+=['5213']+[s['name'] for s in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']]
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -659,10 +670,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         icon_artwork_sha = hashlib.sha256(icon_pixels).hexdigest()
         retired_icon_count = 32 if sd_library else 0
         icon_pixels = icon_pixels[retired_icon_count*6400:]
-        icon_count = 775
+        icon_count = 782
         icon_descriptors = icon_table + icon_count*4
-        icon_data = icon_descriptors + 104*8
-        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(104))
+        icon_data = icon_descriptors + 111*8
+        image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(111))
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+(len(icon_pixels) if i<retired_icon_count else (i-retired_icon_count)*6400))//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
@@ -686,6 +697,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         spectral_icon=(ROOT/'native/gr3/m10v_5213.rgba').read_bytes()
         if len(spectral_icon)!=6400:raise ValueError('5213 icon extent differs')
         image += struct.pack('<HHI',40,40,(style_icon_data+len(style_pixels))//4)
+        d76_icon_pixels=(ROOT/'native/gr3/m10v_d76.rgba').read_bytes()
+        if len(d76_icon_pixels)!=7*6400:raise ValueError('D76 icon extent differs')
+        d76_icon_data=style_icon_data+len(style_pixels)+len(spectral_icon)
+        image += b''.join(struct.pack('<HHI',40,40,(d76_icon_data+i*6400)//4) for i in range(7))
         image += icon_pixels
         if sd_library:
             from scripts.generate_m10v_film_cards import custom_icon
@@ -693,7 +708,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if custom_pixels!=custom_icon():raise ValueError('custom LUT icon differs from source')
             image += custom_pixels
         image += (ROOT/'native/gr3/m10v_charmera.rgba').read_bytes()
-        image += color_pixels+pixel_pixels+style_pixels+spectral_icon
+        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
             .syntax unified
@@ -719,7 +734,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             ldr pc,=0x5320a838
             .ltorg
         """)
-        icon_asm.write_text(icon_asm.read_text().replace('ICON_LAST','774'))
+        icon_asm.write_text(icon_asm.read_text().replace('ICON_LAST','781'))
         if sd_library:
             # Private resources fall back to immutable 40px icons unless their
             # live view owner has published a valid RAM descriptor directory.
@@ -750,9 +765,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         append_code,appended_report=build_appended_slots(append_base,base,capture_stock_rtos(),symbols)
         image+=bytes(append_base-base-len(image))+append_code
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
-                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 88, 'slots': 10,
+                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 95, 'slots': 10,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
-                            ('native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
+                            ('native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
                              'native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py',
                              'native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py',
                              'native/gr3/m10v_library_camera.c', 'native/gr3/m10v_library_menu.c',
@@ -851,6 +866,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         offset=bytes(image).find(payload)
         if offset<0:raise ValueError('style LUT absent from compiled image')
         manifest['film_style_filters'].append({'film_id':291+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
+    manifest['film_d76']=[]
+    for i,payload in enumerate(d76_payloads):
+        offset=bytes(image).find(payload)
+        if offset<0:raise ValueError('D76 LUT absent from compiled image')
+        manifest['film_d76'].append({'film_id':299+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
+    manifest['d76_icons']={'first_id':775,'last_id':781,'pixels':d76_icon_data,'sha256':sha(d76_icon_pixels)}
     manifest['style_icons']={'first_id':762,'last_id':768,'pixels':style_icon_data,'sha256':sha(style_pixels)}
     manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':icon_artwork_sha,'payload_bytes':len(icon_pixels),'retired_generic_count':retired_icon_count}
     if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-portrait-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}

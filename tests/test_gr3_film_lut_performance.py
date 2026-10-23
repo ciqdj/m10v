@@ -60,7 +60,7 @@ class FilmLutPerformanceTests(unittest.TestCase):
         cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup)
         wrapper=Path(cls.tmp.name)/'lut.c';wrapper.write_text(REFERENCE)
         out=wrapper.with_suffix('.dylib')
-        subprocess.run([shutil.which('clang'),'-Os','-dynamiclib','-I',str(ROOT/'native/gr3'),str(wrapper),str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),'-o',str(out)],check=True,capture_output=True)
+        subprocess.run([shutil.which('clang'),'-Os','-dynamiclib','-I',str(ROOT/'native/gr3'),str(wrapper),str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),str(ROOT/'native/gr3/film_d76_0.c'),str(ROOT/'native/gr3/film_d76_1.c'),'-o',str(out)],check=True,capture_output=True)
         cls.lib=C.CDLL(str(out));cls.lib.compare.argtypes=[C.c_uint32]
         cls.lib.benchmark.argtypes=[C.c_uint32,C.c_uint32];cls.lib.benchmark.restype=C.c_uint64
 

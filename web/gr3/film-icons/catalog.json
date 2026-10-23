@@ -790,5 +790,68 @@
     "color": "#b59a45",
     "icon_url": "/gr3/film-icons/298-large.png",
     "sha256": "286f0564eaba03654f6ee43d74fbc491772bf05bd92c0e4fe19c93ef34fe829c"
+  },
+  {
+    "id": 299,
+    "name": "Tri-X 400",
+    "title": "TRI-X",
+    "code": "400",
+    "color": "#49443b",
+    "icon_url": "/gr3/film-icons/299-large.png",
+    "sha256": "37af7c1372f60e983adf54a4227ba892646ddec351e2b61eb4f3b94c2acbd865"
+  },
+  {
+    "id": 300,
+    "name": "Ilford Delta 100",
+    "title": "DELTA",
+    "code": "100",
+    "color": "#777b83",
+    "icon_url": "/gr3/film-icons/300-large.png",
+    "sha256": "a43caf2ccc51e751f72cc03917bdce384819698a1cc09fc78e00d93436af5c49"
+  },
+  {
+    "id": 301,
+    "name": "Ilford Pan 400",
+    "title": "PAN",
+    "code": "400",
+    "color": "#b19b51",
+    "icon_url": "/gr3/film-icons/301-large.png",
+    "sha256": "11c54fad7449940a8347646798387964ffa400ccfc02f6ed9b17fb4dac2fc923"
+  },
+  {
+    "id": 302,
+    "name": "Rollei Infrared 400",
+    "title": "INFRARED",
+    "code": "400 IR",
+    "color": "#9c473b",
+    "icon_url": "/gr3/film-icons/302-large.png",
+    "sha256": "da6e5676afbda3e83ea47fca30560427dbeb128298f406110a1a59c0206f30c8"
+  },
+  {
+    "id": 303,
+    "name": "Ilford SFX 200",
+    "title": "SFX",
+    "code": "200 IR",
+    "color": "#923f40",
+    "icon_url": "/gr3/film-icons/303-large.png",
+    "sha256": "511f3b2bfbd0bc1e5ae0f57bff743da3c8b21f59b822ea7a47a4d3fc56077568"
+  },
+  {
+    "id": 304,
+    "name": "Fomapan 400",
+    "title": "FOMAPAN",
+    "code": "400",
+    "color": "#387e9e",
+    "icon_url": "/gr3/film-icons/304-large.png",
+    "sha256": "df6cac2b621ebe661bbf95ab63b1a851e3469c092daf40dc4e89e8e8bd1ce0f6"
+  },
+  {
+    "id": 305,
+    "name": "CatLABS X Film 80",
+    "title": "X FILM",
+    "code": "80 MKII",
+    "color": "#71916f",
+    "icon_url": "/gr3/film-icons/305-large.png",
+    "sha256": "1cf62ec23895db519e01e5f019b023186b721ac13b987aa3fb99226bd1a9f4bb"
   }
 ]

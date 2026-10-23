@@ -11,7 +11,10 @@
 #define M10V_STYLE_FIRST 291u
 #define M10V_STYLE_LAST 297u
 #define M10V_STYLE(id) ((id)>=M10V_STYLE_FIRST && (id)<=M10V_STYLE_LAST)
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id)))
+#define M10V_D76_FIRST 299u
+#define M10V_D76_LAST 305u
+#define M10V_D76(id) ((id)>=M10V_D76_FIRST && (id)<=M10V_D76_LAST)
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 10u
 #define M10V_CUSTOM_IMMUTABLE_FIRST 21u

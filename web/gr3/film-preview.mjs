@@ -51,6 +51,10 @@ export function previewStyleFiltersPixels(source,lut,film){
   if(!Number.isInteger(film)||film<291||film>297)throw new RangeError('精选滤镜无效');
   return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.values);
 }
+export function previewD76Pixels(source,lut,film){
+  if(!Number.isInteger(film)||film<299||film>305)throw new RangeError('D76 film identity invalid');
+  return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.values);
+}
 function previewRgbLutPixels(source,lut,table){
   const size=lut.size;
   if(size!==15||lut.bits!==8||table?.length!==size**3*3)throw new RangeError('Harman 预览色表无效');
@@ -67,9 +71,13 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
-let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise;
+let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=299&&film<=305){
+    d76TablesPromise??=fetch(new URL('./d76-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('D76 LUT unavailable');return r.json();}).catch(e=>{d76TablesPromise=undefined;throw e;});
+    return previewD76Pixels(source,await d76TablesPromise,film);
+  }
   if(film===298){
     spectralTablesPromise??=fetch(new URL('./spectral-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('胶卷预览色表载入失败');return r.json();}).catch(e=>{spectralTablesPromise=undefined;throw e;});
     return previewNewStocksPixels(source,await spectralTablesPromise,film);

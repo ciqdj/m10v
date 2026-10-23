@@ -9,7 +9,7 @@ class NativeResidualTextureTests(unittest.TestCase):
   cls.temp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.temp.cleanup);cls.libs=[]
   for baseline in (True,False):
    output=Path(cls.temp.name)/('baseline.dylib' if baseline else 'native.dylib')
-   sources=[str(ROOT/('tests/fixtures/gr3_texture_reference.c' if baseline else 'native/gr3/film_5207.c')),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c')]
+   sources=[str(ROOT/('tests/fixtures/gr3_texture_reference.c' if baseline else 'native/gr3/film_5207.c')),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),str(ROOT/'native/gr3/film_d76_0.c'),str(ROOT/'native/gr3/film_d76_1.c')]
    if not baseline:sources.extend(str(ROOT/'native/gr3'/n) for n in ('m10v_spatial_accel.c','m10v_texture_accel.c'))
    subprocess.run([shutil.which('clang'),'-O2','-dynamiclib','-DM10V_SPATIAL_NEON='+str(int(not baseline)),'-DM10V_TEXTURE_NEON='+str(int(not baseline)),'-I',str(ROOT/'native/gr3'),*sources,'-o',str(output)],check=True,capture_output=True)
    lib=C.CDLL(str(output));lib.m10v_5207_texture_q8.argtypes=[C.POINTER(Image),C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32];cls.libs.append(lib)

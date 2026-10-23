@@ -26,6 +26,13 @@ def label(name,i):
  if name=='T-Max 100':return 'TMAX','100','#84817b'
  if name=='Aerochrome':return 'AERO','1443','#ca527d'
  if name=='2460':return 'AERO','2460','#58a3a8'
+ if name=='Tri-X 400':return 'TRI-X','400','#49443b'
+ if name=='Ilford Delta 100':return 'DELTA','100','#777b83'
+ if name=='Ilford Pan 400':return 'PAN','400','#b19b51'
+ if name=='Rollei Infrared 400':return 'INFRARED','400 IR','#9c473b'
+ if name=='Ilford SFX 200':return 'SFX','200 IR','#923f40'
+ if name=='Fomapan 400':return 'FOMAPAN','400','#387e9e'
+ if name=='CatLABS X Film 80':return 'X FILM','80 MKII','#71916f'
  if name=='5213':return '5213','200T','#b59a45'
  if name=='5203':return '5203','50D','#bfaa4c'
  if name=='CCD Classic':return 'GR','CCD','#567f8e'
@@ -70,6 +77,11 @@ def box_style(name,i):
  elif '哈曼' in name:brand='HARMAN';header='#c12f3b';paper='#e9e5d8';ink='#a62936'
  elif '凤凰' in name:brand='HARMAN';header='#e4a738';paper='#317bb5';ink='#fff0d6'
  elif '乐凯' in name:brand='LUCKY';header='#cf343a';paper='#eadb9c';ink='#9f2836'
+ if name=='Tri-X 400':brand,header,accent='KODAK','#ffcf32','#ffcf32'
+ if name.startswith('Ilford '):brand,header,accent='ILFORD','#34373b','#cf473e'
+ if name=='Rollei Infrared 400':brand,header,accent='ROLLEI','#34373b','#d45b40'
+ if name=='Fomapan 400':brand,header,accent='FOMA','#eae7df','#387e9e'
+ if name=='CatLABS X Film 80':brand,header,accent='CATLABS','#354438','#71916f'
  if name.startswith('Portra '):title='PORTRA'
  if name=='Gold 200':title='GOLD'
  if name=='Kodak Charmera':title,code='CHARMERA','PIXEL'
@@ -138,9 +150,15 @@ def generate():
   if row['id'] in display:row['name']=display[row['id']]
  im=box_icon('5213',298);raw=im.tobytes();im.save(out/'298.png');box_icon('5213',298,160).save(out/'298-large.png');(ROOT/'native/gr3/m10v_5213.rgba').write_bytes(raw)
  meta.append({'id':298,'name':'5213','title':'5213','code':'200T','color':'#b59a45','icon_url':'/gr3/film-icons/298-large.png','sha256':hashlib.sha256(raw).hexdigest()})
+ d76_pixels=bytearray()
+ for spec in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();d76_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_d76.rgba').write_bytes(d76_pixels)
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  # Include every sparse identity and custom artwork in the visual inventory.
- sheet=Image.new('RGBA',(1200,1170),'#171a18')
+ sheet=Image.new('RGBA',(1200,((len(meta)+10)//10)*130),'#171a18')
  for n,m in enumerate(meta):sheet.alpha_composite(Image.open(out/f"{m['id']:02d}.png").resize((120,120),Image.Resampling.LANCZOS),(n%10*120,n//10*130))
  box_icon('Custom LUT',0,120).save(out/'custom.png')
  sheet.alpha_composite(box_icon('Custom LUT',0,120),(len(meta)%10*120,len(meta)//10*130))

@@ -13,7 +13,7 @@ class Gr4RenderSizeTests(unittest.TestCase):
             from scripts.build_gr4_m10v_library import gr4_renderer_source
             core=Path(d)/'gr4-core.c';core.write_text(gr4_renderer_source())
             subprocess.run(['clang','-shared','-fPIC','-O2','-I'+str(ROOT/'native/gr3'),str(core),
-                *[str(ROOT/'native/gr3'/s) for s in ('halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c')],'-o',str(out)],check=True,capture_output=True)
+                *[str(ROOT/'native/gr3'/s) for s in ('halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c')],'-o',str(out)],check=True,capture_output=True)
             lib=C.CDLL(str(out));state=State();lib.m10v_library_init(C.byref(state))
             # Original 6000-pixel bound rejected GR4 full resolution before reading pixels.
             # Empty capacities still fail, ensuring validation remains bounded.

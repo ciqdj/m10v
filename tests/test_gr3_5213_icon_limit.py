@@ -19,12 +19,12 @@ class IconLimitTests(unittest.TestCase):
   return u
  def test_5213_reaches_original_dimension_getters_and_next_id_is_rejected(self):
   for address in [0x53209fb8,0x53209fec]:
-   for icon,expected in [(774,40),(775,0)]:
+   for icon,expected in [(774,40),*[(i,40) for i in range(775,782)],(782,0)]:
     u=self.machine();u.reg_write(UC_ARM_REG_R1,icon);u.emu_start(address,0x10000000,count=100000)
     self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x10000000)
     self.assertEqual(u.reg_read(UC_ARM_REG_R0),expected,(hex(address),icon))
  def test_5213_passes_native_draw_bound_and_next_id_is_rejected(self):
-  for icon,end in [(774,0x5320a7e4),(775,0x5320a98c)]:
+  for icon,end in [(774,0x5320a7e4),*[(i,0x5320a7e4) for i in range(775,782)],(782,0x5320a98c)]:
    u=self.machine();u.reg_write(UC_ARM_REG_R3,icon);u.reg_write(UC_ARM_REG_R4,0x55002000);u.reg_write(UC_ARM_REG_FP,0x100f0000)
    u.hook_add(UC_HOOK_CODE,lambda m,a,n,d:m.emu_stop() if a in (0x5320a7e4,0x5320a98c) else None)
    u.emu_start(0x5320a7cc,0x10000000,count=1000);self.assertEqual(u.reg_read(UC_ARM_REG_PC),end)

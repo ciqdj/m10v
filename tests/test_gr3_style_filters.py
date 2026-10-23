@@ -6,7 +6,7 @@ class StyleFiltersTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);out=Path(cls.tmp.name)/'filters.so'
-  sources=['film_harman.c','film_curated.c','film_newstocks.c']
+  sources=['film_harman.c','film_curated.c','film_newstocks.c','film_d76_0.c','film_d76_1.c']
   sources += [p.name for p in sorted((ROOT/'native/gr3').glob('film_style_filters_*.c'))]
   subprocess.run(['clang','-shared','-fPIC','-O2',*[str(ROOT/'native/gr3'/p) for p in sources],'-o',str(out)],check=True,capture_output=True)
   cls.lib=C.CDLL(str(out));cls.rgb=cls.lib.m10v_harman_rgb;cls.rgb.argtypes=[C.c_uint32,C.POINTER(C.c_uint8),C.POINTER(C.c_uint8)]
@@ -28,7 +28,7 @@ class StyleFiltersTests(unittest.TestCase):
  def test_sparse_journal_selection_failure_atomicity_and_padding(self):
   from tests import test_gr3_m10v_library as fixture
   out=Path(self.tmp.name)/'full.so'
-  sources=['m10v_library.c','halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c']
+  sources=['m10v_library.c','halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c']
   subprocess.run(['clang','-shared','-fPIC','-O2',*[str(ROOT/'native/gr3'/p) for p in sources],'-o',str(out)],check=True,capture_output=True)
   lib=C.CDLL(str(out));lib.m10v_library_select.argtypes=[C.POINTER(fixture.State),C.c_uint32,C.c_uint32,fixture.STORE,C.c_void_p]
   lib.m10v_library_render.argtypes=[C.POINTER(fixture.Image),C.POINTER(fixture.State),C.c_uint32,C.c_void_p,C.c_uint32,C.c_void_p,C.c_uint32]
