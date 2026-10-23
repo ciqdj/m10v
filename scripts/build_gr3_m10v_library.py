@@ -654,11 +654,16 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         stock_directory = (ROOT/'native/gr3/m10v_stock_icon_directory.bin').read_bytes()
         icon_pixels = (ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
         if len(stock_directory)!=671*4 or len(icon_pixels)!=78*6400: raise ValueError('icon inventory differs')
+        # Retired IDs 1..32 keep their descriptors and decoder identity, but
+        # use the generic LUT thumbnail. Only current artwork occupies ROM.
+        icon_artwork_sha = hashlib.sha256(icon_pixels).hexdigest()
+        retired_icon_count = 32 if sd_library else 0
+        icon_pixels = icon_pixels[retired_icon_count*6400:]
         icon_count = 775
         icon_descriptors = icon_table + icon_count*4
         icon_data = icon_descriptors + 104*8
         image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(104))
-        image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(78))
+        image += b''.join(struct.pack('<HHI',40,40,(icon_data+(len(icon_pixels) if i<retired_icon_count else (i-retired_icon_count)*6400))//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
             image += struct.pack('<HHI',40,40,(icon_data+len(icon_pixels))//4)
@@ -847,7 +852,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if offset<0:raise ValueError('style LUT absent from compiled image')
         manifest['film_style_filters'].append({'film_id':291+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
     manifest['style_icons']={'first_id':762,'last_id':768,'pixels':style_icon_data,'sha256':sha(style_pixels)}
-    manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
+    manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':icon_artwork_sha,'payload_bytes':len(icon_pixels),'retired_generic_count':retired_icon_count}
     if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-portrait-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
