@@ -1,0 +1,33 @@
+# GR II 实验第一版：工作台与完整容器
+
+用户于 2026-10-23 明确要求优先做出可迭代第一版。完整 GR3/GR4 功能与页面复刻仍是最终目标；本次先把已实现的 GR II 原生能力接到可构建、可回读的端到端工作台。未完成的逆向没有改为“不支持”。
+
+## 本次实现
+
+- `/gr2/` 为实验工作台；原只读分析保留在 `/gr2/inspect/`。
+- 本地官方输入或上传 `.frm`，以已知 GR II 官方完整 SHA 锁定身份；绝不把上传候选当作原厂输入。
+- 五槽、46 款当前可选胶卷、颗粒/尺寸、漏光、特殊胶卷光晕/EI、日期/胶卷名水印；配置草稿、JSON 导入导出、全部 SD 胶卷导出。
+- 初始 HDF 仍限定 0，机内独立 HDF 菜单调节；已有有效机内记录优先。
+- 预检绑定官方源、规范化配置、原生/脚本/Node 构建依赖和相关 LUT 指纹。构建前后核对；取消不返回候选。HTTP 写接口要求会话令牌及同源请求。
+- `generateGr2Native` 调用既有 BE32 原生构建与组件构建器，核对原厂/运行体摘要、ABI、内存边界、LE/BE 初始配置、补丁前像/长度/互斥，再独立重建整个组件。
+- `packGr2Candidate` 仅替换末尾嵌套执行组件，保留原资源、原厂验证开关、入口和延迟加载记录。更新两层 Unity 长度和执行组件加权校验；随后独立解包，逐字节核对组件、原始资源、头部和尾部。
+- 网页与 CLI `scripts/export_gr2_experimental.mjs NEW_DIRECTORY [configuration.json]` 走同一个生成器，输出固件、配置、摘要收据和配套 SD 资源。
+
+## 门禁和范围
+
+研究运行体的 `can_package:false`、组件 `activation_ready:false` 继续保留。新增层只提供 `experimental_offline` 容器，`hardware_verified:false`、`release_ready:false`。这不是证明原研究门禁已经满足，也不是生产发布入口。
+
+完整冷启动、更新器实际写入、物理缓存、JPEG/RAW+JPEG/连拍、HDF 和菜单的真实相机行为尚未验收。离线检查及浏览器下载不能替代这些证据。配方、其他工具、全部页面对齐与 GR2013 移植继续实施；尚未确定的能力保持研究中。
+
+## 验证记录
+
+- 容器 3 项：原始资源/策略保持、篡改/错误源拒绝、扩容无截断。
+- 构建桥 2 项：配置/源码绑定、错误初始 HDF、取消，以及实际编译到完整容器的独立回读。
+- GR II HTTP 与既有 server 测试合跑 10 PASS（22.261 秒），包括身份导入、令牌/Origin 拒绝、过期预检拒绝、真实构建下载、SD ZIP。
+- 浏览器：Chrome 实际打开工作台，5 槽/46 款、无横向溢出、导入/预检/生成成功；页面给出 14,330,880 字节及与 CLI 相同固件 SHA。构建源码变化会拒绝旧预检。
+- 首轮全量 Node：327 项，320 PASS / 1 FAIL / 6 SKIP。唯一失败是新页缺更新记录链接，已修复，针对性重跑 changelog 3 PASS；随后完整重跑：327 项，321 PASS / 0 FAIL / 6 SKIP，167.478 秒。跳过项为既有 Python 备份、800T/GRLife 对照及扩展组合等外部 fixture 用例。
+- 本次重新运行 GR II component/update 原厂 CPU/组件检查：13 PASS，44.224 秒（`python -m unittest tests.test_gr2_component tests.test_gr2_update -q`）。最初尝试 pytest 时该虚拟环境没有 pytest，随后使用仓库原有 unittest。
+- UI 最终修正后 HTTP/changelog 4 PASS，6.007 秒；390px 手机视口 scrollWidth=390，无横向溢出。
+- 原生 C/汇编未修改；此前 213 项原生回归不是本次新跑结果，本次新增验证集中于配置桥、容器、HTTP 和页面。
+
+候选与原厂固件仅存忽略目录，不提交到 Git。本次没有访问相机、修改 SD、刷机、合并 main、推送或部署。

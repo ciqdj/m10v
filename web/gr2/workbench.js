@@ -1,0 +1,28 @@
+import {defaultConfiguration,normalizeConfiguration} from '/gr3/native-library-state.mjs';
+const $=id=>document.getElementById(id);let configuration=defaultConfiguration(),project,plan,token,controller,busy=false;
+const status=text=>$('status').textContent=text;
+function invalidate(){plan=null;$('build').disabled=true;try{localStorage.setItem('m10v-gr2-v1',JSON.stringify(configuration));}catch{}}
+function download(bytes,name,type='application/octet-stream'){const url=URL.createObjectURL(new Blob([bytes],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+async function api(route,body,raw=false){const response=await fetch('/api/gr2/native-library/'+route,{method:'POST',headers:{'x-m10v-token':token,'Content-Type':raw?'application/octet-stream':'application/json'},body:raw?body:JSON.stringify(body),signal:controller?.signal});if(!response.ok)throw Error((await response.json()).error);return response;}
+async function action(fn){if(busy)return;busy=true;controller=new AbortController();$('cancel').disabled=false;for(const e of document.querySelectorAll('input,select,button'))if(e.id!=='cancel')e.disabled=true;try{await fn();}catch(e){status(e.name==='AbortError'?'已取消；没有生成可下载结果':e.message);}finally{busy=false;controller=null;for(const e of document.querySelectorAll('input,select,button'))e.disabled=false;$('cancel').disabled=true;$('build').disabled=!plan;}}
+function choice(parent,label,value,options,onchange){const l=document.createElement('label');l.append(label+' ');const s=document.createElement('select');for(const [v,text]of options){const o=document.createElement('option');o.value=v;o.textContent=text;s.append(o);}s.value=value;s.onchange=()=>{onchange(Number(s.value));invalidate();};l.append(s);parent.append(l);}
+const range=n=>Array.from({length:n+1},(_,i)=>[i,String(i)]);
+let films=[];
+function render(){ $('slots').replaceChildren();configuration.slots.forEach((slot,i)=>{const field=document.createElement('fieldset'),title=document.createElement('legend');title.textContent='槽位 '+(i+1);field.append(title);
+ choice(field,'胶卷',slot.film,films.map(f=>[f.id,f.name]),v=>{slot.film=v;slot.effects.filmExposure=0;render();});
+ choice(field,'颗粒',slot.grain,range(3),v=>slot.grain=v);choice(field,'颗粒尺寸',slot.effects.grainSize,range(2),v=>slot.effects.grainSize=v);
+ if([33,67].includes(slot.film))for(const [key,label]of [['gain','光晕强度'],['spread','光晕范围'],['threshold','光晕阈值']])choice(field,label,slot.halo[key],range(8),v=>slot.halo[key]=v);
+ for(const [key,label,n]of [['leakGain','漏光强度',8],['leakPosition','漏光位置',5],['leakSpread','漏光范围',8],['leakVariation','漏光变化',1]])choice(field,label,slot.effects[key],range(n),v=>slot.effects[key]=v);
+ if([67,68].includes(slot.film))choice(field,'曝光档',slot.effects.filmExposure,range(slot.film===67?1:2),v=>slot.effects.filmExposure=v);
+ $('slots').append(field);});$('stamp').replaceChildren();for(const [key,label,options]of [['stamp','模式',[[0,'关闭'],[1,'日期'],[2,'日期与时间']]],['format','日期格式',[[0,'YYYY.MM.DD'],[1,'DD.MM.YYYY'],[2,'YYYY-MM-DD'],[3,'YY.MM.DD']]],['corner','位置',[[0,'左上'],[1,'右上'],[2,'左下'],[3,'右下']]],['color','颜色',[[0,'白'],[1,'橙'],[2,'红'],[3,'黄']]]])choice($('stamp'),label,configuration[key],options,v=>configuration[key]=v);$('filmNameStamp').checked=configuration.filmNameStamp;}
+$('filmNameStamp').onchange=()=>{configuration.filmNameStamp=$('filmNameStamp').checked;invalidate();};
+async function imported(response){const r=await response.json();project=r.project_id;invalidate();$('identity').textContent=r.model+' · 官方身份已核验';status('可以配置并预检');}
+$('official').onclick=()=>action(async()=>imported(await api('import-official',{})));
+$('source').onchange=()=>action(async()=>{if($('source').files[0])await imported(await api('import',await $('source').files[0].arrayBuffer(),true));});
+$('prepare').onclick=()=>action(async()=>{if(!project)throw Error('请先导入官方固件');plan=await(await api('prepare',{project_id:project,configuration})).json();status('预检通过 · '+plan.configuration_sha256+'\n'+plan.limitations.join('\n'));});
+$('build').onclick=()=>action(async()=>{if(!$('ack').checked)throw Error('请确认实验包说明');if(!plan)throw Error('请重新预检');status('正在编译、封装并回读校验…');const response=await api('build',{project_id:project,configuration,configuration_sha256:plan.configuration_sha256});const bytes=await response.arrayBuffer(),receipt=JSON.parse(atob(response.headers.get('X-M10V-Native-Receipt')));download(bytes,'rg2_v003.frm');download(JSON.stringify(receipt,null,2),'M10V-GR2-experimental-receipt.json','application/json');status('实验包已生成，共 '+bytes.byteLength+' 字节。独立回读通过；真机尚未验证。\nSHA-256: '+receipt.candidate_sha256);});
+$('cancel').onclick=()=>controller?.abort();$('save').onclick=()=>download(JSON.stringify(configuration,null,2),'M10V-GR2-configuration.json','application/json');
+$('config').onchange=()=>action(async()=>{const imported=normalizeConfiguration(JSON.parse(await $('config').files[0].text()));if(imported.hdf!==0)throw Error('请将 HDF 初始值设为 0，强度在机内设置');configuration=imported;invalidate();render();status('配置已导入，请重新预检');});
+try{token=(await(await fetch('/api/status')).json()).session_token;films=(await(await fetch('/api/gr2/native-library/catalog')).json()).films;try{configuration=normalizeConfiguration(JSON.parse(localStorage.getItem('m10v-gr2-v1')));}catch{}render();}catch(e){status(e.message);}
+
+$('sd').onclick=()=>action(async()=>{if(!project)throw Error('请先导入官方固件');const response=await api('sd-export',{project_id:project,ids:films.map(f=>f.id)});download(await response.arrayBuffer(),'M10V-GR2-SD-films.zip','application/zip');status('SD 胶卷资源包已导出');});
