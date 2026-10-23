@@ -30,6 +30,20 @@ test('M10V native library builds from official bytes without a compatibility run
     assert.ok(largeRuntime.length>runtime.length);
     assert.deepEqual(auditNativeLibrary(source,large.candidate,largeRuntime,largeManifest),large.receipt);
 
+    // Reproduce Ubuntu clang's observed full-build extent independently of
+    // source compiler padding; appended ROM data still receives full audits.
+    const serverGrowth=1115104,ceiling=1104*1024;
+    const withGrowth=growth=>{
+      const bytes=Buffer.concat([runtime,Buffer.alloc(growth-result.receipt.rtos_growth)]);
+      return [bytes,{...manifest,code_bytes:bytes.length,code_sha256:createHash('sha256').update(bytes).digest('hex')}];
+    };
+    const [serverRuntime,serverManifest]=withGrowth(serverGrowth);
+    const serverResult=buildNativeLibrary(source,serverRuntime,serverManifest);
+    assert.equal(serverResult.receipt.rtos_growth,serverGrowth);
+    assert.deepEqual(auditNativeLibrary(source,serverResult.candidate,serverRuntime,serverManifest),serverResult.receipt);
+    const [overflowRuntime,overflowManifest]=withGrowth(ceiling+16);
+    assert.throws(()=>buildNativeLibrary(source,overflowRuntime,overflowManifest),/RTOS growth invalid/);
+
     const decoded = decodeFrameMap(result.candidate, result.candidate.readUInt32LE(result.candidate.length - 8)).decoded;
     assert.ok(decoded.includes(Buffer.from('M10V3A.bin')));
     assert.ok(!runtime.includes(Buffer.from('GRLIFE')));

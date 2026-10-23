@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.23.2",
+      "date": "2026-10-23",
+      "title": "发布七款精选滤镜，兼容服务器编译体积",
+      "changes": [
+        "包含七款精选滤镜ID291–297，保留方块世界290；r3已获用户GR III2.10验收并授权发布。",
+        "修复服务器Ubuntu clang完整调试构建比原1088KiB上限多992字节而被拒绝的问题；仅将独立审计预算增加16KiB至1104KiB，保留全部指令、只读映射、段边界及非目标字节校验。",
+        "上一提交首次部署失败并回退，未作为上线成功；本次不修改滤镜参数、相机代码或编译选项，重新构建核对验收固件字节一致。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.23.1",
       "date": "2026-10-23",
       "title": "新增七款 M10V 精选滤镜",
@@ -10,9 +23,9 @@
         "接入七款成片LUT、ISP取景近似、胶卷卡片、菜单及SD配方；颗粒、光晕与漏光默认关闭。社区LUT保留来源和许可证；未经物理胶片标定，不承诺100%复刻。",
         "用户已确认r3在GR III 2.10验证通过（BIN SHA-256 bf933a672cf570ddae5202c18faf79f1a9dc880427ab4f4ccde34026da21ac65）。GR IIIx本次未声明机身实测；r2用户更新SD包后需重新选择五槽，避免沿用试验编号。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "78b681c1134ebd1069415a548a7fb8e8a74883b8",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39898185062"
     },
     {
       "version": "2026.10.22.9",
