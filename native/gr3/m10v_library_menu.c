@@ -122,6 +122,7 @@ static uint32_t resource(uint32_t tone) {
     return 0;
 }
 static uint32_t film_resource(uint32_t film) {
+    if(film==M10V_5213_ID)return M10V_SD_LIBRARY?1128:961;
     if(film==M10V_PIXEL_ID)return M10V_SD_LIBRARY?1023:953;
     if(M10V_STYLE(film))return (M10V_SD_LIBRARY?1104:954)+film-M10V_STYLE_FIRST;
     if(film==M10V_CHAR_ID)return M10V_SD_LIBRARY?1012:947;
@@ -174,6 +175,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
 #if M10V_SD_LIBRARY
             if(M10V_CUSTOM(state.slots[i].film))return 754;
 #endif
+            if(state.slots[i].film==M10V_5213_ID)return 774;
             if(M10V_STYLE(state.slots[i].film))return 762+state.slots[i].film-M10V_STYLE_FIRST;
             return state.slots[i].film==M10V_PIXEL_ID?(M10V_SD_LIBRARY?761:755):state.slots[i].film==M10V_CHAR_ID?(M10V_SD_LIBRARY?755:749):670+state.slots[i].film;
         }

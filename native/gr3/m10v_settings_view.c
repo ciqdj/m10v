@@ -8,6 +8,7 @@
 #include "m10v_film_card.h"
 #include "m10v_ab.h"
 #include "m10v_sd_library.h"
+#include "m10v_film_directory.h"
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -74,8 +75,12 @@ fail:m10v_settings_view_destroy(v);return -1;
 static uint32_t film(const m10v_settings *s,const m10v_settings_ops *o,uint32_t i){
  uint32_t id;
  if(s->screen==M10V_SETTINGS_CATALOG){
-  uint32_t index=(s->index/10)*10+i;
-  id=index<256&&o&&o->item?o->item(o->context,index):0;
+  if(s->group>=M10V_DIRECTORY_GROUPS)return 0;
+  uint32_t first=m10v_directory_first[s->group],end=m10v_directory_first[s->group+1];
+  if(s->index<first||s->index>=end)return 0;
+  uint32_t index=first+((s->index-first)/10)*10+i;
+  id=index<end&&o&&o->item?o->item(o->context,index):0;
+  if(index>=end||id!=m10v_directory[index].id)id=0;
   if(id<33)id=0;
  }else id=s->saved.slots[i].film;
  return id&&(id<=M10V_CUSTOM_MAX_ID||M10V_BUILTIN(id))?id:0;
@@ -89,7 +94,8 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  uint32_t name_page=s->screen==M10V_SETTINGS_NAME;
  uint32_t ab_page=s->screen==M10V_SETTINGS_AB;
  uint32_t films=s->screen==M10V_SETTINGS_FILMS||s->screen==M10V_SETTINGS_CATALOG;
- uint32_t focus=s->screen==M10V_SETTINGS_CATALOG?s->index%10:s->focus;
+ uint32_t first=s->group<M10V_DIRECTORY_GROUPS?m10v_directory_first[s->group]:0;
+ uint32_t focus=s->screen==M10V_SETTINGS_CATALOG?(s->index-first)%10:s->focus;
  caption(v->widgets[TITLE],films?(M10V_APPENDED_SLOTS?1116+m10v_library_count(&s->saved):M10V_VIEW_FILMS):M10V_VIEW_STAMP);
  caption(v->widgets[FOOTER],s->screen==M10V_SETTINGS_CATALOG?M10V_VIEW_CATALOG_HELP:
    s->screen==M10V_SETTINGS_FILMS?M10V_VIEW_FILM_HELP:
@@ -99,6 +105,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  visible(v->widgets[ERROR_TEXT],!films&&error);
  if(error)caption(v->widgets[films?TITLE:ERROR_TEXT],s->error==4?1127:M10V_VIEW_EMPTY+s->error-1);
  ((fn2)0x5339658cu)(v->widgets[TITLE],films&&error?10:31);
+ if(s->screen==M10V_SETTINGS_CATALOG&&s->group<M10V_DIRECTORY_GROUPS&&!error)caption(v->widgets[TITLE],M10V_DIRECTORY_GROUP_RESOURCE+s->group);
  if(films&&!v->widgets[M10V_VIEW_HEAP])v->widgets[M10V_VIEW_HEAP]=((fn1)0x536af2a8u)(M10V_CARD_HEAP_BYTES);
  for(uint32_t i=0;i<10;i++){
   uint32_t id=films?film(s,o,i):0;
@@ -108,11 +115,11 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   color(v->widgets[FRAME+i],i==focus?6:1);
   uint32_t enabled=0;for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film==id&&id)enabled=1;
   if(id){
-   uint32_t icon=M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
+   uint32_t icon=id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[M10V_VIEW_HEAP]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+i*M10V_CARD_PIXELS*4);
     if(M10V_CUSTOM(id)){
-     char name[24];uint32_t index=(s->index/10)*10+i;
+     char name[24];uint32_t index=first+((s->index-first)/10)*10+i;
      int ok=s->screen==M10V_SETTINGS_CATALOG?
       m10v_sd_camera_catalog_name(index,id,name,sizeof(name)):
       m10v_sd_camera_custom_name(&s->saved,i,name,sizeof(name));
@@ -130,7 +137,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  }
  visible(v->widgets[PAGE],films);
  if(films){
-  char page[8];uint32_t pn=s->index/10+1,at=0;if(pn>=10)page[at++]=(char)('0'+pn/10);page[at++]=(char)('0'+pn%10);page[at]=0;
+  char page[8];uint32_t pn=(s->index-first)/10+1,at=0;if(pn>=10)page[at++]=(char)('0'+pn/10);page[at++]=(char)('0'+pn%10);page[at]=0;
   ((fn2)0x53390ef8u)(v->widgets[PAGE],ptr(page));
   uint32_t id=focus<10?film(s,o,focus):0;
   const char *name=id?m10v_library_name(id):0;char custom_name[24];
@@ -166,6 +173,21 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  }
  if(!films&&s->focus<5)caption(v->widgets[TITLE],s->screen==M10V_SETTINGS_VALUE?
    (s->focus==4?M10V_VIEW_EDIT_NAME:M10V_VIEW_EDIT_MODE+s->focus):M10V_VIEW_STAMP);
+ if(s->screen==M10V_SETTINGS_GROUPS){
+  caption(v->widgets[TITLE],1134);caption(v->widgets[FOOTER],1135);
+  uint32_t offset=(s->focus/4)*4;
+  for(uint32_t i=0;i<4;i++){
+   uint32_t g=offset+i,shown=g<M10V_DIRECTORY_GROUPS;
+   visible(v->widgets[ROW+i],shown);visible(v->widgets[VALUE+i],shown);
+   visible(v->widgets[ROW_FRAME+i],shown&&g==s->focus);visible(v->widgets[ROW_INNER+i],shown&&g==s->focus);
+   if(shown){caption(v->widgets[ROW+i],M10V_DIRECTORY_GROUP_RESOURCE+g);
+    ((fn2)0x5339658cu)(v->widgets[ROW+i],g==s->focus?10:31);
+    uint32_t n=m10v_directory_first[g+1]-m10v_directory_first[g];char count[3];uint32_t at=0;
+    if(n>=10)count[at++]=(char)('0'+n/10);count[at++]=(char)('0'+n%10);count[at]=0;
+    ((fn2)0x53390ef8u)(v->widgets[VALUE+i],ptr(count));
+   }
+  }
+ }
  if(name_page){
   caption(v->widgets[TITLE],M10V_VIEW_EDIT_NAME);
   visible(v->widgets[ROW],1);

@@ -48,7 +48,29 @@
       "curve_blend": 0.16
     },
     "tmax": "named community LUT, converted to exactly neutral monochrome; no developer/time/temperature match claimed",
-    "grain": "shared procedural grain, not copied upstream RMS data (C200 upstream RMS is copied from 5207); low ISO has fine default grain, not measured granularity"
+    "grain": "shared procedural grain, not copied upstream RMS data (C200 upstream RMS is copied from 5207); low ISO has fine default grain, not measured granularity",
+    "aerocolor_2460": {
+      "input": "encoded display sRGB D65 after ISP; not recovered scene radiance",
+      "output": "encoded sRGB / Rec.709 primaries",
+      "mode": "full",
+      "paper": "Kodak Portra Endura Paper",
+      "exp_kelvin": 6500,
+      "projector_kelvin": 6500,
+      "exp_comp": 0,
+      "white_clip": false,
+      "white_balance": 0,
+      "apd_intermediate": true,
+      "reference_negative": "same stock",
+      "upsampling_method": "SFL upsampling",
+      "color_masking": {
+        "77": 0.0,
+        "298": 1.0
+      },
+      "grain": "not baked; upstream copied grain values are not used",
+      "official_lut": false,
+      "camera_calibrated": false,
+      "film_calibrated": false
+    }
   },
   "stocks": [
     {
@@ -142,25 +164,30 @@
     {
       "id": 77,
       "key": "aerocolor-iv-2460",
-      "name": "Aerocolor IV 2460",
+      "name": "2460",
       "ascii_name": "Aerocolor IV 2460",
       "iso": 125,
       "grain": 1,
       "grain_size": 0,
-      "official": "https://www.kodak.com/content/pdfs/KODAK-AEROCOLOR-III-Negative-Film-2460-datasheet-en.pdf",
+      "official": "https://www.kodak.com/content/products-brochures/Advanced-Materials/KODAK-AEROCOLOR-III-Negative-Film-2460-datasheet.pdf",
       "data": "negative_film/kodak_aerocolor.py",
       "symbol": "KODAK_AEROCOLOR",
       "warning": "URL filename says III; document/model identifies IV 2460; no claim of measured production-batch matching",
-      "table_sha256": "43efe1343ba422f86aabee653090b9b5ff2341870b1a90a81294d88c141041e3",
+      "table_sha256": "8c2ed0539a58851f2dd17c1483885e5b49c8f5edbe43dbf169b2b9c46abc30e8",
       "table_bytes": 10125,
       "approximation": true,
       "interpolation": {
         "samples": 8192,
-        "seed": 7378,
-        "delta_e00_median": 0.06623151898384094,
-        "delta_e00_p95": 0.17199228703975677,
-        "rgb_abs_p95": 0.0015405164911082153
-      }
+        "seed": 77298,
+        "delta_e00_median": 0.25441333651542664,
+        "delta_e00_p95": 0.986498236656189,
+        "delta_e00_max": 4.820437431335449,
+        "rgb_abs_max": 0.07926795056283575
+      },
+      "physical_process": "AN-6 / C-41",
+      "edition": "AS-2652 October 2009; medium contrast",
+      "camera_calibrated": false,
+      "film_calibrated": false
     },
     {
       "id": 78,
@@ -187,7 +214,7 @@
   ],
   "files": {
     "docs/research/newstocks-sources/proimage-100-digitized.json": "0fb9669b7689ecd80e9200e6c18c8908ed4ad4ef7952407bd0c99edaecc160d3",
-    "scripts/build_gr3_newstocks_reference.py": "ba9c6006399fddf009266c3c06c13d4737ce8acd7e83c333abb1e0ecc9a39550",
+    "scripts/build_gr3_newstocks_reference.py": "b0d8c234ba3724bb78dcbaed35a9cb6f7ef58e7cf8f57888e36a013d7704dd1e",
     "third_party/curated-film-luts/kodak_t-max_100.cube": "f1a5366f5f48d33669f5e71fcd85a4ca364925df6e092051481421940435c08c",
     "third_party/curated-film-luts/LICENSE": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",
     "third_party/spectral-film-lut/LICENSE": "3cdc90b3e7727be6e5930102fadeaf35cf3d3bd7c492b90d6d16fb9ad8c3a1bd",

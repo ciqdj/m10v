@@ -16,11 +16,11 @@ extern uint32_t m10v_settings_factory_original(uint32_t,uint32_t);
 extern uint32_t m10v_settings_top_dtor_original(uint32_t);
 extern uint32_t m10v_settings_controller_vtable(void);
 static int load(void *ctx,m10v_library_state *s){(void)ctx;return m10v_camera_library_load(s);}
-static uint32_t item(void *ctx,uint32_t i){(void)ctx;return m10v_sd_camera_item(i/8,i%8);}
+static uint32_t item(void *ctx,uint32_t i){(void)ctx;return m10v_sd_camera_directory_item(i);}
 static int install(void *ctx,uint32_t i,uint32_t id,uint32_t slot){
  (void)ctx;m10v_library_state state;
  if(m10v_camera_library_load(&state)<0||!m10v_camera_library_mutation_begin())return -1;
- int result=m10v_sd_camera_install(i/8,i%8,id,slot);
+ int result=m10v_sd_camera_directory_install(i,id,slot);
  m10v_camera_library_load(&state);m10v_camera_library_mutation_end(&state);return result;
 }
 static int remove_film(void *ctx,uint32_t slot){

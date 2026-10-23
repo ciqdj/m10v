@@ -3,6 +3,7 @@
  * Read is BOOLEAN even on short reads: seek/tell deltas are mandatory. */
 #include "m10v_sd_library.h"
 #include "m10v_library.h"
+#include "m10v_film_directory.h"
 typedef uint32_t (*get_fn)(void);
 typedef void *(*alloc_fn)(uint32_t);
 typedef void (*free_fn)(void *);
@@ -25,7 +26,8 @@ static int exact(uint32_t fs,const uint32_t *v,uint32_t handle,uint32_t at,uint8
 /* Return selected ID after closing the file, with the complete record in out
  * when requested. Fixed 16 KiB scratch; header bounds all index arithmetic. */
 static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
- if(page>=32||row>=8||!memory)return 0;
+ uint32_t directory=page==32;
+ if(!memory||(directory?row>=M10V_DIRECTORY_COUNT:page>=32||row>=8))return 0;
  uint32_t manager=((get_fn)0x535847d8u)();if(!ram(manager,24))return 0;
  uint32_t fs=((const uint32_t *)(uintptr_t)manager)[5];if(!ram(fs,4))return 0;
  uint32_t vt=*(const uint32_t *)(uintptr_t)fs;if(!code(vt,56))return 0;
@@ -40,6 +42,7 @@ static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
     size>=4096&&size<=4096+M10V_SD_MAX_FILMS*M10V_SD_RECORD_BYTES&&
     exact(fs,v,handle,0,memory,4096)){
   uint32_t count=m10v_sd_header(memory,size),index=page*8+row;
+  if(directory){index=0;while(index<count&&m10v_sd_u32(memory+64+index*12)!=m10v_directory[row].id)index++;}
   if(count&&index<count){
    id=m10v_sd_u32(memory+64+index*12);
    if(full){uint32_t expected=m10v_sd_u32(memory+68+index*12);uint8_t *record=memory+4096;
@@ -56,6 +59,11 @@ uint32_t m10v_sd_camera_item(uint32_t page,uint32_t row){
  if(page>=32||row>=8)return 0;
  uint8_t *memory=allocate();if(!memory)return 0;
  uint32_t id=fetch(page,row,memory,0);((free_fn)0x536af2e4u)(memory);return id;
+}
+uint32_t m10v_sd_camera_directory_item(uint32_t index){
+ if(index>=M10V_DIRECTORY_COUNT)return 0;
+ uint8_t *memory=allocate();if(!memory)return 0;
+ uint32_t id=fetch(32,index,memory,0);((free_fn)0x536af2e4u)(memory);return id;
 }
 /* The stock AppData reader blindly copies the requested size. Instead use its
  * original file loader and header validator and check BOTH sizes before copy.
@@ -82,6 +90,7 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
+ if(id==M10V_5213_ID)id=9;
  if(M10V_STYLE(id))id=id-M10V_STYLE_FIRST+2;
  if(id==M10V_PIXEL_ID)id=1;
  if(id==M10V_CHAR_ID)id=0; /* dedicated M10VS00 snapshot; legacy 33..78 unchanged */
@@ -148,8 +157,8 @@ int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,ui
  int ok=fetch(index/8,index%8,memory,1)==expected_id&&record_name(memory+4096,out,capacity);
  ((free_fn)0x536af2e4u)(memory);return ok;
 }
-int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if(page>=32||row>=8||expected_id<33||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
+static int install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
+ if((page==32?row>=M10V_DIRECTORY_COUNT:page>=32||row>=8)||expected_id<33||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){
@@ -160,4 +169,12 @@ int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint3
   }
  }
  ((free_fn)0x536af2e4u)(memory);return result;
+}
+
+int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
+ if(page>=32||row>=8)return -1;return install(page,row,expected_id,slot);
+}
+int m10v_sd_camera_directory_install(uint32_t index,uint32_t expected_id,uint32_t slot){
+ if(index>=M10V_DIRECTORY_COUNT||m10v_directory[index].id!=expected_id)return -1;
+ return install(32,index,expected_id,slot);
 }

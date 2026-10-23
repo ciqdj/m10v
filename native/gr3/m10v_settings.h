@@ -5,7 +5,7 @@
  * Backend load must provide a validated journal (including compiled defaults).
  * Backend install must recheck expected ID and commit before returning zero. */
 enum { M10V_SETTINGS_CLOSED, M10V_SETTINGS_FILMS, M10V_SETTINGS_CATALOG,
-       M10V_SETTINGS_STAMP, M10V_SETTINGS_VALUE, M10V_SETTINGS_NAME, M10V_SETTINGS_AB };
+       M10V_SETTINGS_STAMP, M10V_SETTINGS_VALUE, M10V_SETTINGS_NAME, M10V_SETTINGS_AB, M10V_SETTINGS_GROUPS=8 };
 enum { M10V_KEY_LEFT, M10V_KEY_RIGHT, M10V_KEY_UP, M10V_KEY_DOWN,
        M10V_KEY_OK, M10V_KEY_BACK, M10V_KEY_PREVIOUS, M10V_KEY_NEXT, M10V_KEY_DISP };
 enum { M10V_SETTINGS_NO_ERROR, M10V_SETTINGS_EMPTY, M10V_SETTINGS_CHANGED,
@@ -21,7 +21,7 @@ typedef struct {
 } m10v_settings_ops;
 typedef struct {
  m10v_library_state saved;
- uint32_t screen, focus, slot, index, expected, value, error;
+ uint32_t screen, focus, slot, index, expected, value, error, group;
 } m10v_settings;
 int m10v_settings_open(m10v_settings *,const m10v_settings_ops *,uint32_t screen);
 void m10v_settings_key(m10v_settings *,const m10v_settings_ops *,uint32_t key);

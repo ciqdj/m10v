@@ -21,7 +21,7 @@ def generate():
  names += ['5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
  if len(names)!=78:raise ValueError('film catalog differs')
  styles=json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']
- specs=[(i,name,None) for i,name in enumerate(names,1)]+[(289,'Kodak Charmera',None),(290,'方块世界',None)]+[(v['id'],v['name'],v) for v in styles]
+ specs=[(i,name,None) for i,name in enumerate(names,1)]+[(289,'Kodak Charmera',None),(290,'方块世界',None)]+[(v['id'],v['name'],v) for v in styles]+[(298,'5213',None)]
  rows=['/* Generated square artwork and antialiased Noto Sans glyph coverage. */','static const struct { char brand[12], main[16], sub[16]; uint32_t header,color,ink,accent; } box_cards[]={']
  for i,name,spec in specs:
   brand,title,code,header,paper,ink,accent=box_style(name,i)
@@ -50,7 +50,7 @@ def caption_data():
  captions=json.loads((ROOT/'native/gr3/m10v_card_captions.json').read_text())
  if captions['schema']!='m10v-card-captions/v1' or (captions['width'],captions['height'])!=(120,28):raise ValueError('card caption format differs')
  packed=bytearray();offsets=[0]
- films=[*range(1,79),*range(289,298)]
+ films=[*range(1,79),*range(289,299)]
  if len(captions['captions'])!=len(films):raise ValueError('card caption inventory differs')
  for film,caption in zip(films,captions['captions']):
   data=base64.b64decode(caption['rle'],validate=True)

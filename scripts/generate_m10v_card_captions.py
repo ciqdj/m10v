@@ -11,6 +11,7 @@ OUTPUT=ROOT/'native/gr3/m10v_card_captions.json'
 WIDTH,HEIGHT=120,28
 
 def resource(film):
+ if film==298:return 1128
  if film==290:return 1023
  if film==289:return 1012
  if film>=291:return 1104+film-291
@@ -31,10 +32,10 @@ def rle(raw):
 
 def generate(font_path,manifest_path):
  texts=json.loads(Path(manifest_path).read_text())['resources']['texts'];rows=[]
- for film in [*range(1,79),*range(289,298)]:
+ for film in [*range(1,79),*range(289,299)]:
   name=texts[resource(film)-786]
   font=ImageFont.truetype(str(font_path),18)
-  while font.getlength(name)>114 and font.size>10:font=ImageFont.truetype(str(font_path),font.size-1)
+  while font.getlength(name)>114 and font.size>6:font=ImageFont.truetype(str(font_path),font.size-1)
   shown=name
   while font.getlength(shown)>114:shown=shown[:-2]+'…'
   image=Image.new('L',(WIDTH,HEIGHT));d=ImageDraw.Draw(image)

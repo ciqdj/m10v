@@ -35,6 +35,9 @@ def data(spec):
  return getattr(importlib.import_module('spectral_film_lut.'+spec['data'][:-3].replace('/','.')),spec['symbol'])
 
 def render(film,rgb):
+ if film==77:
+  from scripts.build_gr3_spectral_reference import render as render_spectral
+  return render_spectral(film,rgb)
  x=np.clip(np.asarray(rgb,float),0,1);s=next(s for s in STOCKS if s['id']==film)
  if film==75:
   y=sample_tetrahedral(cube(ROOT/'third_party/curated-film-luts/kodak_t-max_100.cube'),x)

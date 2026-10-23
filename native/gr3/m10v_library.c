@@ -3,6 +3,7 @@
  * with their source notices; no third-party camera runtime or signed film
  * package is loaded. Camera services have separately verified ABI boundaries. */
 #include "m10v_library.h"
+#include "m10v_film_directory.h"
 #include "halation_core.h"
 #include "film_5207.h"
 #include "m10v_color_cache.h"
@@ -107,6 +108,7 @@ int m10v_library_valid(const m10v_library_state *state) {
     return 1;
 }
 const char *m10v_library_name(uint32_t id) {
+    const char *name=m10v_directory_name(id);if(name)return name;
     static const char appended_names[13][20]={"5207","Phoenix II","HARMAN RED","Portra 160","Fuji Industrial 100","Lucky C200","CCD Classic","Fuji C200","ProImage 100","T-Max 100","Aerochrome","2460","5203"};
     if(id==M10V_PIXEL_ID)return "Pixel World";
     static const char style_names[7][24]={"Leica Monochrome","Lomography","Polaroid","Fujifilm Velvia 50","Cyberpunk","Cyanotype","German Cool"};
@@ -593,6 +595,9 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     }
     else if(choice->film==M10V_CHAR_ID){
         m10v_charmera_render(image,effects.reserved[1]);
+    }
+    else if(choice->film==77||choice->film==M10V_5213_ID){
+        m10v_5207_texture_cached_stats_q8(image,&effects,0,0,choice->film==77?14:24,color_memory,texture_stats);
     }
     else if(M10V_STYLE(choice->film)){
         /* These styles always own still colour in the LUT path, even when an

@@ -1,0 +1,10 @@
+{
+  "schema": "m10v-film-directory/v1",
+  "groups": [
+    {"name":"ECN2","films":[{"id":33,"name":"800T"},{"id":66,"name":"5207"},{"id":62,"name":"5219"},{"id":78,"name":"5203"},{"id":298,"name":"5213"},{"id":77,"name":"2460"}]},
+    {"name":"C41","films":[{"id":69,"name":"Portra 160"},{"id":37,"name":"Portra 400"},{"id":70,"name":"Fuji Industrial 100"},{"id":73,"name":"Fuji C200"},{"id":56,"name":"Fuji Superia 200"},{"id":36,"name":"Fuji Pro 400H"},{"id":35,"name":"Kodak Gold 200"},{"id":58,"name":"Kodak UltraMax 400"},{"id":74,"name":"ProImage 100"},{"id":34,"name":"Ektar 100"},{"id":71,"name":"Lucky C200"},{"id":67,"name":"Harman Phoenix II"},{"id":68,"name":"Harman Red"},{"id":292,"name":"Lomography"}]},
+    {"name":"D76","films":[{"id":75,"name":"T-Max 100"}]},
+    {"name":"创意","films":[{"id":289,"name":"Kodak Charmera"},{"id":72,"name":"CCD"},{"id":293,"name":"Polaroid"},{"id":296,"name":"Cyanotype"},{"id":290,"name":"Pixel Worlds"},{"id":76,"name":"Aerochrome"}]},
+    {"name":"影像","films":[{"id":291,"name":"Leica Monochrome"},{"id":297,"name":"German Cool"},{"id":65,"name":"GR2"}]}
+  ]
+}

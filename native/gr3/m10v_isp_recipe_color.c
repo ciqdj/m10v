@@ -202,7 +202,7 @@ int m10v_isp_frame_recipe_finish(const void *context){
      * Their fitted live ISP previews are never colour-completion evidence.
      * Charmera's live ISP approximation is never completion evidence for
      * the exact still YUV threshold/pair chroma renderer. */
-    if(film==M10V_CHAR_ID||film==M10V_PIXEL_ID||M10V_STYLE(film)){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
+    if(film==77||film==M10V_5213_ID||film==M10V_CHAR_ID||film==M10V_PIXEL_ID||M10V_STYLE(film)){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
     uint32_t exposure=(film==67||film==68)?s->state.effects[slot].film_exposure:0;
     uint32_t generation=(uint32_t)(uintptr_t)s^s->si^s->sequence;
     if(!generation)generation=1;

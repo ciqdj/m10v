@@ -50,9 +50,9 @@ function render(){
   pixelFigure=document.createElement('figure');pixelFigure.style.margin='16px 0';
   const canvas=document.createElement('canvas');canvas.width=620;canvas.height=413;
   canvas.style.cssText='display:block;width:100%;max-width:620px;height:auto;image-rendering:pixelated;border-radius:8px';
-  canvas.setAttribute('role','img');canvas.setAttribute('aria-label','方块世界像素效果参考样张');
+  canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Pixel Worlds像素效果参考样张');
   const caption=document.createElement('figcaption');caption.className='hint';
-  caption.textContent='方块世界 · 效果参考（不含颗粒）。仅静态 JPEG；需更新固件，实际成片以相机为准。';
+  caption.textContent='Pixel Worlds · 效果参考（不含颗粒）。仅静态 JPEG；需更新固件，实际成片以相机为准。';
   pixelFigure.append(canvas,caption);$('#active-slot-label').closest('.section-head').after(pixelFigure);
  }
  if(pixelFigure){pixelFigure.hidden=film!==290;if(film===290){pixelPreview??=createFilmPreview();pixelPreview.request(pixelFigure.querySelector('canvas'),{film:290},error=>{pixelFigure.querySelector('figcaption').textContent=error;});}}
@@ -60,10 +60,10 @@ function render(){
  if($('#charmera-controls')){$('#charmera-controls').hidden=film!==289;$('#effect-charmeraColor').value=String(configuration.slots[active].effects.charmeraColor??0);$('#effect-charmeraColor').disabled=busy;}
  $('#halo-controls').hidden=![33,67].includes(film);
  $('#red-controls').hidden=![67,68].includes(film);
- $('#red-controls .label').textContent=(film===67?'蓝凤凰':'哈曼 RED')+' · 模拟曝光EI';
+ $('#red-controls .label').textContent=(film===67?'Harman Phoenix II':'Harman Red')+' · 模拟曝光EI';
  const eiOptions=film===67?[[0,'EI 200 · 标准'],[1,'EI 120 · 增加曝光']]:[[0,'EI 125 · 标准'],[1,'EI 64 · 明亮橙黄'],[2,'EI 250 · 浓郁暗红']];
  $('#effect-filmExposure').replaceChildren(...eiOptions.map(([value,text])=>{const option=document.createElement('option');option.value=String(value);option.textContent=text;return option;}));
- $('#halo-controls .label').textContent=(film===67?'蓝凤凰':'800T')+' 光晕 · 当前胶卷';
+ $('#halo-controls .label').textContent=(film===67?'Harman Phoenix II':'800T')+' 光晕 · 当前胶卷';
  const effects=configuration.slots[active].effects;
  for(const k of ['filmExposure']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy||(k==='filmExposure'&&![67,68].includes(film));}
  $('#reset-texture').disabled=busy;
@@ -76,13 +76,14 @@ function render(){
  if(focused)root.querySelector(`[data-focus="${focused}"]`)?.focus({preventScroll:true});
 }
 function filmIcon(f){const img=document.createElement('img');img.className='film-icon';img.width=40;img.height=40;img.alt='';img.decoding='async';if(f?.icon_url)img.src=f.icon_url;else img.hidden=true;return img;}
-function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=new Set(configuration.slots.map(s=>s.film));let count=0;
- $('#catalog').replaceChildren(...films.filter(f=>f.name.toLowerCase().includes(q)&&(!$('#film-group').value||f.group===$('#film-group').value)).map(f=>{
+function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=new Set(configuration.slots.map(s=>s.film));let count=0,lastGroup=null;
+ $('#catalog').replaceChildren(...films.filter(f=>f.name.toLowerCase().includes(q)&&(!$('#film-group').value||f.group===$('#film-group').value)).flatMap(f=>{
+  const prefix=[];if(f.group!==lastGroup){const title=document.createElement('h3');title.className='film-directory-group';title.style.cssText='grid-column:1/-1;margin:20px 0 0';title.textContent=f.group;prefix.push(title);lastGroup=f.group;}
   count++;const label=document.createElement('label');label.className='film';label.dataset.selected=String(selected.has(f.id));
   const check=document.createElement('input');check.type='checkbox';check.value=String(f.id);check.checked=selected.has(f.id);check.disabled=busy;check.dataset.focus='film-'+f.id;check.setAttribute('aria-label',`选择 ${f.name}`);
   const strong=document.createElement('strong');strong.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;label.append(check,filmIcon(f),strong);
   check.onchange=()=>{try{if(!selected.has(f.id)&&configuration.slots.length>=selectionLimit())throw Error(`最多选择 ${selectionLimit()} 款胶卷，请先取消一款`);const wasSelected=selected.has(f.id),activeFilm=configuration.slots[active]?.film;configuration=toggleNativeFilm(configuration,f.id);active=wasSelected?Math.max(0,configuration.slots.findIndex(s=>s.film===activeFilm)):configuration.slots.length-1;invalidate({filmSelection:true});render();const status=$('#film-selection-status');if(status)status.textContent=`${wasSelected?'已取消':'已选择'} ${f.name} · 已选 ${configuration.slots.length}/${selectionLimit()}`; }catch(error){check.checked=selected.has(f.id);const status=$('#film-selection-status');if(status)status.textContent=error.message;else message(error.message,true);}};
-  return label;
+  return [...prefix,label];
  }));$('#empty').hidden=count!==0;
 }
 async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(data.error||`请求失败 ${r.status}`);return data;}

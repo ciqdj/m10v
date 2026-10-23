@@ -307,7 +307,7 @@
   },
   {
     "id": 35,
-    "name": "Gold 200",
+    "name": "Kodak Gold 200",
     "title": "KODA",
     "code": "200",
     "color": "#d5a844",
@@ -316,7 +316,7 @@
   },
   {
     "id": 36,
-    "name": "Pro 400H",
+    "name": "Fuji Pro 400H",
     "title": "FUJI",
     "code": "400H",
     "color": "#669c7a",
@@ -496,7 +496,7 @@
   },
   {
     "id": 56,
-    "name": "Superia 200",
+    "name": "Fuji Superia 200",
     "title": "SUPRA",
     "code": "200",
     "color": "#c1a275",
@@ -514,7 +514,7 @@
   },
   {
     "id": 58,
-    "name": "UMax 400",
+    "name": "Kodak UltraMax 400",
     "title": "UMAX",
     "code": "400",
     "color": "#8eab6a",
@@ -550,7 +550,7 @@
   },
   {
     "id": 62,
-    "name": "V3 500T",
+    "name": "5219",
     "title": "5219",
     "code": "500T",
     "color": "#bca26c",
@@ -577,7 +577,7 @@
   },
   {
     "id": 65,
-    "name": "GR2 Vivid",
+    "name": "GR2",
     "title": "GR2",
     "code": "VIVID",
     "color": "#728d88",
@@ -595,7 +595,7 @@
   },
   {
     "id": 67,
-    "name": "蓝凤凰",
+    "name": "Harman Phoenix II",
     "title": "PHNX",
     "code": "II200",
     "color": "#397ac4",
@@ -604,7 +604,7 @@
   },
   {
     "id": 68,
-    "name": "哈曼 RED",
+    "name": "Harman Red",
     "title": "RED",
     "code": "125",
     "color": "#c74435",
@@ -622,7 +622,7 @@
   },
   {
     "id": 70,
-    "name": "富士业务用 100",
+    "name": "Fuji Industrial 100",
     "title": "FUJI",
     "code": "100",
     "color": "#41a66b",
@@ -631,7 +631,7 @@
   },
   {
     "id": 71,
-    "name": "乐凯 C200",
+    "name": "Lucky C200",
     "title": "LUCKY",
     "code": "C200",
     "color": "#d94735",
@@ -640,7 +640,7 @@
   },
   {
     "id": 72,
-    "name": "CCD Classic",
+    "name": "CCD",
     "title": "GR",
     "code": "CCD",
     "color": "#567f8e",
@@ -649,7 +649,7 @@
   },
   {
     "id": 73,
-    "name": "富士 C200",
+    "name": "Fuji C200",
     "title": "FUJI",
     "code": "C200",
     "color": "#41995b",
@@ -712,7 +712,7 @@
   },
   {
     "id": 290,
-    "name": "方块世界",
+    "name": "Pixel Worlds",
     "title": "PIXEL",
     "code": "WORLD",
     "color": "#76a849",
@@ -775,11 +775,20 @@
   },
   {
     "id": 297,
-    "name": "德系冷调",
+    "name": "German Cool",
     "title": "COOL",
     "code": "DE",
     "color": "#6b8792",
     "icon_url": "/gr3/film-icons/297-large.png",
     "sha256": "5c7f9a070cbd56098c85a5011aa2cd0da6ea2c63a644ad86466d60f508653f86"
+  },
+  {
+    "id": 298,
+    "name": "5213",
+    "title": "5213",
+    "code": "200T",
+    "color": "#b59a45",
+    "icon_url": "/gr3/film-icons/298-large.png",
+    "sha256": "286f0564eaba03654f6ee43d74fbc491772bf05bd92c0e4fe19c93ef34fe829c"
   }
 ]

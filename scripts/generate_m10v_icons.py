@@ -26,6 +26,7 @@ def label(name,i):
  if name=='T-Max 100':return 'TMAX','100','#84817b'
  if name=='Aerochrome':return 'AERO','1443','#ca527d'
  if name=='2460':return 'AERO','2460','#58a3a8'
+ if name=='5213':return '5213','200T','#b59a45'
  if name=='5203':return '5203','50D','#bfaa4c'
  if name=='CCD Classic':return 'GR','CCD','#567f8e'
  if name=='5207':return '5207','250D','#b59a45'
@@ -60,7 +61,7 @@ FONT=ROOT/'third_party/noto-sans/NotoSans-Bold.ttf'
 def box_style(name,i):
  title,code,color=label(name,i)
  brand='M10V';header=color;paper='#eee9d9';ink='#25363b';accent=color
- if any(k in name for k in ('Portra','Gold','Ektar','ProImage','Vision3','V3 ','520','T-Max','2460','Aerochrome','Charmera')):
+ if any(k in name for k in ('Portra','Gold','Ektar','ProImage','Vision3','V3 ','520','521','T-Max','2460','Aerochrome','Charmera')):
   brand='KODAK';header='#ffcf32';paper='#6556ae' if 'Portra' in name else '#efbe32' if 'Gold' in name else '#b92538' if 'Ektar' in name else '#252628'
   ink='#f8f4e8' if paper!='#efbe32' else '#9e2335';accent='#ffcf32'
  elif any(k in name for k in ('富士','Pro 400H','Superia','Reversal')):
@@ -131,6 +132,12 @@ def generate():
   raw=im.tobytes();style_pixels+=raw;im.save(out/f"{spec['id']}.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_style_filters.rgba').write_bytes(style_pixels)
+ from scripts.generate_m10v_directory import names as display_names
+ display=display_names()
+ for row in meta:
+  if row['id'] in display:row['name']=display[row['id']]
+ im=box_icon('5213',298);raw=im.tobytes();im.save(out/'298.png');box_icon('5213',298,160).save(out/'298-large.png');(ROOT/'native/gr3/m10v_5213.rgba').write_bytes(raw)
+ meta.append({'id':298,'name':'5213','title':'5213','code':'200T','color':'#b59a45','icon_url':'/gr3/film-icons/298-large.png','sha256':hashlib.sha256(raw).hexdigest()})
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  # Include every sparse identity and custom artwork in the visual inventory.
  sheet=Image.new('RGBA',(1200,1170),'#171a18')

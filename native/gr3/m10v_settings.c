@@ -1,10 +1,11 @@
 #include "m10v_tone.h"
 #include "m10v_settings.h"
+#include "m10v_film_directory.h"
 #define CATALOG_LIMIT 256u
 static int ready(const m10v_settings_ops *o){return o&&o->load&&o->item&&o->install&&o->remove&&o->stamp&&o->film_name_stamp;}
 static uint32_t item(const m10v_settings_ops *o,uint32_t i){
- if(i>=CATALOG_LIMIT)return 0;
- uint32_t id=o->item(o->context,i);return id>=33&&(id<=M10V_CUSTOM_MAX_ID||M10V_BUILTIN(id))?id:0;
+ if(i>=M10V_DIRECTORY_COUNT)return 0;
+ uint32_t id=o->item(o->context,i);return id==m10v_directory[i].id?id:0;
 }
 static uint32_t value(const m10v_library_state *s,uint32_t field){
  return field==0?s->stamp:field==1?s->format:field==2?s->corner:field==3?s->color:s->reserved&1u;
@@ -16,8 +17,8 @@ int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t scre
  if(o->load(o->context,&p->saved)<0)return -1;
  if(p->saved.stamp>2||p->saved.format>3||p->saved.corner>3||p->saved.color>3)return -1;
  if(!m10v_library_valid(&p->saved))return -1;
- p->focus=p->slot=p->index=p->expected=p->value=p->error=0;
- p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_CATALOG:screen;
+ p->focus=p->slot=p->index=p->expected=p->value=p->error=p->group=0;
+ p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_GROUPS:screen;
  if(p->screen==M10V_SETTINGS_CATALOG){p->expected=item(o,0);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;}
  if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
 }
@@ -25,7 +26,14 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
  if(!p||!ready(o)||key>M10V_KEY_DISP)return;
  uint32_t previous=key==M10V_KEY_LEFT||key==M10V_KEY_UP;
  uint32_t next=key==M10V_KEY_RIGHT||key==M10V_KEY_DOWN;
- if(p->screen==M10V_SETTINGS_FILMS){p->screen=M10V_SETTINGS_CATALOG; }else if(p->screen==M10V_SETTINGS_AB){
+ if(p->screen==M10V_SETTINGS_FILMS){p->screen=M10V_SETTINGS_GROUPS; }
+ else if(p->screen==M10V_SETTINGS_GROUPS){
+  if(p->focus>=M10V_DIRECTORY_GROUPS)return;
+  if(previous&&p->focus)p->focus--;
+  if(next&&p->focus+1<M10V_DIRECTORY_GROUPS)p->focus++;
+  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
+  if(key==M10V_KEY_OK){p->group=p->focus;p->index=m10v_directory_first[p->group];uint32_t end=m10v_directory_first[p->group+1];while(p->index+1<end&&!item(o,p->index))p->index++;p->expected=item(o,p->index);p->screen=M10V_SETTINGS_CATALOG;p->error=p->expected?0:M10V_SETTINGS_EMPTY;}
+ }else if(p->screen==M10V_SETTINGS_AB){
   p->value=0;
   if(key==M10V_KEY_UP&&p->focus)p->focus--;
   if(key==M10V_KEY_DOWN&&p->focus<3)p->focus++;
@@ -37,20 +45,26 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
   if(key==M10V_KEY_OK&&p->focus>=2)p->value=p->focus-1;
  }else if(p->screen==M10V_SETTINGS_CATALOG){
-  if(p->index>=CATALOG_LIMIT)return;
-  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;return;}
+  if(p->group>=M10V_DIRECTORY_GROUPS)return;
+  uint32_t first=m10v_directory_first[p->group],end=m10v_directory_first[p->group+1];
+  if(p->index<first||p->index>=end)return;
+  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_GROUPS;p->focus=p->group;p->error=0;return;}
   uint32_t i=p->index;
-  if(key==M10V_KEY_LEFT&&i)i--;
+  if(key==M10V_KEY_LEFT&&i>first)i--;
   if(key==M10V_KEY_RIGHT)i++;
-  if(key==M10V_KEY_UP)i=p->index>=5?p->index-5:0;
+  if(key==M10V_KEY_UP)i=p->index>=first+5?p->index-5:first;
   if(key==M10V_KEY_DOWN)i=p->index+5;
-  if(key==M10V_KEY_PREVIOUS)i=p->index>=10?p->index-10:0;
+  if(key==M10V_KEY_PREVIOUS)i=p->index>=first+10?p->index-10:first;
   if(key==M10V_KEY_NEXT)i=p->index+10;
+  if(i>=end)i=end-1;
   if(i!=p->index){
    uint32_t id=item(o,i);
-   if(!id&&(key==M10V_KEY_DOWN||key==M10V_KEY_NEXT)){
-    uint32_t j=p->index+1;while(j<=i&&item(o,j))j++;
-    if(j>p->index+1){i=j-1;id=item(o,i);}
+   if(i>p->index){
+    while(!id&&i+1<end){i++;id=item(o,i);}
+    while(!id&&i>p->index){i--;id=item(o,i);}
+   }else{
+    while(!id&&i>first){i--;id=item(o,i);}
+    while(!id&&i<p->index){i++;id=item(o,i);}
    }
    if(id){p->index=i;p->expected=id;p->error=0;}
   }
