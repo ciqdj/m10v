@@ -35,17 +35,18 @@ function renderVersionUnlock(){
 function segment(selector,labels,value,change){const node=$(selector);node.replaceChildren(...labels.map((text,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus=selector.slice(1)+'-'+i;b.textContent=text;b.setAttribute('aria-pressed',String(i===value));b.disabled=busy;b.onclick=()=>{change(i);invalidate();render();};return b;}));}
 function render(){
  const focused=document.activeElement?.dataset?.focus;
- const slotNode=$('#slots');slotNode.replaceChildren(...configuration.slots.map((s,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus='slot-'+i;b.className='slot';b.disabled=busy;b.setAttribute('aria-pressed',String(i===active));const n=document.createElement('small');n.textContent=`槽位 ${i+1}`;const t=document.createElement('strong');t.textContent=unresolved.find(v=>v.slot===i)?'需重选 · '+unresolved.find(v=>v.slot===i).id:films.find(f=>f.id===s.film)?.name||'载入中';const e=document.createElement('em');e.textContent=`颗粒 ${levels[s.grain]} · 漏光 ${s.effects.leakGain||"关"}`;const art=filmIcon(films.find(f=>f.id===s.film));b.append(n,art,t,e);b.onclick=()=>{active=i;const status=$('#film-selection-status');if(status)status.textContent='';render();};return b;}));
+ const slotNode=$('#slots');slotNode.replaceChildren(...configuration.slots.map((s,i)=>{const b=document.createElement('button');b.type='button';b.dataset.focus='slot-'+i;b.className='slot';b.disabled=busy;b.setAttribute('aria-pressed',String(i===active));const n=document.createElement('small');n.textContent=`槽位 ${i+1}`;const t=document.createElement('strong');t.textContent=unresolved.find(v=>v.slot===i)?'需重选 · '+unresolved.find(v=>v.slot===i).id:films.find(f=>f.id===s.film)?.name||'载入中';const e=document.createElement('em');e.textContent=`颗粒 ${levels[s.grain]}`;const art=filmIcon(films.find(f=>f.id===s.film));b.append(n,art,t,e);b.onclick=()=>{active=i;const status=$('#film-selection-status');if(status)status.textContent='';render();};return b;}));
  segment('#grain',levels,configuration.slots[active].grain,v=>configuration.slots[active].grain=v);
 
  const film=configuration.slots[active].film;
+ for(const button of $('#grain').querySelectorAll('button'))button.disabled=busy||((sourceModel!=='gr3'||[289,290].includes(film))&&button.dataset.focus!=='grain-0');
  if(film===290&&!pixelFigure){
   pixelFigure=document.createElement('figure');pixelFigure.style.margin='16px 0';
   const canvas=document.createElement('canvas');canvas.width=620;canvas.height=413;
   canvas.style.cssText='display:block;width:100%;max-width:620px;height:auto;image-rendering:pixelated;border-radius:8px';
   canvas.setAttribute('role','img');canvas.setAttribute('aria-label','方块世界像素效果参考样张');
   const caption=document.createElement('figcaption');caption.className='hint';
-  caption.textContent='方块世界 · 效果参考（不含额外颗粒与漏光）。仅静态 JPEG；需更新固件，实际成片以相机为准。';
+  caption.textContent='方块世界 · 效果参考（不含颗粒）。仅静态 JPEG；需更新固件，实际成片以相机为准。';
   pixelFigure.append(canvas,caption);$('#active-slot-label').closest('.section-head').after(pixelFigure);
  }
  if(pixelFigure){pixelFigure.hidden=film!==290;if(film===290){pixelPreview??=createFilmPreview();pixelPreview.request(pixelFigure.querySelector('canvas'),{film:290},error=>{pixelFigure.querySelector('figcaption').textContent=error;});}}
@@ -58,7 +59,7 @@ function render(){
  $('#effect-filmExposure').replaceChildren(...eiOptions.map(([value,text])=>{const option=document.createElement('option');option.value=String(value);option.textContent=text;return option;}));
  $('#halo-controls .label').textContent=(film===67?'蓝凤凰':'800T')+' 光晕 · 当前槽位';
  const effects=configuration.slots[active].effects;
- for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy||(k==='filmExposure'&&![67,68].includes(film));}
+ for(const k of ['filmExposure']){$('#effect-'+k).value=String(effects[k]);$('#effect-'+k).disabled=busy||(k==='filmExposure'&&![67,68].includes(film));}
  $('#reset-texture').disabled=busy;
  const halo=configuration.slots[active].halo;
  for(const k of ['gain','spread','threshold']){$('#halo-'+k).value=String(halo[k]);$('#halo-'+k+'-value').textContent=halo[k]+'/8';$('#halo-'+k).disabled=busy;}
@@ -77,7 +78,7 @@ function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
 async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
-for(const k of ['grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};
+for(const k of ['filmExposure'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};
 if($('#effect-charmeraColor'))$('#effect-charmeraColor').onchange=()=>{configuration.slots[active].effects.charmeraColor=Number($('#effect-charmeraColor').value);invalidate();render();};
 $('#reset-texture').onclick=()=>{configuration=resetNativeTexture(configuration,active);invalidate();render();};
 $('#film-group').onchange=renderFilms;

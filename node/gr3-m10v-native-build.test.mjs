@@ -33,7 +33,7 @@ test('M10V native library builds from official bytes without a compatibility run
     const decoded = decodeFrameMap(result.candidate, result.candidate.readUInt32LE(result.candidate.length - 8)).decoded;
     assert.ok(decoded.includes(Buffer.from('M10V3A.bin')));
     assert.ok(!runtime.includes(Buffer.from('GRLIFE')));
-    assert.deepEqual(manifest.detail.ids,[18,19,20,21,22,23,24,25,26,27,28,29]);
+    assert.deepEqual(manifest.detail.ids,[18,19,20,28,29]);
     assert.equal(manifest.detail.backend,'m10v_camera_library_detail');
     // Updating an untrusted manifest hash cannot authorize arbitrary shim code.
     assert.deepEqual(manifest.isp_base.carriers,[12,18,19,20,21]);

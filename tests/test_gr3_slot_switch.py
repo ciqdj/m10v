@@ -36,6 +36,7 @@ class SlotSwitchTests(unittest.TestCase):
  def test_first_still_freezes_selected_slot_at_ingress_not_old_frame_or_later_ui(self):
   e=StockISP(self.candidate);recipe=e.alloc(0x50f0);e.w32(recipe,0x53d0fc90);e.w32(recipe+0x4778,0x31545653)
   obj=e.cursor;e.make(12,1);frame=obj+0x1400;si=struct.unpack('<I',e.u.mem_read(frame+0x82d0,4))[0]
+  e.u.mem_write(si+0x77c,bytes([12])) # encoder identity alongside stage1 sub-shot
   context=recipe+0x96c;e.w32(context+0x30,recipe+0x1a8);e.w32(context+0x34,si)
   current=self.backend(e,12);ui=self.ui_selection(e,18);load=self.manifest['symbols']['m10v_camera_library_load']
   def fs(u,at,size,data):

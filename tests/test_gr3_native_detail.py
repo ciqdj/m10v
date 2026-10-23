@@ -6,7 +6,7 @@ from scripts.build_gr3_m10v_library import build
 class NativeDetailTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  cls.folder=tempfile.TemporaryDirectory(); build(cls.folder.name)
+  cls.folder=tempfile.TemporaryDirectory(); build(cls.folder.name,native_grain=True,native_color=True,recipe_snapshot=True,lifecycle_trace=True)
   cls.manifest=json.loads((Path(cls.folder.name)/'m10v-library-arm.json').read_text())
   cls.runtime=(Path(cls.folder.name)/'m10v-library-arm.bin').read_bytes()
  @unittest.skipUnless(Path('/usr/bin/clang').is_file(),'system clang unavailable')
@@ -21,21 +21,21 @@ class NativeDetailTests(unittest.TestCase):
 
  def test_five_controls_integrated_with_unified_runtime(self):
   self.assertIn('detail',self.manifest,'native runtime has no stock five-control detail integration')
-  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure','Charmera Color'])
-  self.assertEqual(self.manifest['detail']['ids'],list(range(18,30)))
+  self.assertEqual(self.manifest['detail']['fields'],['Halation Gain','Halation Spread','Highlight Gate','Film Grain','RED Exposure','Charmera Color'])
+  self.assertEqual(self.manifest['detail']['ids'],[18,19,20,21,28,29])
   self.assertEqual(self.manifest['detail']['backend'],'m10v_camera_library_detail')
 
 
  def test_caption_pairs_resolve_actual_runtime_resources(self):
   base=self.manifest['base'];at=self.manifest['detail']['captions']-base
-  ids=[struct.unpack_from('<H',self.runtime,at+72+i*4)[0] for i in range(11)]
+  ids=[struct.unpack_from('<H',self.runtime,at+72+i*4)[0] for i in (0,1,2,3,10)]
   labels=[]
   resources=self.manifest['resources']
   for resource_id in ids:
    descriptor=resources['descriptors'][resource_id-resources['first_id']]-base
    length,flags,reserved,pointer=struct.unpack_from('<BBHI',self.runtime,descriptor)
    labels.append(self.runtime[pointer-base:pointer-base+(length-1)*2].decode('utf-16le'))
-  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','已停用','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Film Exposure'])
+  self.assertEqual(labels,['光晕强度','扩散范围','高光阈值','颗粒','Film Exposure'])
  def test_charmera_has_dedicated_named_color_values_and_four_position_scale(self):
   self.assertIn('charmera_colors',self.manifest['detail'])
   display=self.manifest['detail']['charmera_colors']
@@ -103,7 +103,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     # Match the real selected private list row, including each stock prefix.
     kind=uc.mem_read(ui+0x19a,1)[0];setting=uc.mem_read(ui+0x199,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
-    ids=[21,23,24,25,26,27,29] if film==289 else [i for i in range(18,29 if film==67 else 28) if i!=22] if film in (33,67) else [i for i in range(21,29 if film==68 else 28) if i!=22]
+    ids=self.manifest['detail']['variant_ids']['pixel' if film==290 else 'charmera' if film==289 else 'phoenix' if film==67 else 'halo' if film==33 else 'red' if film==68 else 'common']
     result=n+ids.index(18+field) if 18+field in ids else n
    elif real_row and a==0x536af31c:result=0x5500c000
    elif real_row and a==0x533ad3c0:calls.append(('visible',args[0],args[1]))
@@ -141,9 +141,9 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   # Decode the shipped directory/descriptors independently of the runtime
   # manifest. The visual selection was reviewed from these exact RGBA bytes.
   from hashlib import sha256
-  ids=(484,473,398,478,587,644,411,588,372,50,648)
-  self.assertEqual(self.manifest['detail']['row_icons'][:11],list(ids))
-  self.assertEqual(len(set(ids)),11)
+  ids=(484,473,398,478,648)
+  self.assertEqual([self.manifest['detail']['row_icons'][i] for i in (0,1,2,3,10)],list(ids))
+  self.assertEqual(len(set(ids)),5)
   def offset(address):
    if 0x55000000<=address<0x5503a080:address=address-0x55000000+0x5407b540
    return address-0x53000000
@@ -155,7 +155,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    rgba=self.iconbin[pixel*4:pixel*4+6400]
    self.assertEqual(len(rgba),6400);self.assertTrue(any(rgba[3::4]))
    hashes.append(sha256(rgba).hexdigest())
-  self.assertEqual(len(set(hashes)),11)
+  self.assertEqual(len(set(hashes)),5)
  def test_charmera_uses_named_color_icon_instead_of_ascii_and_grain_scale(self):
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_PC,UC_ARM_REG_LR
   for color in range(4):
@@ -217,7 +217,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
      if a in handlers:uc.reg_write(UC_ARM_REG_PC,0x531b0064)
      elif a==0x5339e274:uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
     u.hook_add(UC_HOOK_CODE,widgets);self.execute(u,0x531aff84,ui)
-    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 9)
+    self.assertEqual(len([c for c in calls if c[0]=='row']),0 if tone==11 else 4)
 
  def test_stock_count_and_selector_resolve_each_carrier_dynamically(self):
   for tone in (12,18,19,20,21):
@@ -226,7 +226,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     kind=u.mem_read(ui+0x19a,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+kind*8)
     original=sum(self.rtos[p-0x53000000+i*2]!=1 for i in range(n))
-    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(9 if film==33 else 6))
+    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(4 if film==33 else 1))
     if film==33:
      for field in range(4):
       # machine's external widget-index stub supplies last field selection.
@@ -250,8 +250,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    self.assertIn(('range',0,8 if field<3 else 3),calls)
 
  def test_all_extended_sliders_use_the_full_stock_360_pixel_track(self):
-  for film,field,maximum,pitch in ((33,5,2,180),(33,6,8,45),(33,7,5,72),
-                                  (33,8,8,45),(33,9,1,360),(68,10,2,180)):
+  for film,field,maximum,pitch in ((68,10,2,180),(67,10,1,360)):
    u,ui,slider,calls,state=self.machine(film=film,field=field)
    self.execute(u,0x531b05c4,ui)
    self.assertIn(('range',0,maximum),calls)
@@ -329,7 +328,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   # former mock decoded its input as UTF16 and concealed the actual ABI bug.
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP,UC_ARM_REG_LR
   for field,expected in enumerate(('3','4','5','1','0','1','0','0','4','0','125')):
-   if field==4:continue # Retired row is excluded from every actual list.
+   if 4<=field<=9:continue # Retired fields never enter an actual list.
    u,ui,slider,calls,state=self.machine(film=68 if field==10 else 33,field=field,real_row=True)
    u.reg_write(UC_ARM_REG_R3,18+field);u.reg_write(UC_ARM_REG_R4,10+field);u.reg_write(UC_ARM_REG_R5,ui)
    u.reg_write(UC_ARM_REG_SP,0x5700fff0);u.reg_write(UC_ARM_REG_LR,0x57000000)
@@ -357,18 +356,32 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
    self.execute(u,0x531b05c4,ui)
    self.assertIn(('range',0,1),calls)
 
- def test_stock_slider_default_markers_match_opt_in_grain_halo_and_leak(self):
-  for film in (33,35,66,67,68,69,71,78,289):
-   for field in ((0,3,6) if film in (33,67) else (3,6)):
+ def test_stock_slider_default_markers_match_native_grain_and_halo(self):
+  for film in (33,35,66,67,68,69,71,78):
+   for field in ((0,3) if film in (33,67) else (3,)):
     u,ui,slider,calls,state=self.machine(film=film,field=field)
     self.execute(u,0x531b05c4,ui)
     self.assertIn(('default',0),calls,(film,field))
 
- def test_fine_grain_new_stocks_restore_the_same_size_in_stock_slider_defaults(self):
-  for film in (74,75,77,78):
-   u,ui,slider,calls,state=self.machine(film=film,field=5)
-   self.execute(u,0x531b05c4,ui)
-   self.assertIn(('default',0),calls)
+ def test_software_detail_runtime_rejects_grain_even_for_legacy_callback(self):
+  with tempfile.TemporaryDirectory() as folder:
+   build(folder)
+   manifest,runtime=self.manifest,self.runtime
+   try:
+    self.manifest=json.loads((Path(folder)/'m10v-library-arm.json').read_text())
+    self.runtime=(Path(folder)/'m10v-library-arm.bin').read_bytes()
+    u,ui,slider,calls,state=self.machine(film=33,field=3);before=bytes(state)
+    self.execute(u,self.manifest['symbols']['m10v_detail_control'],2,ui,(3<<8)|1)
+    self.assertEqual(bytes(state),before);self.assertFalse(any(c[0]=='save' for c in calls))
+    for ids in self.manifest['detail']['variant_ids'].values():self.assertNotIn(21,ids)
+   finally:self.manifest,self.runtime=manifest,runtime
+
+ def test_retired_effect_fields_and_unsupported_film_grain_never_save(self):
+  for film,fields in ((33,range(4,10)),(289,(3,)),(290,(3,))):
+   for field in fields:
+    u,ui,slider,calls,state=self.machine(film=film,field=field);before=bytes(state)
+    self.execute(u,self.manifest['symbols']['m10v_detail_control'],2,ui,(field<<8)|1)
+    self.assertEqual(bytes(state),before);self.assertFalse(any(c[0]=='save' for c in calls))
 
  def test_red_exposure_uses_real_ei_numbers_in_selected_and_unselected_rows(self):
   from unicorn.arm_const import UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_SP

@@ -6,7 +6,7 @@
 .debug-option{display:flex;align-items:flex-start;gap:12px;padding:16px;margin:16px 0;border:1px solid #454545;border-radius:0;cursor:pointer}.debug-option input{width:18px;height:18px;flex:0 0 auto;margin:3px 0;accent-color:#eeb65e}.debug-option span{font-weight:600}.debug-option small{display:block;margin-top:6px;font-size:12px;font-weight:400;line-height:1.6;color:#aaa}.debug-option[hidden]{display:none}
 
 /* Keep common grain controls together at every film selection. */
-.texture>div{flex:1;min-width:0}.texture .grain-size{grid-template-columns:1fr;margin-top:14px}
+.texture>div{flex:1;min-width:0}
 @media(max-width:480px){.texture{flex-direction:column}}
 
 .version-unlock-option[hidden],.version-unlock-fields[hidden]{display:none!important}.version-unlock-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 20px}.version-unlock-fields label{font-size:12px;color:#b6ada0;min-width:0}.version-unlock-fields input{display:block;width:100%;min-width:0;box-sizing:border-box;margin-top:8px;padding:10px;border:1px solid #69645c;background:#171918;color:#eee7d7;font:14px ui-monospace,monospace}.version-unlock-fields p{grid-column:1/-1;margin:0;font-size:12px;line-height:1.7}.version-error{color:#efaaa0;min-height:0}.version-error:empty{display:none}@media(max-width:480px){.version-unlock-fields{grid-template-columns:1fr}}

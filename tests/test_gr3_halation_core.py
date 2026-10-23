@@ -52,13 +52,13 @@ class HalationTests(unittest.TestCase):
         self.assertEqual(self.fn(C.byref(im),2,s,n),0)
         self.assertEqual(bytes(c),before)
 
-    def test_camera_controls_gain_zero_disables_halo_without_disabling_grain(self):
+    def test_camera_controls_gain_zero_and_retired_grain_are_noop(self):
         im,y,c,s,n=self.fixture();y[48*128+64]=255
         before=(bytes(y),bytes(c))
         self.assertEqual(self.fn(C.byref(im),self.controls(gain=0),s,n),0)
         self.assertEqual((bytes(y),bytes(c)),before)
         self.assertEqual(self.fn(C.byref(im),self.controls(gain=0,grain=4),s,n),0)
-        self.assertNotEqual(bytes(y),before[0]);self.assertEqual(bytes(c),before[1])
+        self.assertEqual((bytes(y),bytes(c)),before)
 
     def test_camera_gain_threshold_and_radius_change_real_pixels(self):
         energies=[];radii=[]
@@ -81,17 +81,19 @@ class HalationTests(unittest.TestCase):
         self.assertNotEqual(outputs[0],outputs[1])
         self.assertEqual(outputs[1],bytes([128])*im.chroma_bytes+bytes([197])*64)
 
-    def test_grain_preserves_chroma_padding_and_white_black_endpoints(self):
-        im,y,c,s,n=self.fixture(130,63,14)
-        y[0]=0;y[2]=255;before_y=bytes(y);before_c=bytes(c)
-        self.assertEqual(self.fn(C.byref(im),self.controls(gain=0,grain=8),s,n),0)
-        self.assertEqual(bytes(c),before_c);self.assertEqual(y[0],0);self.assertEqual(y[2],255)
-        differences=[]
-        for row in range(63):
-            for x in range(130):differences.append(y[row*144+x]-before_y[row*144+x])
-            self.assertEqual(bytes(y[row*144+130:row*144+144]),before_y[row*144+130:row*144+144])
-        self.assertGreater(max(differences),0);self.assertLess(min(differences),0)
-        self.assertLess(abs(sum(differences)/len(differences)),0.5)
+    def test_retired_grain_preserves_planes_and_needs_no_scratch(self):
+        for grain in range(9):
+            im,y,c,s,n=self.fixture(130,63,14)
+            y[0]=0;y[2]=255;before=(bytes(y),bytes(c),bytes(s))
+            self.assertEqual(self.fn(C.byref(im),self.controls(gain=0,grain=grain),None,0),0)
+            self.assertEqual((bytes(y),bytes(c),bytes(s)),before)
+        # Legacy grain bits must also be inert while real halo runs.
+        results=[]
+        for grain in (0,8):
+            im,y,c,s,n=self.fixture(130,63,14);y[32*144+64]=255
+            self.assertEqual(self.fn(C.byref(im),self.controls(grain=grain),s,n),0)
+            results.append((bytes(y),bytes(c)))
+        self.assertEqual(*results)
     def test_strong_is_stronger_and_order_is_explicit(self):
         results=[]
         for strength,fmt in [(1,1),(2,1),(2,2)]:

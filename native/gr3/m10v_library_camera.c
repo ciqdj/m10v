@@ -203,6 +203,9 @@ int m10v_camera_library_select_custom(m10v_library_state *state,uint32_t slot,ui
 }
 int m10v_camera_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grain, uint32_t soft) {
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
+#if !M10V_ISP_NATIVE_GRAIN_MODE
+    if(grain)return M10V_LIBRARY_INVALID;
+#endif
     uint32_t fs = filesystem();
     return fs ? m10v_library_texture(state, slot, grain, soft, store, (void *)(uintptr_t)fs) : M10V_LIBRARY_STORE_FAILED;
 }
@@ -211,6 +214,9 @@ int m10v_camera_library_halation(m10v_library_state *state,uint32_t slot,uint32_
     uint32_t fs=filesystem();return fs?m10v_library_halation(state,slot,gain,spread,threshold,profile,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
 }
 int m10v_camera_library_detail(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t grain,uint32_t soft){
+#if !M10V_ISP_NATIVE_GRAIN_MODE
+ if(grain)return M10V_LIBRARY_INVALID;
+#endif
     if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();
     return fs?m10v_library_detail(state,slot,gain,spread,threshold,grain,soft,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;

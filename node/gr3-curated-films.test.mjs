@@ -26,7 +26,7 @@ test('new film defaults keep textures off and retain per-film grain size',()=>{
  const old=selectNativeFilm(defaultConfiguration(),0,68);old.slots[0].effects.filmExposure=2;
  for(const [film,grain] of [[69,0],[70,0],[71,0]]){
   const c=selectNativeFilm(old,0,film);assert.equal(c.slots[0].grain,grain);
-  assert.equal(c.slots[0].effects.grainSize,film===71?1:0);
+  assert.equal(c.slots[0].effects.grainSize,0);
   assert.equal(c.slots[0].effects.filmExposure,0);assert.equal(c.slots[0].halo.gain,0);
   assert.deepEqual(c.slots.slice(1),old.slots.slice(1));
   assert.deepEqual(resetNativeTexture(c,0).slots[0],c.slots[0]);

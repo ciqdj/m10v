@@ -29,6 +29,5 @@ int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info);
 int m10v_isp_frame_recipe_finish(const void *context);
 uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,uint32_t execution);
 void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uint32_t result);
-int m10v_isp_frame_recipe_grain_noise(const void *context,uint8_t *noise,uint32_t bytes,uint32_t width,uint32_t height,uint32_t stride);
 uint32_t m10v_isp_frame_recipe_completed(void *recipe,uint32_t shooting,uint32_t tone,const m10v_library_state *);
 #endif

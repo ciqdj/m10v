@@ -38,10 +38,12 @@ def initial_state(configuration):
         if set(h)!={'gain','spread','threshold','profile'} or set(e)!={'grainSize','leakGain','leakPosition','leakSpread','leakVariation','filmExposure'}:raise ValueError('invalid effect fields')
         film=integer(s['film'],78)
         if not film:raise ValueError('film zero is invalid')
-        struct.pack_into('<H6B',b,12+i*8,film,integer(s['grain'],3),integer(s['soft'],3),
+        if integer(s['grain'],3):raise ValueError('grain requires the GR III original native pipeline')
+        struct.pack_into('<H6B',b,12+i*8,film,0,integer(s['soft'],3),
             integer(h['gain'],8) if integer(h['profile'],3) else 0,integer(h['spread'],8),integer(h['threshold'],8),h['profile'])
         b[56+i*8:64+i*8]=bytes([integer(e['grainSize'],2),integer(e['leakGain'],8),integer(e['leakPosition'],5),
             integer(e['leakSpread'],8),integer(e['leakVariation'],1),integer(e['filmExposure'],2),0,0])
+        b[56+i*8:61+i*8]=bytes([0,0,0,4,0])
     b[52:56]=bytes(integer(configuration[k],2 if k=='stamp' else 3) for k in ['stamp','format','corner','color'])
     struct.pack_into('<I',b,100,zlib.crc32(b[:100]));return validate_state(bytes(b))
 

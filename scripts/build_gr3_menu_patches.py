@@ -47,7 +47,7 @@ def build_menu_patches(rtos):
  def pword(a,w,label):patch(a,struct.pack('<I',w),label)
  def stub(a,s,label):return put(a,assembly(s,a),label)
  put(START,build_menu_controls(),'independent controls backend')
- # Clone all original lists, only kind8 adds five shooting-only (visibility0) IDs.
+ # Clone all original lists, only kind8 adds four shooting-only (visibility0) IDs.
  data_cursor=0x540c0000
  def data(raw,label):
   nonlocal data_cursor
@@ -55,35 +55,35 @@ def build_menu_patches(rtos):
  table=bytearray(rtos[0xb3488c:0xb3488c+288])
  for s in range(3):
   index=(s*12+8)*8;p,n=struct.unpack_from('<II',table,index)
-  copied=rtos[p-BASE:p-BASE+n*2]+bytes(sum(([0,i] for i in range(18,23)),[]))
-  new=data(copied,'800T menu list '+str(s));struct.pack_into('<II',table,index,new,n+5)
+  copied=rtos[p-BASE:p-BASE+n*2]+bytes(sum(([0,i] for i in range(18,22)),[]))
+  new=data(copied,'800T menu list '+str(s));struct.pack_into('<II',table,index,new,n+4)
  table_address=data(table,'parameter tables')
  for lo,hi,reg in [(0x531afa20,0x531afa24,12),(0x531afabc,0x531afacc,3),(0x531affa0,0x531affa8,12),(0x531b01f4,0x531b01f8,3)]:
   pword(lo,movw(reg,table_address&65535),'parameter table low');pword(hi,movw(reg,table_address>>16,True),'parameter table high')
- captions=data(rtos[0xb34bd8:0xb34bd8+72]+b''.join(struct.pack('<HH',0x312+i,0x312+i) for i in range(5)),'caption pairs')
+ captions=data(rtos[0xb34bd8:0xb34bd8+72]+b''.join(struct.pack('<HH',0x312+i,0x312+i) for i in range(4)),'caption pairs')
  pword(0x531b0248,movw(3,captions&65535),'caption table low');pword(0x531b024c,movw(3,captions>>16,True),'caption table high')
  # ASCII captions remain readable in every stock font. Chinese is enabled only
  # after verifying the shipped glyph index, never by guessing glyph coverage.
- names=['Halation Gain','Halation Spread','Highlight Gate','Halation Mode','Film Grain']
+ names=['Halation Gain','Halation Spread','Highlight Gate','Halation Mode']
  desc=[]
  for name in names:
   txt=data((name+'\0').encode('utf-16le'),'caption '+name)
   desc.append(data(struct.pack('<II',((len(name)+1)&255)|0x100,txt),'descriptor '+name))
- labels=data(struct.pack('<5I',*desc),'caption descriptor lookup')
+ labels=data(struct.pack('<4I',*desc),'caption descriptor lookup')
  cn=[]
- for name in ['红晕强度','扩散范围','高光阈值','红晕档位','颗粒感']:
+ for name in ['红晕强度','扩散范围','高光阈值','红晕档位']:
   txt=data((name+'\0').encode('utf-16le'),'简体 '+name)
   cn.append(data(struct.pack('<II',len(name)+1|0x100,txt),'简体descriptor '+name))
- chinese_labels=data(struct.pack('<5I',*cn),'简体caption lookup')
+ chinese_labels=data(struct.pack('<4I',*cn),'简体caption lookup')
  def addr(reg,value):return f'movw {reg},#{value&65535};movt {reg},#{value>>16};'
  def localized():return addr('r3',labels)+f'cmp r0,#19;movweq r3,#{chinese_labels&65535};movteq r3,#{chinese_labels>>16};'
  # Preserve original invalid-ID/language handling and every original lookup.
- stub(0x540bf000,f'cmp r0,#20;bhi fallback;movw ip,#0x312;sub ip,r7,ip;cmp ip,#4;bhi stock;'+localized()+'ldr r7,[r3,ip,lsl #2];sub r8,fp,#0xb0;mov r0,r8;b 0x53396700;stock:;cmp r0,#20;cmpls r7,r3;bhi fallback;b 0x533966e8;fallback:;b 0x53396850','caption getter A')
+ stub(0x540bf000,f'cmp r0,#20;bhi fallback;movw ip,#0x312;sub ip,r7,ip;cmp ip,#3;bhi stock;'+localized()+'ldr r7,[r3,ip,lsl #2];sub r8,fp,#0xb0;mov r0,r8;b 0x53396700;stock:;cmp r0,#20;cmpls r7,r3;bhi fallback;b 0x533966e8;fallback:;b 0x53396850','caption getter A')
  # r3 must hold original311 in stock fallback (custom calculation uses only ip).
- stub(0x540bf080,f'cmp r0,#20;bhi fallback;movw ip,#0x312;sub ip,r7,ip;cmp ip,#4;bhi stock;'+localized()+'ldr r3,[r3,ip,lsl #2];b 0x5339710c;stock:;cmp r7,r3;cmpls r0,#20;bhi fallback;b 0x533970fc;fallback:;b 0x533971e0','caption getter B')
+ stub(0x540bf080,f'cmp r0,#20;bhi fallback;movw ip,#0x312;sub ip,r7,ip;cmp ip,#3;bhi stock;'+localized()+'ldr r3,[r3,ip,lsl #2];b 0x5339710c;stock:;cmp r7,r3;cmpls r0,#20;bhi fallback;b 0x533970fc;fallback:;b 0x533971e0','caption getter B')
  pword(0x533966e4,branch(0x533966e4,0x540bf000),'caption getter A dispatch');pword(0x533970f8,branch(0x533970f8,0x540bf080),'caption getter B dispatch')
  # For unknown IDs the exact original assert/default remains reachable.
- def gate(idreg,model,fallback):return f'sub ip,{idreg},#18;cmp ip,#4;bhi {hex(fallback)};ldrb ip,[{model},#0x19a];cmp ip,#8;bne {hex(fallback)};ldrb ip,[{model},#0x19d];cmp ip,#0;bne {hex(fallback)};'
+ def gate(idreg,model,fallback):return f'sub ip,{idreg},#18;cmp ip,#3;bhi {hex(fallback)};ldrb ip,[{model},#0x19a];cmp ip,#8;bne {hex(fallback)};ldrb ip,[{model},#0x19d];cmp ip,#0;bne {hex(fallback)};'
  stub(0x540bf100,gate('r3','r5',0x531b01ac)+'sub r2,r3,#18;lsl r2,r2,#16;orr r2,r2,r4;mov r1,r5;mov r0,#3;bl 0x540be000;b 0x531b0064','custom row render')
  stub(0x540bf180,gate('r4','r5',0x531b0594)+'sub r2,r4,#18;mov r1,r5;mov r0,#1;bl 0x540be000;mov r4,r0;b 0x531b045c','custom row current value')
  stub(0x540bf200,gate('r0','r4',0x531b075c)+'cmp r0,#21;mov r0,r4;sub sp,fp,#0x10;ldm sp,{r4,fp,sp,lr};blo 0x540bf700;b 0x540bf900','custom slider setup')

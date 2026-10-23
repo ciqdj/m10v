@@ -51,11 +51,11 @@ sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
 sources.push(...hdfSources);
 sources.push('native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
-const nativeGrainSources=['native/gr3/m10v_isp_native_effects.c','native/gr3/m10v_isp_native_effects.h','scripts/build_gr3_native_grain_hooks.py','scripts/build_gr3_native_grain_noise_hook.py'];
+const nativeGrainSources=['scripts/build_gr3_native_grain_hooks.py'];
 const viewDeferredSources=['native/gr3/m10v_view_deferred.c','native/gr3/m10v_view_deferred.h','native/gr3/m10v_view_recovery.h','scripts/build_gr3_view_deferred.py'];
 const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h'];
 const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
-const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
+const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
 export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
@@ -210,13 +210,16 @@ detailInstructions.row_dispatch=[0xe92d500f,0xe1a02803,0xe1822004,0xe1a01005,0xe
  0x531b009c,0x531b00ac,0x531b00bc,0x531b00cc,0x531b00dc,0x531b00ec,0x531b00fc,0x531b010c,0x531b011c,0x531b012c,0x531b013c,0x531b014c,0x531b015c,0x531b016c,0x531b017c,0x531b018c,0x531b019c,0x531b0058];
 function checkDetail(runtime,manifest,raw) {
  const d=manifest.detail,base=manifest.base;
- need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&
-  JSON.stringify(d.ids)==='[18,19,20,21,22,23,24,25,26,27,28,29]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure','Charmera Color']), 'native detail contract differs');
+ const grain=manifest.experimental_capture?.native_grain===true;
+ const ids=[18,19,20,...(grain?[21]:[]),28,29];
+ const fields=['Halation Gain','Halation Spread','Highlight Gate',...(grain?['Film Grain']:[]),'RED Exposure','Charmera Color'];
+ need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&d.native_grain===grain&&
+  JSON.stringify(d.ids)===JSON.stringify(ids)&&JSON.stringify(d.fields)===JSON.stringify(fields),'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
  const captions=read(d.captions,120);
- const variants={halo:[18,19,20,21,23,24,25,26,27],common:[21,23,24,25,26,27],red:[21,23,24,25,26,27,28],charmera:[21,23,24,25,26,27,29],phoenix:[18,19,20,21,23,24,25,26,27,28]};
+ const variants={halo:[18,19,20,...(grain?[21]:[])],common:grain?[21]:[],red:[...(grain?[21]:[]),28],charmera:[29],phoenix:[18,19,20,...(grain?[21]:[]),28],pixel:[]};
  need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
- const expectedIds=[862,863,864,827,828,913,914,915,916,917,933,manifest.sd_library?1013:948];
+ const expectedIds=[862,863,864,827,828,913,913,913,913,913,933,manifest.sd_library?1013:948];
  for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
@@ -243,14 +246,15 @@ function checkDetail(runtime,manifest,raw) {
     need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(suffix),'native detail list differs');
    }
   }
-  const maxima=[8,8,8,3,3,2,8,5,8,1,2,3],dispatch=read(d.slider_dispatch,25*4);
-  for(let i=0;i<12;i++){
-   need(dispatch.readUInt32LE(i*8)===(0xe35c0000|18+i)>>>0,'native detail slider selector differs');
-   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(i===11?d.charmera_colors.slider:i===10?d.entries.exposure_dispatch:d.sliders[maxima[i]]))&0x0fffffff),'native detail slider target differs');
+  const maxima=[8,8,8,3,3,2,8,5,8,1,2,3],dispatch=read(d.slider_dispatch,(ids.length*2+1)*4);
+  for(let i=0;i<ids.length;i++){
+   const id=ids[i];
+   need(dispatch.readUInt32LE(i*8)===(0xe35c0000|id)>>>0,'native detail slider selector differs');
+   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(id===29?d.charmera_colors.slider:id===28?d.entries.exposure_dispatch:d.sliders[maxima[id-18]]))&0x0fffffff),'native detail slider target differs');
   }
-  need(dispatch.readUInt32LE(96)===branch(d.slider_dispatch+96,d.sliders[8]),'native detail slider fallback differs');
+  need(dispatch.readUInt32LE(ids.length*8)===branch(d.slider_dispatch+ids.length*8,d.sliders[8]),'native detail slider fallback differs');
   need(JSON.stringify(d.charmera_colors?.names)==='["RED","YELLOW","BLUE","GRAY"]'&&JSON.stringify(d.charmera_colors.value_icons)===JSON.stringify([0,1,2,3].map(i=>(manifest.sd_library?756:750)+i))&&d.charmera_colors.scale_icon===(manifest.sd_library?760:754),'native Charmera enum differs');
-  for(const [maximum,target,color] of [...[8,3,2,5,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true]]){
+  for(const [maximum,target,color] of [...[8,3,2,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true]]){
    const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
    for(let a=start;a<stop;a+=4){
     const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
@@ -351,10 +355,7 @@ function lifecyclePatches(manifest,runtime){
   for(const [i,address,word,link]of [[0,0x53513620,0xe1a00004,false],[1,0x535033d8,0xebffff1b,true],[2,0x53503aa0,0xebfffd69,true],[3,0x53503ab4,0xeb05f4c0,true]]){
    const row=m.native_grain.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid grain hook');expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'native grain '+address.toString(16)});
   }
-  const n=m.native_grain_noise;
-  need(n?.patches?.length===1&&n.expected_stage_return===m.native_grain.patches[3].entry+16&&n.independent_dma===false,'invalid native grain owner');
-  const row=n.patches[0];need(row.address===0x5367ae14&&inRuntime(row.entry),'invalid RNG hook');
-  expected.push({address:0x5367ae14,expected:branch(0x5367ae14,0x5368a92c,true),replacement:branch(0x5367ae14,row.entry,true),name:'native grain noise shape'});
+  need(!m.native_grain_noise&&m.native_grain.cpu_noise_processing===false&&m.native_grain.software_fallback===false,'retired CPU grain processing must not be installed');
  }
  if(m.view_deferred){
   const v=m.view_deferred;need(v.patches?.length===6&&v.mutable_global_bytes===0&&v.filesystem_calls===0&&v.storage?.token_offset===0x184&&v.storage.extended_bytes===0x194,'invalid view recovery ownership');
@@ -521,5 +522,5 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
-    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color initialized at normal UI live entry; preview excludes grain/halo/leak; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
+    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color initialized at normal UI live entry; preview excludes grain/halo; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }

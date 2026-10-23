@@ -16,7 +16,7 @@ def catalog_texts(sd_library=True):
         'White', 'Orange', 'Red', 'Yellow', 'Back', 'Done', names[32],
         '800T Halation','光晕强度','扩散范围','高光阈值','Halation Profile',
         *[str(i) for i in range(9)],'Off','Weak','Natural','Strong',
-        *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']], '5207','Light Leak','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Fine','Standard','Coarse','Left','Right','Top','Bottom','Corner','Random','Fixed','Per Shot','Reset Texture','Phoenix II','HARMAN RED','Phoenix II Halation','Film Exposure','EI 125','EI 64','EI 250']
+        *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']], '5207','','','','','','','Fine','Standard','Coarse','Left','Right','Top','Bottom','Corner','Random','Fixed','Per Shot','Reset Texture','Phoenix II','HARMAN RED','Phoenix II Halation','Film Exposure','EI 125','EI 64','EI 250']
     if len(texts) != 151: raise ValueError('private resource inventory differs')
     if sd_library:
         translations={'M10V Film Library':'胶卷库','Save failed. Try again.':'读取或保存失败，请检查存储卡','M10V Library':'胶卷设置',
@@ -26,7 +26,7 @@ def catalog_texts(sd_library=True):
             'Timestamp Off':'时间戳关闭','Date Only':'仅日期','Date and Time':'日期和时间','Date Format':'日期格式',
             'Stamp Corner':'显示位置','Stamp Color':'文字颜色','Back':'返回','Done':'完成','Top Left':'左上','Top Right':'右上',
             'Bottom Left':'左下','Bottom Right':'右下','White':'白色','Orange':'橙色','Red':'红色','Yellow':'黄色',
-            '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Light Leak':'漏光','Grain Size':'颗粒尺寸','Leak Gain':'漏光强度','Leak Position':'漏光位置','Leak Spread':'漏光范围','Leak Variation':'漏光变化','Fine':'细','Standard':'标准','Coarse':'粗','Left':'左','Right':'右','Top':'上','Bottom':'下','Corner':'角落','Random':'随机','Fixed':'固定','Per Shot':'每张变化','Reset Texture':'重置质感','Phoenix II':'蓝凤凰','Phoenix II Halation':'蓝凤凰光晕','Film Exposure':'模拟曝光EI','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
+            '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Light Leak':'','Grain Size':'','Leak Gain':'','Leak Position':'','Leak Spread':'','Leak Variation':'','Fine':'细','Standard':'标准','Coarse':'粗','Left':'左','Right':'右','Top':'上','Bottom':'下','Corner':'角落','Random':'随机','Fixed':'固定','Per Shot':'每张变化','Reset Texture':'重置质感','Phoenix II':'蓝凤凰','Phoenix II Halation':'蓝凤凰光晕','Film Exposure':'模拟曝光EI','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
         texts=[translations.get(t,t) for t in texts]
     if sd_library:
         texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']

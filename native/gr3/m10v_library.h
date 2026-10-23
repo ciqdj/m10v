@@ -15,6 +15,7 @@
 #define M10V_LIBRARY_STORE_FAILED -2
 
 typedef struct { uint16_t film; uint8_t grain, soft, halo_gain, halo_spread, halo_threshold, halo_profile; } m10v_slot;
+/* Retired grain_size/leak_* bytes retain the published 104-byte journal ABI. */
 typedef struct { uint8_t grain_size, leak_gain, leak_position, leak_spread, leak_variation, film_exposure, reserved[2]; } m10v_film_effects;
 typedef struct {
     uint32_t magic;
@@ -57,14 +58,12 @@ enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
        M10V_NATIVE_HALO=8u, M10V_NATIVE_LEAK=16u, M10V_NATIVE_ALL=31u };
 /* CPU residual plan after the recipe owner has authenticated completion.
  * No pixel access and no state mutation. A disabled halo has no spatial pass;
- * uncompleted native work always retains its software fallback. */
+ * color retains its exact fallback. Grain is native-only and leak is retired. */
 #define M10V_CPU_STAMP 32u
 static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,uint32_t slot,uint32_t completed){
     const m10v_slot *v=&state->slots[slot];
     uint32_t stages=(v->film>M10V_FILM_COUNT||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
-    if(v->grain&&!(completed&M10V_NATIVE_GRAIN))stages|=M10V_NATIVE_GRAIN;
     if((v->film==33||v->film==67)&&v->halo_gain&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
-    if(state->effects[slot].leak_gain&&!(completed&M10V_NATIVE_LEAK))stages|=M10V_NATIVE_LEAK;
     if(state->stamp||(state->reserved&1u))stages|=M10V_CPU_STAMP;
     return stages;
 }

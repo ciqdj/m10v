@@ -52,7 +52,7 @@ def build(out_dir,base=0x54150000):
        'sha256':hashlib.sha256(image).hexdigest(),'flags':FLAGS,'firmware_emitted':False,'camera_tested':False,
        'exact_full_isp':False,'neon_ownership':'caller establishes original task NEON context',
        'capabilities':{'full_color_texture_block8':True,'lut_entries':3375,'lut_channels':3,
-                       'grain_q8_max':1024,'exact_rgb24_cache_bytes':65536,'precomputed_noise_required':True,'hardware_isp':False},
+                       'cpu_grain':False,'cpu_leak':False,'exact_rgb24_cache_bytes':65536,'precomputed_noise_required':False,'hardware_isp':False},
        'extra_image_buffers':0,'module_direct_allocation_calls':0,
        'source_sha256':{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in ('native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h')}}
     (out/'manifest.json').write_text(json.dumps(report,indent=2)+'\n');return report

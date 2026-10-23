@@ -313,7 +313,7 @@ int m10v_capture_library(uint32_t context) {
     }
     uint32_t time[3] = {0,0,0};
     uint32_t seed = state.sequence ^ planes[0];
-    if (state.stamp || (cpu_stages&M10V_NATIVE_GRAIN) || ((cpu_stages&M10V_NATIVE_LEAK)&&state.effects[slot].leak_variation)) {
+    if (state.stamp) {
         /* Official producer 0x534322d8/0x534fa22c writes this capture
          * metadata date. +0x948 is weekday, not hour. Prefer exposure metadata
          * over the UI cache (which may be unavailable or from a later time). */
@@ -342,19 +342,6 @@ int m10v_capture_library(uint32_t context) {
                     ((uint32_t)((const uint8_t *)time)[6] << 8);
         }
     }
-    if((cpu_stages&(M10V_NATIVE_GRAIN|M10V_NATIVE_LEAK))&&(state.slots[slot].film==66||state.effects[slot].leak_variation)){
-        /* Content entropy changes with captured sensor noise; identical frames
-         * can retain the same seed. No unverified timer/MMIO calls. */
-        for(uint32_t yy=0;yy<height;yy+=height/16+1)for(uint32_t xx=0;xx<width;xx+=width/16+1){seed^=((const uint8_t *)(uintptr_t)planes[0])[yy*stride+xx];seed*=16777619u;}
-        const uint8_t *e=(const uint8_t *)&state.effects[slot];(void)e;
-        CAPTURE_LOG(130,context,state.slots[slot].film,seed,(uint32_t)e[0]|((uint32_t)e[1]<<8)|((uint32_t)e[2]<<16)|((uint32_t)e[3]<<24));
-        CAPTURE_LOG(131,context,e[4],state.slots[slot].grain,state.slots[slot].soft);
-    }
-#if M10V_CAPTURE_PROFILE
-    CAPTURE_LOG(132,context,state.slots[slot].film,state.effects[slot].grain_size,
-        state.effects[slot].leak_gain|((uint32_t)state.effects[slot].leak_position<<8)|
-        ((uint32_t)state.effects[slot].leak_spread<<16)|((uint32_t)state.effects[slot].leak_variation<<24));
-#endif
     uint8_t *scratch = (uint8_t *)0; uint32_t scratch_bytes = 0;
     uint32_t use_halo=cpu_stages&M10V_NATIVE_HALO;
     uint32_t step=1,shift=0,required=0;

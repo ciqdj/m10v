@@ -43,7 +43,7 @@ def build(out_dir,base=0x54150000):
                     symbol=strings[n:].split(b'\0',1)[0].decode()
                     if section==0 and symbol:raise ValueError('undefined symbol '+symbol)
                     if symbol.startswith('m10v_spatial_') and info&15==2:symbols[symbol]=value
-        if set(symbols)!={'m10v_spatial_blur_u16','m10v_spatial_grain_work_bytes','m10v_spatial_stock_grain_execute','m10v_spatial_grain_noise8'}:raise ValueError('spatial API mismatch')
+        if set(symbols)!={'m10v_spatial_blur_u16','m10v_spatial_grain_work_bytes','m10v_spatial_stock_grain_execute'}:raise ValueError('spatial API mismatch')
         if not image:raise ValueError('empty image')
         (out/'m10v-spatial-arm.o').write_bytes(obj.read_bytes())
         (out/'m10v-spatial-arm.elf').write_bytes(b)
@@ -51,7 +51,7 @@ def build(out_dir,base=0x54150000):
     report={'schema':'m10v-spatial-accel/v1','base':base,'symbols':symbols,'code_bytes':len(image),
        'sha256':hashlib.sha256(image).hexdigest(),'flags':FLAGS,'firmware_emitted':False,'camera_tested':False,
        'exact_full_isp':False,'neon_ownership':'caller must establish the original capture-task NEON context',
-       'capabilities':{'energy_blur_exact':True,'grain_hash_noise8_exact_neon':True,'current_grain_exact_iip':False,'leak_exact_iip':False,'halation_exact_iip':False,
+       'capabilities':{'energy_blur_exact':True,'grain_hash_noise8_exact_neon':False,'cpu_grain_retired':True,'current_grain_exact_iip':False,'leak_exact_iip':False,'halation_exact_iip':False,
                        'stock_grain_workspace_query':True,'stock_grain_execute_adapter':'experimental; original owner context required; no production hook',
                        'stock_grain_is_current_model_equivalent':False},
        'extra_image_buffers':0,'module_direct_allocation_calls':0,

@@ -33,7 +33,7 @@ export function previewFilmPixels(source, look) {
 }
 
 // RGB colour approximation only: these tables do not simulate spatial halation,
-// grain, diffusion or leaks, and do not establish a camera/film calibration.
+// grain or diffusion, and do not establish a camera/film calibration.
 export function previewHarmanPixels(source, lut, film, filmExposure=0) {
   if(![67,68].includes(film)||!Number.isInteger(filmExposure)||filmExposure<0||filmExposure>2||(film===67&&filmExposure>1))throw new RangeError('Harman 胶卷或模拟曝光EI无效');
   const size=lut.size,table=lut.stocks[film===67?(filmExposure===1?4:0):filmExposure+1]?.values;

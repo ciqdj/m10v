@@ -40,7 +40,7 @@ uint32_t m10v_menu_800t(uint32_t op,uint32_t ui,uint32_t arg){
         if(op==2)field=arg>>8;
         if(op==3)field=arg>>16;
         if(op==4)field=((uint32_t (*)(uint32_t))0x531b01d0u)(ui)-18;
-        if(op!=7&&field>4)return 0;
+        if(op!=7&&field>3)return 0;
     }else if(ram(r,0xb48))set=((uint8_t *)r)[0x1c0];
     if(set>2)return 0;
     if(op==4)return (DEFAULT>>(field*4))&15;
@@ -88,9 +88,8 @@ uint32_t m10v_menu_800t(uint32_t op,uint32_t ui,uint32_t arg){
         ((void (*)(uint32_t,uint32_t,const uint16_t *))0x5339e2f8u)(row,0x1e3,txt);return 1;
     }
     uint32_t gain=packed&15,radius=(packed>>4)&15,threshold=(packed>>8)&15;
-    uint32_t profile=(packed>>12)&15,grain=(packed>>16)&15;
+    uint32_t profile=(packed>>12)&15;
     profile=profile==0?0:profile==1?1:profile==2?4:7;
-    grain=grain==0?0:grain==1?2:grain==2?4:8;
     if(ui==1)gain>>=1;
-    return 0x80000000u|gain|(radius<<4)|(threshold<<8)|(grain<<12)|(profile<<16);
+    return 0x80000000u|gain|(radius<<4)|(threshold<<8)|(profile<<16);
 }

@@ -117,10 +117,9 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             struct.pack_into('<I', image, out_at, word)
     required = {
         'm10v_zoom_': set(),  # Checked against the zoom module's explicit ABI registry.
-        'm10v_isp_native_effects_': {'m10v_isp_native_effects_noise_shape'},
         'm10v_isp_frame_': {'m10v_isp_frame_apply'},
         'm10v_lifecycle_': {'m10v_lifecycle_phase','m10v_lifecycle_file_flush'},
-        'm10v_spatial_': {'m10v_spatial_blur_u16','m10v_spatial_grain_work_bytes','m10v_spatial_stock_grain_execute','m10v_spatial_grain_noise8'},
+        'm10v_spatial_': {'m10v_spatial_blur_u16','m10v_spatial_grain_work_bytes','m10v_spatial_stock_grain_execute'},
         'm10v_texture_': {'m10v_texture_block8','m10v_texture_block8_cached','m10v_texture_effects_block8'},
         'm10v_halation': {'m10v_halation'},
         'm10v_5207_': {'m10v_5207_rgb','m10v_5207_render','m10v_5207_texture','m10v_5207_texture_q8','m10v_5207_texture_cached_q8','m10v_5207_texture_cached_stats_q8'},
@@ -184,7 +183,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         struct.pack_into('<IHHI', initial, 0, 0x5630314d, 4, 104, 0)
         for i in range(5): struct.pack_into('<H6B', initial, 12+i*8, 33 if i == 4 else i+34, 0, 0, 0,3,5,2)
 
-        for i in range(5):initial[56+i*8]=1;initial[59+i*8]=4
+        for i in range(5):initial[56+i*8]=0;initial[59+i*8]=4
         struct.pack_into('<I', initial, 100, zlib.crc32(initial[:100]))
     else:
         initial = bytes.fromhex(initial_state_hex)
@@ -195,6 +194,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if not (1 <= film <= 78 or film in (289,290)) or grain > 3 or soft > 3 or gain>8 or spread>8 or threshold>8 or profile>3: raise ValueError('invalid initial slot')
         if initial[52] > 2 or any(v > 3 for v in initial[53:56]) or struct.unpack_from('<I',initial,96)[0] not in (0,1) or struct.unpack_from('<I',initial,100)[0] != zlib.crc32(initial[:100]):
             raise ValueError('invalid initial settings/checksum')
+    if not native_grain and any(initial[14+i*8] for i in range(5)):
+        raise ValueError('Grain requires the GR III native processing pipeline')
     if type(hdf_default) is not int or not 0<=hdf_default<=3:
         raise ValueError('invalid HDF default')
     if hdf_enabled is None:hdf_enabled=not lifecycle_trace
@@ -241,13 +242,6 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 texture_base=(spatial_base+len(spatial)+15)&~15
                 texture,texture_symbols=link_object(texture_obj.read_bytes(),texture_base,prefix='m10v_texture_')
                 spatial+=bytes(texture_base-spatial_base-len(spatial))+texture;spatial_symbols.update(texture_symbols)
-        if native_grain:
-            noise_obj=folder/'native-noise.o'
-            noise_flags=[f for f in RENDER_FLAGS if not f.startswith('-mfloat-abi=')]+['-mfpu=neon','-mfloat-abi=softfp','-DM10V_NATIVE_NOISE_ONLY=1','-DM10V_NOISE_NEON=1']
-            subprocess.run([compiler,*noise_flags,'-c',str(ROOT/'native/gr3/m10v_isp_native_effects.c'),'-o',str(noise_obj)],check=True,capture_output=True)
-            noise_base=(spatial_base+len(spatial)+15)&~15
-            noise,noise_symbols=link_object(noise_obj.read_bytes(),noise_base,prefix='m10v_isp_native_effects_')
-            spatial+=bytes(noise_base-spatial_base-len(spatial))+noise;spatial_symbols.update(noise_symbols)
         curated_base=(spatial_base+len(spatial)+15)&~15
         curated_obj=folder/'curated.o'
         subprocess.run([compiler,*render_flags,'-c',str(ROOT/'native/gr3/film_curated.c'),'-o',str(curated_obj)],check=True,capture_output=True)
@@ -289,7 +283,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             struct.pack_into('<II', image, offset, word, 0xea000000 | ((delta >> 2) & 0xffffff))
         (out / 'm10v-library-arm.o').write_bytes(obj.read_bytes())
         camera_obj = folder / 'camera.o'
-        subprocess.run([compiler, *compile_flags, '-DM10V_LIVE_COLOR='+str(int(live_color)), '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
+        subprocess.run([compiler, *compile_flags, '-DM10V_LIVE_COLOR='+str(int(live_color)), '-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)), '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
                        check=True, capture_output=True)
         camera_base = (base + len(image) + 15) & ~15
         camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, symbols, 'm10v_camera_library_')
@@ -370,7 +364,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if recipe_snapshot:
                 from scripts.build_gr3_isp_recipe_color import build as build_recipe_color
                 snapshot_base=(base+len(image)+15)&~15
-                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=native_grain,live_color=live_color,shared_hdf=hdf_enabled,appended_slots=appended_slots)
+                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=False,live_color=live_color,shared_hdf=hdf_enabled,appended_slots=appended_slots)
                 image+=bytes(snapshot_base-base-len(image))+snapshot_code;symbols.update(snapshot_report['exports'])
                 lifecycle_report['snapshot']=snapshot_report
                 lifecycle_report['patches']+=snapshot_report['patches']
@@ -381,13 +375,6 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 image+=bytes(grain_base-base-len(image))+grain_code
                 lifecycle_report['native_grain']=grain_report
                 lifecycle_report['patches']+=grain_report['patches']
-                from scripts.build_gr3_native_grain_noise_hook import build as build_grain_noise
-                noise_base=(base+len(image)+15)&~15
-                stage_return=next(p['entry']+16 for p in grain_report['patches'] if p['address']==0x53503ab4)
-                noise_code,noise_report=build_grain_noise(out/'native-grain-noise',noise_base,symbols,stage_return,rtos=stock)
-                image+=bytes(noise_base-base-len(image))+noise_code
-                lifecycle_report['native_grain_noise']=noise_report
-                lifecycle_report['patches']+=noise_report['patches']
             if view_deferred:
                 from scripts.build_gr3_view_deferred import build as build_view_deferred
                 view_base=(base+len(image)+15)&~15
@@ -440,10 +427,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         detail_obj=folder/'detail.o'
         subprocess.run([compiler,*compile_flags,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_detail.c'),'-o',str(detail_obj)],check=True,capture_output=True)
         detail_base=(base+len(image)+15)&~15
-        provisional,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,**{n:detail_base for n in ['m10v_detail_tables','m10v_detail_common_tables','m10v_detail_red_tables','m10v_detail_phoenix_tables','m10v_detail_charmera_tables']}},'m10v_detail_')
+        provisional,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,**{n:detail_base for n in ['m10v_detail_tables','m10v_detail_common_tables','m10v_detail_red_tables','m10v_detail_phoenix_tables','m10v_detail_charmera_tables','m10v_detail_pixel_tables']}},'m10v_detail_')
         shims_base=(detail_base+len(provisional)+15)&~15
-        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols},sd_library=sd_library,appended_slots=appended_slots)
-        detail,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,'m10v_detail_tables':detail_report['tables'],'m10v_detail_common_tables':detail_report['variant_tables']['common'],'m10v_detail_red_tables':detail_report['variant_tables']['red'],'m10v_detail_phoenix_tables':detail_report['variant_tables']['phoenix'],'m10v_detail_charmera_tables':detail_report['variant_tables']['charmera']},'m10v_detail_')
+        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols},sd_library=sd_library,appended_slots=appended_slots,native_grain=native_grain)
+        detail,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,'m10v_detail_tables':detail_report['tables'],'m10v_detail_common_tables':detail_report['variant_tables']['common'],'m10v_detail_red_tables':detail_report['variant_tables']['red'],'m10v_detail_phoenix_tables':detail_report['variant_tables']['phoenix'],'m10v_detail_charmera_tables':detail_report['variant_tables']['charmera'],'m10v_detail_pixel_tables':detail_report['variant_tables']['pixel']},'m10v_detail_')
         image+=bytes(detail_base-base-len(image))+detail
         image+=bytes(shims_base-base-len(image))+shims
         symbols.update(detail_symbols)
@@ -483,6 +470,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             '800T Halation','光晕强度','扩散范围','高光阈值','Halation Profile',
             *[str(i) for i in range(9)],'Off','Weak','Natural','Strong',
             *[f['name'] for f in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']], '5207','Light Leak','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','Fine','Standard','Coarse','Left','Right','Top','Bottom','Corner','Random','Fixed','Per Shot','Reset Texture','Phoenix II','HARMAN RED','Phoenix II Halation','Film Exposure','EI 125','EI 64','EI 250']
+        texts=['' if text in ('Light Leak','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation') else text for text in texts]
         if len(texts) != 151: raise ValueError('private resource inventory differs')
         if sd_library:
             translations={'M10V Film Library':'胶卷库','Save failed. Try again.':'读取或保存失败，请检查存储卡','M10V Library':'胶卷设置',
@@ -492,7 +480,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'Timestamp Off':'时间戳关闭','Date Only':'仅日期','Date and Time':'日期和时间','Date Format':'日期格式',
                 'Stamp Corner':'显示位置','Stamp Color':'文字颜色','Back':'返回','Done':'完成','Top Left':'左上','Top Right':'右上',
                 'Bottom Left':'左下','Bottom Right':'右下','White':'白色','Orange':'橙色','Red':'红色','Yellow':'黄色',
-                '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Light Leak':'漏光','Grain Size':'颗粒尺寸','Leak Gain':'漏光强度','Leak Position':'漏光位置','Leak Spread':'漏光范围','Leak Variation':'漏光变化','Fine':'细','Standard':'标准','Coarse':'粗','Left':'左','Right':'右','Top':'上','Bottom':'下','Corner':'角落','Random':'随机','Fixed':'固定','Per Shot':'每张变化','Reset Texture':'重置质感','Phoenix II':'蓝凤凰','Phoenix II Halation':'蓝凤凰光晕','Film Exposure':'模拟曝光EI','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
+                '800T Halation':'800T 光晕','Halation Profile':'光晕模式','Light Leak':'','Grain Size':'','Leak Gain':'','Leak Position':'','Leak Spread':'','Leak Variation':'','Fine':'细','Standard':'标准','Coarse':'粗','Left':'左','Right':'右','Top':'上','Bottom':'下','Corner':'角落','Random':'随机','Fixed':'固定','Per Shot':'每张变化','Reset Texture':'重置质感','Phoenix II':'蓝凤凰','Phoenix II Halation':'蓝凤凰光晕','Film Exposure':'模拟曝光EI','Off':'关闭','Weak':'弱','Natural':'自然','Strong':'强'}
             texts=[translations.get(t,t) for t in texts]
         if sd_library:
             texts += ['胶卷库','时间水印','左右选择 OK更换 MENU返回','左右选卷 上下翻页 OK安装 MENU返回','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
@@ -748,7 +736,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if save_chain_trace:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py']})
     manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py']})
     if native_color:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h']})
-    if native_grain:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_isp_native_effects.c','native/gr3/m10v_isp_native_effects.h','scripts/build_gr3_native_grain_hooks.py','scripts/build_gr3_native_grain_noise_hook.py']})
+    if native_grain:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['scripts/build_gr3_native_grain_hooks.py']})
     if view_deferred:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_view_deferred.c','native/gr3/m10v_view_deferred.h','native/gr3/m10v_view_recovery.h','scripts/build_gr3_view_deferred.py']})
     if candidate_color:
         header=(ROOT/'native/gr3/m10v_film_color_candidates.h').read_text()
@@ -761,7 +749,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if len(payload)!=10125 or offset<0 or metadata[key]['table_sha256']!=sha(payload):raise ValueError('candidate color provenance/readback differs')
             manifest['color_candidates'].append({'name':name,'bytes':len(payload),'offset':offset,'sha256':sha(payload),'camera_calibrated':False})
     if sd_library:
-        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs']})
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs']})
     manifest['settings_menu']=settings_report
     manifest['zoom']=zoom_report
     if zoom_report:manifest['sources'].update(zoom_report['sources'])

@@ -29,11 +29,22 @@ class DedicatedMenuTests(unittest.TestCase):
         self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x57000000)
         self.assertEqual(u.reg_read(UC_ARM_REG_SP),0x5700fff0)
         return u.reg_read(UC_ARM_REG_R0)
+    def test_retired_grain_cannot_write_or_enter_capture_from_legacy_record(self):
+        u=self.machine();self.call(u,0,2)
+        # Keep old packed record ABI, including formerly supported grain nibble.
+        u.mem_write(0x55001b34,struct.pack('<I',0x32533))
+        before=bytes(u.mem_read(0x55001b28,32));events=self.fs_calls
+        self.assertEqual(self.call(u,2,0x55004000,(4<<8)|1),0)
+        self.assertEqual(self.call(u,0,2),0x80040533)
+        self.assertEqual(self.call(u,6),0x32533)
+        self.assertEqual(bytes(u.mem_read(0x55001b28,32)),before)
+        self.assertEqual(self.fs_calls,events)
+
     def test_defaults_and_record_pointer(self):
         u=self.machine()
         self.assertEqual(self.call(u,5),0x55001000)
         self.assertEqual(self.call(u,0,2),0x80040533)
-        self.assertEqual([self.call(u,1,0x55004000,i) for i in range(5)],[3,3,5,2,0])
+        self.assertEqual([self.call(u,1,0x55004000,i) for i in range(4)],[3,3,5,2])
         self.assertEqual(self.fs_calls,1)
     def test_independent_sets_and_original_record_bytes(self):
         u=self.machine();original=bytes(u.mem_read(0x55001000,0xb28))
@@ -41,11 +52,11 @@ class DedicatedMenuTests(unittest.TestCase):
         self.assertEqual(self.call(u,1,0x55004000,0),8)
         u.mem_write(0x55004199,b'\1')
         self.assertEqual(self.call(u,1,0x55004000,0),3)
-        self.call(u,2,0x55004000,(4<<8)|3)
-        self.assertEqual(self.call(u,1,0x55004000,4),3)
+        self.call(u,2,0x55004000,(3<<8)|3)
+        self.assertEqual(self.call(u,1,0x55004000,3),3)
         self.assertEqual(bytes(u.mem_read(0x55001000,0xb28)),original)
         u.mem_write(0x550011c0,b'\1')
-        self.assertEqual(self.call(u,0,2),0x80048533)
+        self.assertEqual(self.call(u,0,2),0x80070533)
     def test_invalid_fields_modes_and_busy_initialization_do_not_write(self):
         u=self.machine();self.call(u,0,2)
         original=bytes(u.mem_read(0x55001000,0xb48))
@@ -79,13 +90,13 @@ class DedicatedMenuTests(unittest.TestCase):
         u.hook_add(UC_HOOK_CODE,fs)
     def test_persisted_settings_reload_without_reading_during_steady_capture(self):
         u=self.machine();self.filesystem(u)
-        self.call(u,2,0x55004000,(4<<8)|3)
+        self.call(u,2,0x55004000,(3<<8)|3)
         self.assertEqual(self.file_events,[('open',1),('open',0),('write',32),('close',7)])
         events=list(self.file_events)
-        self.assertEqual(self.call(u,0,2),0x80048533)
+        self.assertEqual(self.call(u,0,2),0x80070533)
         self.assertEqual(self.file_events,events)
         saved=self.disk;u=self.machine();self.filesystem(u,saved)
-        self.assertEqual(self.call(u,1,0x55004000,4),3)
+        self.assertEqual(self.call(u,1,0x55004000,3),3)
         self.assertIn(('read',32),self.file_events)
     def test_partial_and_bad_checksum_files_fall_back_without_stock_writes(self):
         u=self.machine();self.filesystem(u);self.call(u,2,0x55004000,8);saved=self.disk

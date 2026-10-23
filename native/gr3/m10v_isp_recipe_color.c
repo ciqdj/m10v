@@ -3,9 +3,6 @@
 #include <stddef.h>
 #if M10V_ISP_NATIVE_LOOK
 #include "m10v_isp_native_look.h"
-#if M10V_ISP_NATIVE_GRAIN_MODE
-#include "m10v_isp_native_effects.h"
-#endif
 #endif
 #ifndef M10V_ISP_RECIPE_COLOR_OBSERVER
 #define M10V_ISP_RECIPE_COLOR_OBSERVER 1
@@ -153,7 +150,9 @@ int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info){
     uint32_t tone=selected_tone(s,raw_tone),slot;
     if(m10v_tone_slot(tone)<5)slot=m10v_tone_slot(tone);
     else return 0;
-    s->tone=shot[0x77c];s->si=si;
+    /* Encoder identity is base SI even when tuning uses a stage1 sub-shot. */
+    if(!s->selected_tone)s->selected_tone=(uint16_t)tone;
+    s->tone=((const uint8_t *)(uintptr_t)si)[0x77c];s->si=si;
 #if !M10V_ISP_RECIPE_COLOR_OBSERVER && !M10V_ISP_NATIVE_LOOK
     uint32_t film=s->state.slots[slot].film;
     if(film<34||film>65){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
@@ -218,7 +217,7 @@ uint32_t m10v_isp_frame_recipe_completed(void *recipe,uint32_t shooting,uint32_t
     uint32_t effective=selected_tone(s,tone);
     uint32_t slot=m10v_tone_slot(effective);
     if(slot<5&&s->native_grain.magic==0x374e5247u&&s->native_grain.si==shooting&&s->native_grain.tone==tone&&s->native_grain.done&&
-       s->native_grain.grain==state->slots[slot].grain&&s->native_grain.size==state->effects[slot].grain_size)completed|=M10V_NATIVE_GRAIN;
+       s->native_grain.grain==state->slots[slot].grain)completed|=M10V_NATIVE_GRAIN;
 #endif
     return completed;
 #else
@@ -254,17 +253,17 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
     uintptr_t values=((const uint32_t *)params)[0x10/4];
     if(!grain_ram(values,12))return hdf;
     /* The carrier's original menu grain is not the queued custom grain. If
-     * ownership/planning rejects, keep native grain off for the CPU route. */
+     * ownership/planning rejects, keep grain off; never run a CPU fallback. */
     ((int16_t *)values)[2]=0;
     if(!s)return hdf;
-    /* Pixel cells overwrite native grain; apply its selected texture on CPU
-     * after the spatial pass. Independent shared HDF still owns its result. */
-    if(s->state.slots[slot].film==M10V_PIXEL_ID){
+    /* Palette/cell renderers overwrite upstream grain. No software fallback.
+     * Imported old records remain readable; shared HDF remains independent. */
+    if(s->state.slots[slot].film==M10V_PIXEL_ID||s->state.slots[slot].film==M10V_CHAR_ID){
         s->native_grain.planned=0;s->native_grain.armed=0;s->native_grain.done=0;
         return hdf;
     }
-    uint32_t grain=s->state.slots[slot].grain,size=s->state.effects[slot].grain_size;
-    if(grain>3||size>2)return hdf;
+    uint32_t grain=s->state.slots[slot].grain,size=0;
+    if(grain>3)return hdf;
     if(execution){
         if(s->native_grain.magic!=0x374e5247u||!s->native_grain.planned||s->native_grain.si!=si||s->native_grain.tone!=tone||s->native_grain.grain!=grain||s->native_grain.size!=size)return hdf;
         s->native_grain.armed=1;s->native_grain.done=0;s->native_grain.noise_ready=0;
@@ -276,16 +275,6 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
     return grain!=0||hdf;
 #else
     (void)context;(void)params;(void)execution;return 0;
-#endif
-}
-int m10v_isp_frame_recipe_grain_noise(const void *context,uint8_t *noise,uint32_t bytes,uint32_t width,uint32_t height,uint32_t stride){
-#if M10V_ISP_NATIVE_GRAIN_MODE
-    m10v_isp_recipe_color *s=grain_owner(context);
-    if(!s||s->native_grain.magic!=0x374e5247u||!s->native_grain.armed||!s->native_grain.grain||s->native_grain.si!=((const uint32_t *)context)[0x34/4])return 0;
-    int result=m10v_isp_native_effects_noise_shape(noise,bytes,width,height,stride,s->native_grain.size);
-    s->native_grain.noise_ready=result==0;return result==0;
-#else
-    (void)context;(void)noise;(void)bytes;(void)width;(void)height;(void)stride;return 0;
 #endif
 }
 void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uint32_t result){

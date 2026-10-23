@@ -1,4 +1,5 @@
 """Execute the linked M10V ARM runtime; camera services are not emulated."""
+from contextlib import contextmanager
 import ctypes as C
 import struct
 import tempfile
@@ -17,9 +18,40 @@ class FilmLibraryArmTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(); cls.addClassCleanup(cls.tmp.cleanup)
-        cls.manifest = build(Path(cls.tmp.name))
+        cls.manifest = build(Path(cls.tmp.name),native_grain=True,native_color=True,recipe_snapshot=True,lifecycle_trace=True)
         cls.code = (Path(cls.tmp.name) / 'm10v-library-arm.bin').read_bytes()
         host_tests.NativeFilmLibraryTests.setUpClass(); cls.addClassCleanup(host_tests.NativeFilmLibraryTests.doClassCleanups)
+
+    @contextmanager
+    def runtime_profile(self,**options):
+        original_manifest,original_code=self.manifest,self.code
+        try:
+            with tempfile.TemporaryDirectory() as folder:
+                self.manifest=build(Path(folder),**options)
+                self.code=(Path(folder)/'m10v-library-arm.bin').read_bytes()
+                yield
+        finally:self.manifest,self.code=original_manifest,original_code
+
+    def test_software_halation_edits_clear_legacy_grain_without_losing_other_slots(self):
+        with self.runtime_profile():
+            u=self.machine();state=0x55001000;ui=0x55007000
+            self.call(u,'m10v_library_init',state)
+            old=bytearray(u.mem_read(state,C.sizeof(State)))
+            struct.pack_into('<H',old,20,33);old[22]=3
+            struct.pack_into('<I',old,8,7);struct.pack_into('<I',old,100,zlib.crc32(old[:100]))
+            self.files['M10V5B.bin']=bytes(old)
+            u.mem_write(ui+0x198,bytes([18,0,8,0,0,0,0,0]))
+            self.assertEqual(self.call(u,'m10v_detail_control',2,ui,6),1)
+            self.assertEqual(self.call(u,'m10v_camera_library_load',state),0)
+            saved=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
+            self.assertEqual((saved.slots[1].halo_gain,saved.slots[1].grain),(6,0))
+            original=State.from_buffer_copy(old)
+            self.assertEqual(bytes(saved.slots[0]),bytes(original.slots[0]))
+            self.assertEqual(self.files['M10V5B.bin'],bytes(old))
+            model=0x55068200;u.mem_write(model+0x1d,b'\x01')
+            ids=[self.call(u,'m10v_menu_index',model,i) for i in range(self.call(u,'m10v_menu_count',model))]
+            self.assertEqual(ids,[129,132,133,214]);u.mem_write(model+0x1d,b'\x03')
+            self.assertEqual(self.call(u,'m10v_menu_count',model),0)
 
     def machine(self):
         base = self.manifest['base']; u = Uc(UC_ARCH_ARM, UC_MODE_ARM)
@@ -99,9 +131,9 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u,'m10v_menu_icon',0,21),703)
 
     def test_detail_lists_offer_only_controls_consumed_by_each_film(self):
-        common = [21,23,24,25,26,27]
+        common = [21]
         for film, ids in ((33,[18,19,20]+common),(35,common),(66,common),
-                          (67,[18,19,20]+common+[28]),(68,common+[28]),(289,common+[29])):
+                          (67,[18,19,20]+common+[28]),(68,common+[28]),(289,[29]),(290,[])):
             with self.subTest(film=film):
                 u=self.machine();state=0x55001000;ui=0x55007000
                 self.call(u,'m10v_library_init',state)
@@ -113,10 +145,10 @@ class FilmLibraryArmTests(unittest.TestCase):
                 entries=bytes(u.mem_read(pointer,count*2))
                 self.assertEqual([v for v in entries[1::2] if v>=18],ids)
                 # One immediate callback must be visible to a fresh capture load.
-                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(3<<8)|3),1)
+                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(3<<8)|3),0 if film in (289,290) else 1)
                 self.assertEqual(self.call(u,'m10v_camera_library_load',state),0)
                 saved=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
-                self.assertEqual(saved.slots[1].grain,3)
+                self.assertEqual(saved.slots[1].grain,0 if film in (289,290) else 3)
                 self.assertEqual(saved.slots[0].grain,0)
 
     def test_charmera_native_color_row_persists_four_values_and_rejects_overflow(self):
@@ -139,20 +171,21 @@ class FilmLibraryArmTests(unittest.TestCase):
             self.call(u,'m10v_library_init',state)
             self.call(u,'m10v_camera_library_select',state,1,film)
             u.mem_write(ui+0x198,bytes([18,0,8,0,0,0,0,0]))
-            for field,value,byte in ((5,2,0),(6,8,1),(7,5,2),(8,8,3),(9,1,4)):
-                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(field<<8)|value),1)
-                self.call(u,'m10v_camera_library_load',state)
-                saved=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
-                self.assertEqual(saved.effects[1][byte],value)
-                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(field<<8)|(value+1)),0)
+            before=dict(self.files);initial=bytes(u.mem_read(state,C.sizeof(State)))
+            for field,value in ((5,2),(6,8),(7,5),(8,8),(9,1)):
+                self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(field<<8)|value),0)
+                self.assertEqual(self.files,before)
+                self.assertEqual(bytes(u.mem_read(state,C.sizeof(State))),initial)
+            # Supported grain callbacks still save atomically and restore on failure.
+            self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(3<<8)|3),1)
             before=dict(self.files);self.store_result=-1
-            self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(6<<8)|0),0)
+            self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(3<<8)|0),0)
             self.assertEqual(self.files,before)
             self.store_result=0
             self.assertEqual(self.call(u,'m10v_detail_control',2,ui,(10<<8)|2),1 if film==68 else 0)
 
     def test_detail_reset_restores_all_visible_fields_in_one_atomic_slot_commit(self):
-        for film,grain,gain,size in ((33,0,0,1),(35,0,0,1),(66,0,0,1),(67,0,0,0),(68,0,0,1)):
+        for film,grain,gain,retired_spread in ((33,0,0,0),(35,0,0,4),(66,0,0,0),(67,0,0,0),(68,0,0,0)):
             with self.subTest(film=film):
                 u=self.machine();state=0x55001000;ui=0x55007000
                 self.call(u,'m10v_library_init',state)
@@ -171,7 +204,7 @@ class FilmLibraryArmTests(unittest.TestCase):
                 fresh=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
                 self.assertEqual((fresh.slots[1].film,fresh.slots[1].grain,fresh.slots[1].soft),(film,grain,0))
                 if film in (33,67):self.assertEqual((fresh.slots[1].halo_gain,fresh.slots[1].halo_spread,fresh.slots[1].halo_threshold),(gain,3,5))
-                self.assertEqual(list(fresh.effects[1]),[size,0,0,4,0,0,0,0])
+                self.assertEqual(list(fresh.effects[1]),[0,0,0,retired_spread,0,0,0,0])
                 self.assertEqual(bytes(fresh.slots[0]),bytes(old.slots[0]))
                 self.assertEqual(bytes(fresh.effects[0]),bytes(old.effects[0]))
                 before=dict(self.files);self.store_result=-1
@@ -212,7 +245,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.current_tone = 21
         self.focus = 12; self.call(u, 'm10v_menu_confirm', 0x55005000)
         self.assertEqual(u.mem_read(model, 1), b'\x12')
-        self.focus = 5; self.call(u, 'm10v_menu_confirm', 0x55005000)
+        self.focus = 4; self.call(u, 'm10v_menu_confirm', 0x55005000)
         self.focus = 0; self.call(u, 'm10v_menu_confirm', 0x55005000)
         self.assertEqual(u.mem_read(model + 0x1d, 1), b'\x0b')
         self.assertEqual(self.focus, 8)
@@ -298,7 +331,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         for i in range(5):initial[56+i*8]=1;initial[59+i*8]=4
         struct.pack_into('<I', initial, 100, zlib.crc32(initial[:100]))
         with tempfile.TemporaryDirectory() as folder:
-            manifest = build(Path(folder), initial_state_hex=initial.hex())
+            manifest = build(Path(folder), initial_state_hex=initial.hex(),native_grain=True,native_color=True,recipe_snapshot=True,lifecycle_trace=True)
             code = (Path(folder)/'m10v-library-arm.bin').read_bytes()
         u = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         u.mem_map(manifest['base'], (len(code)+4095)&~4095); u.mem_write(manifest['base'], code)
@@ -382,7 +415,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.focus = 12; self.call(u, 'm10v_menu_confirm', controller)
         self.assertEqual(u.mem_read(model + 0x1d, 1), b'\x01')
 
-        self.assertEqual(self.call(u, 'm10v_menu_count', model), 5)
+        self.assertEqual(self.call(u, 'm10v_menu_count', model), 4)
         self.focus = 0; self.call(u, 'm10v_menu_confirm', controller)
         self.assertEqual(self.call(u, 'm10v_menu_count', model), 48)
         self.call(u, 'm10v_menu_focus', controller, 45)
@@ -546,7 +579,8 @@ class FilmLibraryArmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.manifest=build(Path(tmp),sd_library=True)
             self.code=(Path(tmp)/'m10v-library-arm.bin').read_bytes()
-        self.assertEqual(self.manifest['resources']['last_id'],1023)
+        self.assertEqual(self.manifest['resources']['last_id'],1103)
+        self.assertEqual(len(self.manifest['resources']['descriptors']),1103-786+1)
         self.test_private_utf16_resource_hooks_preserve_stock_fallback_and_locale()
 
     def test_v2_journal_migrates_to_v3_and_keeps_old_bytes_on_failed_save(self):
@@ -585,7 +619,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(self.call(u,'m10v_camera_library_load',0x55001000),2)
         s=State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(State)))
         self.assertEqual((s.slots[0].halo_gain,s.slots[0].halo_spread,s.slots[0].halo_threshold),(8,1,7))
-        self.assertEqual(self.call(u,'m10v_camera_library_effects',0x55001000,0,1,8),0)
+        self.assertEqual(self.call(u,'m10v_camera_library_stamp',0x55001000,1,0,0,0),0)
         self.assertEqual(self.files['M10V3B.bin'],bytes(old));self.assertIn('M10V5A.bin',self.files)
 
     def test_old_journals_ignore_compiled_red_ei_defaults(self):
@@ -625,7 +659,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         self.assertEqual(migrated.version,4)
         self.assertEqual((migrated.slots[0].halo_gain,migrated.slots[0].halo_spread,migrated.slots[0].halo_threshold),(8,1,7))
         self.assertEqual(list(migrated.effects[0]),[2,8,5,7,1,0,0,0])
-        self.assertEqual(self.call(u,'m10v_camera_library_effects',state,0,1,7),0)
+        self.assertEqual(self.call(u,'m10v_camera_library_stamp',state,1,0,0,0),0)
         self.assertEqual(self.files['M10V4B.bin'],bytes(old))
         self.assertTrue(any(name.startswith('M10V5') for name in self.files))
 
@@ -633,7 +667,7 @@ class FilmLibraryArmTests(unittest.TestCase):
         u=self.machine();state=0x55001000;model=0x55068200;controller=0x55005000
         self.call(u,'m10v_library_init',state)
         self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,68),0)
-        u.mem_write(model+0x1d,b'\x01');self.focus=5
+        u.mem_write(model+0x1d,b'\x01');self.focus=4
         self.call(u,'m10v_menu_confirm',controller)
         self.assertEqual(u.mem_read(model+0x1d,1),b'\x15')
         for index in range(3):
@@ -654,33 +688,32 @@ class FilmLibraryArmTests(unittest.TestCase):
         for film in range(1,79):
             self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,film),0)
             u.mem_write(model+0x1d,b'\x01')
-            self.assertEqual(self.call(u,'m10v_menu_count',model),6 if film in (33,67,68) else 5)
-            self.assertEqual(self.call(u,'m10v_menu_index',model,4),300)
-            self.assertEqual(self.call(u,'m10v_menu_index',model,5),214 if film==33 else 339 if film==67 else 340 if film==68 else 0)
+            self.assertEqual(self.call(u,'m10v_menu_count',model),5 if film in (33,67,68) else 4)
+            self.assertEqual(self.call(u,'m10v_menu_index',model,4),214 if film==33 else 339 if film==67 else 340 if film==68 else 0)
         u.mem_write(model+0x1d,b'\x03')
-        self.assertEqual(self.call(u,'m10v_menu_count',model),5)
-        self.assertEqual(self.call(u,'m10v_menu_index',model,4),301)
+        self.assertEqual(self.call(u,'m10v_menu_count',model),4)
+        self.assertEqual(self.call(u,'m10v_menu_index',model,4),0)
 
-    def test_5207_menu_saves_independent_leak_and_resets_defaults(self):
+    def test_retired_texture_menu_routes_cannot_write_settings(self):
         u=self.machine();state=0x55001000;model=0x55068200;controller=0x55005000
         self.call(u,'m10v_library_init',state)
         self.assertEqual(self.call(u,'m10v_camera_library_select',state,1,66),0)
+        before=dict(self.files)
         for group,index in [(16,2),(17,8),(18,1),(19,7),(20,1)]:
             u.mem_write(model+0x1d,bytes([group]));self.focus=index
+            self.assertEqual(self.call(u,'m10v_menu_count',model),0)
             self.assertEqual(self.call(u,'m10v_menu_confirm',controller),0)
-            self.assertEqual(u.mem_read(model+0x1d,1),b'\x03' if group==16 else b'\x0f')
+            self.assertEqual(self.files,before)
         self.call(u,'m10v_camera_library_load',state)
         s=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
-        self.assertEqual(list(s.effects[1])[:5],[2,8,1,7,1])
-        u.mem_write(model+0x1d,b'\x0f');self.focus=4
-        self.call(u,'m10v_menu_confirm',controller);self.call(u,'m10v_camera_library_load',state)
-        s=State.from_buffer_copy(u.mem_read(state,C.sizeof(State)))
-        self.assertEqual(list(s.effects[1])[:5],[1,0,0,4,0]);self.assertEqual(s.slots[1].grain,0)
+        self.assertEqual(s.effects[1][0],0);self.assertEqual(s.effects[1][1],0)
 
-    def test_5207_arm_pixels_match_host_with_leak_grain_and_padding(self):
+    def test_5207_arm_ignores_legacy_texture_bytes_and_preserves_padding(self):
         u=self.machine();state=0x55001000;self.call(u,'m10v_library_init',state)
         self.call(u,'m10v_camera_library_select',state,0,66)
-        for field,value in [(0,2),(1,8),(2,4),(3,7),(4,1)]:self.call(u,'m10v_camera_library_effects',state,0,field,value)
+        # Historical texture bytes are synthesized directly; retired setters reject them.
+        old=bytearray(u.mem_read(state,C.sizeof(State)));old[56:61]=bytes([2,8,4,7,1]);old[14]=3
+        struct.pack_into('<I',old,100,zlib.crc32(old[:100]));u.mem_write(state,bytes(old))
         width,height,stride=32,16,40;size=stride*height
         y=bytes((i*37+19)%256 for i in range(size));uv=bytes((i*13+97)%256 for i in range(size))
         u.mem_write(0x55010000,y);u.mem_write(0x55020000,uv)
@@ -693,6 +726,9 @@ class FilmLibraryArmTests(unittest.TestCase):
         for row in range(height):self.assertEqual(bytes(hy[row*stride+width:(row+1)*stride]),y[row*stride+width:(row+1)*stride])
 
     def test_capture_chain_restores_registers_flags_and_unaligned_caller_stack(self):
+        with self.runtime_profile():self.assert_default_capture_chain_preserves_abi()
+
+    def assert_default_capture_chain_preserves_abi(self):
         registers = (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3, UC_ARM_REG_R4,
                      UC_ARM_REG_R5, UC_ARM_REG_R6, UC_ARM_REG_R7, UC_ARM_REG_R8, UC_ARM_REG_R9,
                      UC_ARM_REG_R10, UC_ARM_REG_R11, UC_ARM_REG_R12)

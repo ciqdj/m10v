@@ -123,21 +123,21 @@ class M10VCaptureTests(unittest.TestCase):
         u.mem_write(0x55010000, bytes(y)); u.mem_write(0x55020000, bytes(uv))
         return h, u, recipe + 0x9b8, y, uv, cache, frees, width, height, stride
 
-    def test_common_leak_is_consumed_by_non_5207_capture_with_per_shot_seed(self):
+    def test_retired_leak_controls_reject_without_affecting_color_capture(self):
         for film in (40,67,68):
             h,u,context,y,uv,cache,frees,width,height,stride=self.fixture(film=film,stamp=0,debug=True)
             if film==68:self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,6,2),0)
-            self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,1,8),0)
-            self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,4,1),0)
+            self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,1,8),-1)
+            self.assertEqual(h.call(u,'m10v_camera_library_effects',0x55001000,1,4,1),-1)
             self.assertEqual(h.call(u,'m10v_capture_library',context),0)
             events=[e for e in h.capture_events if e[0]==130]
-            self.assertEqual(len(events),1);self.assertEqual(events[0][2],film)
+            self.assertEqual(events,[])
             state=host_tests.State.from_buffer_copy(u.mem_read(0x55001000,C.sizeof(host_tests.State)))
             hy=(C.c_uint8*len(y)).from_buffer_copy(y);hc=(C.c_uint8*len(uv)).from_buffer_copy(uv)
             image=host_tests.Image(hy,hc,stride*height,stride*height,width,height,stride)
             scratch=(C.c_uint8*(6*width*height))()
             self.assertEqual(host_tests.NativeFilmLibraryTests.lib.m10v_library_render(
-                C.byref(image),C.byref(state),1,None,events[0][3],scratch,len(scratch)),0)
+                C.byref(image),C.byref(state),1,None,0,scratch,len(scratch)),0)
             self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(hy))
             self.assertEqual(bytes(u.mem_read(0x55020000,len(uv))),bytes(hc))
 
@@ -185,11 +185,11 @@ class M10VCaptureTests(unittest.TestCase):
 
     def test_settings_trace_records_all_five_actual_capture_values(self):
         h,u,context,*_=self.fixture(debug=True,film=33)
-        self.assertEqual(h.call(u,'m10v_camera_library_detail',0x55001000,1,6,2,7,1,3),0)
+        self.assertEqual(h.call(u,'m10v_camera_library_detail',0x55001000,1,6,2,7,0,3),0)
         h.capture_events.clear()
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         rows=[e for e in h.capture_events if e[0]==112]
-        self.assertEqual(rows,[(112,1,6|(2<<4)|(7<<8)|(1<<12)|(3<<16),4,3)])
+        self.assertEqual(rows,[(112,1,6|(2<<4)|(7<<8)|(3<<16),3,3)])
 
     def test_capture_trace_records_cpu_pixel_changes_for_the_reported_films(self):
         for film in (33,35,66,67,68):
@@ -260,15 +260,15 @@ class M10VCaptureTests(unittest.TestCase):
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         self.assertEqual([e[1:3] for e in h.capture_events if e[0]==113],[(1,2)])
         self.assertEqual(h.call(u,'m10v_camera_library_load',0x55001000),2)
-        self.assertEqual(h.call(u,'m10v_camera_library_detail',0x55001000,1,3,3,5,1,0),0)
+        self.assertEqual(h.call(u,'m10v_camera_library_detail',0x55001000,1,3,3,5,0,0),0)
         h.capture_events.clear()
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
         self.assertEqual([e[1:3] for e in h.capture_events if e[0]==113],[(1,0)])
 
-    def test_grain_without_stamp_survives_unready_official_clock(self):
+    def test_cpu_grain_is_inert_without_stamp_and_does_not_require_clock(self):
         h,u,context,y,uv,cache,frees,*_ = self.fixture(film=33,clock_ready=0,stamp=0)
         self.assertEqual(h.call(u,'m10v_capture_library',context),0)
-        self.assertNotEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
+        self.assertEqual(bytes(u.mem_read(0x55010000,len(y))),bytes(y))
         self.assertEqual(len(cache),4)
 
     def test_unsupported_tone_raw_only_or_cfa_alias_do_not_access_library_or_pixels(self):
