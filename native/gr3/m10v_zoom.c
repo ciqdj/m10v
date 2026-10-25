@@ -31,8 +31,8 @@ static uint32_t crc(const uint8_t *b){
 static int focal(uint32_t mm){return mm>=M10V_ZOOM_MIN_MM&&mm<=M10V_ZOOM_MAX_MM;}
 static int decode(m10v_zoom_state *s,const uint8_t *b){
  if(get(b)!=0x315a304du||get(b+4)!=1||get(b+20)!=crc(b)||
-    !focal(get(b+12))||!focal(get(b+16)))return 0;
- s->sequence=get(b+8);s->mm[0]=(uint16_t)get(b+12);s->mm[1]=(uint16_t)get(b+16);return 1;
+    !((get(b+12)>=28&&get(b+12)<=100)&&(get(b+16)>=28&&get(b+16)<=100)))return 0;
+ s->sequence=get(b+8);s->mm[0]=(uint16_t)(get(b+12)>50?50:get(b+12));s->mm[1]=(uint16_t)(get(b+16)>50?50:get(b+16));return 1;
 }
 static void encode(uint8_t *b,const m10v_zoom_state *s){
  put(b,0x315a304du);put(b+4,1);put(b+8,s->sequence);

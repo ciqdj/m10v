@@ -1,0 +1,15 @@
+{
+  "baseline_bin_sha256": "e81521a75eac13740ca1eb8d40e9c77398fbac10cca4d9fbdba9e7f92e9a7691",
+  "user_confirmation": "28–50mm rollback functionality normal; custom focal labels missing",
+  "stable_source_files": {
+    "native/gr3/m10v_zoom.c": "64cff1108c07d6a712fa7edd6834ea86f03bc656f77ae85c0e79c5300cdf0043",
+    "native/gr3/m10v_zoom.h": "fdaefec591d096f73e40e7c7f1b2243096b998c83be2659db66af5c772a7d159",
+    "native/gr3/m10v_zoom_camera.c": "a63705eeb706d985f48823c2af6b4792cddf6d36d5ee91160aab03fe89f78d06",
+    "native/gr3/m10v_zoom_live.c": "ce0cd872af853858fb5a93b99b6e3e3cdd3df9b5e9d5b89b11173d272ca0632d",
+    "native/gr3/m10v_zoom_live.S": "8fe776a951bf254d3b304679fd8ba44652445a28015aeee2f9a825e7c801b5f6",
+    "native/gr3/m10v_zoom_capture.c": "0783c491792f9970648fffd60bd512caf65d3fd7406867dc5b95aed52976a0dc",
+    "native/gr3/m10v_zoom_capture_adapters.c": "f556b80f691c7d7837fdb1bfd3be69043ff3c2d86069e5a75565f98e870d46f8",
+    "native/gr3/m10v_zoom_menu.c": "45eeb163de0169b5174c6b237144bc29d29daac2c36ef75ac7d23c4e6948386a"
+  },
+  "ui_source_origin": "95639994464337db274c74697dacea071d7cbcec native artwork;736f989 UI renderer integration only"
+}

@@ -96,8 +96,8 @@ def verify_final_runtime():
      for name in ['m10v_zoom_capture_caption_hook','m10v_zoom_capture_icon_hook']:
       u,calls=machine(mm);u.reg_write(A.UC_ARM_REG_S0,bits(mm));run(u,name,0xaabbccdd)
       value=u.reg_read(A.UC_ARM_REG_R0)
-      assert value==(0x12345678 if mm in (28,35,50) else caption_base+mm if 'caption' in name else 0)
-    results.append('custom caption resource and omitted ambiguous fixed icon; originals preserved')
+      assert value==(0x12345678 if mm in (28,35,50) else caption_base+mm if 'caption' in name else 762+mm-28)
+    results.append('custom caption resource and per-mm live icon IDs; originals preserved')
     for invalid_bits in [0,0x3fbae148,0x7fc00000,0x7f800000,0xbf800000]:
      for name in ['m10v_zoom_capture_caption_hook','m10v_zoom_capture_icon_hook']:
       u,calls=machine();u.reg_write(A.UC_ARM_REG_S0,invalid_bits);run(u,name,0xaabbccdd)

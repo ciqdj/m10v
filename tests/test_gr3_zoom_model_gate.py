@@ -37,7 +37,7 @@ import{zoomPatches}from'./node/gr3-zoom.mjs';
 import{checkSettings}from'./node/gr3-settings-menu.mjs';
 import{hdfMenuPatches}from'./node/gr3-digital-hdf.mjs';
 const dir=process.argv[1],m=JSON.parse(readFileSync(dir+'/m10v-library-arm.json')),b=readFileSync(dir+'/m10v-library-arm.bin');
-if(zoomPatches(b,m).length!==17)throw Error('missing GR III focal hooks');checkSettings(b,m);const p=hdfMenuPatches(b,m);if(p.find(x=>x.address===0x53b37018)?.replacement!==0x0200f105)throw Error('original crop entry not merged');"""
+if(zoomPatches(b,m).length!==21)throw Error('missing GR III focal hooks');checkSettings(b,m);const p=hdfMenuPatches(b,m);if(p.find(x=>x.address===0x53b37018)?.replacement!==0x0200f105)throw Error('original crop entry not merged');"""
             subprocess.run(['node','--input-type=module','-e',script,directory],cwd=ROOT,check=True,capture_output=True)
 
     def test_cli_model_gate_flag_is_available(self):

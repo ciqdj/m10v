@@ -8,7 +8,7 @@ export function normalizeConfiguration(value=defaultConfiguration()){
  const required=['slots','stamp','format','corner','color'],allowed=[...required,'hdf','filmNameStamp','zoom'];
  if(!value||typeof value!=='object'||Array.isArray(value)||required.some(k=>!Object.hasOwn(value,k))||Object.keys(value).some(k=>!allowed.includes(k))||!Array.isArray(value.slots)||value.slots.length!==5)throw Error('需要完整的五槽配置');
  const z=value.zoom===undefined?{write:false,slots:[35,50],revision:0}:value.zoom;
- if(!exact(z,['write','slots','revision'])||typeof z.write!=='boolean'||!Array.isArray(z.slots)||z.slots.length!==2||z.slots.some(n=>!int(n,28,100))||!int(z.revision,0,0xffffffff))throw Error('裁切焦距需要两档 28–100 mm 整数和有效写入标识');
+ if(!exact(z,['write','slots','revision'])||typeof z.write!=='boolean'||!Array.isArray(z.slots)||z.slots.length!==2||z.slots.some(n=>!int(n,28,50))||!int(z.revision,0,0xffffffff))throw Error('裁切焦距需要两档 28–50 mm 整数和有效写入标识');
  const zoom={write:z.write,slots:[...z.slots],revision:z.revision};
  const hdf=value.hdf===undefined?0:value.hdf;if(!int(hdf,0,3))throw Error('HDF 模拟档位无效');
  const slots=value.slots.map(s=>{

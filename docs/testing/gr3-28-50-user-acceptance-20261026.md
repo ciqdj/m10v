@@ -1,0 +1,5 @@
+# User acceptance and release scope · 2026-10-26
+
+User confirmed28–50 rollback functionality, then requested native-style custom focal labels. Exact delivered label candidate BIN SHA25699794ec21804aa15f83319e7bba05d67ba4b79780e6d296f909e87f33b1a8442, ZIP SHA256f0fdba4d4571053bb2278b524643f360962bc03721f2c6c00fa8ed04b3da66d6. User replied“没问题了，合入main，发布宝塔和GitHub”. This authorizes main/develop integration and Baota publication of validated28..50 two-slot behavior and native-style labels.
+
+Do not integrate failed>50 ownedLCD/AF/tracking experiments fromdaily/gr3-zoom80-fix. Preserve newer existing production film catalog and model import support during merge. Resource-ID relocation needed by newer catalog must keep native artwork and label semantics; re-run packaged widget/blitter and directory collision checks. Existing production feature validation is not inferred from this camera acceptance. Full regression previously skipped by user request; required integration/preimage/package/deployment checks still apply.

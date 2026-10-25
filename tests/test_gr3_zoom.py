@@ -23,7 +23,7 @@ static int write_page(void *ctx,unsigned page,const void *in,unsigned size){
  memcpy(pages[page],in,size);present[page]=1;writes++;return 1;
 }
 int main(void){
- for(unsigned mm=28;mm<=100;mm++){
+ for(unsigned mm=28;mm<=50;mm++){
   union {float f;unsigned u;} native={(float)mm/28.0f};
   assert(m10v_zoom_bits(mm)==native.u);
   assert(m10v_zoom_mm(native.u)==mm);
@@ -75,9 +75,9 @@ int main(void){
  corrupt_read=0;
  /* A web preset commits both slots in one journal record. */
  s=t;before=writes;fail_write=1;
- assert(m10v_zoom_replace(&t,50,80,&io)<0&&!memcmp(&s,&t,sizeof(s)));
- fail_write=0;assert(m10v_zoom_replace(&t,50,80,&io)==0&&writes==before+1);
- assert(m10v_zoom_load(&s,&io)==1&&s.mm[0]==50&&s.mm[1]==80);
+ assert(m10v_zoom_replace(&t,35,40,&io)<0&&!memcmp(&s,&t,sizeof(s)));
+ fail_write=0;assert(m10v_zoom_replace(&t,35,40,&io)==0&&writes==before+1);
+ assert(m10v_zoom_load(&s,&io)==1&&s.mm[0]==35&&s.mm[1]==40);
  /* Invalid slot and corrupted records cannot become active geometry. */
  m10v_zoom_open(&e,&t,2);assert(m10v_zoom_save(&t,&e,&io)<0);
  memset(pages,0xff,sizeof(pages));assert(m10v_zoom_load(&s,&io)==0);

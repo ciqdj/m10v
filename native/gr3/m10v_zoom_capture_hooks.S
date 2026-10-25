@@ -57,5 +57,30 @@ m10v_zoom_capture_icon_hook:
     vpop {d0}
     pop {r0-r4,lr}
     beq m10v_zoom_original_crop_icon
-    mov r0,#0
-    bx lr
+    push {r4,lr}
+    vmov r0,s0
+    bl m10v_zoom_icon_id
+    pop {r4,pc}
+/* The original draw frame owns the temporary bitmap. Eight added bytes move
+ * outgoing arguments below the owner at fp-0x80; native epilogue restores SP. */
+.global m10v_zoom_icon_draw_frame
+.type m10v_zoom_icon_draw_frame,%function
+m10v_zoom_icon_draw_frame:
+    sub sp,sp,#0x74
+    mov ip,#0
+    str ip,[fp,#-0x80]
+    ldr pc,=0x5320a7bc
+    .ltorg
+.global m10v_zoom_icon_draw_done
+.type m10v_zoom_icon_draw_done,%function
+m10v_zoom_icon_draw_done:
+    push {r0-r3,ip,lr}
+    ldr r0,[fp,#-0x80]
+    cmp r0,#0
+    beq 1f
+    bl m10v_zoom_native_icon_free
+1:
+    pop {r0-r3,ip,lr}
+    ldr r2,[fp,#-0x30]
+    ldr pc,=0x5320a9b8
+    .ltorg

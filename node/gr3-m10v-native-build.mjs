@@ -139,10 +139,17 @@ function checkRuntime(runtime, manifest) {
     need(Number.isInteger(address) && address % 4 === 0 && address >= BASE + 0x100 && address < BASE + runtime.length,
       'native symbol outside module: '+name);
   }
+  const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
+  const iconCount=focalIcons?835:manifest.sd_library?762:756,descriptorCount=(manifest.sd_library?91:85)+(focalIcons?1:0);
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,(manifest.sd_library?762:756)*4],[icons.descriptors,(manifest.sd_library?91:85)*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.descriptors===icons.table+(manifest.sd_library?762:756)*4&&icons.pixels===icons.descriptors+(manifest.sd_library?91:85)*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  for(const [address,length] of [[icons.table,iconCount*4],[icons.descriptors,descriptorCount*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.catalog_count===iconCount&&icons.descriptor_count===descriptorCount&&icons.descriptors===icons.table+iconCount*4&&icons.pixels===icons.descriptors+descriptorCount*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  if(focalIcons){
+    const f=icons.focal,descriptor=icons.descriptors+91*8,at=descriptor-BASE;
+    need(f?.first_id===762&&f.last_id===834&&f.width===60&&f.height===20&&f.descriptor===descriptor&&f.storage==='draw-owned-heap'&&f.heap_bytes===4800&&f.owner_fp_offset===-0x80&&runtime.readUInt16LE(at)===60&&runtime.readUInt16LE(at+2)===20&&runtime.readUInt32LE(at+4)===0,'native focal icon descriptor differs');
+    for(let id=762;id<=834;id++)need(runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor,'native focal directory differs');
+  }else need(icons.focal===null,'unexpected focal icons');
   for(let i=0;i<78;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
     need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
@@ -406,7 +413,7 @@ function patchList(manifest,runtime) {
       else p.replacement=0xe1a00000;
     }
   }
-  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.sd_library?761:755),name:'M10V icon maximum '+address.toString(16)});
+  for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.icons.catalog_count-1),name:'M10V icon maximum '+address.toString(16)});
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){

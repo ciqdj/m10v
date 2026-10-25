@@ -4,7 +4,7 @@ from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
 from unicorn.arm_const import *
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 BASE=0x540bc000; RAM=0x60000000; STOP=RAM+0xff000
-EXTERNAL={'m10v_zoom_camera_bits':RAM+0xf1000,'m10v_zoom_camera_slot':RAM+0xf1010,'m10v_zoom_camera_select':RAM+0xf1020,'m10v_zoom_caption':RAM+0xf1030}
+EXTERNAL={'m10v_zoom_original_front_getter':0x5324526c,'m10v_zoom_original_back_getter':0x5354a7bc,'m10v_zoom_camera_bits':RAM+0xf1000,'m10v_zoom_camera_slot':RAM+0xf1010,'m10v_zoom_camera_select':RAM+0xf1020,'m10v_zoom_caption':RAM+0xf1030}
 REGS=[UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3]
 def bits(mm):return struct.unpack('<I',struct.pack('<f',mm/28))[0]
 class ZoomLive(unittest.TestCase):

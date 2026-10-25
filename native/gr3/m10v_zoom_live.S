@@ -77,3 +77,31 @@ entry assert_trace
  pop {r0-r4,lr}
  b m10v_zoom_original_assert
 #endif
+
+/* Read-only rollback guard for persisted native ratios. Preserve all valid
+ *28..50 ratios; finite larger values read as50, malformed/nonpositive as28.
+ * No settings write or new display/AF/recipe hook. */
+.macro guard_getter name
+entry guard_\name
+ push {r4,lr}
+ bl m10v_zoom_original_\name\()_getter
+ vmov r3,s0
+ movw ip,#0
+ movt ip,#0x3f80
+ cmp r3,ip
+ blo 1f
+ movw ip,#0
+ movt ip,#0x7f80
+ cmp r3,ip
+ bhs 1f
+ movw ip,#0x9249
+ movt ip,#0x3fe4
+ cmp r3,ip
+ vmovhi s0,ip
+ pop {r4,pc}
+1:
+ vmov.f32 s0,#1.0
+ pop {r4,pc}
+.endm
+guard_getter front
+guard_getter back

@@ -13,9 +13,10 @@ SOURCES=['m10v_zoom.c',
  'm10v_zoom_live.c',
  'm10v_zoom_live.S',
  'm10v_zoom_capture.c',
+ 'm10v_zoom_icon.c',
  'm10v_zoom_capture_adapters.c',
  'm10v_zoom_capture_hooks.S']
-EXPORTS=['m10v_zoom_replace','m10v_zoom_adjust',
+EXPORTS=['m10v_zoom_icon_id','m10v_zoom_icon_decode','m10v_zoom_icon_draw_frame','m10v_zoom_icon_draw_done','m10v_zoom_guard_front','m10v_zoom_guard_back','m10v_zoom_replace','m10v_zoom_adjust',
  'm10v_zoom_bits',
  'm10v_zoom_camera_bits',
  'm10v_zoom_camera_load',
@@ -61,7 +62,7 @@ EXPORTS=['m10v_zoom_replace','m10v_zoom_adjust',
  'm10v_zoom_selected',
  'm10v_zoom_set',
  'm10v_zoom_title']
-LIVE_HOOKS=[{'address': 1394306032,
+LIVE_HOOKS=[{'address':0x5320a7b8,'link':False,'preimage':0xe24dd06c,'symbol':'m10v_zoom_icon_draw_frame'},{'address':0x5320a9b4,'link':False,'preimage':0xe51b2030,'symbol':'m10v_zoom_icon_draw_done'},{'address':0x5324526c,'preimage':0xe5903004,'symbol':'m10v_zoom_guard_front','link':False},{'address':0x5354a7bc,'preimage':0xe30f3020,'symbol':'m10v_zoom_guard_back','link':False},{'address': 1394306032,
   'link': False,
   'preimage': 3785408525,
   'symbol': 'm10v_zoom_set'},
@@ -147,7 +148,7 @@ CAPTURE_HOOKS=[{'address': 1399466544,
   'official_preimage_hex': '0dc0a0e1',
   'symbol': 'm10v_zoom_capture_replay_rect',
   'trampoline_original_instruction_then_branch': 1398728852}]
-BINDINGS={'__aeabi_uidiv': 1393809488,
+BINDINGS={'m10v_zoom_native_icon_alloc':0x536af2a8,'m10v_zoom_native_icon_free':0x536af2e4,'__aeabi_uidiv': 1393809488,
  'm10v_zoom_native_ifd_byte': 1398604988,
  'm10v_zoom_native_ifd_write_byte': 1398604468,
  'm10v_zoom_native_raw_mag': 1395144364,
@@ -155,7 +156,7 @@ BINDINGS={'__aeabi_uidiv': 1393809488,
 
 def build(base, stock, aspect=False, seed=None, debug_log=None):
     if seed is not None:
-        if not isinstance(seed,dict) or set(seed)!={'id','slots'} or len(seed['id'])!=16 or any(c not in '0123456789abcdef' for c in seed['id']) or int(seed['id'],16)==0 or len(seed['slots'])!=2 or any(type(mm)is not int or not 28<=mm<=100 for mm in seed['slots']):raise ValueError('invalid zoom seed')
+        if not isinstance(seed,dict) or set(seed)!={'id','slots'} or len(seed['id'])!=16 or any(c not in '0123456789abcdef' for c in seed['id']) or int(seed['id'],16)==0 or len(seed['slots'])!=2 or any(type(mm)is not int or not 28<=mm<=50 for mm in seed['slots']):raise ValueError('invalid zoom seed')
     flags=[] if seed is None else [f'-DM10V_ZOOM_SEED_LO=0x{seed["id"][:8]}u',f'-DM10V_ZOOM_SEED_HI=0x{seed["id"][8:]}u',f'-DM10V_ZOOM_SEED_FIRST={seed["slots"][0]}u',f'-DM10V_ZOOM_SEED_SECOND={seed["slots"][1]}u']
     flags+=[f'-DM10V_DEBUG_MODE={int(debug_log is not None)}']
     extra_hooks=[] if debug_log is None else [{'address':0x536b93d0,'preimage':0xe1a0c00d,'symbol':'m10v_zoom_assert_trace','link':False}]
@@ -172,6 +173,9 @@ def build(base, stock, aspect=False, seed=None, debug_log=None):
         bindings['m10v_debug_log']=debug_log
         entry=base+len(image);bindings['m10v_zoom_original_assert']=entry
         image+=struct.pack('<II',0xe1a0c00d,branch(entry+4,0x536b93d4))
+    for address,expected,name in [(0x5324526c,0xe5903004,'front'),(0x5354a7bc,0xe30f3020,'back')]:
+        entry=base+len(image);bindings['m10v_zoom_original_'+name+'_getter']=entry
+        image+=struct.pack('<II',expected,branch(entry+4,address+4))
     for hook in CAPTURE_HOOKS:
         name=hook['fallback_symbol'];address=hook['address']
         if name=='m10v_zoom_original_resolution' and aspect:
@@ -220,6 +224,6 @@ def build(base, stock, aspect=False, seed=None, debug_log=None):
               'native/gr3/m10v_zoom_menu.h','native/gr3/m10v_zoom_capture.h','scripts/build_gr3_zoom.py','node/gr3-zoom.mjs']
     return bytes(image),dict(schema='m10v-gr3-zoom/v1',base=base,bytes=len(image),
         symbols=symbols,bindings=bindings,patches=patches,aspect=aspect,
-        slots=2,min_mm=28,max_mm=100,title_id=1024,focal_first_id=1031,
+        slots=2,min_mm=28,max_mm=50,title_id=1024,focal_first_id=1031,
         debug_trace=debug_log is not None,seed=seed,seed_parameters=seed_parameters,
         sources={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in sources},camera_tested=False)

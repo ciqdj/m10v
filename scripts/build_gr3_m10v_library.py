@@ -631,10 +631,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         stock_directory = (ROOT/'native/gr3/m10v_stock_icon_directory.bin').read_bytes()
         icon_pixels = (ROOT/'native/gr3/m10v_icons.rgba').read_bytes()
         if len(stock_directory)!=671*4 or len(icon_pixels)!=78*6400: raise ValueError('icon inventory differs')
-        icon_count = 762 if sd_library else 756
+        focal_icons=bool(sd_library and custom_zoom)
+        icon_count = 835 if focal_icons else 762 if sd_library else 756
+        descriptor_count=(91 if sd_library else 85)+int(focal_icons)
         icon_descriptors = icon_table + icon_count*4
-        icon_data = icon_descriptors + (91 if sd_library else 85)*8
+        icon_data = icon_descriptors + descriptor_count*8
         image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(91 if sd_library else 85))
+        if focal_icons:
+            image+=struct.pack('<I',icon_descriptors+91*8)*73
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+i*6400)//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
@@ -646,6 +650,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         for width,height in [(64,16)]*4+[(400,12)]:
             image += struct.pack('<HHI',width,height,color_at//4);color_at+=width*height*4
         image += struct.pack('<HHI',40,40,color_at//4)
+        if focal_icons:image+=struct.pack('<HHI',60,20,0) # Decoded into draw-owned heap.
         image += icon_pixels
         if sd_library:
             from scripts.generate_m10v_film_cards import custom_icon
@@ -668,6 +673,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             push {r0,r1}
             mrs r0,cpsr
             ldrh r1,[r5,#0x24]
+            FOCAL_ICON_DISPATCH
             movw ip,#671
             cmp r1,ip
             blo 1f
@@ -681,7 +687,31 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             pop {r0,r1}
             ldr pc,=0x5320a838
             .ltorg
-        """.replace('ICON_LAST',str(icon_count-1)))
+        """.replace('ICON_LAST',str(icon_count-1)).replace('FOCAL_ICON_DISPATCH','movw ip,#762\n            cmp r1,ip\n            bhs .Lfocal_pixels' if focal_icons else ''))
+        if focal_icons:
+            icon_asm.write_text(icon_asm.read_text()+'''
+        .Lfocal_pixels:
+            msr cpsr_fs,r0
+            pop {r0,r1}
+            push {r0-r12,lr}
+            mrs ip,cpsr
+            push {ip,lr}
+            ldrh r0,[r5,#0x24]
+            bl m10v_zoom_icon_decode
+            cmp r0,#0
+            beq 3f
+            str r0,[fp,#-0x80]
+            str r0,[sp,#56]
+            pop {ip,lr}
+            msr cpsr_fs,ip
+            pop {r0-r12,lr}
+            ldr pc,=0x5320a838
+        3:  pop {ip,lr}
+            msr cpsr_fs,ip
+            pop {r0-r12,lr}
+            ldr pc,=0x5320a9b4
+            .ltorg
+        ''')
         if sd_library:
             # Private resources fall back to immutable 40px icons unless their
             # live view owner has published a valid RAM descriptor directory.
@@ -801,7 +831,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         offset=bytes(image).find(payload)
         if offset<0:raise ValueError('new stock LUT absent from compiled image')
         manifest['film_newstocks'].append({'film_id':73+i,'offset':offset,'bytes':len(payload),'sha256':sha(payload),'camera_calibrated':False,'film_calibrated':False})
-    manifest['icons']={'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
+    manifest['icons']={'catalog_count':icon_count,'descriptor_count':descriptor_count,'focal':{'first_id':762,'last_id':834,'width':60,'height':20,'descriptor':icon_descriptors+91*8,'storage':'draw-owned-heap','heap_bytes':4800,'owner_fp_offset':-0x80} if focal_icons else None,'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':sha(icon_pixels)}
     if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-derived-uppercase-alphanumeric-prefix-5-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')

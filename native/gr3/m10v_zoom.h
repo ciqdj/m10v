@@ -5,7 +5,7 @@
  * image geometry and per-photo metadata; this module never touches pixels. */
 #define M10V_ZOOM_BYTES 24u
 #define M10V_ZOOM_MIN_MM 28u
-#define M10V_ZOOM_MAX_MM 100u
+#define M10V_ZOOM_MAX_MM 50u
 #define M10V_ZOOM_STALE (-2)
 typedef struct { uint32_t sequence; uint16_t mm[2]; } m10v_zoom_state;
 typedef struct {

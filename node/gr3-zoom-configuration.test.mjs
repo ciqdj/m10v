@@ -8,7 +8,7 @@ test('legacy configurations preserve camera focal slots by default',()=>{
 });
 test('zoom contract rejects malformed fields even with writing disabled',()=>{
  for(const zoom of [null,{}, {write:1,slots:[35,50],revision:0},{write:false,slots:[35],revision:0},{write:false,slots:[28,100.1],revision:0},{write:false,slots:['35',50],revision:0},{write:false,slots:[27,50],revision:0},{write:false,slots:[35,101],revision:0},{write:false,slots:[35,50],revision:-1},{write:false,slots:[35,50],revision:2**32},{write:false,slots:[35,50],revision:0,extra:1}])assert.throws(()=>normalizeConfiguration({...defaultConfiguration(),zoom}));
- assert.deepEqual(normalizeConfiguration({...defaultConfiguration(),zoom:{write:true,slots:[100,28],revision:0xffffffff}}).zoom.slots,[100,28]);
+ assert.deepEqual(normalizeConfiguration({...defaultConfiguration(),zoom:{write:true,slots:[50,28],revision:0xffffffff}}).zoom.slots,[50,28]);
 });
 test('each opt-in prepare refreshes nonzero revision and snapshots remain independent',()=>{
  const config=defaultConfiguration();config.zoom.write=true;let seed=0;
@@ -25,8 +25,8 @@ test('native preflight binds opt-in focal slots and rejects unsupported models',
  const {normalizeGr4Request}=await import('./gr4-m10v-native-build.mjs');
  const source=await readNativeOfficial('gr3'),off=defaultConfiguration();
  const original=prepareNative(source,off);assert.equal(original.zoom_seed,null);
- const on={...off,zoom:{write:true,slots:[50,80],revision:1}};
- const first=prepareNative(source,on);assert.deepEqual(first.zoom_seed.slots,[50,80]);
+ const on={...off,zoom:{write:true,slots:[40,50],revision:1}};
+ const first=prepareNative(source,on);assert.deepEqual(first.zoom_seed.slots,[40,50]);
  assert.notEqual(first.configuration_sha256,original.configuration_sha256);
  const second=prepareNative(source,{...on,zoom:{...on.zoom,revision:2}});
  assert.notEqual(first.zoom_seed.id,second.zoom_seed.id);

@@ -12,12 +12,12 @@ export function renderZoomControls(root,configuration,model,onChange,busy=false)
  toggle.onchange=()=>onChange(normalizeConfiguration({...configuration,zoom:{...configuration.zoom,write:toggle.checked}}));
  const fields=make('div');fields.className='stamp-fields';
  configuration.zoom.slots.forEach((mm,index)=>{
-  const field=make('label',`第 ${index+1} 档（mm）`),input=make('input');input.type='number';input.min='28';input.max='100';input.step='1';input.value=String(mm);input.required=true;input.disabled=busy||!configuration.zoom.write;
+  const field=make('label',`第 ${index+1} 档（mm）`),input=make('input');input.type='number';input.min='28';input.max='50';input.step='1';input.value=String(mm);input.required=true;input.disabled=busy||!configuration.zoom.write;
   input.setAttribute('aria-label',`裁切焦距第 ${index+1} 档（mm）`);
   input.oninput=()=>input.setCustomValidity('');
   input.onchange=()=>{
    const value=Number(input.value);
-   if(input.value.trim()===''||!Number.isInteger(value)||value<28||value>100){input.setCustomValidity('请输入 28–100 的整数焦距');input.reportValidity();return;}
+   if(input.value.trim()===''||!Number.isInteger(value)||value<28||value>50){input.setCustomValidity('请输入 28–50 的整数焦距');input.reportValidity();return;}
    input.setCustomValidity('');const slots=[...configuration.zoom.slots];slots[index]=value;
    onChange(normalizeConfiguration({...configuration,zoom:{...configuration.zoom,slots}}));
   };
@@ -30,5 +30,5 @@ export function renderZoomControls(root,configuration,model,onChange,busy=false)
 
 export function validateZoomControls(root){
  const invalid=root?.querySelector('input:invalid');
- if(invalid){invalid.reportValidity();throw Error('请输入 28–100 的整数裁切焦距');}
+ if(invalid){invalid.reportValidity();throw Error('请输入 28–50 的整数裁切焦距');}
 }
