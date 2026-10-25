@@ -13,7 +13,7 @@ typedef struct {
  * The five installed films occupy their existing real carrier positions. */
 static inline uint32_t m10v_ab_tone(uint32_t choice){
  static const uint8_t tones[12]={11,12,13,14,15,16,22,17,18,19,20,21};
- if(M10V_APPENDED_SLOTS&&choice>=12&&choice<17)return 25+choice-12;
+ if(M10V_APPENDED_SLOTS&&choice>=12&&choice<22)return 25+choice-12;
  return choice<12?tones[choice]:0;
 }
 static inline uint32_t m10v_ab_slot(uint32_t choice){
@@ -31,7 +31,10 @@ static inline const char *m10v_ab_stock_name(uint32_t choice){
 static inline uint32_t m10v_ab_caption(uint32_t choice,uint32_t film){
  static const uint16_t stock[12]={4,268,269,270,271,272,273,274,275,276,277,278};
  if(choice>=M10V_TONE_CHOICES)return 4;
- if(m10v_ab_slot(choice)>=5)return stock[choice];
+ if(m10v_ab_slot(choice)>=M10V_SLOT_COUNT)return choice<12?stock[choice]:4;
+ if(M10V_D76(film))return 1130+film-M10V_D76_FIRST;
+ if(film==M10V_5213_ID)return 1128;
+ if(M10V_STYLE(film))return 1104+film-M10V_STYLE_FIRST;
  if(film==M10V_PIXEL_ID)return 1023;
  if(film==M10V_CHAR_ID)return 1012;
  if(film>=1&&film<=32)return 785+film;
@@ -43,7 +46,7 @@ static inline uint32_t m10v_ab_caption(uint32_t choice,uint32_t film){
  return 997+m10v_ab_slot(choice);
 }
 static inline int m10v_ab_start(m10v_ab *s,uint32_t a,uint32_t b,uint32_t current,uint32_t fa,uint32_t fb){
- if(a>=M10V_TONE_CHOICES||b>=M10V_TONE_CHOICES||a==b||(m10v_ab_slot(a)<5&&!fa)||(m10v_ab_slot(b)<5&&!fb)){s->enabled=0;return -1;}
+ if(a>=M10V_TONE_CHOICES||b>=M10V_TONE_CHOICES||a==b||(m10v_ab_slot(a)<M10V_SLOT_COUNT&&!fa)||(m10v_ab_slot(b)<M10V_SLOT_COUNT&&!fb)){s->enabled=0;return -1;}
  s->a=a;s->b=b;s->film_a=fa;s->film_b=fb;
  s->selected=current==b?b:a;s->down=0;s->enabled=1;return 0;
 }

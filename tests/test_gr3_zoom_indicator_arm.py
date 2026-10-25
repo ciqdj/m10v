@@ -65,11 +65,18 @@ class ZoomIndicatorArmTests(unittest.TestCase):
    u=self.machine();ctl,widget,state,vt=RAM+0x10000,RAM+0x20000,RAM+0x30000,RAM+0x40000
    for address,value in [(ctl+0x15c,widget),(ctl+0x4e8,state),(state+0xaf0,bits(mm/28)),(widget,vt),(vt+0x20,RAM+0x50000)]:u.mem_write(address,struct.pack('<I',value))
    u.mem_write(RAM+0x50000,struct.pack('<I',0xe12fff1e));self.execute(u,0x53171904,ctl,0,1)
-   self.assertEqual(struct.unpack('<H',u.mem_read(widget+0xea,2))[0],{28:0,35:452,50:89}.get(mm,762+mm-28));self.assertEqual(u.mem_read(widget+0x9e,1)[0],int(mm!=28))
+   self.assertEqual(struct.unpack('<H',u.mem_read(widget+0xea,2))[0],{28:0,35:452,50:89}.get(mm,782+mm-28));self.assertEqual(u.mem_read(widget+0x9e,1)[0],int(mm!=28))
+ def test_native_directory_preserves_existing_film_icons(self):
+  u=self.machine()
+  for id in [*range(762,769),*range(774,782),782+40-28]:
+   expected=(60,20) if id==782+40-28 else (40,40)
+   for entry,value in zip((0x53209fb8,0x53209fec),expected):
+    self.execute(u,entry,RAM+0x1000,id)
+    self.assertEqual(u.reg_read(A.UC_ARM_REG_R0),value,(id,hex(entry)))
  def draw(self,mm,oom=False,angle=0):
   u=self.machine(oom);ctx,draw,surface=RAM+0x1000,RAM+0x2000,RAM+0x3000
   u.mem_write(ctx,struct.pack('<I',0x57000000));u.mem_write(surface+2,b'\x05');u.mem_write(surface+0x18,struct.pack('<H',60))
-  u.mem_write(draw,struct.pack('<I',surface));u.mem_write(draw+4,struct.pack('<4I',0,0,60,20));u.mem_write(draw+0x14,struct.pack('<4I',0,0,60,20));u.mem_write(draw+0x24,struct.pack('<Hi',762+mm-28,0))
+  u.mem_write(draw,struct.pack('<I',surface));u.mem_write(draw+4,struct.pack('<4I',0,0,60,20));u.mem_write(draw+0x14,struct.pack('<4I',0,0,60,20));u.mem_write(draw+0x24,struct.pack('<Hi',782+mm-28,0))
   u.mem_write(draw+0x28,struct.pack('<i',angle));u.mem_write(RAM+0x70000,b'\x33'*4800)
   saved={getattr(A,'UC_ARM_REG_R'+str(i)):0x10203040+i for i in range(4,12)}
   for reg,value in saved.items():u.reg_write(reg,value)

@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,7 +41,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         wrapper = Path(cls.tmp.name) / 'date_probe.c'
         wrapper.write_text('#include "' + str(ROOT / 'native/gr3/m10v_library.c') + '"\nuint32_t m10v_test_date(char *out,const m10v_library_date *date,uint32_t format,uint32_t mode){return date_text(out,date,format,mode); }\nvoid m10v_test_stamp(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name){stamp(image,state,date,name); }\nvoid m10v_test_line(m10v_library_image *image,const m10v_library_state *state,const char *text){stamp_line(image,state,text,1,0,0,108);}')
         subprocess.run([shutil.which('clang') or 'clang', '-O2', '-Wall', '-Wextra', '-Werror',
-                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'), '-o', str(out)],
+                        '-dynamiclib', str(wrapper), str(ROOT / 'native/gr3/halation_core.c'), str(ROOT/'native/gr3/film_5207.c'),str(ROOT/'native/gr3/film_harman.c'),str(ROOT/'native/gr3/film_curated.c'),str(ROOT/'native/gr3/film_newstocks.c'),str(ROOT/'native/gr3/film_style_filters_0.c'),str(ROOT/'native/gr3/film_style_filters_1.c'),str(ROOT/'native/gr3/film_d76_0.c'),str(ROOT/'native/gr3/film_d76_1.c'), '-o', str(out)],
                        check=True, capture_output=True)
         cls.lib = C.CDLL(str(out))
         cls.lib.m10v_test_line.argtypes = [C.POINTER(Image), C.POINTER(State), C.c_char_p]
@@ -67,11 +68,12 @@ class NativeFilmLibraryTests(unittest.TestCase):
         off()
         for film in list(range(33,79))+[289]:
             self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,film,ok,None),0);off()
-            self.assertEqual(self.lib.m10v_library_texture(C.byref(state),0,3,0,ok,None),0)
+            grain=0 if film==289 else 3
+            self.assertEqual(self.lib.m10v_library_texture(C.byref(state),0,grain,0,ok,None),0)
             if film not in (66,68):self.assertEqual(self.lib.m10v_library_halation(C.byref(state),0,6,3,5,2,ok,None),0)
             saved=bytes(state)
             self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,film,ok,None),0)
-            self.assertEqual(state.slots[0].grain,3);self.assertEqual(state.slots[0].halo_gain,0 if film in (66,68) else 6)
+            self.assertEqual(state.slots[0].grain,grain);self.assertEqual(state.slots[0].halo_gain,0 if film in (66,68) else 6)
             self.assertEqual(self.lib.m10v_library_reset(C.byref(state),0,ok,None),0);off()
             self.assertNotEqual(bytes(state),saved)
 
@@ -88,7 +90,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
             self.assertEqual(list(y),[96,96,176,176,240,240,91,92]*3)
             self.assertEqual(list(uv),([128]*6+[81,82])*3)
         before=bytes(state)
-        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,291,ok,None),-1)
+        self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,298,ok,None),-1)
         self.assertEqual(bytes(state),before)
 
     def test_charmera_colors_are_atomic_per_slot_and_render_preserves_padding(self):
@@ -131,7 +133,9 @@ class NativeFilmLibraryTests(unittest.TestCase):
     def test_selecting_new_custom_film_does_not_inherit_previous_light_leak(self):
         state=self.state();ok=STORE(lambda ctx,next:0)
         self.lib.m10v_library_effects.argtypes=[C.POINTER(State),C.c_uint32,C.c_uint32,C.c_uint32,STORE,C.c_void_p]
-        self.assertEqual(self.lib.m10v_library_effects(C.byref(state),0,1,8,ok,None),0)
+        # Imported old journal remains readable; selection retires its leak.
+        state.effects[0][1]=8;state.crc=zlib.crc32(bytes(state)[:-4])
+        self.assertEqual(self.lib.m10v_library_valid(C.byref(state)),1)
         self.assertEqual(self.lib.m10v_library_select_custom(C.byref(state),0,79,0,ok,None),0)
         self.assertEqual(state.effects[0][1],0)
 
@@ -254,7 +258,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
         self.assertEqual(self.render(image, state, scratch), 0)
         self.assertEqual((bytes(y), bytes(uv), bytes(scratch)), before)
 
-    def test_color_preset_changes_color_and_grain_is_seeded_and_bounded(self):
+    def test_color_preset_changes_color_and_cpu_ignores_native_grain(self):
         @STORE
         def save(_, proposed): return 0
         state = self.state()
@@ -270,7 +274,7 @@ class NativeFilmLibraryTests(unittest.TestCase):
             outputs.append(bytes(y)); self.assertEqual(bytes(uv), bytes(self.image()[2]))
             for row in range(image.height): self.assertEqual(bytes(y[row * image.stride + 128:(row + 1) * image.stride]), bytes([173] * 8))
             self.assertEqual(bytes(y)[image.y_bytes:], bytes([173] * 32))
-        self.assertEqual(outputs[0], outputs[1]); self.assertNotEqual(outputs[0], outputs[2])
+        self.assertEqual(outputs[0], outputs[1]); self.assertEqual(outputs[0], outputs[2])
 
     def test_retired_soft_does_not_spread_highlight_or_touch_chroma_or_scratch(self):
         @STORE

@@ -14,7 +14,8 @@ typedef struct {
  * All regions must be disjoint. Invalid inputs leave all regions untouched.
  * control: legacy 0 off, 1 weak, 2 natural; or bit31 plus five 0..8 nibbles
  * at bits0/4/8/12/16: gain/radius/threshold/grain/profile. Other bits zero.
- * Profile0 disables halo,1..2 weak,3..5 natural,6..8 strong. Grain is independent.
+ * Profile0 disables halo,1..2 weak,3..5 natural,6..8 strong. The historical
+ * grain nibble is validated for ABI compatibility and has no pixel effect.
  * No allocation, I/O or camera API calls. */
 int m10v_halation(const m10v_halo_image *image, uint32_t strength,
                   uint8_t *scratch, uint32_t scratch_bytes);

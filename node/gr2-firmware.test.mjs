@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
 const moduleURL = new URL('./gr2-firmware.mjs', import.meta.url);
-const sample = new URL('../bin/rg2_v003/rg2_v003.frm', import.meta.url);
+const sample = new URL('../bin/rg2_v003.frm', import.meta.url);
 async function implementation() {
   assert.ok(existsSync(moduleURL), 'GR II UNITY inspector is not implemented');
   return import(moduleURL);

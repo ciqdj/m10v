@@ -10,7 +10,7 @@
  * this stores cursor/lifetime state, never a second canvas or controller. */
 typedef struct {
  uint32_t controller,mode,origin,source,position,offset,rebuilding,back_pending;
- uint32_t level,focus,a,b,error,films[5];
+ uint32_t level,focus,a,b,error,films[M10V_SLOT_COUNT];
 } m10v_native_ab_host;
 /* Two instances are embedded after the original TopMenu object, never placed
  * in undocumented RAM or freed independently from their owner. */
@@ -27,7 +27,7 @@ typedef struct {
 } m10v_settings_controller;
 _Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");
 #define M10V_SETTINGS_OWNER_BYTES 0x13bcu
-#define M10V_SETTINGS_CONTROLLER_BYTES 0x2c0u
+#define M10V_SETTINGS_CONTROLLER_BYTES 0x6c0u
 _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,"controller tail capacity");
 #define M10V_SETTINGS_FILMS_ROUTE 0x0200f100u
 #define M10V_SETTINGS_STAMP_ROUTE 0x0200f101u

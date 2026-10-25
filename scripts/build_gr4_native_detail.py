@@ -6,9 +6,8 @@ import hashlib, struct
 from scripts.build_gr3_menu_patches import assembly, branch, movw
 BASE=0x53000000
 RTOS_SHA256="a9a9a51530c35819df47dee1cce9f4f560a17eeed1da258950167d282884fce1"
-FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Soft Diffusion','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure']
-DETAIL_IDS={'halo':list(range(19,29)),'common':list(range(22,29)),'red':list(range(22,30))}
-DETAIL_IDS['phoenix']=list(range(19,30))
+FIELDS=['Halation Gain','Halation Spread','Highlight Gate','','','','','','','','RED Exposure']
+DETAIL_IDS={'halo':[19,20,21],'common':[],'red':[29],'phoenix':[19,20,21,29]}
 STOCK_TABLE_ADDRESS=0x53d9a458
 STOCK_CAPTIONS_ADDRESS=0x53d9a724
 
@@ -43,7 +42,7 @@ def build_detail(base,symbols,rtos=None):
  table_address=tables['halo']
  # Existing resource extension occupies IDs786..910. Reuse its text descriptors
  # for three captions, Grain and Soft Diffusion, avoiding another global hook.
- caption_ids=[i+238 for i in [862,863,864,827,828,913,914,915,916,917,933]]
+ caption_ids=[i+238 for i in [862,863,864,913,913,913,913,913,913,913,933]]
  captions=data(rtos[STOCK_CAPTIONS_ADDRESS-BASE:STOCK_CAPTIONS_ADDRESS-BASE+76]+b''.join(struct.pack('<HH',i,i) for i in caption_ids),'detail caption pairs')
  # Each call site has already saved LR in the genuine stock prologue.
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:
@@ -99,7 +98,7 @@ def build_detail(base,symbols,rtos=None):
  exposure_dispatch=stub('push {r0,r4,r12,lr};mov r1,r0;mov r0,#9;mov r2,#0;bl '+hex(control)+';cmp r0,#1;pop {r0,r4,r12,lr};beq '+hex(sliders[1])+';b '+hex(sliders[2]),'film-specific exposure range')
  entries['exposure_dispatch']=exposure_dispatch
  dispatch=''
- for id in range(19,30):
+ for id in (19,20,21,29):
   maximum=[8,8,8,3,3,2,8,5,8,1,2][id-19]
   destination=exposure_dispatch if id==29 else sliders[maximum]
   dispatch+=f'cmp ip,#{id};beq {hex(destination)};'
@@ -123,4 +122,4 @@ def build_detail(base,symbols,rtos=None):
  word(0x531ca76c,0xe350001d,'detail caption range')
  word(0x531ca7c0,movw(3,captions&65535),'detail captions low')
  word(0x531ca7c4,movw(3,captions>>16,True),'detail captions high')
- return bytes(image),{'patches':patches,'schema':'m10v-gr4-native-detail/v1','tables':table_address,'captions':captions,'entries':entries,'fields':FIELDS,'ids':list(range(19,30)),'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[500,488,413,493,595,1102,424,596,381,50,647],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}
+ return bytes(image),{'patches':patches,'schema':'m10v-gr4-native-detail/v1','tables':table_address,'captions':captions,'entries':entries,'fields':[f for f in FIELDS if f],'ids':[19,20,21,29],'variant_ids':DETAIL_IDS,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[500,488,413,493,595,1102,424,596,381,50,647],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'camera_tested':False}

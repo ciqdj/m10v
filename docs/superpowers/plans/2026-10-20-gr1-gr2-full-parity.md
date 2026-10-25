@@ -18,7 +18,7 @@
 - 不关闭 bExecVerify/bCompareCsum 来代替校验重算；不猜注入空间或复制 GR3/GR4 地址。
 - RAW CFA 保持原始内容；取景与 RAW 再开发遵循当前 GR3/GR4 范围。
 - 官方样本、提取资源和候选二进制保持 Git 忽略；不自动推送、部署、写 SD 或操作相机。
-- 本计划与设计待审阅；研究候选和离线通过不能标记为实机完成。
+- 本计划与设计已于 2026-10-20 获用户批准，当前会话直接实施；研究候选和离线通过不能标记为实机完成。
 
 ## Review Focus
 
@@ -36,9 +36,9 @@
 
 **Interfaces:** JSON schema `m10v-unity-parity/v1`; each row `{id, baseline_files, models: {gr1,gr2}}`; each model row `{status, implementation_files, evidence_files, automated_checks, browser_evidence, hardware_status, limitation}`. CLI `node scripts/check_unity_parity.mjs` checks required fields; `--complete` rejects researching rows or unsupported claims without limitation evidence.
 
-- [ ] Enumerate every existing control and builder option, including film name imprint, named LUT, exposure variants, power images, version strategy, SD operations, drafts and cancellation; group using the spec without dropping small options.
-- [ ] Implement the checker; exercise a missing baseline ID and a `proven_unavailable` row without evidence; both must fail, while an honest research ledger passes the structural check.
-- [ ] Record all current GR/GR II rows as researching except proved inventory/header operations; run the checker and commit this independently reviewable ledger.
+- [x] Enumerate every existing control and builder option, including film name imprint, named LUT, exposure variants, power images, version strategy, SD operations, drafts and cancellation; group using the spec without dropping small options.
+- [x] Implement the checker; exercise a missing baseline ID and a `proven_unavailable` row without evidence; both must fail, while an honest research ledger passes the structural check.
+- [x] Record all current GR/GR II rows as researching except proved inventory/header operations; run the checker and commit this independently reviewable ledger.
 
 ### Task 2: 双机型严格解析与真实样本回归
 
@@ -46,10 +46,10 @@
 
 **Interfaces:** `decodeUnity(data: Buffer, depth?: number)` preserves the current return shape; `inspectUnityModel(data: Buffer, model: 'gr1'|'gr2') -> Inventory`; `readUnityModelComponent(data, model, name) -> Buffer`; wrappers preserve `inspectGr2`/`readGr2Component`, add `inspectGr1`/`readGr1Component`. Profile fields include exact input/component hashes and resource directory offset/count from the research record.
 
-- [ ] Add failing tests: GR 5.01/119 resources at 0x654000, GR II 3.00/121 at 0x786000, corrected +512 payload offsets; same-name wrong-model components and a one-byte changed official image are rejected.
-- [ ] Run `node --test node/gr1-firmware.test.mjs node/unity-firmware.test.mjs node/gr2-firmware.test.mjs node/model-firmware.test.mjs`; confirm failures identify missing interfaces or old sample path.
-- [ ] Extract the existing codec without semantic changes; add exact profiles/wrappers and root sample paths; support explicit research extraction without enabling writes. Assert header/resource overlap, nested depth, duplicates, truncation and both byte-exact roundtrips.
-- [ ] Re-run the focused command. Both provided samples must execute real integration cases with no sample-path skips; compare extraction SHA to the research record, update ledger and commit.
+- [x] Add failing tests: GR 5.01/119 resources at 0x654000, GR II 3.00/121 at 0x786000, corrected +512 payload offsets; same-name wrong-model components and a one-byte changed official image are rejected.
+- [x] Run `node --test node/gr1-firmware.test.mjs node/unity-firmware.test.mjs node/gr2-firmware.test.mjs node/model-firmware.test.mjs`; confirm failures identify missing interfaces or old sample path.
+- [x] Extract the existing codec without semantic changes; add exact profiles/wrappers and root sample paths; support explicit research extraction without enabling writes. Assert header/resource overlap, nested depth, duplicates, truncation and both byte-exact roundtrips.
+- [x] Re-run the focused command. Both provided samples must execute real integration cases with no sample-path skips; compare extraction SHA to the research record, update ledger and commit.
 
 ### Task 3: 修改校验与加载映射证明
 
@@ -57,9 +57,9 @@
 
 **Interfaces:** `analyze_update(component: bytes, model: str) -> dict` returns identity-locked header/verify/checksum evidence; `analyze_runtime(component: bytes, model: str) -> dict` returns proved file-to-runtime segments, startup operations and original instruction hashes. Reports distinguish candidates from contracts; neither exports a firmware writer.
 
-- [ ] Port the three header cases to independent model profiles: GR entry 0xA0053994, copy 0xA009DB2C, compare 0xA009D72C; GR II entry 0xA0057684, copy 0xA00A027C, compare 0xA009FE7C. Verify wrong component identity fails before emulation.
-- [ ] Follow official verification call sites and data reads to identify checksum coverage, initialization, finalization, block and tail behavior; execute original checksum instructions against synthetic buffers. Save exact disassembly and caller evidence; do not mark checksum proved based only on matching examples.
-- [ ] Add original-value assertions for all four components: 0x7C565038, 0x7B62E1A9, 0xA3A80234, 0x826A5E33. Compare CPU results on byte mutations, 0/1/3/4/511/512/513-byte lengths where caller permits them, and a mutation outside the covered interval. Invalid caller lengths must be rejected.
+- [x] Port the three header cases to independent model profiles: GR entry 0xA0053994, copy 0xA009DB2C, compare 0xA009D72C; GR II entry 0xA0057684, copy 0xA00A027C, compare 0xA009FE7C. Verify wrong component identity fails before emulation.
+- [x] Follow official verification call sites and data reads to identify checksum coverage, initialization, finalization, block and tail behavior; execute original checksum instructions against synthetic buffers. Save exact disassembly and caller evidence; do not mark checksum proved based only on matching examples.
+- [x] Add original-value assertions for all four components: 0x7C565038, 0x7B62E1A9, 0xA3A80234, 0x826A5E33. Compare CPU results on byte mutations, 0/1/3/4/511/512/513-byte lengths where caller permits them, and a mutation outside the covered interval. Invalid caller lengths must be rejected.
 - [ ] Follow startup copy/zero operations for each load record; prove aux semantics and component roles; exercise copied data, untouched sentinels and entry selection. Do not infer runtime mapping from header field names alone.
 - [ ] Run `.venv/bin/python -m unittest tests.test_unity_update tests.test_unity_runtime`; publish reproducible CPU limits and maps, update ledger and commit. If an algorithm/map is unresolved, retain researching status and continue reverse analysis; dependent writes remain unavailable.
 

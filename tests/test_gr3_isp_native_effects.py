@@ -14,34 +14,9 @@ class NativeEffectsTests(unittest.TestCase):
         so=Path(cls.temp.name)/'effects.dylib'
         subprocess.run(['clang','-shared','-Wall','-Wextra','-Werror','-O2',str(ROOT/'native/gr3/m10v_isp_native_effects.c'),'-o',str(so)],check=True,capture_output=True)
         cls.lib=C.CDLL(str(so))
-        cls.lib.m10v_isp_native_effects_noise_shape.argtypes=[C.c_void_p]+[C.c_uint32]*5
         cls.lib.m10v_isp_native_effects_settings.argtypes=[C.c_void_p,C.c_void_p,C.POINTER(Config)]
-        cls.lib.m10v_isp_native_effects_field.argtypes=[C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32,C.c_uint32,C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32,C.c_uint32]
     @classmethod
     def tearDownClass(cls):cls.temp.cleanup()
-    def test_noise_shape_zero_preserves_rng_and_rejects_invalid_shapes(self):
-        fn=self.lib.m10v_isp_native_effects_noise_shape
-        fn.argtypes=[C.c_void_p]+[C.c_uint32]*5
-        data=(C.c_uint8*64)(*range(64));before=bytes(data)
-        self.assertEqual(fn(data,64,8,8,8,0),0)
-        self.assertEqual(bytes(data),before)
-        for args in [(data,63,8,8,8,1),(data,64,8,8,8,3),(data,64,9,8,8,1)]:
-            self.assertEqual(fn(*args),-1);self.assertEqual(bytes(data),before)
-    def test_noise_shape_sizes_retain_mean_variance_and_correlate(self):
-        import random,statistics
-        rng=random.Random(123);w,h,stride=257,211,272
-        initial=bytes(rng.randrange(256) for _ in range(stride*h))
-        values=[]
-        for size in (0,1,2):
-            data=(C.c_uint8*len(initial)).from_buffer_copy(initial)
-            self.assertEqual(self.lib.m10v_isp_native_effects_noise_shape(data,len(initial),w,h,stride,size),0)
-            interior=[data[y*stride+x] for y in range(8,h) for x in range(8,w)]
-            mean=statistics.mean(interior);var=statistics.pvariance(interior)
-            self.assertLess(abs(mean-127.5),3.0);self.assertLess(abs(var/(65535/12)-1),0.06)
-            corr=sum((data[y*stride+x]-mean)*(data[y*stride+x-1]-mean) for y in range(8,h) for x in range(8,w))/len(interior)/var
-            values.append(corr)
-            for y in range(h):self.assertEqual(bytes(data[y*stride+w:(y+1)*stride]),initial[y*stride+w:(y+1)*stride])
-        self.assertLess(abs(values[0]),0.03);self.assertGreater(values[1],0.35);self.assertGreater(values[2],values[1]+0.12)
     def test_settings_selective_transaction_and_scale_preserved(self):
         src=(C.c_int16*6)(-1,2,3,1,0x1234,0x5678);dst=(C.c_int16*6)(*([91]*6))
         cfg=Config(6,(C.c_int16*4)(0,-3,2,0))
@@ -50,38 +25,9 @@ class NativeEffectsTests(unittest.TestCase):
         cfg.value[2]=4
         self.assertEqual(self.lib.m10v_isp_native_effects_settings(dst,src,C.byref(cfg)),-1)
         self.assertEqual(list(dst),[-1,-3,2,1,0x1234,0x5678])
-    def test_field_bilinear_preserves_padding_and_original_noise_endpoint(self):
-        field=(C.c_uint8*4)(0,100,100,200);buf=(C.c_uint8*15)(*([77]*15))
-        fn=self.lib.m10v_isp_native_effects_field
-        self.assertEqual(fn(buf,15,3,3,5,field,2,2,2,0),0)
-        self.assertEqual(list(buf),[0,50,100,77,77,50,100,150,77,77,100,150,200,77,77])
-        before=bytes(buf)
-        self.assertEqual(fn(buf,15,3,3,5,field,2,2,2,255),0)
-        self.assertEqual(bytes(buf),before)
-    def test_preflight_rejects_alias_and_partial_capacity_without_writing(self):
-        buf=(C.c_uint8*16)(*range(16));before=bytes(buf);fn=self.lib.m10v_isp_native_effects_field
-        for args in [(buf,15,4,4,4,buf,2,2,2,0),(buf,16,4,4,4,buf,2,2,2,0),(buf,16,4,4,4,buf,2,2,2,256)]:
-            self.assertEqual(fn(*args),-1);self.assertEqual(bytes(buf),before)
-    def test_full_width_field_matches_independent_coordinate_oracle(self):
-        import random
-        rng=random.Random(29);w,h,stride=6000,3,6016
-        fw,fh,fs=7,2,9;field=(C.c_uint8*(fs*fh))(*[rng.randrange(256) for _ in range(fs*fh)])
-        initial=bytes(rng.randrange(256) for _ in range(stride*h));buf=(C.c_uint8*len(initial)).from_buffer_copy(initial)
-        self.assertEqual(self.lib.m10v_isp_native_effects_field(buf,len(buf),w,h,stride,field,fw,fh,fs,91),0)
-        for y in range(h):
-            py=y*(fh-1)*256//(h-1);iy,dy=divmod(py,256);jy=min(iy+1,fh-1)
-            for x in range(w):
-                px=x*(fw-1)*256//(w-1);ix,dx=divmod(px,256);jx=min(ix+1,fw-1)
-                top=field[iy*fs+ix]*(256-dx)+field[iy*fs+jx]*dx
-                bot=field[jy*fs+ix]*(256-dx)+field[jy*fs+jx]*dx
-                v=(top*(256-dy)+bot*dy+32768)>>16
-                expected=(initial[y*stride+x]*91+v*164+127)//255
-                self.assertEqual(buf[y*stride+x],expected)
-            self.assertEqual(bytes(buf[y*stride+w:(y+1)*stride]),initial[y*stride+w:(y+1)*stride])
-    def test_singleton_field_and_skinny_full_resolution(self):
-        field=(C.c_uint8*1)(137);buf=(C.c_uint8*6000)()
-        self.assertEqual(self.lib.m10v_isp_native_effects_field(buf,6000,6000,1,6000,field,1,1,1,0),0)
-        self.assertEqual(set(buf),{137})
+    def test_cpu_field_and_noise_size_exports_are_removed(self):
+        self.assertFalse(hasattr(self.lib,'m10v_isp_native_effects_noise_shape'))
+        self.assertFalse(hasattr(self.lib,'m10v_isp_native_effects_field'))
 
 class NativeEffectsArmTests(unittest.TestCase):
     """Native ARM pointer layouts, no stock service or hardware double."""

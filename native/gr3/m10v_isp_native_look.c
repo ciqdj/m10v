@@ -2,10 +2,12 @@
 #include "m10v_isp_multiaxis.h"
 #include "m10v_library.h"
 #include "m10v_isp_native_look_profiles.h"
+#include "m10v_spectral_native_profiles.h"
+#include "m10v_d76_native_profiles.h"
 #include <stddef.h>
 _Static_assert(sizeof(m10v_isp_native_look)==1600,"bounded recipe color storage");
 _Static_assert(sizeof(native_frame_packed)==48,"lossless profile storage");
-static int supported(uint32_t film,uint32_t exposure){return film==M10V_CHAR_ID?exposure<4:film>=33&&film<=78&&exposure<3&&(film==68||(film==67&&exposure==1)||!exposure);}
+static int supported(uint32_t film,uint32_t exposure){return film==M10V_CHAR_ID?exposure<4:(M10V_D76(film)||film==M10V_5213_ID||M10V_STYLE(film)||(film>=33&&film<=78))&&exposure<3&&(film==68||(film==67&&exposure==1)||!exposure);}
 int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t exposure,uint32_t generation){
  if(!s)return 0;
  s->magic=M10V_ISP_NATIVE_LOOK_MAGIC;s->version=M10V_ISP_NATIVE_LOOK_VERSION;
@@ -21,6 +23,23 @@ int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t 
    s->target.matrix_q13[r*3+c]=luma[c];s->target.post_q9[r*3+c]=r==c?512:0;
   }
   for(uint32_t c=0;c<3;c++)for(uint32_t i=0;i<256;i++)s->target.curves[c][i]=i<128?0:palette[exposure][c];
+ }
+ else if(film==77||film==M10V_5213_ID){
+  const m10v_isp_frame_target *t=&native_spectral_frame[film==77?0:1];
+  for(uint32_t i=0;i<9;i++){s->target.matrix_q13[i]=t->matrix_q13[i];s->target.post_q9[i]=t->post_q9[i];}
+  for(uint32_t c=0;c<3;c++)for(uint32_t i=0;i<256;i++)s->target.curves[c][i]=t->curves[c][i];
+ }
+ else if(M10V_D76(film)){
+  const m10v_isp_frame_target *t=&native_d76_frame[film-M10V_D76_FIRST];
+  for(uint32_t i=0;i<9;i++){s->target.matrix_q13[i]=t->matrix_q13[i];s->target.post_q9[i]=t->post_q9[i];}
+  for(uint32_t c=0;c<3;c++)for(uint32_t i=0;i<256;i++)s->target.curves[c][i]=t->curves[c][i];
+ }
+ else if(M10V_STYLE(film)){
+  /* Full curves preserve steep community LUT transitions without changing the
+   * historical 8-bit delta stream ABI used by the existing packed profiles. */
+  const m10v_isp_frame_target *t=&native_style_filters_frame[film-M10V_STYLE_FIRST];
+  for(uint32_t i=0;i<9;i++){s->target.matrix_q13[i]=t->matrix_q13[i];s->target.post_q9[i]=t->post_q9[i];}
+  for(uint32_t c=0;c<3;c++)for(uint32_t i=0;i<256;i++)s->target.curves[c][i]=t->curves[c][i];
  }
  else if(film>=34&&film<=65){uint16_t knots[99];if(m10v_library_tables(film,s->target.matrix_q13,s->target.post_q9,&s->target.curves[0][0],knots))return 0;}
  else {
@@ -44,7 +63,7 @@ int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t 
 /* Keep the sector workspace out of the frame gamma packer call chain. */
 static __attribute__((noinline)) void apply_native_sectors(void *frame,uint32_t film,uint32_t exposure){
   m10v_isp_multiaxis_target t;
-  const int16_t *h=film>=73?native_newstocks_hue[film-73]:film>=69?native_curated_hue[film-69]:film==66?native_5207_hue:exposure?native_phoenix120_hue:native_phoenix_hue;
+  const int16_t *h=M10V_D76(film)?native_d76_hue[film-M10V_D76_FIRST]:film==77||film==M10V_5213_ID?native_spectral_hue[film==77?0:1]:M10V_STYLE(film)?native_style_filters_hue[film-M10V_STYLE_FIRST]:film>=73?native_newstocks_hue[film-73]:film>=69?native_curated_hue[film-69]:film==66?native_5207_hue:exposure?native_phoenix120_hue:native_phoenix_hue;
   const uint16_t boundaries[16]={1298,750,0,0,1448,843,0,0,1298,750,0,0,1205,843,0,0};
   const uint8_t selectors[20]={0,1,2,2,2,3,4,5,5,5,6,7,8,8,8,9,10,11,11,11};
   const uint16_t controls[21]={32,328,328,328,293,800,1600,2400,3200,32,1024,1024,1024,1024,0,0,0,0,0,640,1280};
@@ -66,7 +85,7 @@ int m10v_isp_native_look_apply(m10v_isp_native_look *s,const void *gamma,void *f
   * embedded multiaxis records are build-time certified; their writer writes
   * disjoint banks (CCA/CSP/gamma untouched), and cannot reject this frame. */
  if(!m10v_isp_frame_apply(gamma,frame,&s->target,cs)){s->status=M10V_NATIVE_LOOK_REJECTED;return 0;}
- if(s->film==66||s->film==67||(s->film>=69&&s->film<=78))apply_native_sectors(frame,s->film,s->exposure);
+ if(M10V_D76(s->film)||s->film==M10V_5213_ID||s->film==66||s->film==67||(s->film>=69&&s->film<=78)||M10V_STYLE(s->film))apply_native_sectors(frame,s->film,s->exposure);
  s->applied_frame=(uint32_t)f;s->status=M10V_NATIVE_LOOK_APPLIED;return 1;
 }
 int m10v_isp_native_look_matches(const m10v_isp_native_look *s,uint32_t film,uint32_t exposure,uint32_t generation){

@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 
 export const SHA256 = 'd6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4';
+export const GR3_220_SHA256 = '5c53760b3b564c87239dbf7f5c94d0f6fd91accd156ec4ba672ebfd6b861793e';
 const FILE_SIZE = 30391780;
 const DECODED_SIZE = 59718388;
 const RTOS_HASH = '8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67';
@@ -25,8 +26,8 @@ function sum32(data) {
   return value;
 }
 
-function decode(payload) {
-  const output = Buffer.allocUnsafe(DECODED_SIZE);
+function decode(payload, decodedSize = DECODED_SIZE) {
+  const output = Buffer.allocUnsafe(decodedSize);
   let position = 0;
   let used = 0;
   let frames = 0;
@@ -35,7 +36,7 @@ function decode(payload) {
     const prefix = payload.readUInt16BE(position);
     position += 2;
     if (prefix === 0) {
-      requireValue(position === payload.length && used === DECODED_SIZE, 'decoded: length or terminator mismatch');
+      requireValue(position === payload.length && used === decodedSize, 'decoded: length or terminator mismatch');
       return { output, frames };
     }
     const length = prefix & 0x7fff;
@@ -43,7 +44,7 @@ function decode(payload) {
     requireValue(length > 0 && end <= payload.length, 'decoded: invalid frame length');
     frames++;
     if (prefix & 0x8000) {
-      requireValue(used + length <= DECODED_SIZE, 'decoded: literal overrun');
+      requireValue(used + length <= decodedSize, 'decoded: literal overrun');
       payload.copy(output, used, position, end);
       used += length;
       position = end;
@@ -56,7 +57,7 @@ function decode(payload) {
       position += 2;
       for (let bit = 15; bit >= 0; bit--) {
         if (!(flags & (1 << bit))) {
-          requireValue(position < end && used < DECODED_SIZE, 'decoded: literal token overrun');
+          requireValue(position < end && used < decodedSize, 'decoded: literal token overrun');
           output[used++] = payload[position++];
           continue;
         }
@@ -83,7 +84,7 @@ function decode(payload) {
           }
         }
         count += 3;
-        requireValue(offset <= used && used + count <= DECODED_SIZE, 'decoded: invalid back-reference');
+        requireValue(offset <= used && used + count <= decodedSize, 'decoded: invalid back-reference');
         for (let i = 0; i < count; i++) output[used + i] = output[used + i - offset];
         used += count;
       }
@@ -97,10 +98,13 @@ export function inspectOfficial(data) {
   requireValue(Buffer.isBuffer(data), 'input: firmware must be bytes');
   const identity = hash(data);
   const isX = identity === '708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7';
-  requireValue(data.length === (isX ? 30391788 : FILE_SIZE), 'size: unsupported firmware length');
-  requireValue(identity === SHA256 || isX, 'identity: full-file SHA-256 differs from supported official baseline');
+  const is220 = identity === GR3_220_SHA256;
+  const decodedBytes = is220 ? 59798532 : DECODED_SIZE;
+  const sectionRules = rules.map(([name, size, flags, count]) => [name, is220 && name === 'RTOS' ? 17520384 : is220 && name === 'RES' ? 6675096 : size, flags, is220 && name === 'RES' ? 37 : count]);
+  requireValue([FILE_SIZE, 30391788, 30472516].includes(data.length), 'size: unsupported firmware length');
+  requireValue(identity === SHA256 || isX || is220, 'identity: full-file SHA-256 differs from supported official baseline');
   const project = isX ? 0x02610261 : 0x024c024c;
-  const version = isX ? 0x013c0b11 : 0x020a151b;
+  const version = is220 ? 0x0214141c : isX ? 0x013c0b11 : 0x020a151b;
   const footer = data.length - 24;
   const encodedSize = data.readUInt32LE(footer + 12);
   const decodedSize = data.readUInt32LE(footer + 16);
@@ -112,12 +116,12 @@ export function inspectOfficial(data) {
     data.readUInt32LE(footer + 8) === 2, 'container: marker or type mismatch');
   requireValue(sum32(data) === 0, 'container: additive checksum failed');
   requireValue(payloadEnd <= footer && metadataStart <= footer && metadataStart === footer &&
-    data.readUInt32LE(60) === 0 && decodedSize === DECODED_SIZE, 'container: metadata or decoded length mismatch');
-  const { output, frames } = decode(data.subarray(128, payloadEnd));
+    data.readUInt32LE(60) === 0 && decodedSize === decodedBytes, 'container: metadata or decoded length mismatch');
+  const { output, frames } = decode(data.subarray(128, payloadEnd), decodedBytes);
   const sections = [];
   const rows = new Map();
   let position = 0;
-  for (const [name, payloadSize, flags, resourceCount] of rules) {
+  for (const [name, payloadSize, flags, resourceCount] of sectionRules) {
     const end = position + 16 + payloadSize;
     requireValue(end <= output.length - 4, `sections: ${name} exceeds decoded stream`);
     const actualName = output.toString('ascii', position, position + 8).split('\0', 1)[0];
@@ -135,17 +139,17 @@ export function inspectOfficial(data) {
     'sections: decoded trailer or checksum mismatch');
   const rtos = rows.get('RTOS');
   const cpu = rows.get('CPU');
-  requireValue(rtos.length === 17520064 && hash(rtos) === (isX ? '0f11b0d28bc67932d044c5d01bc0314844a756057c89984278c73a23449a24c6' : RTOS_HASH),
+  requireValue(rtos.length === (is220 ? 17520384 : 17520064) && hash(rtos) === (is220 ? 'fb13f9b4e49abec5f036d3f9fc5e4d21ba2a4e65522efb849ac52a7151c87da9' : isX ? '0f11b0d28bc67932d044c5d01bc0314844a756057c89984278c73a23449a24c6' : RTOS_HASH),
     'rtos: unsupported baseline content');
-  requireValue(rtos.readUInt32LE(0x450) === 0x5407b540 &&
-    rtos.readUInt32LE(0x454) === 0x55000000 && rtos.readUInt32LE(0x458) === 0x3a080,
+  requireValue(rtos.readUInt32LE(0x450) === (is220 ? 0x5407b640 : 0x5407b540) &&
+    rtos.readUInt32LE(0x454) === 0x55000000 && rtos.readUInt32LE(0x458) === (is220 ? 0x3a0c0 : 0x3a080),
   'rtos: startup copy layout mismatch');
   for (const [name, word] of [
     ['rtos', rtos.readUInt32BE(0x2038)], ['cpu', cpu.readUInt32BE(0x90)],
     ['outer_cpu', data.readUInt32BE(0x38)], ['outer_dsp', data.readUInt32BE(0x50)],
   ]) requireValue(word === version, `version: ${name} differs`);
   return {
-    model: isX ? 'GR IIIx' : 'GR III', public_version: isX ? '1.60' : '2.10', internal_version: isX ? '1.60.11.17' : '2.10.21.27',
+    model: isX ? 'GR IIIx' : 'GR III', public_version: is220 ? '2.20' : isX ? '1.60' : '2.10', internal_version: is220 ? '2.20.20.28' : isX ? '1.60.11.17' : '2.10.21.27',
     sha256: identity, size: data.length, sections,
     proof: { identity: true, container: true, decoded: true, sections: true,
       versions: true, strict_frames: frames > 0 },
@@ -154,14 +158,14 @@ export function inspectOfficial(data) {
 
 export function readOfficialSection(data, name) {
   // Revalidate the entire exact baseline before exposing a read-only payload.
-  inspectOfficial(data);
+  const report = inspectOfficial(data);
   if (!rules.some((rule) => rule[0] === name)) throw new Error('unknown official section');
   const end = 128 + data.readUInt32LE(data.length - 12);
-  const { output } = decode(data.subarray(128, end));
+  const { output } = decode(data.subarray(128, end), data.readUInt32LE(data.length - 8));
   let offset = 0;
-  for (const [sectionName, size] of rules) {
-    if (sectionName === name) return Buffer.from(output.subarray(offset + 16, offset + 16 + size));
-    offset += 16 + size;
+  for (const {name: sectionName, size: blockSize} of report.sections) {
+    if (sectionName === name) return Buffer.from(output.subarray(offset + 16, offset + blockSize));
+    offset += blockSize;
   }
   throw new Error('unknown official section');
 }

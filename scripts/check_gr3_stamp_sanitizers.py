@@ -35,6 +35,6 @@ int main(void){
 with tempfile.TemporaryDirectory() as tmp:
     source=Path(tmp)/'probe.c';source.write_text(HARNESS)
     out=Path(tmp)/'probe'
-    subprocess.run([shutil.which('clang') or 'clang','-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(ROOT/'native/gr3'),str(source),*[str(ROOT/'native/gr3'/f) for f in ['halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c']],'-o',str(out)],check=True)
+    subprocess.run([shutil.which('clang') or 'clang','-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(ROOT/'native/gr3'),str(source),*[str(ROOT/'native/gr3'/f) for f in ['halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c']],'-o',str(out)],check=True)
     subprocess.run([str(out)],check=True)
 print('Production C stamp: ASan/UBSan and row/tail guards passed.')

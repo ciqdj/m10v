@@ -3,7 +3,7 @@
 These facts permit inspection only. They authorize no patch or camera write.
 Section payload lengths exclude the 16-byte header (also for RES).
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True)
@@ -122,3 +122,17 @@ class GR3Profile:
 
 
 GR3 = GR3Profile()
+
+# Official GR III 2.20 identity; retain 2.10 as the default patch baseline.
+GR3_220 = replace(
+    GR3, sha256='5c53760b3b564c87239dbf7f5c94d0f6fd91accd156ec4ba672ebfd6b861793e',
+    file_size=30472516, decoded_size=59798532, rtos_size=17520384,
+    rtos_sha256='fb13f9b4e49abec5f036d3f9fc5e4d21ba2a4e65522efb849ac52a7151c87da9',
+    startup_copy=(0x5407B640, 0x55000000, 0x3A0C0),
+    version_word=0x0214141C, internal_version='2.20.20.28', public_version='2.20',
+    version_sites=tuple(replace(site, expected_bytes=bytes.fromhex('0214141c')) for site in GR3.version_sites),
+    sections=tuple(replace(rule, payload_bytes=17520384) if rule.name == 'RTOS' else
+                   replace(rule, payload_bytes=6675096, resource_count=37) if rule.name == 'RES' else rule
+                   for rule in GR3.sections),
+    checksum_evidence=(),
+)

@@ -6,11 +6,11 @@ import {buildSdFilmPack,auditSdFilmPack} from './gr3-sd-film-pack.mjs';
 import {defaultConfiguration,selectNativeFilm,resetNativeTexture} from '../web/gr3/native-library-state.mjs';
 import {previewCuratedPixels} from '../web/gr3/film-preview.mjs';
 
-test('CCD Classic is a stable curated identity carried by the SD pack',async()=>{
+test('CCD is a stable curated identity carried by the SD pack',async()=>{
  const catalog=await nativeCatalog(),film=catalog.films.find(f=>f.id===72);
- assert.ok(film,'CCD Classic is missing');assert.equal(film.name,'CCD Classic');
- assert.equal(film.group,'M10V精选');assert.equal(film.camera_calibrated,false);
- assert.deepEqual(auditSdFilmPack(buildSdFilmPack([35,72,33])).ids,[72,33,35]);
+ assert.ok(film,'CCD is missing');assert.equal(film.name,'CCD');
+ assert.equal(film.group,'创意');assert.equal(film.camera_calibrated,false);
+ assert.deepEqual(auditSdFilmPack(buildSdFilmPack([35,72,33])).ids,[33,35,72]);
 });
 test('CCD selection and texture reset disable film artifacts without touching other slots',()=>{
  const old=selectNativeFilm(defaultConfiguration(),0,68);

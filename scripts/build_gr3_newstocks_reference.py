@@ -18,7 +18,7 @@ STOCKS=[
  {'id':74,'key':'kodak-proimage-100','name':'ProImage 100','ascii_name':'ProImage 100','iso':100,'grain':1,'grain_size':0,'official':'https://www.bhphotovideo.com/lit_files/519169.pdf','reference':'Kodak E-4L page 3 manually digitized characteristic and spectral sensitivity curves, uncertainty recorded; display adaptation, no numerical LUT copied'},
  {'id':75,'key':'kodak-tmax-100','name':'T-Max 100','ascii_name':'T-Max 100','iso':100,'grain':1,'grain_size':0,'official':'https://www.kodakprofessional.com/sites/default/files/wysiwyg/pro/resources/f4016_TMax_100.pdf','reference':'named G MIC community Kodak T-Max 100 cube; assumed sRGB input; MIT notice retained'},
  {'id':76,'key':'aerochrome-iii-1443','name':'Aerochrome','ascii_name':'Aerochrome','iso':40,'speed_system':'aerial ISO A, not pictorial ISO; metadata only, never sets camera ISO','grain':1,'grain_size':1,'official':'https://www.kodak.com/content/pdfs/amc/Specifications-and-Characteristics-of-KODAK-Aerial-Films-datasheet-EN.pdf','data':'reversal_film/kodak_aerochrome_iii.py','symbol':'KODAK_AEROCHROME_III','approximation':True,'warning':'false-colour approximation: RGB contains no near-infrared reflectance; vegetation/material identity and real infrared response cannot be reproduced'},
- {'id':77,'key':'aerocolor-iv-2460','name':'2460','ascii_name':'2460','iso':125,'grain':1,'grain_size':0,'official':'https://www.kodak.com/content/pdfs/KODAK-AEROCOLOR-III-Negative-Film-2460-datasheet-en.pdf','data':'negative_film/kodak_aerocolor.py','symbol':'KODAK_AEROCOLOR','warning':'URL filename says III; document/model identifies IV 2460; no claim of measured production-batch matching'},
+ {'id':77,'key':'aerocolor-iv-2460','name':'2460','ascii_name':'2460','iso':125,'grain':1,'grain_size':0,'official':'https://www.kodak.com/content/pdfs/amc/KODAK-AEROCOLOR-IV-Negative-Film-2460-datasheet-en.pdf','data':'negative_film/kodak_aerocolor.py','symbol':'KODAK_AEROCOLOR','warning':'Official IV2460; medium-contrast C-41 4:15 curves; not measured production-batch/camera matching'},
  {'id':78,'key':'vision3-50d-5203','name':'5203','ascii_name':'5203','iso':50,'grain':1,'grain_size':0,'official':'https://www.kodak.com/content/products-brochures/Film/VISION3-50D-Color-Negative-Film-7203-TECHNICAL-DATA.pdf','data':'negative_film/kodak_5203.py','symbol':'KODAK_5203'},
 ]
 PARAMETERS={'input':'encoded display sRGB D65 after ISP','output':'encoded display sRGB D65','camera_calibrated':False,'film_calibrated':False,'official_lut':False,'spectral_reconstruction':False,
@@ -35,6 +35,9 @@ def data(spec):
  return getattr(importlib.import_module('spectral_film_lut.'+spec['data'][:-3].replace('/','.')),spec['symbol'])
 
 def render(film,rgb):
+ if film==77:
+  from scripts.build_gr3_spectral_reference import render as render_spectral
+  return render_spectral(film,rgb)
  x=np.clip(np.asarray(rgb,float),0,1);s=next(s for s in STOCKS if s['id']==film)
  if film==75:
   y=sample_tetrahedral(cube(ROOT/'third_party/curated-film-luts/kodak_t-max_100.cube'),x)

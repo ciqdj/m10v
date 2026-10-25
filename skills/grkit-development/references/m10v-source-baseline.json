@@ -1,0 +1,149 @@
+{
+  "schema": "m10v-skill-source-baseline/v1",
+  "observed_date": "2026-10-21",
+  "timezone": "Asia/Shanghai",
+  "head": "c988e7a907d22fa68a8412a656f3c8b0bb40ff1a",
+  "scope": "Current working files including uncommitted and untracked changes; not a device-qualified release or immutable requirement. Refresh against actual source before edits.",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "d787f42cd56a18f2143553f66b0f9560f2502ce4503c84752f8720008828fc91",
+      "worktree_status": "M "
+    },
+    {
+      "path": "native/gr3/m10v_library.h",
+      "sha256": "3f5903c32df80112266bc58764177488b45106d91b7c185b983f362b83f18390",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_library.c",
+      "sha256": "6461974fe245987a518cf6526e4d6565f67b95121b7fe34432c76049434d31d9",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_library_camera.c",
+      "sha256": "f67ab7b191b5044457af9bdd19504011feab3492f6657687a7771d5d72d010b4",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_library_capture.c",
+      "sha256": "e0476d5f7d4f4e64cfabbb0bc3c88a0760bf98e813f67c51d8948d0238e77055",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_library_menu.c",
+      "sha256": "2886a42244a759bc5f3885f316fcdfbaa1db13796722d37a2d01a1e62ed48b03",
+      "worktree_status": "M "
+    },
+    {
+      "path": "native/gr3/m10v_sd_library.h",
+      "sha256": "8c0a9afc96ca0b43be279f398aa91a44237150175afc9e572a964ba7f6727e03",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_sd_library.c",
+      "sha256": "2a6261f33bd4aeca57650627a4d413c985438084d6990ad09ca7736bdc33eb7b",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_sd_camera.c",
+      "sha256": "d3274f5b739849bffe9fa83f387ae05429caa296bd8d7f002dd2c53a875e1aef",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_settings.h",
+      "sha256": "301826e1fc98fce640c25cbfb0aadb15cd2185922989ca39465b191db82afa14",
+      "worktree_status": "M "
+    },
+    {
+      "path": "native/gr3/m10v_settings.c",
+      "sha256": "b6bfe91d4afc9887f38ccc184f7b423cd2e67264555cdef3449ef7e008e2e362",
+      "worktree_status": "M "
+    },
+    {
+      "path": "native/gr3/m10v_settings_controller.c",
+      "sha256": "258f6ab9c0678df919a4883cf95bcd6e92660c4fdff25fd8eec9787683cfbd7b",
+      "worktree_status": "M "
+    },
+    {
+      "path": "native/gr3/m10v_settings_view.c",
+      "sha256": "67e1f682ace4f215436a4227d008fc63b965ddcc731c29ae57976f5d8b60a08d",
+      "worktree_status": "M "
+    },
+    {
+      "path": "native/gr3/m10v_ab.h",
+      "sha256": "cb15ed1aebc54bfa31f244b18dfc322b3c1c137bf524416795044db41fd9c450",
+      "worktree_status": "??"
+    },
+    {
+      "path": "native/gr3/m10v_ab_camera.inc",
+      "sha256": "eef97bf42f15bf3d892f2e1d8f49d7ae2239cd3f1ba8d514b120322b3a8d0612",
+      "worktree_status": "??"
+    },
+    {
+      "path": "native/gr3/m10v_capture_raw_lifetime.h",
+      "sha256": "3b00affffcbae93fcd305a0184c292afdb0256cf1edf77591585cfe73b8142df",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "native/gr3/m10v_capture_raw_lifetime.c",
+      "sha256": "13c4a5efd122c05831686c2d65a60ede594116283125370e6dd46fa4625d038a",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "web/gr3/native-library-state.mjs",
+      "sha256": "9800511b33e5a2c487f207747da3c13d3979b263ab49abb65e1357d1f443f4e6",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "node/gr3-native-library.mjs",
+      "sha256": "9922d095a1615fae422cf052bc4cb49d2b3411666e57553f713a82ab0886617d",
+      "worktree_status": "M "
+    },
+    {
+      "path": "node/gr3-m10v-native-build.mjs",
+      "sha256": "d151308a9e536e0d776fc89729414eba8c385a53e717fe60b4c0f97e169171c3",
+      "worktree_status": "M "
+    },
+    {
+      "path": "scripts/build_gr3_m10v_library.py",
+      "sha256": "f47dd6ed54c74d05b9a5697e1082bfdb379e8cf48a4b896428bfa8eebef9bf9c",
+      "worktree_status": "M "
+    },
+    {
+      "path": "scripts/build_gr3_settings_hooks.py",
+      "sha256": "3a81677be2641044762f9535aee87b4de7af901633db7ff7e2c96abe20a97c95",
+      "worktree_status": "M "
+    },
+    {
+      "path": "scripts/build_gr3_ab_candidate.mjs",
+      "sha256": "90a046e99b3f3f50e30cde1a9b8c20e041427f1bbafcaf47b7bb0e008d056e86",
+      "worktree_status": "??"
+    },
+    {
+      "path": "tests/test_gr3_ab_compare.py",
+      "sha256": "b927bb5d164ee2a7c1c9176af5f6cb0aee4b092d4e5c29f1ec5593054bf1cdf5",
+      "worktree_status": "??"
+    },
+    {
+      "path": "docs/research/gr3-stamp-and-first-shot-2026-10-20.md",
+      "sha256": "f63c25097cb00273fa80edd79263cd6a0328f3521b269e89c9eddde99540e4da",
+      "worktree_status": "clean"
+    },
+    {
+      "path": "docs/testing/gr3-ab-controller-fix-20261021.md",
+      "sha256": "d8a7c10d07a21a6fedb4bae3100a1220574b449b5c8ae3616ebb4941f4f3453d",
+      "worktree_status": "??"
+    },
+    {
+      "path": "docs/testing/gr3-ab-log-audit-20261021.md",
+      "sha256": "0172768472d11be9b564405fcef2088781c36d5ef8710bd77a0ae5568ab292bf",
+      "worktree_status": "??"
+    },
+    {
+      "path": ".github/workflows/deploy-baota.yml",
+      "sha256": "8ec413d94f367c7d207338413271f498cc7774b87b61f08a7f7f6dd63dcaf6ef",
+      "worktree_status": "clean"
+    }
+  ]
+}

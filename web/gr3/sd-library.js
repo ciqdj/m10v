@@ -48,8 +48,8 @@ try{
  for(const [name,rows] of groups){
   const section=document.createElement('fieldset'),legend=document.createElement('legend'),grid=document.createElement('div');legend.textContent=`${name} · ${rows.length} 款`;grid.className='sd-grid';section.append(legend,grid);
   for(const f of rows){const label=document.createElement('label'),check=document.createElement('input'),icon=document.createElement('img'),text=document.createElement('span');
-   label.className='sd-film';check.type='checkbox';check.value=f.id;check.checked=true;check.onchange=()=>{check.checked?selected.add(f.id):selected.delete(f.id);update();};icon.src=f.icon_url;icon.alt='';icon.width=40;icon.height=40;text.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;label.append(check,icon,text);grid.append(label);}
+   label.className='sd-film';check.type='checkbox';check.value=f.id;check.checked=true;check.onchange=()=>{check.checked?selected.add(f.id):selected.delete(f.id);update();};icon.src=f.icon_url;icon.alt='';icon.width=40;icon.height=40;text.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;label.append(check,icon,text);if(f.id>=299&&f.id<=305){const badge=document.createElement('small');badge.textContent=f.infrared_style?'\u7ea2\u5916\u6ee4\u955c\u98ce\u683c\u8fd1\u4f3c':'\u98ce\u683c\u8fd1\u4f3c';badge.style.cssText='display:block;font-size:12px;font-weight:400;opacity:.7;margin-top:4px';text.append(badge);}grid.append(label);}
   $('sd-films').append(section);
  }
- $('sd-films').setAttribute('aria-busy','false');update();status('可全选或多选，不改变固件工作台的五槽配置。');
+ $('sd-films').setAttribute('aria-busy','false');update();status('可全选或多选，不改变固件工作台的已选胶卷。');
 }catch(e){$('sd-films').setAttribute('aria-busy','false');$('sd-count').textContent='目录暂不可用';status(e.message,true);}

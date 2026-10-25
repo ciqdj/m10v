@@ -66,51 +66,14 @@ class SpatialHostTests(unittest.TestCase):
             out=C.c_uint32(0xabad1dea)
             self.assertEqual(self.query(w,h,address,C.byref(out)),-1);self.assertEqual(out.value,0xabad1dea)
 
-    def test_noise8_matches_frozen_hash_bilinear_and_signed_division(self):
-        self.assertTrue(hasattr(self.lib,'m10v_spatial_grain_noise8'),'exact grain SIMD primitive is not implemented')
-        f=self.lib.m10v_spatial_grain_noise8
-        f.argtypes=[C.c_void_p,C.c_uint32,C.c_uint32,C.c_uint32,C.c_void_p,C.c_void_p]
-        for size in (0,1,2):
-            for gy,seed in ((0,0),(1,42),(3999,0xffffffff)):
-                for xs in (list(range(8)),list(range(5992,6000)),[0,1,16,200,1025,3000,5999,6000]):
-                    gx=(C.c_uint32*8)(*xs);hh=(C.c_uint32*16)(*([0xdeadbeef]*16));nn=(C.c_int32*16)(*([-12345]*16))
-                    self.assertEqual(f(gx,gy,seed,size,hh,nn),0)
-                    want=[noise_reference(x,gy,seed,size) for x in xs]
-                    self.assertEqual(list(hh)[:8],[v[0] for v in want]);self.assertEqual(list(nn)[:8],[v[1] for v in want])
-                    self.assertEqual(list(hh)[8:],[0xdeadbeef]*8);self.assertEqual(list(nn)[8:],[-12345]*8)
-        before=bytes(hh),bytes(nn),bytes(gx)
-        self.assertEqual(f(gx,0,0,3,hh,nn),-1);self.assertEqual(f(gx,0,0,1,gx,nn),-1)
-        self.assertEqual((bytes(hh),bytes(nn),bytes(gx)),before)
+    def test_retired_cpu_grain_generator_is_not_exported(self):
+        self.assertFalse(hasattr(self.lib,'m10v_spatial_grain_noise8'))
 
 class SpatialArmTests(unittest.TestCase):
-    def test_noise8_neon_preserves_exact_hash_and_signed_bilinear_output(self):
+    def test_arm_export_removes_cpu_grain_generator(self):
         from scripts.build_gr3_spatial_accel import build
-        from unicorn import Uc,UC_ARCH_ARM,UC_MODE_ARM
-        from unicorn import arm_const as A
-        import struct
         with tempfile.TemporaryDirectory() as tmp:
-            report=build(tmp);code=(Path(tmp)/'m10v-spatial-arm.bin').read_bytes()
-            u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u.mem_map(report['base'],(len(code)+4095)&~4095);u.mem_write(report['base'],code)
-            u.mem_map(0x55000000,0x100000)
-            u.reg_write(A.UC_ARM_REG_C1_C0_2,0xf00000);u.reg_write(A.UC_ARM_REG_FPEXC,0x40000000)
-            xs=[0,1,7,16,33,1025,5999,6000]
-            u.mem_write(0x55001000,struct.pack('<8I',*xs))
-            for size in (0,1,2):
-                for gy,seed in ((0,0),(1,42),(3999,0xffffffff)):
-                    sp,stop=0x550fe000,0x550ff000
-                    u.mem_write(0x55002000,b'\x5a'*64);u.mem_write(0x55003000,b'\xa5'*64)
-                    u.mem_write(sp,struct.pack('<II',0x55002000,0x55003000))
-                    for reg,val in ((A.UC_ARM_REG_R0,0x55001000),(A.UC_ARM_REG_R1,gy),(A.UC_ARM_REG_R2,seed),(A.UC_ARM_REG_R3,size),(A.UC_ARM_REG_SP,sp),(A.UC_ARM_REG_LR,stop)):u.reg_write(reg,val)
-                    saved={getattr(A,f'UC_ARM_REG_D{i}'):0x1234000000000000+i for i in range(8,16)}
-                    for reg,val in saved.items():u.reg_write(reg,val)
-                    u.emu_start(report['symbols']['m10v_spatial_grain_noise8'],stop,count=100000)
-                    self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),stop);self.assertEqual(u.reg_read(A.UC_ARM_REG_R0),0)
-                    want=[noise_reference(x,gy,seed,size) for x in xs]
-                    self.assertEqual(list(struct.unpack('<8I',u.mem_read(0x55002000,32))),[v[0] for v in want])
-                    self.assertEqual(list(struct.unpack('<8i',u.mem_read(0x55003000,32))),[v[1] for v in want])
-                    self.assertEqual(bytes(u.mem_read(0x55002020,32)),b'\x5a'*32)
-                    self.assertEqual(bytes(u.mem_read(0x55003020,32)),b'\xa5'*32)
-                    self.assertEqual({reg:u.reg_read(reg) for reg in saved},saved)
+            self.assertNotIn('m10v_spatial_grain_noise8',build(tmp)['symbols'])
 
     def test_stock_grain_execution_preflights_workspace_and_forwards_original_abi(self):
         self.assertTrue((ROOT/'scripts/build_gr3_spatial_accel.py').is_file())

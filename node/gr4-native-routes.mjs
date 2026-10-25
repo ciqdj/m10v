@@ -8,7 +8,7 @@ export async function handleGr4NativeRequest({request,response,runtime,token,rea
  const prefix='/api/gr4/native-library/';if(!request.url?.startsWith(prefix))return false;
  const route=request.url.slice(prefix.length),sourcePath=path.join(runtime.root,'inputs',GR4_OFFICIAL_SHA256+'.bin');
  try{
-  if(request.method==='GET'&&route==='catalog'){const catalog=await nativeCatalog();catalog.films=catalog.films.filter(f=>f.id!==289&&f.id!==290).map((f,i)=>({...f,number:i+1}));catalog.film_count=catalog.films.length;return send(response,200,{...catalog,local_sources:['gr4'],local_source_available:await readModelOfficial('gr4').then(()=>true,()=>false),slot_tone_ids:undefined}),true;}
+  if(request.method==='GET'&&route==='catalog'){const catalog=await nativeCatalog();catalog.films=catalog.films.filter(f=>f.id<289).map((f,i)=>({...f,number:i+1}));catalog.film_count=catalog.films.length;return send(response,200,{...catalog,local_sources:['gr4'],local_source_available:await readModelOfficial('gr4').then(()=>true,()=>false),slot_tone_ids:undefined}),true;}
   if(request.headers['x-m10v-token']!==token||(request.headers.origin&&request.headers.origin!==origin))return send(response,403,{error:'authorization failed'}),true;
   if(request.method!=='POST')return send(response,405,{error:'POST required'}),true;
   const body=await readBody(request,route==='import'?64*1024*1024:16384);

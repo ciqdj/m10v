@@ -1,0 +1,376 @@
+# GR II 原生内存、启动交接与 JPEG 输入契约
+
+本记录基于精确官方 GR II 3.00 b01firm8（SHA-256 `13fa830bff194679628eb1bb3f233420ee23c4fca3a28c4b650c53692820de95`）。CPU 探针和编译桥均为离线证据，尚未完成相机启动、完整胶卷功能或成像验收。
+
+## 内存归属
+
+`0xA0022D5C` 通过原厂字面量 `0xA0023154`/`0xA0023158` 返回 C 运行库堆边界 `0xA0798000..0xA0900000`。ARM 调用者 `0xA00A1A3C` 与 Thumb 堆初始化器 `0xA00A07E2` 均已执行，没有拦截任何辅助函数；初始化器实际在堆起点建立控制头和自由链。因此这段内存不能作为空闲填充直接占用。
+
+仅在模拟 RAM 内把起点字面量提高到 `0xA0800000`，再次执行上述原厂初始化；`0xA0798000..0xA0800000` 的 A5 哨兵全部保留，剩余 C 堆为 1 MiB。原厂静态加载/清零记录不与预留区重叠；启动模式栈来自低地址范围。实际 libc 峰值需求和缓存/地址别名仍需进一步验收，不能把边界调整当作完整稳定性证明。
+
+另一个分配系统从 `0xA0900000` 开始：原厂 `0xA0024BCA` 首先通过 `0xA0024B68` 预留 2 MiB 并创建 RTOS 内存池，之后区域分配包含元数据、16 字节 payload 对齐和 4 字节游标对齐。CPU 测试只拦截 RTOS 建池，执行原始初始化、对齐与后续分配，核对旧区域哨兵未被覆盖。该区域与 C 堆不是同一个分配器，不能混用释放接口。
+
+## 启动交接修正与闭环
+
+原厂共同位置 `0xA0020AB4` 调用的 `0xA0023234` 返回 `0xFFFFFFFF`，之后继续调用阶段 0、阶段 -1 和模块服务 -1。旧探针把该目标作为合成服务返回 0，因而只证明了到达共同点，跳过了尾部回调。现在原厂目标执行不变，并加入专门回归；所有正常/已测提前分支都保留尾部回调。
+
+新建 `native/gr2/m10v_startup.S`：保存上下文、调用原生初始化、恢复被保存的寄存器，重现 -1 返回值与原厂 `adds r1,r0,#1` 的结果，回到 `0xA0020ABC`。这是针对该 8 字节调用/条件检查窗口的桥，不是通用 GR3 trampoline。
+
+集成 CPU 测试让原厂按记录加载器 `0xA0056722` 实际加载新编译的记录 14 代码、清零 BSS、设置完成标志，再执行启动桥，验证原生计数器恰好增加一次且最后三个原厂回调保留。模块头和块设备是明确的合成边界，其余模块初始化服务也是边界；测试没有模拟 NAND 擦写、boot-ROM、调度器或真实缓存。原厂低地址记录 15 不改动。
+
+## JPEG 输入布局
+
+通过 `ISP_StillEncodeJpeg` 原厂名称/断言定位 `0xA01324BA`，进一步执行 `0xA0134B12` 配置构造到 `0xA0107010` 提交边界。锁、硬件配置和提交为合成服务，原始端序转换、尺寸/平面/stride 运算执行不变。
+
+| 原厂请求字段 | 含义/证据 |
+| --- | --- |
+| +0x00 / +0x04 | 原始图像 Y 起点 / JPEG 输出地址 |
+| +0x08 | u32：低 16 位宽，高 16 位高 |
+| +0x0D | 输入格式：2→0x422，3→0x420，4→0x444 |
+| +0x18 / +0x1C | 非零时覆盖 U / V 地址 |
+| +0x20 / +0x24 | 非零时覆盖 Y / C pitch；包装层写入内部 u16 字段 |
+
+这是分离平面。4:2:2 / 4:2:0 默认 C pitch 为 `align16(width/2)`，Y pitch **为 C pitch 的两倍**，不能普遍写成 `align16(width)`；宽 642 的原厂 CPU 用例明确区分 672 与 656。4:4:4 两者均为 `align16(width)`。4:2:0 的每个 C 平面只有半高，其余为全高。原厂先用默认 pitch 计算默认平面起点，再应用覆盖字段；不能在自己的解析器里重排这两步。
+
+已测试 4928×3264、1280×848、638×426、642×426，各格式及独立平面/pitch 覆盖。编译桥通过原厂 CPU 输出交叉检查，没有读取或改写 JPEG 像素。
+
+`0xA02ADC14(context,kind)` 构造实际请求：kind 1/2/3 分别使用 context 的源句柄 +0x1F4/+0x1FC/+0x200、输出句柄 +0x204/+0x208/+0x20C、尺寸 +0x3E4/+0x3E8/+0x3EC。测试执行原始分派、禁用裁切时的描述符构造及 `0xA00E0714` 句柄 magic 检查/数据 getter。测试中的主图/预览/缩略图尺寸是合成输入，不单凭它们断言完整模式角色或生产者完成。
+
+还须追踪：生产者完成事件、裁切时 plane override、RAW 所属句柄与区间、缓存维护、取消/连拍/失败释放。解析成功不能代替这些所有权条件。
+
+## 大端原生桥
+
+`scripts/build_gr2_runtime.py` 使用 `armeb-none-eabi`、ARMv4T、soft-float 保守指令子集，审计 ELF32 大端、BE32（拒绝 BE8）、单一有界加载段、导出地址与未解析符号。编译模块包括日期有效性、原厂平面解析和启动返回桥。CPU 测试运行真正编译的 ARM 指令，并验证错误输入不修改输出描述符。
+
+构建器只接受空配置，输出 `can_package:false`，没有相机固件封装、功能构建成功或页面下载。机内菜单、SD 文件/日志与捕获生命周期继续按计划实现。
+
+```sh
+.venv/bin/python -m unittest tests.test_unity_runtime tests.test_gr2_native_contract tests.test_gr2_runtime_build
+.venv/bin/python scripts/build_gr2_runtime.py --component data/research/gr2/implementation/b01firm8.bin --out data/research/gr2/implementation/native-foundation
+```
+
+## 共享标量渲染、平面恢复与 SD 字节序
+
+大端构建已链接共享纯算法与全部表库（没有链接 GR3 相机地址桥），在 ARM CPU 中执行全部 78 个历史 ID，以及颗粒、Phoenix/HARMAN 曝光、漏光组合。与独立主机编译的参考逐字节比较 Y/C 输出。这里只验证软件算法；没有建立 GR2 原厂 ISP 的颜色基底校准。
+
+`m10v_planar.c` 用常数额外内存原地转换连续 U/V 平面；`m10v_capture.c` 渲染后恢复原厂分离布局。已覆盖奇数平面长度、边界哨兵、逆变换、stride 溢出拒绝和 82 组胶卷/参数的平面输出。当前同步适配器只接收已证明的连续 4:2:2 布局；4:2:0、4:4:4、非连续裁切继续研究，未标成机型不支持。后续已改为下述 O(n) 字节移动，相机耗时未测。
+
+`m10v_storage.c` 为 104 字节共享状态显式读写小端整数，并分别验证磁盘 CRC 和本机状态 CRC；损坏或语义无效时不改变输出。现有 Node 生成的 46 卷 SD 包头、逐卷 SHA/CRC 校验器也在大端 CPU 上执行通过，包括修复 CRC 后仍拒绝篡改的用例。后续已接入下述私有文件/双日志桥，实卡生命周期仍待验收。
+
+## 可失败的 RTOS 分配与时钟桥
+
+继续执行原厂 `0xA0067794` 建池、`0xA006798C` 分配、`0xA0067BE8` 释放，包括其原厂内部辅助函数和中断屏蔽指令。使用合成单池内核表和单线程 SVC CPU 环境，不拦截辅助函数。验证池耗尽返回 -50、超出池允许大小返回 -17、释放后原块可复用。
+
+`m10v_services.c` 使用系统池描述符的原厂 id 调用可返回失败的 RTOS 入口；没有调用会在失败时触发原厂断言的上层分配包装。编译后的桥已与上述原厂代码联合执行，池耗尽返回空指针，释放返回 0。并发/调度器及真实拍摄时剩余池容量仍待验收。
+
+时钟桥调用原厂 `RTC_GetTime` 后按日历校验，整分钟秒数为 0 仍返回有效，2100-02-29 等无效时间不改变输出；硬件驱动是明确的合成边界。不会把原厂返回的秒值当作成功标志，也没有把未经证明的 RTC 全局标志直接当作时间有效性。
+
+## 捕获准入、RAW 和缓存边界的继续验证
+
+`BUFF` 构造器明确区分 `+8` 已用长度与 `+0x14` 分配容量：JPEG 新输出可以已用长度为零。原生准入据此用源图已用长度限定所有平面，以输出/RAW 分配容量检查重叠，不以零已用长度误拒绝新 JPEG 输出。原厂 `0xA0162C7C` 的 `hRawForDng` 断言及捕获辅助函数共同确认上下文 `+0x1E4`；此处范围已受保护，其他 RAW/共享池别名仍需继续核实。
+
+`gr2_capture_process` 已联合原厂 RTOS 分配器在 BE32 CPU 执行：读取元数据前进入缓存桥，校验句柄/尺寸/布局，复制配置快照，分配可失败的光晕及颜色缓存，执行共享算法，恢复 U/V 平面并释放临时内存。覆盖池耗尽时像素不变、RAW 哨兵不变、输出/RAW 重叠拒绝、缓存调用先于元数据读取。这仍是研究用同步运行体，尚未安装到真实相机捕获入口；逐帧随机种子、生产者完成、取消和模式准入继续研究。
+
+原厂 `0xA00AF200` 的 MPU/缓存初始化代码在四种合成启动模式下执行：I/D 缓存掩码均为 `0x20`，写缓冲掩码为零。直接桥只允许 System/SVC 模式，分别发出 D-cache invalidate 和写缓冲 drain；IRQ 模式拒绝，User 模式经下述已安装 SVC 回调进入。测试观察 CP15 指令与模式保护，不模拟缓存、DMA 或物理地址别名；寄存器语义参考 [ARM946E-S TRM](https://documentation-service.arm.com/static/5e8e3ee588295d1e18d3aa82)，不能据此断言相机具体 CPU 型号或真实缓存一致性已验收。
+
+外层 `0xA02AE5C0`（kind 1）及 `0xA02AE610`（kind 3）已执行穿过原厂 `0xA02ADC14`：进入编码、编码返回、源图释放调用依次发生，返回时栈恢复。编码完成与释放副作用是合成边界，此证明限于调用顺序，不等同于真实 DMA/并发所有权证明。
+
+## 私有 SD 文件与双日志
+
+`m10v_files.c` 已连接原厂正常文件 open/read/write。只允许写两个私有日志文件，胶卷包只读。原厂外层 close 为 void，会丢弃底层 fclose 错误；桥保留底层关闭状态，再依原厂顺序清除 FILE 魔数并释放自己持有的文件元数据。联合原厂包装代码的测试覆盖完整传输、短写及关闭失败，均关闭/释放自己的句柄；没有操作真实 SD。
+
+`gr2_load_state` / `gr2_save_state` 已连接双日志编解码：读取 105 字节以拒绝 104 字节记录后的多余内容，验证小端线格式及本机 CRC，按可回绕序号选择最新记录；保存后回读并逐字节确认。覆盖短写恢复、损坏回读、序号回绕和无有效记录时输出不变。真实文件系统持久化和掉电恢复仍待实卡测试。
+
+## 原厂效果菜单转换
+
+原厂 UI 定义访问器 `0xA0396900` 指向 `0xA04330D8` 的 64 字节定义表，共 `0x148` 项。第 102 项的属性 id 为 43（PROPID_EFFECT），包含 18 个 12 字节选择记录。菜单 getter `0xA03C0A50`、setter `0xA03C0AD0` 经原厂置换表转换显示索引与属性值，不能直接互用。
+
+新增 CPU 探针对全部 18 个选项执行 setter→属性派发边界→原厂 getter/属性变换→显示索引的往返，属性银行读写、界面刷新是明确的合成边界。无效定义 id `0x148` 返回空。此结果证明原厂转换规则，尚未构成 M10V 菜单接管、按键焦点和五槽入口完成。
+
+### User 任务经原厂 SVC 缓存回调
+
+原厂 ARM 任务帧构造器 `0xA00AF7A8` 已无拦截执行，写入任务 CPSR `0x10`、调度 CPSR `0xD2`，边界哨兵不变。因此仅允许 System/SVC 的直接 CP15 桥不足以覆盖普通任务，不能据此宣称捕获已接通。
+
+继续定位原厂 SVC 5：低地址 `0x844` 的原厂跳转到 `0xA00AF858` 分派器；5 号处理器在保存 R0/LR 后调用 `0xA0044F4C`，该入口的原始 ARM 指令为 `BX LR`，随后执行异常返回。研究构建器现在生成仅替换此 4 字节空回调的范围受检 ARM B 指令，不更改 SVC 编号、分派表、其他服务或低地址记录。回调只响应两个完整 M10V 操作标记，其他调用保持原空操作行为。
+
+User 桥先读取回调指令，确认精确跳往本次运行体，再发出 ARM SVC 5；未安装或指令不匹配则返回失败。新增联合 CPU 用例执行原厂低地址跳转、分派和异常返回，缓存操作发生在 SVC 模式，返回后恢复 User 模式、栈及保留寄存器。测试只合成硬件异常进入（CPSR/SPSR/LR/banked SP）并观察 CP15，不模拟真实缓存效果。此桥仍未打包或刷入相机。
+
+### 原生文字服务
+
+`0xA03A4AD0` 直接查原厂已加载的 21 个语言指针表，文本 id 为 `1..0x34F`，其他 id 返回原厂空串。字符串为以双字节零结束的大端 UTF-16；例如 id 106 在日语、英语和简繁中文分别返回“白黒”、“Black & White”、“黑白”。没有调用辅助函数。
+
+`m10v_ui.c` 已连接该原厂接口，并补上原函数缺少的语言索引边界检查。编译后的 ARM→Thumb 桥与全部 21 种语言的原厂结果逐字节一致；索引 21 返回空指针。这里只证明文字资源 ABI，没有声称字体绘制、M10V 页面或物理按键已完成。
+
+## 完整 User 单任务联测与线性平面转换
+
+进一步把捕获处理、原厂池分配/释放和调度返回放入 User 模式执行。异常入口以硬件边界设置 banked SP/SPSR/LR，其后执行原厂低地址跳转和内核；单个合成运行任务、无待切换任务。观察到服务序列 `5,4,3,5,4,3,0`，包括缓存、屏蔽/恢复中断和释放后的调度返回；函数返回 User 模式、原栈、RAW 哨兵保持不变。没有模拟抢占、多个任务或真实设备中断。
+
+此联测揭示了模拟器选择的重要差异：Unicorn 默认为 ARM1176；执行这份旧 BE32 内核的异常返回时，会把其较新的动态端序状态带入，导致读取已交换的指针。原厂运行映射探针现显式选择 ARM946 指令/MPU 模型，以执行 ARMv5/BE32 行为。它是模拟器模型选择，并非对相机具体芯片型号的识别结论。不能通过拦截分配/调度结果来掩盖这个问题。
+
+平面转换改为按 `(3^k-1)/2` 分块、旋转与循环首领置换，累计像素搬运 O(n)，只用 O(log n) 调用栈，没有整帧临时缓冲。8192 样本的原算法读取量为 204800 字节，超过新增的线性访存门限；替换后正/逆转换都通过门限、逐字节参考及哨兵检查。补充 1..512 样本、三次幂分块边界和 4928×3264 的主机完整分辨率参考对照，全部恢复原始 U/V；共享 82 组胶卷/参数回归保持一致。真实相机耗时仍未测量。
+
+## 原厂效果页面按键路由与焦点条件
+
+通过 `STID_RG1_SCR_MONSETEFFECTMODE` 的名字表、状态描述符 `0xA0400C8C`、动作表与原厂事件名字/数值配对表建立关联。状态 id 为 `0x60004067`，构造/事件处理器位于 `0xA03AD0C6`，UI 定义第 102 项对应配置在 `0xA0411A18`。
+
+该页面包含 17 个按键动作路由。原厂动作代码已经执行到明确的 UI 队列边界，事件携带的两个参数保持原值；例如 UP/DOWN/OK 分别变换为 `0x60002003/04/05`。不能把 `0x60001017` 猜成 MENU：原厂名字表明确将它命名为 `APP_EVENT_SYS_JOG_LEFT`。
+
+原厂焦点谓词也已对根对象 `+0x514` 的 0..6 状态逐项执行。LEFT 有两条不同路由：焦点 0/6 发 `0x60002002`，焦点 1 发 `0x6000200F`；RIGHT 及 EFFECT 另有自己的焦点条件。这里只证明动作与条件，焦点迁移、视图构造/释放、取消恢复、M10V 页面安装仍需继续逆向。
+
+## 原厂页面 CREATE、INIT、动画与撤销
+
+进一步执行 `0xA03AD0C6(root, event)`，事件名由原厂数值/名字配对表核对：`0x60000000` 为 CREATE，`0x60000001` 为 INIT，`0x60000005` 为 EXIT；不能把 INIT 误当退出。
+
+CREATE 阶段复制原厂 64 字节配置后，在合成新存储中完整执行，无辅助函数拦截、无页面外写入，初始化 7 个嵌入视图，偏移为 `44/84/42C/4A0/294/304/344`，视图表在 `+51C`、焦点在 `+514`、默认事件回调在 `+518`。`m10v_ui.c` 已提供仅用于新建离线视图内存的有界原生桥；不足 `0x600`、未对齐或无效地址拒绝且不改输出。它不分配、注册或打开真实菜单。
+
+INIT 在合成有效属性银行及已唤醒的 UI 工作线程状态下，也可完整执行而不替换辅助函数：原厂 18 项列表选择索引 1（属性 43 为 5），入口动画状态为 2，并登记延迟工作。该阶段原厂返回 0，不能自行解释为“初始化失败”。
+
+原厂 OSD 上下文初始化 `0xA03BC94C` 从原厂 BUFF getter 取得缓冲 4/5，原厂尺寸 getter 返回 720×480 的物理缓冲，逻辑坐标则由原厂构造器设为 640×480。两者不同，不能拿启动图或 GR3 的坐标直接当 GR2 OSD 像素布局。此独立探针使用合成显示 BUFF；调色板设备上传/应用为 3 个明确边界。为隔离尚未加载的字体/完整绘图服务，先构造 detached 页面，再接入原厂图形上下文，执行原厂动画工作回调 `0xA039C56A`；合成内核时钟前进后动画状态从 2 变为 0，而非强行清除动画标志。没有验证真实绘图线程、字形渲染或可见屏幕。
+
+浏览列表会通过 `0xA03AD02A` 立即调用属性 setter。原厂撤销体系现已独立执行：初始化 `0xA03A0106`、begin `0xA03A013E`，经正常 setter 从效果 5 浏览至 6、7，保存区始终保留最初的 5；cancel `0xA03A01FA` 恢复 5，commit `0xA03A0302` 保留 7。最后原厂销毁 `0xA03A0120` 后系统池可用字节恢复原值，栈深度和 active 标志清零。分配器、位图和属性 setter/restore 均执行原厂代码，无辅助函数拦截；属性银行被配置为无别名、无通知订阅者和无锁的单线程状态，因此不代表 ISP 预览监听器或真实页面栈已经接通。
+
+原厂 undo 构造调用的是断言式分配包装，私有菜单后续不能把它未经检查地用于可恢复的分配失败路径。M10V 私有状态的预览、确认持久化和取消还需要与上述机型自己的页面生命周期衔接。
+
+## 流式胶卷包读取与共享设置逻辑
+
+继续定位正常文件 seek `0xA002E490` 和 tell `0xA002E39E`。seek 把有符号 32 位偏移扩展为 backend 的大端 64 位参数，origin 经栈传递；tell 仅在底层成功后复制 8 字节位置，错误时调用方输出不变。`m10v_files.c` 已连接绝对分段读取和实际文件长度查询，所有路径保留关闭结果并释放自己的元数据；覆盖 EOF、seek/tell/close/open 失败和超过 32 位的文件位置，不用头声明冒充实际文件长度。
+
+`m10v_sd.c` 流式读取公共 SD 格式：用实际文件长度校验 4096 字节包头，以 12288 字节单条读取，并校验 UI 期待的 ID、头内记录 CRC、记录 CRC/SHA/渲染器合约。列举最多分配 4 KiB，读取记录/名称最多分配 16 KiB；没有整包分配。与原厂系统池及原厂正常文件 open/seek/tell/read 联合 CPU 测试已通过，只替换底层 stdio、介质状态与文件元数据池边界；读取、损坏记录、无卡结束后没有保留文件句柄，系统池可用字节恢复原值。胶卷安装事务、私有 LUT 快照以及 capture 的预载缓存仍需继续接入，不能据此标记 camera-load 全部完成。
+
+已复用并编译现有 `m10v_settings.c` 的纯页面状态机，没有链接 GR3 的相机/视图地址桥。在 GR2 BE32 CPU 上验证 5 个槽位、46 项目录游标与换页、来源 ID 变化拒绝、保存失败停留、确认和取消，以及日期时间/格式/位置/颜色/独立胶卷名的全部取值。这里的后端是明确的回调边界；它证明共享页面操作逻辑可复用，原厂 GR2 视图、页面栈与真实 SD 后端还要按本机型连接。
+
+
+## 主图生产者交接与 ISP 等待适配器
+
+原厂 `0xA02AE0AE` 对比 `ctx+0x3E4` 的目标主图尺寸和 `ctx+0x258` 的生产者尺寸；相同时把 `ctx+0x1F0` 句柄移至 JPEG 主图源 `ctx+0x1F4`，清零旧槽，然后以种类 `0x17` 的容量调用原厂 BUFF 有效长度 setter `0xA029AB6E → 0xA00E09C6`。CPU 回归从有效长度 0 开始，执行真实句柄移动和 setter，得到完整主图长度且栈恢复；容量查询是明确的合成边界。尺寸不同时，另一分支分配 `0x17` 缓冲、调用 `0xA02AD7C2(ctx,1)`、设置长度、释放旧源，仍待联合执行。
+
+原厂 RAW→YUV 构建器 `0xA02AD48A` 从 `ctx+0x1E0` 取输入、`ctx+0x1F0` 取输出，调用 `0xA0130D72 → 0xA013B4F0`。后者启动 `0xA010C004(1)`；模式 5/6 继续调用 `0xA010C464(...,0x11,timeout)` 和 `0xA010C380(1)`。等待适配器调用 RTOS 事件 13，mode=1；成功后仅保留请求位，再用反掩码清除。执行原始等待适配器的测试提供合成 RTOS 结果 `0x91`，观察输出 `0x11`、清除参数 `0xFFFFFFEE`，确认无关位不会误清。真实事件发布者、中断、超时处理及 DMA 完成尚未验证，不据此宣称完整生产者就绪。
+
+## 目录内容冻结与保存后仲裁
+
+相同 custom ID（如 79）可以对应完全不同的名称/LUT；仅核对 ID 无法检测浏览后替换。新增每次目录会话持有的 4108 字节 manifest，冻结真实文件长度、有效条目数及完整 4096 字节包头。确认前重读长度/完整头，再校验记录 CRC/SHA；相同 ID、相同长度但内容改变以及追加字节均被拒绝。输出与 manifest 重叠也拒绝，防止覆盖冻结依据。原生 `gr2_sd_catalog_open` / `gr2_sd_frozen_record` 已连接原厂文件和系统池桥，每次调用释放临时 4/16 KiB，没有常驻文件句柄；实际页面的会话生命周期仍需连接。
+
+日志保存现在除写入、回读、逐字节验证候选外，还重新加载双日志，确认最终仲裁选择了该候选。新增旧序号候选测试先失败再修复：B 日志序号 100 时写入候选 12 不再误报保存成功。尚未将“文件读取失败”当作“首次初始化”，缺失与介质/I/O 错误的区分继续逆向。
+
+共享 120×196 胶片卡片绘制也已编入 GR2。原实现的整数像素约定依赖小端内存；BE32 包装逐像素转换为相同 RGBA 字节，6 组代表性胶卷/槽位/选中状态与独立主机参考逐字节一致，边界哨兵及短缓冲拒绝通过。没有将 RGBA 字节直接当作 GR2 的原生调色板或宣称可见绘制完成。
+
+捕获准入现同时保护仍被 ctx 保留的 `+0x1E0` 生产者 RAW 与 `+0x1E4` DNG RAW：二者生命周期不同，不能仅检查后者。新增前者与 YUV 重叠用例先暴露旧实现错误放行，再修复为拒绝且描述符输出不变；全部捕获联合回归通过。
+
+
+## 六个图形上下文、原厂字体与实际列表 DRAW
+
+默认 UI 图形上下文有 6 个：索引 0/2/4 使用 BUFF 4、5 的 8 位平面，索引 1/3/5 使用 BUFF 6 的 16 位平面。原始构造器保留物理 720×480、逻辑原尺寸/640×480/居中偏移等各自区别。完整离线 fixture 为这些平面、当前显示尺寸和属性银行提供合成状态，但 getter、构造器、widget handler、属性 setter 均执行原厂指令。DOWN/DOWN/UP 分别返回且属性 43 为 6/7/6；每次检查实际返回 PC 和栈，不把达到指令预算后的中间状态当完成。
+
+字体初始化 `0xA039955A` 应在列表 CREATE/INIT 之前。其字体工作区来自显示控制 `+0x2C`，原厂大小常量为 2246020 字节（`0x224584`）；此前的 `0x448A0` 访问异常是该工作区基址未初始化，不能据此说字体服务不可用。字体初始化经正常加载器读取官方 `RT_Latin.pac / LE_Latin.bin / RT_Moni.pac / LE_JP.bin`，全部来自 SHA 校验锁定的 b01firm6，原始字形引擎和列表 DRAW 已运行并生成可辨认文字。资源 SDK 有界读取与调色板硬件上传是明确边界；真实 A: 文件系统和硬件显示没有模拟。
+
+正确顺序的离线图形缓冲已进行灰度调试图检查，可见 Off、Black & White、B&W (TE)、Hi-Contrast B&W、Cross Process、Positive Film、Bleach Bypass、Retro 和 Detail/Fn2。该调试图不是相机截图，也未用它证明最终色彩合成或菜单已注册。
+
+新增 `gr2_text_draw` 编译后通过 ARM→Thumb 调用原厂 UTF-16 绘图 `0xA03BC4DC`。它仅复用现有 UI 线程已初始化的 640×480 逻辑上下文，不重置全局图形/字体服务；要求显式长度、终止符、边界及原厂符号颜色，使用私有栈上的描述符承接原函数对矩形的写回。M10V 文字联合 CPU 测试新增 477 字节像素变化，调用方矩形之外变化为 0，原页面与哨兵保持；缺少字体指针时，旧原厂调用可超出执行预算，桥现先拒绝且不改像素（RED→GREEN）。真实页面所有权、事件注册与完整私有视图仍在实施，尚未打开下载门禁。
+
+
+## 原生 16 位胶片卡片绘制
+
+`0xA03A4B34(mode=1, symbol)` 的原始软件颜色转换现已对 256 项逐项执行，无辅助函数拦截。其 RGB 固定点系数和最终通道移位证明 16 位结果为 R/G/B/A 各 4 位、依次占位 12/8/4/0；例如原厂白/黑结果为 `0xFFFF / 0x000F`，并非先前可能混淆的 RGB565 或 ARGB1555。参考按原始系数做 YUV→RGB、夹紧和 `/17` 四舍五入，再核对 alpha 表，全部一致。这是 CPU 图形格式证据，不替代实际显示硬件/透明合成验证。
+
+新增 `gr2_card_draw` 只供现有 UI 所有者调用：取得原厂全分辨率 RGB 上下文（索引 1），检查物理和逻辑 720×480 及目标范围，恢复性分配单张 94080 字节临时缓冲，执行已与主机逐字节对照的共享卡片，再原位缩为大端 RGBA4444，通过原厂行拷贝 blitter `0xA03BE442` 写入 BUFF 6。卡片不使用 GR3 绘图地址或私有调色板上传。
+
+联合 CPU 回归验证原厂 blitter 的 120×196 结果与独立转换参考一致、矩形之外字节不变、系统池可用字节恢复；分配失败返回拒绝，显示字节不变。这里仅补齐了可复用绘制桥，完整私有页布局、屏幕注册/退出及 SD 安装后端继续实施，未标记整个页面功能已完成。
+
+
+## 原厂根视图切换与可恢复的模态叠加层
+
+在已初始化字体和六个图形上下文的 fixture 中，原厂 `0xA0398CD8` 从空根视图切换至原厂效果页，实际发送 CREATE、INIT、设定当前根及绘图上下文。随后原厂主绘图循环 `0xA0398F20` 经正常根/子视图分派发送 DRAW，完成返回。此循环还访问低地址 `0x2004`：它位于原固件第 15 条延迟模块中，并非未知外部 ROM；给 CPU fixture 显式装入该原始模块后可继续执行。此处没有证明物理启动器已经提交该低地址模块，更新/加载链门禁仍保留。
+
+原厂另有独立的 5 槽叠加层：注册 `0xA0399094`、成员查询 `0xA0399182`、事件分派 `0xA0398E6C`、移除 `0xA0398A5E`。其前缀为 36 字节，和主根视图不同，不能混用。登记不会发送 CREATE/INIT，调用方应先完成私有构造；绘制发送 DRAW，关闭发送 EXIT（不是 DESTROY）后调用 `+0x10` 的销毁回调。注册原函数返回 0、关闭原函数返回残余寄存器值，都不能当成功/失败；应查询真实成员关系。
+
+新增 `gr2_overlay_attach/detach` 按该机型 ABI 连接：要求 UI 所有者、新建且有效的私有前缀、底层当前根存在；预查 5 槽容量、禁止重复注册；关闭后仅比较地址，销毁回调即便释放所有者也不会再解引用它。双重关闭不重复销毁。联合 CPU 用例执行原厂注册/绘图/按键/移除，仅私有事件与销毁回调为测试边界：叠加层消费 DOWN 时底层效果保持 6，退出销毁一次后同一个原厂事件把底层效果改为 7；当前相机根始终不变。满槽拒绝且候选前缀不变。
+
+补充事件名字校对：`0x60002001/02/03/04/05/06` 分别是 SPEC RIGHT/LEFT/UP/DOWN/OK/MENU，`0x6000200F` 明确是 FN1；既有状态动作把某个方向键转为 FN 事件属于焦点路由语义，不能把 FN1 直接当普通 RIGHT。正常模态还有 `0x60002501..06` 的 DLG OK/CANCEL/UP/DOWN/LEFT/RIGHT。真实物理键经过状态观察者再到叠加层的映射、私有页面状态与 SD 后端仍需继续连接，不能仅凭合成方向事件声称完整实体按键操作已实现。
+
+
+### 物理坐标填充与全宽文字
+
+原厂高层矩形函数会对照默认 640 宽参考系缩放：在 720 逻辑上下文中直接传物理 x=10..14，实际会写至 x=8..12。新增回归先暴露了边界外写入；`gr2_fill_rect` 改为使用原厂上下文 `+0x44` 的物理矩形方法，显式验证 720×480 和边界，8 位及 RGBA4444 表面逐像素均符合参考，外部字节不变。没有修改全局参考坐标来掩盖差异。另提供 `gr2_text_draw_full` 使用原厂索引 0 的 720 宽上下文，保留原有 640 桥；x=600..719 的文字绘制测试通过且矩形外字节不变。
+
+### 捕获对象归属的新线索（继续联合执行）
+
+原厂 `0xA00E1E3C(kind)` 是图像属性对象分配器，和 BUFF 像素句柄分开：在返回指针前 8 字节记录 magic `IMG ` 与 kind，再清零对象正文。原始尺寸表 `0xA01137EC` 为 type0=`0xFB0C`、type1=`0x7EF8`；数量表 `0xA01137E4` 为 60、91。初始化 `0xA00E1DF0` 按 `(size+8)*count` 从通用静态区域分配，并创建两个固定块池；不是通用 libc 堆，也不是先前证明的系统变量块池。释放 `0xA00E2020` 将 magic 置为 `void` 再归还对应固定池。
+
+上层构造 `0xA029B4E0(kind)` 分配对象、设正文首字节为 1，并增加 type0/type1 的独立属性计数；`0xA029B522(slot)` 获取类型、减少计数、释放后清空指针槽。该布局和 type0 的 0xFB00 尾部访问吻合，是定位逐帧快照扩展与销毁边界的直接线索。固定块池、构造、克隆与销毁现已按下节完成 CPU 联合执行；实际捕获入口和并发生命周期仍继续连接。
+
+
+### 固定池归属与逐帧值快照的联合执行
+
+`probe_image_object_pools` 已执行原厂 bump/system MPL 初始化、两个 MPF 固定池创建及分配/归还、上层构造计数、克隆和指针槽销毁。type0 的 60 个块全部可分配，第 61 次返回 -50，全部归还后可再次分配。互斥锁创建/加锁/解锁保留显式单线程边界，未模拟并发。释放时 MPF 链表会覆盖 magic，所以验证的是不再为 `IMG `，不能要求最终保持 `void`。
+
+内核 MPF 记录每项 24 字节，`+0` 活跃状态为 -1，`+0xC` 总长度，`+0x10` 块大小，`+0x14` 区域基址；原厂 type0 描述符 `0xA05FB0E8` 的 `+8` 块大小、`+0xC` 总长度、`+0x14` 半字池 ID 与之对应，控制指针位于 `0xA0129C54`。原生 `gr2_image_owner_bytes` 交叉验证尺寸表、描述符、内核记录、60 个块的精确边界与 IMG/type0 头。实际原厂构造/上层克隆返回有效大小，内部偏移指针、伪造独立 IMG、错误基址/步长、尺寸表不一致及已释放对象全部拒绝。检查要求调用者持续持有对象引用，不代替并发引用管理。
+
+捕获准入现接入上述归属检查，保护整个已配置对象块（含扩展）、48 字节请求、源/输出 BUFF 和保留的两类 RAW BUFF 元数据；拒绝把图像平面或输出描述符放到这些对象内。新增回归先证明原实现会接受错误池基址/步长及覆盖 BUFF，修正后通过。
+
+128 字节内联快照 `m10v_gr2_frame` 包含版本、槽、固定 seed、104 字节配方值、CRC 和保留字段，不包含动态指针。`gr2_frame_freeze/read` 只接受经过上述归属校验且正文恰为 `0xFB8C` 的对象；原尺寸拒绝写入，非空快照拒绝覆盖，读取失败不改输出，禁止覆盖对象本体。模拟内存中把原厂尺寸表增加 128 字节后，原厂初始化自动清零扩展、上层克隆 `0xA029B57C` 完整复制快照，修改全局配方后从克隆读取仍完全一致，上层销毁计数归零。60 个对象的正文总增加量为 7680 字节；尚未修改官方固件或证明整机峰值内存。此快照冻结配方数值，不声称冻结 custom LUT 内容或拍摄时间，也尚未接入真正拍摄入口、效果中和与 JPEG 钩子。
+
+
+原生 `gr2_capture_frozen` 已把对象内快照接到同步平面渲染：与原同步入口共用缓存前置、归属/RAW 准入、恢复性系统池 scratch、时钟及渲染后缓存处理。冻结 seed/槽/配方后破坏全局状态，输出仍与同 seed 的有效原配方逐字节相同；快照 CRC 损坏时未改动像素。此入口仍由 CPU fixture 调用，实际拍摄入口尚未安装；拍摄时刻冻结与 custom LUT 引用仍继续研究。
+
+
+### 逐帧色彩模式、原厂 ISP 配方与 JPEG 桥
+
+新增原厂 `0xA0141E68` 的无函数替换 CPU 探针，执行全部 21 个逐帧 `+0x408` 值、原厂软件浮点和属性库服务，输出 64 字节配方描述符及 12 字节辅助数据，输入对象及两个输出的外部哨兵不变。帧模式 0..20 映射到描述符 `+5`：`[0,1,14,2,3,4,5,6,7,8,9,10,11,12,13,0,16,0,15,17,18]`；`+17` 在模式 5/7 为 1。菜单模式、帧模式和此 ISP 配方编号是不同语义层，不能直接复用 GR3 常量。FE 独立属性库 `A016A58C(43)` 实际由全局 `12F/AEAF_TARGET_POS` 填充，不是 UI `43/EFFECT`；全局 `45/COLOR_MODE` 原厂 getter 在 EFFECT=Off 时选择 IMAGE_TONE。
+
+GR2 候选载体按五槽暂取 `[9,10,11,18,8]`（正片、漂白、怀旧、鲜艳、交叉冲洗），不把带额外裁切/合成路径的 Miniaturize/HDRTone 当作快捷等价项。原生 `gr2_producer_ingress/leave` 在调用者持有的有效扩展对象上先冻结，再只中和该对象 `+0x408`，结束后恢复槽对应的模式；原厂 UI 全局属性不改。对象/配方无效拒绝中和，已有有效快照重用旧配方/seed，模式冲突拒绝覆盖。与原厂 ISP 描述符函数联合执行时，五个候选载体均进入标准配方 0，退出恢复原值，其他已测模式不变。载体选择仍需实际生产者全路径验证，并非机型限制结论。
+
+已编译对齐的 `A02ADC98` 八字节 Thumb→ARM JPEG 前置桥；构建器验证原指令 `a806f684fc0e980a` 的精确样本和模块偏移。桥用原保留寄存器 r5/r7 与原栈 `+0x18` 请求调用冻结处理，随后无条件重放原厂 JPEG 调用和 `sp+0x28` 结果加载，回到 `A02ADCA0`。模拟 RAM 安装真实分支后，原厂主图/缩略图外层完整走到编码和释放，像素在编码前改变、RAW 不变、r4..r11/栈保留；损坏快照保留原像素且仍编码/释放。User 任务通过原厂低地址 SVC/池/调度返回，保持 User 模式。编码完成、源释放效果、质量/容量查询为明确边界；缓存 CP15 只观察，不模拟真实效果。
+
+重复编码回归先暴露同一 kind 被二次叠加。快照 ABI 更新为 v2：仍为 128 字节，`+120` 存三种 JPEG kind 的执行位、`+124` 为覆盖前 124 字节的 CRC。成功渲染后记录自己的 kind，在后缓存处理前写入；同 kind 重入保留像素，独立 kind3 仍渲染。新一次已确认的生产者入口清执行位、保留原冻结配方和 seed。失败未标记，未知标记位/坏 CRC 拒绝。这些桥和补丁元数据尚未组成可下载固件；真正生产者调用点、完整 IQ 参数初始化、custom LUT/时间快照和 UI/页面继续连接。
+
+
+### 原厂 IQ 参数初始化与完整生产者联合执行
+
+此前 `A01508AE` 在空 IQ 全局上读 `+0x2C` 的故障，现通过真正初始化消除，没有把它标为无法实现或替换 profile 查询。原厂 `A014DDE8(arena)` 建立 IQ 库，`A01507CC(0, IQ, COMMON)` 对精确资源组件中的 `A:/isp/IQ.bin`（194848 字节）与 `A:/isp/COMMON.BIN`（60 字节）执行完整解析、重定位和标记就绪，两者均返回 0、库 ready=1。输入资源不变，arena 外部哨兵保留；arena 位置是模拟分配，不声称整机峰值归属已证明。
+
+在上述真实参数库与无观察者属性库 fixture 中，完整原厂 `A02AD48A` 运行到 ISP 引擎，152 字节请求的 RAW 地址来自 `ctx+1E0`，YUV 地址来自 `ctx+1F0`，`+0x48` 传原始帧对象。引擎完成边界回填 33 个半字，原厂函数复制至 `ctx+F730`，保留栈并返回预期输出尺寸。唯一函数效果替换为 ISP 引擎完成；原厂 BUFF 读取、IQ 查表、软件浮点、配方构造和响应复制全部执行。
+
+新增 `gr2_producer_run` 先准备冻结配方，再经过精确重放原厂十字节前导的 Thumb trampoline 执行原生产者主体，最后恢复对象色彩模式并返回原厂结果。五个候选载体与上述官方 IQ 联合测试均在引擎入口观察模式 0、返回后恢复原模式、快照有效、矩阵响应正确。此包装仍需连接实际捕获调度入口和已提交配置源；它不是已经安装的整机捕获方案。CPU1 固件与真实 DMA/IRQ 完成、连拍/取消和缓存实机行为继续研究。
+
+
+更深一层的探针继续执行原厂 `A0130D72`，只在互斥锁单线程边界与 `A013B4F0` 硬件管线边界返回。原厂建立 128 字节硬件配置：mode=6、RAW/YUV 地址与前述请求一致；返回的非零矩阵由原厂 IQ 计算，随后原厂生产者复制至对象。测试对照引擎返回后的真实请求矩阵，不再用预填矩阵替代软件计算。这仍不模拟物理管线和 DMA/IRQ。
+
+自定义 LUT 的归属继续采用值快照研究方向，避免给原厂浅拷贝正文加入未经引用计数管理的动态指针。固定池探针已增加 `128+12288` 字节的模拟扩展：type0 块为 `0x12B94`（76692 字节，超过 64 KiB），原厂创建、清零、完整克隆、60 块耗尽/归还仍通过，没有 16 位长度截断。相对原对象 60 块总增加 744960 字节，其中 LUT 部分增加 737280 字节。尚未接入完整 LUT 快照，也未证明全机峰值内存；仅扩大模拟映射容纳原厂分配范围，没有修改官方固件或直接许可这些地址用于实机。
+
+
+### 完整 custom LUT 随帧克隆与冻结渲染
+
+在上述大块尺寸证明后，原生归属校验现仅接受原尺寸 `FB0C`、值快照尺寸 `FB8C` 和完整记录尺寸 `12B8C` 三种精确正文，其他尺寸不因落在范围内就被接受。`gr2_frame_freeze_custom` 把经过版本、ID、CRC、完整 SHA/renderer 校验的 12288 字节记录复制到对象 `+FB8C`，再次校验自己的副本后才发布 128 字节帧头；来源、配置与整块所有者重叠会拒绝，源记录错误或对象未扩展时不改对象。常规 freeze 拒绝把 custom ID 冻成缺少 LUT 的配方。读取 custom 帧同时验证对象中的完整记录，坏记录失败不改输出。
+
+联合原厂大 MPF、上层克隆与退休的测试中，完整 LUT 和帧头都随正文复制；破坏外部配置和 LUT 来源后，克隆仍完整有效，归还和计数正常。没有给原厂浅拷贝的正文添加堆指针，也没有新增必须拦截的引用计数释放路径。
+
+冻结捕获处理现把对象内 LUT/名称传给共享 `m10v_library_render_custom`，不在捕获中读取文件。真实原厂系统池和缓存桥 fixture 中，32×4 422 平面图像与共享主机算法逐字节一致（包括 UV 交织/复原）；外部记录先前已覆盖成 A5，输出仍使用快照。LUT 原始字节不变，损坏的对象记录被拒绝。原生捕获准入保护整个大对象，禁止把像素平面放进 LUT 扩展区。当前仍需连接 SD 持久安装、配置发布、实际生产者调度入口和完整页面，且未将大池扩展写入可下载固件。
+
+
+### SD 安装、A/B 自定义记录与原厂文件接口
+
+新增 `m10v_snapshot.c` 的数据事务：按当前已验证日志选择未激活的自定义记录 bank（每槽两个文件），先验证记录，再写入/精确读回 12288 字节并逐字节对照，成功后才返回新 bank；不在该步骤修改状态或日志。既有文件完全相同可跳过写入。短写、尾部多余字节、错误记录或输出别名拒绝，当前激活 bank 保留。读取只接受日志选中的 ID/bank 和精确长度，失败不改输出。
+
+原生文件白名单仅增加十个完整文件名 `H:/M10VC[0-4][0-1].bin`；尾缀、越界槽/bank、路径拼接和其他盘符拒绝，胶卷包仍只读。`gr2_pack_install`/`gr2_sd_install` 重读冻结目录、取新鲜有效日志、完成自定义记录事务，再通过共享库提交新日志；失败不凭读失败创建默认状态。内置记录由冻结包校验后选取 ROM 对应配方，不为拍摄新增文件依赖。
+
+事务回归中，日志短写后旧 sequence10/内置 ID34 仍可恢复；重试时跳过已验证记录，仅成功提交 sequence11/custom ID79；坏包不产生写入。另一联合测试通过原厂 open/read/write/seek/tell/close 包装与真正系统 MPL 执行目录打开、完整安装、日志重新加载和 custom 记录读回，所有 FILE 元数据及临时池空间释放，输出与包记录完全相同。原厂 `fread` 使用 `(buffer,1,count,file)` 并返回字节数，`fwrite` 使用 `(buffer,count,1,file)` 并返回 item 数 1；联合后端遵守两套不同约定。存储设备、文件元数据池、卷/线程/互斥边界仍显式合成，没有真实 SD 写入或硬件验证。
+
+### 原生设置页面、中文绘制与按键作用域（2026-10-21）
+
+`gr2_settings_backend_bind` 将共享胶卷/水印状态机连接到已验证的原生日志和冻结目录接口。每次写入都重新读取有效日志，不把页面上用于显示的旧 CRC 状态直接写回；目录只在进入选择页时刷新。联合原厂文件包装、系统池与共享状态机的测试覆盖安装、取消、水印保存及读回，关闭所有文件并归还临时内存。首次启动默认配置的发布仍待接通，不因两个日志读取失败就覆盖磁盘。
+
+`gr2_settings_open` 分配并注册原厂 modal overlay，保留相机根页面。胶卷库、目录、水印及字段编辑均运行共享确认/取消状态机；五张卡片逐张使用临时池空间绘制并释放，不常驻五张 RGBA 位图。通过原厂 720 坐标文字接口、RGB4444 绘制与官方字体服务完成绘制。语言属性 `0x1E4=4` 时，原厂字体初始化实际读取 `RT_CN_S.pac`、`LE_CN_S.bin`；英文和简体中文均完成绘制、安装取消/提交、字段取消/提交、关闭和重开，原相机效果值不变，页面池空间全部归还。CPU 重建两个显示平面的图片已检查五张卡片和中文水印布局；这不是硬件屏幕截图或显示合成证明。
+
+原厂事件入口 `A039494E` 先保存 r4-r6/LR，`A0394950` 的八字节为 `0006000d24002900`，随后执行 provider、定时器、状态 watchers、overlay、provider post。新增身份校验的 RAM 测试 veneer 在 watchers 转换/排队前处理私有页面的方向、ADJ 左右/按下、拨轮及 OK，避免一次原始按键又排成 SPEC 事件造成双重操作；页面关闭或未映射事件继续原指令。测试执行安装后的原入口，检查 r4-r11/SP、页面操作次数以及未进入 watchers/overlay 二次投递；关闭后比较同一原按键在有/无 veneer 时的完整 provider 路径。切换模拟器中的指令时显式失效 Unicorn 翻译缓存，避免旧指令读取新 literal 的 fixture 假故障。该 hook 尚未由启动安装器自动启用。
+
+GR II 没有单独的原始 MENU 事件：`SYS_KEY_OK=6000100A` 对应合一的 MENU/OK；原始 `60001017/18` 是拨轮左右，不能充当 MENU。官方 [GR II Operating Manual](https://www.ricoh-imaging.co.jp/english/support/man-pdf/gr-2.pdf) 印刷页15将 DISP 标为 r，印刷页29将 r 用于取消；结合固件 `SYS_KEY_DISP=6000100E`，私有页面返回/取消采用 DISP，页脚同步标为 DISP。其余页面语义沿用 GR3，按键实现遵守 GR2 实际硬件。
+
+### 配置发布所需互斥接口
+
+原厂 `A0027270` 包装使用属性2创建内核互斥量；直接内核接口 `A00665CC`、`A0066D94(id, timeout)`、`A00671B8(id)` 可返回错误而不触发外层断言。使用两个明确的合成任务记录执行全部原始指令，创建返回1；任务1首次 try-lock 成功，同任务重入 -28，任务2竞争 timeout0 返回 -50，非所有者 unlock -28；任务1释放后任务2取得并释放成功。内核表所有者依次为 `[1,1,1,1,0,2,0]`，无代码替换，栈保持。任务激活/dispatch 状态和空拥有链是合成内核状态，未声称实际抢占/等待队列/相机任务时序；此证据用于下一步 UI 配置与捕获之间的受保护发布。
+
+### 受保护配置发布与真实生产者入口（2026-10-21）
+
+`m10v_configuration.c` 在 UI 所有者上先验证并复制整个配方和全部已选 custom 记录，再在原厂内核互斥量内交换活动指针；捕获在同一互斥量内把所需数据冻入图像正文，随后不再依赖活动指针。旧配置只在交换完成、所有读者退出后释放。互斥量直接使用上述内核接口及属性2，timeout0，创建/分配/竞争失败保留旧配置并释放候选。没有在共享活动对象中保存调用者 LUT 指针，也没有在捕获入口打开文件。种子在锁内递增，已冻结的克隆继续保留原种子。
+
+原始系统 MPL 与原始内核互斥测试中，任务2占锁时任务1发布/新帧冻结立即失败，快照不变且不泄漏；解锁后可发布。发布 custom ID79 后，先破坏来源状态和 LUT，再冻结，帧内完整记录与原记录逐字节相同。之后发布另一配方并释放活动配置，既有帧继续保留 ID79、原 LUT 和 seed1234，全部配置池空间可归还。`gr2_configuration_reload` 只由 UI 调用，先取得有效日志和全部已选记录，再原子发布；坏记录或发布失败保留旧活动配置。设置后端在加载/提交后连接该过程，SDK 联合测试验证保存后的 RAM 配方与日志一致、坏记录不会替换旧配置，FILE 元数据和临时池空间全部释放。
+
+生产者入口原始 `A02AD48A` 先 PUSH `{r4-r7,lr}`，对齐 `A02AD48C` 八字节是 `0004000db0ad2198`。构建器对精确组件和模块偏移验证后提供八字节 RAM 测试分支。`gr2_producer_chain` 恢复这次原 PUSH，再尾转入活动适配器；适配器从受保护配置冻结、调用绕过 hook 的原厂 trampoline、恢复原模式并保留返回值。安装真实 RAM 分支后，从原地址而非显式测试适配器进入，五种载体 `[9,10,11,18,8]` 均在原厂 IQ/生产者到达引擎前被中和，返回后恢复原模式，原厂输出尺寸和响应复制保持。引擎完成仍是硬件边界；启动自动安装、物理 DMA、实际拍摄并发和峰值 RAM 尚待验证。
+
+新增冻结 JPEG 准入检查：当前帧模式必须为中和模式0或该槽的 GR2 原始载体。有效 CRC 的旧快照不能用于当前模式冲突的帧；冲突拒绝不修改像素。该回归先失败（此前仍处理），增加模式约束后通过。配置/入口/自定义处理三个定向测试通过，后端/配置三个联合测试通过。
+
+首次启动研究继续：固件包含 `pf_init_prfile2` 标记。原厂 fopen 经 `A007F412`、`A007E136` 进入路径/目录查找；`A0078514` 的某些下层失败会统一转为3，因此不能仅凭 fopen 错误号3就断言两个日志确实不存在，更不能据此覆盖未知的旧自定义 bank。正在继续区分真实目录缺失与介质/查找失败，尚未完成该逆向，不标为不支持。
+
+User 模式补充：配置发布、读回、竞争拒绝、custom 冻结、替换和清理也经原厂低地址 SVC 分发及实际 same-task 调度返回执行，最终仍为 User 模式，观察到 SVC4/3/0。最初的合成 fixture 启用任务却未填 ready bitmap/head，原调度器正确选择了未构造的 task0；补齐优先级20的 ready 位、head 和对应用户返回标记后通过，未替换互斥或调度函数。两个任务身份由 fixture 显式切换，不宣称真实抢占时序。
+
+### 页面初始配置的大端编译契约
+
+GR2 构建器现接受完整 M10V 五槽配置；复用现有页面 `normalizeConfiguration` 与共享 `initialState`，通过 stdin 传递 JSON，不拼接用户输入到命令。它先取得共享 LE104 线协议，再转换状态头、五个 film ID、reserved 与 CRC 为 BE32 原生内存格式，通过 `M10V_INITIAL_STATE_BYTES` 编入共享库；审计保留标准化配置、配置摘要及两种状态字节。原来的 `{}` 仍表示共享默认配置。
+
+非默认五种胶卷、Phoenix/RED 专用曝光、水印与胶卷名称标记编译后实际执行 `m10v_library_init`，通过原生校验，再由 `gr2_state_encode` 回转，输出与页面共享协议逐字节一致。非法取值/字段拒绝；HDF 的 GR2 ISP 绑定仍待逆向，不会静默丢弃非零 HDF 配置。该状态是原生初始值来源，不据此创建/覆盖未知的 SD 日志，也未打开下载门。完整104项 GR2/公共回归通过。
+
+### 原效果菜单的胶卷名称与稳定指针
+
+实际菜单使用两条文字入口：显式语言 `A03A4AD0` 和当前语言 `A03A4AEE`，均读取 `A03A4C20 -> A05909EC` 的21张语言目录。五载体关联七个文字 ID：112、113/114、115、126、110/111；长短别名必须一并更新。构建时直接从精确 GR2 组件提取全部行地址和147个原指针，生成只含地址/预期值的本机构建头，不使用 GR3 地址。
+
+`gr2_configuration_names` 在同一原厂互斥量内复制五份 UTF16 值；custom 名称来自已拥有的记录。`gr2_effect_names_refresh` 将值写入固定生命周期的五个静态名称缓冲区，再把已逐项验证的147个目录项指向对应缓冲区。更新配方只改缓冲内容，不释放其地址，避免原控件缓存悬空字符串。原厂所有其他标签指针不变；restore 验证后恢复全部原指针。若目录、行地址或任一目标被第三方值改动，refresh/restore 均拒绝且不修改其余表。
+
+21种语言的显式/当前语言原厂访问器都实际运行，七个别名与配置槽对应；换卷后地址保持、名称更新，原表逐字节恢复，真实系统 MPL 临时空间归还。刷新用可恢复的960字节 MPL 临时空间，避免与原生 UI 调用链叠加两份大栈数组；池耗尽时保留旧名称和所有指针，释放保留块后重试成功。低内存 fixture 从内核实际空闲单元计算，而非把2MiB区域总长当作可分配载荷：此合成初始池可用载荷为1747620字节，包含分配器粒度/元数据开销。设置后端仅在名称重定向已经明确安装时随 journal/config reload 刷新，尚未自动安装到启动流程。完整105项回归通过，没有据此声称原生控件重画或真机可视结果已验证。
+
+首次启动补充：原厂 stdio 模式解析器实际执行得到 r=2、w=1、a=4，`+` 加8，`wx`/`wbx`/`x` 均拒绝；这仅证明该解析器的拼写，不证明底层不存在独占创建接口。目录包装 `A002F354` 为 FIND 后续遍历，调用 SDK `A00653EE -> A0079DFC -> A0079124`，错误号3走无额外错误日志的结束分支，其他错误另行记录；`A00653BC` 是首项接口。继续向实际 FAT 目录遍历与错误传播逆向，尚未将错误号直接当作安全初始化依据。
+
+### First-boot journal absence and startup ordering
+
+The directory probe now executes the original PrFILE initializer, SDK FindFirst/FindNext, character conversion, FAT16 matching and entry decoder. Sector-cache acquisition is the explicit device boundary; original record reader A00941B2 executes. Empty directory returns3; media error9 is preserved; cache error3 and short records become17. An unready device returns9 without reading media. Native exact A/B-name checks release their private4096-byte cursor through the original MPL. Original FindClose has no additional directory-close operation.
+
+The UI initializes compiled defaults only when both journals are confirmed absent, using existing write/readback/arbitration. Repeated initialization does not write. Corrupt existing journals, failed reads and unready devices are preserved. This synthetic FAT16 evidence does not prove FAT32/exFAT, hot-swap or actual preemption. Full108 tests passed in199.683s; runtime code274956/memory275940, BE32, no undefined symbols/BE8, can_package:false.
+
+Original phase dispatcher A00C63A6 calls A00DFC08 then image-pool initializer A00E1DF0 in phase2, before module14 and post-load. Pool-size literal A01137EC must therefore be reserved before original pool initialization; changing it after allocation would invalidate ownership geometry. Startup auto-install remains disabled while its safe window is researched.
+
+### Actual native menu root (continued)
+
+The earlier84-widget candidate is not used as proof of the settings menu. Executing shooting-OK action A039242E observes its actual FSM push request60028; indexed record40 resolves to public60004019, configurationA040D494 and handlerA03ABCD5. Original CREATE initializes six embedded children at offsets30/78/174/324/1B4/2E8 with guards and stack preserved. Original INIT also returns with a synthetic initialized property bank and active root; category predicates execute without substitution. It exposes five categories with35/12/20/47/48 items and titles355/356/357/358/0. This does not yet prove live eligibility, drawing or a private launcher.
+
+The build audit now records both exact source-literal owners: C-heap reservation A0023154 belongs to load record0/source2F54, and image-body size A01137EC belongs to record1/sourceF35EC. Expected valuesA0798000/FB0C and proposed valuesA0800000/12B8C are identity locked and marked before_original_module_load; these are audit descriptions, not emitted firmware patches. Original phase2 dispatch execution reaches the pool call fromA00C6474 after its three preceding helper boundaries. Targeted3 tests passed; native-contract/build61 tests passed before the added menu-root regression.
+
+Original type1 confirmation additionally executes with a detached copied32-byte row and private target6D100001/6D100003. SPEC_RIGHT60002001 reaches A03948C0 with each exact target, preserving stack/guards. Route conversion is an observation boundary, not an installed launcher or accepted FSM event. Full111 tests passed in201.641s; the strengthened INIT/confirm regression separately passed in0.799s.
+
+### Owned native setup entries and confirmation routing
+
+The native adapter appends two persistent32-byte action rows after the original setup category is refreshed. Each refresh restores the original47-row pointer/count before running A03C1380, then copies those47 rows and appends the private actions into49 owned rows. Thus the original definition/parallel-ID lookup never visits a synthetic index. Original row bytes remain unchanged; cached owned-row pointers remain stable. Explicit disable restores category metadata; UI consumers must subsequently rebind their lists. Foreign category metadata rejects modification.
+
+Private routes6D100001/6D100003 enter films/stamp through a native bridge at A03948C4, before public-route conversion. Open failure is consumed and leaves the menu available for retry; ordinary and wrong-root route traces, stack and r4-r11 match the original. Actual original type1 rows activate through RIGHT (SPEC60002001); ordinary stock MENU/OK can close the menu. The existing physical-key bridge additionally accepts MENU/OK or ADJ confirmation only when the active kind17 menu has an owned row pointer, row focus and selected index47/48. Other rows, root kinds, category focus and pointers decline unchanged.
+
+Private captions70068/70069 use persistent UTF16 labels. The original current-language accessor is unchanged; the native caption adapter delegates all stock IDs to it, preserving21 locales and live dynamic pointer updates. A private descriptor bridge at A039D168 resolves original setup-title670 geometry/font metadata, restores the private ID and replaces the resolved caption pointer. The original raster classifier at A039D60E changes only its104-to106 namespace limit; this branch performs classification, not table indexing. This pair is necessary: a lookup-only change leaves blank rows, while replacing the private ID permanently causes a later resolver pass to recover the stock caption. Stock descriptor84-byte values and return values match before/after for21 locales; private geometry matches the original setup title.
+
+CPU rendering exposed and resolved two additional fixture/integration issues: scrolling needs actual original animation progression, and raster classification is separate from metadata classification. Advancing the synthetic clock and executing A039C56A produces the final original-font frame, visually inspected at ignored runtime-menu-entries/menu-frame.png: both Chinese titles, stock yellow selection, existing menu rows and footer render correctly. Tests also check caption glyph pixels, original navigation to both new rows, RIGHT and raw MENU/OK/ADJ routing, and all scope rejections. Page-open failure is an explicit boundary in this combined menu probe; the complete private page and SD/backend lifetimes are tested separately. No real-device display, startup installation or joint live SD launch is claimed.
+
+Seven menu/settings tests passed in20.841s; complete116-test GR2/common regression passed in208.568s. Final runtime code276120/memory278676, BE32, no undefined symbols/BE8, can_package:false. Boot installation and unverified features continue under research.
+
+### User-mode instruction-cache handoff through SVC data dispatch
+
+The original task-frame constructor A00AF7A8, executed with static initial-task entry A00B5BB4=A0020945, builds a User-mode SPSR(10). Direct privileged CP15 instructions in post-load are therefore insufficient. Modifying the old callback instruction A0044F4C also creates an instruction-cache bootstrap question. The original SVC dispatcher instead reads a data table at A00AF870: its SVC5 slot A00AF884 contains A00AF8A8. The new native handler can be selected by changing this data word while leaving the original callback code untouched. Its save and exception-return sequence reproduces the original handler.
+
+`gr2_code_sync` accepts only the exact owned data entry in User mode. Actual original low SVC dispatch/return executes the native gateway, drains writes and invalidates the instruction cache; unexpected region5 bufferable policy rejects without either operation. Original startup sets D/I-cache region masks20 and bufferable mask0 for A0000000 region5. The [Arm946E-S TRM](https://documentation-service.arm.com/static/5e8e3ee588295d1e18d3aa82), sections2.3.8 and3.3.2, explains the relevant CP15 operations and write-through policy for that execution model. This is conditional architectural interpretation, not identification of the physical camera CPU. The CP15 read/maintenance operations are explicit observation boundaries in emulation.
+
+The existing User data-cache bridges accept either the original audited callback branch or the new data-vector entry. All native cache-maintenance operands now use zero as required by the documented SBZ contract; the new regression first exposed nonzero tag operands. The native gateway preserves the original R0 and its scratch registers for unrelated SVC5 callers. Tests verify absent-vector0/installed1/unexpected-policy0, original callback code unchanged, actual User exception return/stack/r4-r11 preserved, unrelated calls unchanged, data-cache before/after functioning through the data vector and zero maintenance operands. The isolated old cache fixture required the real vector memory page after this new read; no runtime workaround was added.
+
+Targeted cache/SVC tests passed; complete117-test GR2/common regression passed in219.077s, with the task-frame follow-up separately passing in2.425s. Automatic boot installation remains to implement and hardware cache coherence remains unverified.
+
+### Early native load before subsystem execution
+
+CPU locking alone does not make an eight-byte Thumb hot patch safe: a suspended task may already have its saved PC inside that window. The source plan now loads the native record before module1 initialization, so subsequent original module loads can bring in prepared hook instructions. Module0 has316 zero-padding bytes after its original loaded extent (A00C4AC4/sourceA48C4), before the next source and destination. A44-byte bootstrap fits there; extending only record0 length preserves all neighboring records. Startup prelude A002094C (24010020) branches to it.
+
+The bootstrap calls original indexed loader A0056722 for record14, checks success, restores the original4-byte record14 stub at A05F5400, then reproduces r4=1/r0=1 and resumes the original module1 call. Failure unwinds both helper and startup frames and returns-1 before any phase. Restoring the original stub is deliberate compatibility preservation; moving record14 to the native window must not silently remove its old entry. Removing that store makes the regression fail; restoring it passes.
+
+Original wrapper prefix A0022E28 and its loaded-flag getter execute with both flag states: completed records do not request another indexed load. Combined startup evidence loads native once before phase1, preserves a BSS canary through the late record14 call, reaches post-load once and preserves r4-r11/SP. The separate full-module0 loader probe copies the complete extended payload, verifies its tail and next-module guards, clears original BSS and sets completion. These use explicit synthetic header/storage and subsystem boundaries; they are not complete boot-ROM or camera startup proof. Full120 tests passed in208.853s.
+
+Image-pool ownership is also explicit: original bump allocation beginsA0900000, reserves the first2MiB for system MPL, and bounds its later allocations atBFDC0000. Extended type0 data beginsA0B00020 (60 blocks of76692); type1 beginsA0F636E0 (91 blocks of32512). All original factory/clone/exhaustion/reuse tests still pass. These pools are separate from the C-heap reservationA0798000..A0800000; neither is claimed to prove full live peak demand.
+
+### Research component assembly and actual source-stream startup
+
+`build_gr2_component.py` now assembles an offline executable component from the exact official GR2 input and audited native runtime. It prepares the two memory literals and all source hooks, places the44-byte early loader in original module0 padding, appends native code at a512-aligned source offset, assigns record14 its bounded code/BSS extent, and recomputes component lengths and weighted checksum. Original identity bytes, all four verification switches, other record ownership fields and the complete deferred record15 remain unchanged. SVC5 callback code and its dispatch data entry remain original until native post-load activation. The artifact is deliberately not an FRM package or download.
+
+The generated component is6409080 bytes, below the original executable partition policy. Original updater instructions accept its complete modified payload checksum. The startup probe additionally consumes this actual candidate header and full padded NAND-source stream; it poisons unloaded module destinations and executes original indexed-loader copies, BSS clearing and completion flags for requested records. Runtime loads once before phase1; the original stub and BSS canary survive; loaded memory literals match the reserved ownership contract, and caller stack/r4-r11 remain intact. Initial module0 copying is covered by the separate full-loader probe; subsystem bodies and wrapper post-actions remain explicit boundaries.
+
+Source-component/import gates reject incorrect model identity, runtime digest/base/endianness and an escalated packaging flag. Four component tests plus existing runtime/loader checks passed (41 tests,70.991s); complete124 tests passed in226.864s. Research artifact: ignored data/research/gr2/implementation/gr2-research-component.bin and its audit JSON. `can_package:false` and `activation_ready:false` remain accurate while post-load activation and UI-owned journal restoration are completed.
+
+### Source-prepared native activation at post-load
+
+`m10v_boot.c` now validates all prepared source branches, heap/image-body literals, the restored original stub, required original completion flags and actual pool/MPF geometry before activation. It checks the original callback instruction and SVC data entry, accepts only User/SVC/System with fully unlocked or fully masked IRQ/FIQ state, rechecks the vector inside the critical section, installs only its owned data entry and invokes the cache handoff. Failed policy verification restores the prior data entry; initially unlocked callers are unlocked through the original API, while already masked callers retain their mask. Repeated successful activation does not reinstall or issue another SVC. No instruction hot patch, filesystem access or allocation occurs here. `gr2_post_load` invokes this gate while retaining the original-1 result and boot counter.
+
+The actual candidate startup fixture now runs in User mode, with explicit original deferred-vector mapping and synthetic initialized pool geometry (pool creation/factory execution remains covered independently). Original CPU mask/SVC dispatch/exception-return instructions execute: normal activation emits4/5/3, already masked activation emits only5; partial masks decline. Changed pool stride, source target or foreign SVC vector decline before SVC; unexpected bufferable policy rolls back without cache operations. All caller masks, stack and r4-r11 remain correct, the callback code remains unchanged and idempotency is tested. The complete126-test regression passed in213.845s. This completes the data/cache activation step, not UI-owned persistent-state restoration or real-device boot validation.
+
+### Final startup return and the filesystem lifecycle
+
+The original startup tail A0020AD2 consists of MOVS r0,0 / POP {r4,pc}. The research source now redirects this four-byte pair through an eight-byte Thumb-to-ARM bridge after the existing44-byte early loader. Module0 grows52 bytes within its original316-byte zero padding. The native tail stores `gr2_startup_complete=1`, reproduces the original zero result/flags, restores original r4/return address and interworks back to the caller. No filesystem, allocator or SVC is called. Preflight checks both unaligned Thumb branch halfwords and the aligned bridge/target. Candidate CPU tests observe completion0 when the original finalizer is entered and1 after its return, with original stack, saved registers and User return intact. The finalizer body remains an explicit subsystem boundary in this integrated probe.
+
+Further original control-flow analysis distinguishes initial loading from normal filesystem operation. PrFILE initialization writes A061EAD0 last; the high-level filesystem constructor A002C11A publishes control A00C2C6C+20=0 only at its successful end, creates the mutex and FILE metadata variable-pool pointer+1C. Cleanup A002C600 sets+24 while tearing down, invalidates/frees pools and ends with+20=1. Startup finalization calls cleanup; later operating-mode paths A0022EFC/A0023002 call the constructor again, and their paired paths close it. The diagnostic wrapper A004BE44 also exposes the same open/close pair. Therefore UI restoration must wait for this later live service state; simply calling fopen after the native post-load callback is insufficient. Original path helper A002B0EE only checks the selected driver, not a mounted volume.
+
+### UI-owned automatic restoration
+
+`m10v_boot_ui.c` adds a pure readiness snapshot: cache activation and final-return markers, PrFILE initialized, the high-level FILE service open/not tearing down with a mutex, H: mounted bits and drive letter, and a live original variable-MPL metadata head at A05FA9CC+28*id. It does not initialize/mount services, allocate or access media. Actual SDK reads still perform their original media-change checks; this snapshot is not a hot-swap guarantee.
+
+The prepared original UI event chain now invokes restoration before private key conversion, then reloads the original message from its saved frame. The UI owner restores or safely initializes the journal, loads/copies selected custom snapshots, publishes configuration through the original mutex, enables private menu entries and refreshes stock captions. A loading state prevents reentrancy. Failure is retried only on raw MENU/OK or ADJ; success does not repeatedly access disk. Caption failure disables the pending private entries. Neither the startup callback nor the capture worker accesses the filesystem.
+
+Readiness rejection tests cover unfinished startup, closed/tearing-down services, absent/misaligned/dead metadata pools, unavailable H: and invalid IDs without I/O. State-machine tests cover ordered restoration, failure/retry and no repeated work. The installed raw-chain test deliberately clobbers r1 inside bootstrap and verifies the original message reaches the next adapter with saved registers/stack intact. The existing native SD integration now performs automatic restoration through original FILE wrappers, RTOS allocation/mutex and real native configuration/caption/menu adapters, recovering custom film79 and the `Native LUT` title without new journal writes; disk/mounted state and FILE metadata allocation remain explicit fixtures. Complete130-test regression passed in252.996s. Final BE32 runtime277896 code/280468 total bytes, no undefined symbols/BE8; packaging remains closed. Full original boot-to-UI, physical cache and camera capture are still unverified.

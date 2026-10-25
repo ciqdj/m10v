@@ -153,8 +153,9 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
     # not required. Override the base class's inherited skip marker.
     __unittest_skip__ = not OFFICIAL.exists()
     __unittest_skip_why__ = 'official firmware unavailable'
-    visible_film_count = 47
-    choose_slot_index = 3
+    visible_film_count = 55
+    choose_slot_index = 2
+    root_menu_rows = 6
     slot_five_film_index = 0
     slot_one_film_index = 15
 
@@ -172,7 +173,7 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
                 self.assertEqual(self.call(0x53394820,redraw.VIEW),want)
 
     def test_curated_first_and_last_rows_confirm_into_real_stock_slot(self):
-        for index,film,tone in ((0,33,213),(1,66,288),(2,67,289),(3,68,290),(4,69,344),(13,78,353),(14,289,354),(15,34,256),(46,65,287)):
+        for index,film,tone in ((0,33,213),(1,66,288),(2,67,289),(3,68,290),(4,69,344),(13,78,353),(14,289,354),(15,34,256),(46,65,287),(47,290,360),(48,291,400),(54,297,406)):
             with self.subTest(index=index):
                 self.files.clear()
                 self.u.mem_write(redraw.MODEL+0x1d,b'\x01')
@@ -218,6 +219,8 @@ class CurrentMenuArmTests(redraw.FixedNativeRedrawArmTests):
     def setUpClass(cls):
         AdjArmTests.setUpClass.__func__(cls)
         cls.firmware = cls.code
+        cls.choose_slot_index=3 if cls.manifest["detail"]["native_grain"] else 2
+        cls.root_menu_rows=7 if cls.manifest["detail"]["native_grain"] else 6
 
     @classmethod
     def tearDownClass(cls): cls.folder.cleanup()

@@ -42,7 +42,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_tone.h','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
@@ -51,11 +51,11 @@ sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
 sources.push(...hdfSources);
 sources.push('native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
-const nativeGrainSources=['native/gr3/m10v_isp_native_effects.c','native/gr3/m10v_isp_native_effects.h','scripts/build_gr3_native_grain_hooks.py','scripts/build_gr3_native_grain_noise_hook.py'];
+const nativeGrainSources=['scripts/build_gr3_native_grain_hooks.py'];
 const viewDeferredSources=['native/gr3/m10v_view_deferred.c','native/gr3/m10v_view_deferred.h','native/gr3/m10v_view_recovery.h','scripts/build_gr3_view_deferred.py'];
 const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h'];
 const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
-const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
+const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-styles-contract.json','node/gr3-sd-20261023-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
 export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
@@ -71,7 +71,7 @@ function checkRuntime(runtime, manifest) {
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 80 && manifest.slots === 5 && Array.isArray(manifest.dependencies) &&
+  need(manifest.film_count === 95 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
@@ -125,8 +125,20 @@ function checkRuntime(runtime, manifest) {
     const w=newstocks.stocks[i],m=manifest.film_newstocks[i],payload=Buffer.from(w.values);
     need(w.id===73+i&&m.film_id===w.id&&payload.length===10125&&m.bytes===payload.length&&m.sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'new stock compiled payload differs');
   }
+  const styles=JSON.parse(readFileSync(new URL('../web/gr3/style-filters-luts.json',import.meta.url)));
+  need(styles.stocks.length===7&&manifest.film_style_filters?.length===7,'style inventory differs');
+  for(let i=0;i<7;i++){
+    const w=styles.stocks[i],m=manifest.film_style_filters[i],payload=Buffer.from(w.values);
+    need(w.id===291+i&&m.film_id===w.id&&payload.length===10125&&m.bytes===payload.length&&m.sha256===sha(payload)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+payload.length<=runtime.length&&runtime.subarray(m.offset,m.offset+payload.length).equals(payload)&&m.camera_calibrated===false&&m.film_calibrated===false,'style compiled payload differs');
+  }
+  const d76=JSON.parse(readFileSync(new URL('../web/gr3/d76-luts.json',import.meta.url)));
+  need(d76.stocks.length===7&&manifest.film_d76?.length===7,'D76 inventory differs');
+  for(let i=0;i<7;i++){
+    const w=d76.stocks[i],m=manifest.film_d76[i],p=Buffer.from(w.values);
+    need(w.id===299+i&&m.film_id===w.id&&p.length===10125&&m.bytes===p.length&&m.sha256===sha(p)&&Number.isInteger(m.offset)&&m.offset>=0&&m.offset+p.length<=runtime.length&&runtime.subarray(m.offset,m.offset+p.length).equals(p)&&m.camera_calibrated===false&&m.film_calibrated===false,'D76 compiled payload differs');
+  }
   const init = Buffer.from(manifest.initial_state_hex || '', 'hex'), initAt = manifest.initial_state_offset;
-  need(init.length === 104 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+104).equals(init), 'native initial settings readback differs');
+  need(init.length === 184 && Number.isInteger(initAt) && initAt >= 0 && runtime.subarray(initAt,initAt+184).equals(init), 'native initial settings readback differs');
   const quietDebugSinks=!!manifest.capture_lifecycle&&manifest.experimental_capture?.native_color===true&&['m10v_debug_log','m10v_debug_batch'].every(name=>{const at=manifest.symbols?.[name]-BASE;return Number.isInteger(at)&&at>=0&&at+8<=runtime.length&&runtime.readUInt32LE(at)===0xe3a00000&&runtime.readUInt32LE(at+4)===0xe12fff1e;});
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
     manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
@@ -140,34 +152,41 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
-  const iconCount=focalIcons?835:manifest.sd_library?762:756,descriptorCount=(manifest.sd_library?91:85)+(focalIcons?1:0);
+  const iconCount=focalIcons?855:782,descriptorCount=111+(focalIcons?1:0);
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
-  for(const [address,length] of [[icons.table,iconCount*4],[icons.descriptors,descriptorCount*8],[icons.pixels,78*6400]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
-  need(icons.catalog_count===iconCount&&icons.descriptor_count===descriptorCount&&icons.descriptors===icons.table+iconCount*4&&icons.pixels===icons.descriptors+descriptorCount*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+artwork.length).equals(artwork),'native icon readback differs');
+  const retired=manifest.sd_library?32:0, packedArt=artwork.subarray(retired*6400), packedCount=78-retired;
+  need(icons.catalog_count===iconCount&&icons.descriptor_count===descriptorCount&&icons.payload_bytes===packedArt.length&&icons.retired_generic_count===retired,'native packed icon inventory differs');
+  for(const [address,length] of [[icons.table,iconCount*4],[icons.descriptors,descriptorCount*8],[icons.pixels,packedArt.length]])need(Number.isInteger(address)&&address%4===0&&address>=BASE&&address+length<=BASE+runtime.length,'native icon address outside module');
+  need(icons.descriptors===icons.table+iconCount*4&&icons.pixels===icons.descriptors+descriptorCount*8&&runtime.subarray(icons.table-BASE,icons.table-BASE+stock.length).equals(stock)&&runtime.subarray(icons.pixels-BASE,icons.pixels-BASE+packedArt.length).equals(packedArt),'native icon readback differs');
   if(focalIcons){
-    const f=icons.focal,descriptor=icons.descriptors+91*8,at=descriptor-BASE;
-    need(f?.first_id===762&&f.last_id===834&&f.width===60&&f.height===20&&f.descriptor===descriptor&&f.storage==='draw-owned-heap'&&f.heap_bytes===4800&&f.owner_fp_offset===-0x80&&runtime.readUInt16LE(at)===60&&runtime.readUInt16LE(at+2)===20&&runtime.readUInt32LE(at+4)===0,'native focal icon descriptor differs');
-    for(let id=762;id<=834;id++)need(runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor,'native focal directory differs');
+    const f=icons.focal,descriptor=icons.descriptors+111*8,at=descriptor-BASE;
+    need(f?.first_id===782&&f.last_id===854&&f.width===60&&f.height===20&&f.descriptor===descriptor&&f.storage==='draw-owned-heap'&&f.heap_bytes===4800&&f.owner_fp_offset===-0x80&&runtime.readUInt16LE(at)===60&&runtime.readUInt16LE(at+2)===20&&runtime.readUInt32LE(at+4)===0,'native focal icon descriptor differs');
+    for(let id=782;id<=854;id++)need(runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor,'native focal directory differs');
   }else need(icons.focal===null,'unexpected focal icons');
   for(let i=0;i<78;i++){
     const descriptor=icons.descriptors+i*8,at=descriptor-BASE;
-    need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+i*6400,'native icon descriptor differs');
+    need(runtime.readUInt32LE(icons.table-BASE+(671+i)*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===icons.pixels+(i<retired?packedCount:i-retired)*6400,'native icon descriptor differs');
+  }
+  const styleArt=readFileSync(new URL('../native/gr3/m10v_style_filters.rgba',import.meta.url)),styleAt=manifest.style_icons?.pixels;
+  need(manifest.style_icons?.first_id===762&&manifest.style_icons?.last_id===768&&styleArt.length===44800&&manifest.style_icons.sha256===sha(styleArt)&&Number.isInteger(styleAt)&&styleAt>=BASE&&styleAt+styleArt.length<=BASE+runtime.length&&runtime.subarray(styleAt-BASE,styleAt-BASE+styleArt.length).equals(styleArt),'style artwork readback differs');
+  for(let i=0;i<7;i++){const d=icons.descriptors+(91+i)*8,at=d-BASE;
+    need(runtime.readUInt32LE(icons.table-BASE+(762+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===styleAt+i*6400,'style icon descriptor differs');
   }
   {
     const extra=readFileSync(new URL('../native/gr3/m10v_pixel_world.rgba',import.meta.url));
     const id=manifest.sd_library?761:755,descriptor=icons.descriptors+(id-671)*8,at=descriptor-BASE;
-    const pixels=icons.pixels+(manifest.sd_library?80:79)*6400+35584;
+    const pixels=icons.pixels+(packedCount+(manifest.sd_library?2:1))*6400+35584;
     need(extra.length===6400&&runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+6400).equals(extra),'native Pixel World icon differs');
   }
   {
     const extra=readFileSync(new URL('../native/gr3/m10v_charmera.rgba',import.meta.url));
-    const id=manifest.sd_library?755:749,descriptor=icons.descriptors+(manifest.sd_library?84:78)*8,at=descriptor-BASE,pixels=icons.pixels+(manifest.sd_library?79:78)*6400;
+    const id=manifest.sd_library?755:749,descriptor=icons.descriptors+(manifest.sd_library?84:78)*8,at=descriptor-BASE,pixels=icons.pixels+(packedCount+(manifest.sd_library?1:0))*6400;
     need(extra.length===6400&&runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+6400).equals(extra),'native Charmera icon differs');
   }
   {
     const artwork=readFileSync(new URL('../native/gr3/m10v_charmera_ui.rgba',import.meta.url));
-    let pixel=icons.pixels+(manifest.sd_library?80:79)*6400,offset=0;
+    let pixel=icons.pixels+(packedCount+(manifest.sd_library?2:1))*6400,offset=0;
     for(let i=0;i<5;i++){
       const id=(manifest.sd_library?756:750)+i,descriptor=icons.descriptors+((manifest.sd_library?85:79)+i)*8,at=descriptor-BASE;
       const width=i<4?64:400,height=i<4?16:12,bytes=width*height*4;
@@ -178,21 +197,26 @@ function checkRuntime(runtime, manifest) {
   }
   if(manifest.sd_library){
     const custom=manifest.custom_film_display,icon=readFileSync(new URL('../native/gr3/m10v_custom_icon.rgba',import.meta.url));
-    const descriptor=icons.descriptors+83*8,at=descriptor-BASE,pixels=icons.pixels+78*6400;
+    const descriptor=icons.descriptors+83*8,at=descriptor-BASE,pixels=icons.pixels+packedCount*6400;
     need(custom?.icon_id===754&&custom.icon_sha256===sha(icon)&&icon.length===6400&&
       runtime.readUInt32LE(icons.table-BASE+754*4)===descriptor&&
       runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
       runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
     need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
-    need(c?.first_id===749&&c.last_id===753&&c.width===120&&c.height===196&&c.heap_bytes===470464&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===470400&&c.directory_offset===470440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===749&&c.last_id===773&&c.width===120&&c.height===148&&c.artwork_height===148&&c.caption_height===0&&c.heap_bytes===710580&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===710400&&c.directory_offset===710480&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
     }
     for(const [i,index] of [32,65,66,67,34].entries())need(runtime.readUInt32LE(icons.table-BASE+(749+i)*4)===icons.descriptors+index*8,'native immutable card fallback differs');
   }else need(manifest.film_cards===null,'unexpected native film cards');
-  const resourceCount=manifest.sd_library?318:168;
+  {
+    const art=readFileSync(new URL('../native/gr3/m10v_d76.rgba',import.meta.url)),p=manifest.d76_icons?.pixels;
+    need(manifest.d76_icons?.first_id===775&&manifest.d76_icons?.last_id===781&&art.length===7*6400&&manifest.d76_icons.sha256===sha(art)&&Number.isInteger(p)&&p>=BASE&&p+art.length<=BASE+runtime.length&&runtime.subarray(p-BASE,p-BASE+art.length).equals(art),'D76 artwork differs');
+    for(let i=0;i<7;i++){const d=icons.descriptors+(104+i)*8,at=d-BASE;need(runtime.readUInt32LE(icons.table-BASE+(775+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===p+i*6400,'D76 icon descriptor differs');}
+  }
+  const resourceCount=manifest.sd_library?351:183;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -217,13 +241,16 @@ detailInstructions.row_dispatch=[0xe92d500f,0xe1a02803,0xe1822004,0xe1a01005,0xe
  0x531b009c,0x531b00ac,0x531b00bc,0x531b00cc,0x531b00dc,0x531b00ec,0x531b00fc,0x531b010c,0x531b011c,0x531b012c,0x531b013c,0x531b014c,0x531b015c,0x531b016c,0x531b017c,0x531b018c,0x531b019c,0x531b0058];
 function checkDetail(runtime,manifest,raw) {
  const d=manifest.detail,base=manifest.base;
- need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&
-  JSON.stringify(d.ids)==='[18,19,20,21,22,23,24,25,26,27,28,29]'&&JSON.stringify(d.fields)===JSON.stringify(['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Retired Soft','Grain Size','Leak Gain','Leak Position','Leak Spread','Leak Variation','RED Exposure','Charmera Color']), 'native detail contract differs');
+ const grain=manifest.experimental_capture?.native_grain===true;
+ const ids=[18,19,20,...(grain?[21]:[]),28,29];
+ const fields=['Halation Gain','Halation Spread','Highlight Gate',...(grain?['Film Grain']:[]),'RED Exposure','Charmera Color'];
+ need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&d.native_grain===grain&&
+  JSON.stringify(d.ids)===JSON.stringify(ids)&&JSON.stringify(d.fields)===JSON.stringify(fields),'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
  const captions=read(d.captions,120);
- const variants={halo:[18,19,20,21,23,24,25,26,27],common:[21,23,24,25,26,27],red:[21,23,24,25,26,27,28],charmera:[21,23,24,25,26,27,29],phoenix:[18,19,20,21,23,24,25,26,27,28]};
+ const variants={halo:[18,19,20,...(grain?[21]:[])],common:grain?[21]:[],red:[...(grain?[21]:[]),28],charmera:[29],phoenix:[18,19,20,...(grain?[21]:[]),28],pixel:[]};
  need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
- const expectedIds=[862,863,864,827,828,913,914,915,916,917,933,manifest.sd_library?1013:948];
+ const expectedIds=[862,863,864,827,828,913,913,913,913,913,933,manifest.sd_library?1013:948];
  for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
@@ -242,22 +269,23 @@ function checkDetail(runtime,manifest,raw) {
  if(raw){
   need(captions.subarray(0,72).equals(raw.subarray(0xb34bd8,0xb34c20)),'native detail stock captions differ');
   for(const [variant,ids] of Object.entries(variants)){
-   const table=read(d.variant_tables[variant],manifest.appended_slots?328:288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
-   for(let i=0;i<(manifest.appended_slots?41:36);i++){
+   const table=read(d.variant_tables[variant],manifest.appended_slots?368:288),suffix=Buffer.from(ids.flatMap(id=>[0,id]));
+   for(let i=0;i<(manifest.appended_slots?46:36);i++){
     const old=0xb3488c+(i%36)*8,p=raw.readUInt32LE(old),n=manifest.appended_slots?0:raw.readUInt32LE(old+4),fresh=table.readUInt32LE(i*8);
     need(table.readUInt32LE(i*8+4)===n+ids.length,'native detail count differs');
     const list=read(fresh,n*2+suffix.length);
     need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(suffix),'native detail list differs');
    }
   }
-  const maxima=[8,8,8,3,3,2,8,5,8,1,2,3],dispatch=read(d.slider_dispatch,25*4);
-  for(let i=0;i<12;i++){
-   need(dispatch.readUInt32LE(i*8)===(0xe35c0000|18+i)>>>0,'native detail slider selector differs');
-   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(i===11?d.charmera_colors.slider:i===10?d.entries.exposure_dispatch:d.sliders[maxima[i]]))&0x0fffffff),'native detail slider target differs');
+  const maxima=[8,8,8,3,3,2,8,5,8,1,2,3],dispatch=read(d.slider_dispatch,(ids.length*2+1)*4);
+  for(let i=0;i<ids.length;i++){
+   const id=ids[i];
+   need(dispatch.readUInt32LE(i*8)===(0xe35c0000|id)>>>0,'native detail slider selector differs');
+   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(id===29?d.charmera_colors.slider:id===28?d.entries.exposure_dispatch:d.sliders[maxima[id-18]]))&0x0fffffff),'native detail slider target differs');
   }
-  need(dispatch.readUInt32LE(96)===branch(d.slider_dispatch+96,d.sliders[8]),'native detail slider fallback differs');
+  need(dispatch.readUInt32LE(ids.length*8)===branch(d.slider_dispatch+ids.length*8,d.sliders[8]),'native detail slider fallback differs');
   need(JSON.stringify(d.charmera_colors?.names)==='["RED","YELLOW","BLUE","GRAY"]'&&JSON.stringify(d.charmera_colors.value_icons)===JSON.stringify([0,1,2,3].map(i=>(manifest.sd_library?756:750)+i))&&d.charmera_colors.scale_icon===(manifest.sd_library?760:754),'native Charmera enum differs');
-  for(const [maximum,target,color] of [...[8,3,2,5,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true]]){
+  for(const [maximum,target,color] of [...[8,3,2,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true]]){
    const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
    for(let a=start;a<stop;a+=4){
     const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
@@ -279,7 +307,7 @@ function checkDetail(runtime,manifest,raw) {
 function checkIspBase(runtime,manifest) {
  const m=manifest.isp_base, base=manifest.base;
  need(m?.schema==='m10v-gr3-isp-base/v2'&&m.bytes===504&&m.base%16===0&&m.base>=base&&m.base+504<=base+runtime.length&&
-  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)===(manifest.appended_slots?'[25,26,27,28,29]':'[12,18,19,20,21]'), 'native ISP base contract differs');
+  m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)===(manifest.appended_slots?'[25,26,27,28,29,30,31,32,33,34]':'[12,18,19,20,21]'), 'native ISP base contract differs');
  need(Object.keys(m.entries||{}).sort().join('|')===ispHooks.map(h=>h[4]).sort().join('|')&&m.patches?.length===5,'native ISP inventory differs');
  for(const [i,[address,expected,reg,object,name]] of ispHooks.entries()) {
   const at=m.base+i*104, off=4+reg*4, compare=name==='local_process'?0x53513620:0x53dbd8a0;
@@ -288,7 +316,7 @@ function checkIspBase(runtime,manifest) {
    movw(1,compare&65535),(0xe3401000|(((compare>>>16)&0xf000)<<4)|((compare>>>16)&0xfff))>>>0,
    0xe1500001,0x1a000007,0xe59d2000|off,0xe352000c,0x0a000002,0xe2422012,0xe3520003,0x8a000001,
    0xe3a0200b,0xe58d2000|off,0xe49dc004,0xe12cf00c,0xe8bd500f];
-  if(manifest.appended_slots){words.splice(11,5,0xe2422019,0xe3520004,0x8a000003,0xe320f000,0xe320f000);if(name==='parameters')words[16]=0xe3a02019;}
+  if(manifest.appended_slots){words.splice(11,5,0xe2422019,0xe3520009,0x8a000003,0xe320f000,0xe320f000);if(name==='parameters')words[16]=0xe3a02019;}
   if(name!=='local_process')words.splice(9,0,0x0a000003,movw(1,0xd938),0xe34513db,0xe1500001);
   words.push(branch(at+words.length*4,address+4));
   for(const [j,word] of words.entries())need(runtime.readUInt32LE(at-base+j*4)===(word>>>0),'native ISP instruction differs: '+name+'+'+j*4);
@@ -297,7 +325,7 @@ function checkIspBase(runtime,manifest) {
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
  const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
- need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x50f0&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
+ need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x5140&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
  const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],
   ...[0x535153ec,0x53516e14,0x53516ebc,0x5351897c,0x5351af20,0x5351feb4].map(a=>[a,0x535216d0,'m10v_save_trace_recipe_allocate']),
   ...[0x5351703c,0x535170cc,0x535182f8,0x5351f3a8,0x5351fd50].map(a=>[a,0x53521d14,'m10v_save_trace_recipe_release'])];
@@ -331,7 +359,7 @@ function lifecyclePatches(manifest,runtime){
   expected.push({address:0x53521e18,expected:0xe58d5008,replacement:branch(0x53521e18,target),name:'raw pool dispatch return'});
  }
  if(m.snapshot){
-  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1716&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
+  need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1796&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
   need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ae44,'snapshot must freeze current recipe at submission');
   for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351ae44,0xe59000f0,false],...(m.snapshot.shared_hdf?[[2,0x5351aed4,0xe59420f0,false],[3,0x5351b068,0xe59420f0,false]]:[])]){
    const row=m.snapshot.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid snapshot hook');
@@ -343,7 +371,7 @@ function lifecyclePatches(manifest,runtime){
   words.forEach((word,i)=>need(runtime.readUInt32LE(at-manifest.base+i*4)===(word>>>0),'snapshot submission wrapper instruction differs'));
  }
  if(m.snapshot?.live_color){
-  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x19bc,'preview requires owned parameter cache');
+  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x223c,'preview requires owned parameter cache');
   const row=m.snapshot.patches.at(-1);need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
   expected.push({address:0x53dbd954,expected:0x536ddecc,replacement:row.entry,name:'native Live Make color'});
   const at=row.entry,ex=m.snapshot.exports;
@@ -358,10 +386,7 @@ function lifecyclePatches(manifest,runtime){
   for(const [i,address,word,link]of [[0,0x53513620,0xe1a00004,false],[1,0x535033d8,0xebffff1b,true],[2,0x53503aa0,0xebfffd69,true],[3,0x53503ab4,0xeb05f4c0,true]]){
    const row=m.native_grain.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid grain hook');expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'native grain '+address.toString(16)});
   }
-  const n=m.native_grain_noise;
-  need(n?.patches?.length===1&&n.expected_stage_return===m.native_grain.patches[3].entry+16&&n.independent_dma===false,'invalid native grain owner');
-  const row=n.patches[0];need(row.address===0x5367ae14&&inRuntime(row.entry),'invalid RNG hook');
-  expected.push({address:0x5367ae14,expected:branch(0x5367ae14,0x5368a92c,true),replacement:branch(0x5367ae14,row.entry,true),name:'native grain noise shape'});
+  need(!m.native_grain_noise&&m.native_grain.cpu_noise_processing===false&&m.native_grain.software_fallback===false,'retired CPU grain processing must not be installed');
  }
  if(m.view_deferred){
   const v=m.view_deferred;need(v.patches?.length===6&&v.mutable_global_bytes===0&&v.filesystem_calls===0&&v.storage?.token_offset===0x184&&v.storage.extended_bytes===0x194,'invalid view recovery ownership');
@@ -379,26 +404,34 @@ function lifecyclePatches(manifest,runtime){
 }
 function appendedSlotPatches(runtime,manifest,raw) {
  const m=manifest.appended_slots;if(!m)return [];
- need(manifest.sd_library&&manifest.film_library_enabled!==false&&m.schema==='m10v-gr3-appended-slots/v1'&&
-  JSON.stringify(m.tones)==='[25,26,27,28,29]'&&m.stock_choices===12&&m.shooting_choices===17&&
-  m.library_index===19&&m.stock_parameter_proxy===false&&m.state_version===4,'invalid appended slot contract');
+ need(manifest.sd_library&&manifest.film_library_enabled!==false&&m.schema==='m10v-gr3-appended-slots/v2'&&
+  JSON.stringify(m.tones)==='[25,26,27,28,29,30,31,32,33,34]'&&m.stock_choices===12&&m.shooting_choices==='12+enabled_films'&&m.shooting_choices_max===22&&
+  m.library_index==='14+enabled_films'&&m.stock_parameter_proxy===false&&m.state_version===5,'invalid appended slot contract');
  const read=(at,n)=>{need(Number.isInteger(at)&&!(at&3)&&at>=manifest.base&&at+n<=manifest.base+runtime.length,'appended code outside runtime');return runtime.subarray(at-manifest.base,at-manifest.base+n);};
  read(m.base,m.bytes);
  const rows=[[0x532c2a9c,0xe1a0c00d,'count'],[0x532c2c80,0xe1a0c00d,'index'],
   [0x532c2f08,0xe1a0c00d,'position'],[0x532c2b7c,0xe30d3368,'maximum'],
   [0x5326c240,branch(0x5326c240,0x5326c2a0),'display']];
+ const dynamicCount=manifest.symbols.m10v_camera_library_shooting_count;read(dynamicCount,4);
+ const exact=(name,words)=>{const body=read(m.entries[name],words.length*4);need(words.every((w,i)=>body.readUInt32LE(i*4)===(w>>>0)),'appended '+name+' instructions differ');};
+ const at=(name,i)=>m.entries[name]+i*4;
+ exact('count',[0xe5d0c01b,0xe35c0000,0x1a000002,0xe92d4010,branch(at('count',4),dynamicCount,true),0xe8bd8010,0xe1a0c00d,branch(at('count',7),0x532c2aa0)]);
+ exact('index',[0xe5d0c01b,0xe35c0000,0x1a00000c,0xe92d4070,0xe1a04000,0xe1a05001,branch(at('index',6),dynamicCount,true),0xe355000c,0x3a000003,0xe1550000,0x3245000c,0x32800019,0x38bd8070,0xe1a00004,0xe1a01005,0xe8bd4070,0xe1a0c00d,branch(at('index',17),0x532c2c84)]);
+ exact('position',[0xe5d0c01b,0xe35c0000,0x1a00000b,0xe92d4070,0xe1a04000,0xe1a05001,branch(at('position',6),dynamicCount,true),0xe240000c,0xe245c019,0xe15c0000,0x328c000c,0x38bd8070,0xe1a00004,0xe1a01005,0xe8bd4070,0xe1a0c00d,branch(at('position',16),0x532c2f0c)]);
+ exact('maximum',[branch(at('maximum',0),dynamicCount)]);
+ exact('display',[0xe2430019,0xe350000a,0x31a00003,((branch(at('display',3),0x5326c22c)&0x0fffffff)|0x30000000),branch(at('display',4),0x5326c2a0)]);
  const patches=rows.map(([address,expected,name])=>{read(m.entries[name],4);return {address,expected,replacement:branch(address,m.entries[name]),name:'appended '+name};});
  for(const [address,old,name] of [[0x531ab7a8,0x532a985c,'menu_name'],[0x531ab894,0x532a9988,'menu_icon'],[0x531ab8bc,0x532a9988,'menu_icon'],[0x531a05ac,0x532c2c80,'index'],[0x531a070c,0x532c2c80,'index'],[0x531a0588,0x532a985c,'adj_name'],[0x531a06e0,0x532a9988,'adj_icon']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:branch(address,old,true),replacement:branch(address,to,true),name:'appended visible '+name});}
  for(const [address,name] of [[0x531abe0c,'menu_matches'],[0x531a1500,'adj_matches'],[0x531a0ba0,'adj_select']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:0xe1a0c00d,replacement:branch(address,to),name:'appended visible '+name});}
- need(m.exif_bytes===68,'appended EXIF capacity differs');
- const table=read(m.exif_table,68);
+ need(m.exif_bytes===88,'appended EXIF capacity differs');
+ const table=read(m.exif_table,88);
  if(raw)need(table.subarray(0,48).equals(raw.subarray(0xd2b6f4,0xd2b724)),'stock EXIF pairs changed');
- for(let i=0;i<5;i++)need(table.readUInt32LE(48+i*4)===((0x10c+i)<<16|25+i),'appended EXIF mapping differs');
+ for(let i=0;i<10;i++)need(table.readUInt32LE(48+i*4)===((0x10c+i)<<16|25+i),'appended EXIF mapping differs');
  const movt=(r,v)=>(0xe3400000|((v&0xf000)<<4)|(r<<12)|(v&0xfff))>>>0;
  for(const [address,expected,replacement] of [
-  [0x53599df4,0xe3a00030,0xe3a00044],[0x53599e20,0xe30bc6f4,movw(12,m.exif_table&65535)],
-  [0x53599e2c,0xe345c3d2,movt(12,m.exif_table>>>16)],[0x53599e30,0xe2801030,0xe2801044],
-  [0x53599e4c,0xe353000c,0xe3530011],[0x53599e60,0xe2800030,0xe2800044],
+  [0x53599df4,0xe3a00030,0xe3a00058],[0x53599e20,0xe30bc6f4,movw(12,m.exif_table&65535)],
+  [0x53599e2c,0xe345c3d2,movt(12,m.exif_table>>>16)],[0x53599e30,0xe2801030,0xe2801058],
+  [0x53599e4c,0xe353000c,0xe3530016],[0x53599e60,0xe2800030,0xe2800058],
  ])patches.push({address,expected,replacement,name:'appended EXIF '+address.toString(16)});
  need(m.patches.length===patches.length&&patches.every((p,i)=>p.address===m.patches[i].address&&p.expected===m.patches[i].expected&&p.replacement===m.patches[i].replacement),'appended patch inventory differs');
  return patches;
@@ -466,7 +499,7 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
-  // Reserve 64 KiB for the new immutable LUT/icon bank and native profiles.
+  // The bounded allowance includes all immutable LUT/icon banks and native profiles.
   // Mapping/readback/section preservation checks below still cover the whole extent.
   const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,`native RTOS growth invalid: ${growth} bytes exceeds budget ${MAX_NATIVE_RTOS_GROWTH}`);
   const insertion=rtos.offset+rtos.size;
@@ -523,10 +556,10 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:4,film_count:manifest.film_library_enabled===false?0:80,active_slots:manifest.film_library_enabled===false?0:5,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:48,max_records:256,custom_lut:true,page_rows:8}:null,
-    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:[25,26,27,28,29],stock_choices:12,shooting_choices:17,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus five independent M10V film slots':'12 stock entries only; no private IDs',
-    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
-    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?[25,26,27,28,29]:[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
+    verified_hooks:patchList(manifest,runtime).length,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:5,film_count:manifest.film_library_enabled===false?0:95,active_slots:manifest.film_library_enabled===false?0:Array.from({length:10},(_,i)=>Buffer.from(manifest.initial_state_hex,'hex').readUInt16LE(12+i*8)).filter(Boolean).length,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:37,max_records:256,custom_lut:true,page_rows:10}:null,
+    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:Array.from({length:10},(_,i)=>25+i),stock_choices:12,shooting_choices:'12+enabled_films',capacity:10,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus up to ten selected M10V films':'12 stock entries only; no private IDs',
+    still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
+    live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
-    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color initialized at normal UI live entry; preview excludes grain/halo/leak; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
+    camera_scope:manifest.film_library_enabled===false?'still JPEG digital HDF only; original ImageControl, LiveView, RAW and metadata preserved':manifest.capture_lifecycle?.snapshot?.live_color?'still JPEG; native live color initialized at normal UI live entry; preview excludes grain/halo; RAW pixels protected':'still JPEG; original RAW pixels protected; live view uses Standard base; film-color preview and RAW-development effects not integrated'};
 }

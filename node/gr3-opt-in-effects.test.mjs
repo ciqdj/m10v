@@ -12,9 +12,9 @@ test('fresh defaults and every film selection leave extra effects off',()=>{
 });
 test('switching away from a manually enabled effect resets extras, selecting same film preserves them',()=>{
  const c=defaultConfiguration();Object.assign(c.slots[0],{grain:3});c.slots[0].halo.gain=6;c.slots[0].effects.leakGain=7;
- assert.deepEqual(selectNativeFilm(c,0,34),c);
+ assert.deepEqual(selectNativeFilm(c,0,34),normalizeConfiguration(c));
  for(const film of [33,35,66,67,68,69,78,289])off(selectNativeFilm(c,0,film).slots[0]);
  const kept=normalizeConfiguration(c);assert.equal(kept.slots[0].grain,3);assert.equal(kept.slots[0].halo.gain,6);
- const bytes=initialState(c);assert.equal(bytes[14],3);assert.equal(bytes[16],6);assert.equal(bytes[57],7);
+ const bytes=initialState(c);assert.equal(bytes[14],3);assert.equal(bytes[16],6);assert.equal(bytes[57],0);
  off(resetNativeTexture(c,0).slots[0]);
 });

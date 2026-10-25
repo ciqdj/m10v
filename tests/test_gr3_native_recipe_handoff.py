@@ -90,7 +90,7 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   e.call(done,c,params,1);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
   e.call(settings,c,params,1);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
   e.call(done,c,params,0);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),1)
-  e.call(settings,c,params,1);noise=e.alloc(256);e.u.mem_write(noise,bytes(range(256)));e.u.mem_write(0x5effff00,struct.pack('<II',16,16));e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_noise'],c,noise,256,16);e.call(done,c,params,1);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),3)
+  e.call(settings,c,params,1);e.call(done,c,params,1);e.call(complete,r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),3)
 
  def test_foreign_destination_cannot_publish_native_completion_for_source_recipe(self):
   e,r,o,i,c,si=self.fixture();self.snapshot(e,r,state((67,)*5));foreign=e.alloc(0x100);e.u.mem_write(foreign,bytes(e.u.mem_read(c,0x100)));before=bytes(e.u.mem_read(i,0x9000));self.callback(e,o,i,foreign)
@@ -103,11 +103,10 @@ class NativeRecipeHandoffTests(unittest.TestCase):
   params=e.alloc(0x40);values=e.alloc(12);e.w32(params+0x10,values);noise=e.alloc(256);source=e.alloc(104);e.u.mem_write(source,bytes(data))
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_settings'],digital,params,0)
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_settings'],digital,params,1)
-  e.u.mem_write(0x5effff00,struct.pack('<II',16,16));e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_noise'],digital,noise,256,16)
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_grain_done'],digital,params,1)
   e.call(self.manifest['exports']['m10v_isp_frame_recipe_completed'],r,si,12,source);self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),2)
 
- def test_successful_native_grain_is_not_reapplied_when_size_hook_was_unavailable(self):
+ def test_successful_stock_grain_has_no_cpu_size_hook_or_software_reapplication(self):
   import struct,zlib
   e,r,o,i,c,si=self.fixture();data=bytearray(state((67,)*5));data[14]=2;data[56]=1;struct.pack_into('<I',data,100,zlib.crc32(data[:100]));self.snapshot(e,r,data)
   digital=r+0x4320;e.u.mem_write(digital,bytes(e.u.mem_read(c,0x40)));e.w32(digital,0x53d0fc60)

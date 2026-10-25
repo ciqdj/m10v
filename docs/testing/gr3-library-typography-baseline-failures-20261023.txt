@@ -1,0 +1,53 @@
+Baseline 197a6f11814c066a1886f0ba7bd1b6e5928d68e5
+324 tests: 248 pass, 50 fail, 26 skipped
+
+<repo>/node/candidate-verify.test.mjs
+candidate analysis returns a report without exposing firmware bytes
+verified GR III shutdown modification exports a same-version firmware package
+old web configuration migrates into v4 and validates effect ranges
+legacy effects serialize as neutral and resetting preserves film and special controls
+GR III preflight preserves factory choices and binds the new slot layout to approval
+aborted firmware request terminates its child and cleans the owned temporary folder
+four colors persist per slot, texture reset preserves color and switching film clears it
+<repo>/node/gr3-customization.test.mjs
+digital HDF is independent of films and retired soft values never become HDF
+real GR III build stores correct grain strengths and preserves Positive shared branch
+diffusion hook, frozen code and per-tone levels are read back independently of receipt
+<repo>/node/gr3-frames.test.mjs
+old effects upgrade and film-specific bounds accept bounded integer simulated EI
+schema4 packs EI in each effects reserved byte and common reset preserves EI and disables extra effects
+final joined firmware contains all selected components and rejects repaired-checksum tampering
+native RAW NR export independently reads back off and threshold together with old extensions
+<repo>/node/gr3-jpeg.test.mjs
+abort while checking fitter availability cannot be missed
+<repo>/node/gr3-m10v-native-build.test.mjs
+legacy retired effects migrate to neutral without losing other slot settings
+web debug export uses the running Node when the service PATH contains no node
+original M10V web workflow binds all five slots and timestamp into audited firmware
+fresh defaults and every film selection leave extra effects off
+switching away from a manually enabled effect resets extras, selecting same film preserves them
+<repo>/node/gr3-patch-plan.test.mjs
+Phoenix EI120 persists independently per slot and resets on a different stock
+<repo>/node/gr3-raw-nr.test.mjs
+deleting texture processing retains all55 previous-revision film records
+prior renderer custom LUTs remain accepted while repaired-CRC tampering is rejected
+v1 built-in pack from the preceding release remains readable
+last delivered 47-film and named custom packs remain readable after opt-in defaults
+independent settings audit binds owned controllers, original fallback and root captions
+<repo>/node/gr3-stock-audit.test.mjs
+<repo>/node/gr3-stock-presets.test.mjs
+fresh journals preserve independent timestamp corner and colour bytes
+four halo controls and grain/soft are packed in each version4 slot
+film name stamp migrates off and packs independently from date
+both colour views edit a single native configuration and do not restore the legacy film builder
+<repo>/node/gr3-update-evidence.test.mjs
+complete identity Look is rendered locally and fitted to GR III matrices
+GR IIIx ports audited legacy recipe, timestamp, aspect and level composition with stock edits
+GR IV actual native capabilities and custom prepare are model-specific
+single studio orders source, settings and save with the library embedded directly
+the same import handler accepts both models and updates target labels from official identity
+local sample selection does not override the loaded target until import completes
+GR IV import uses the shared workflow and isolated native endpoints
+product home exposes GR IV native workbench and GR II inspection with truthful limits
+<repo>/node/version-candidate.test.mjs
+<repo>/node/version-verify.test.mjs

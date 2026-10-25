@@ -7,11 +7,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {inspectGr2,GR2_SHA256} from './gr2-firmware.mjs';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectGr1,GR1_SHA256} from './gr1-firmware.mjs';
+import {inspectOfficial,GR3_220_SHA256} from './firmware.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url)),run=promisify(execFile);
 const profiles={
-  gr2:['bin/rg2_v003/rg2_v003.frm',GR2_SHA256],
+  gr2:['bin/rg2_v003.frm',GR2_SHA256],
+  gr1:['bin/rg1_v051.frm',GR1_SHA256],
   gr4:['bin/fwdc248b-gr4-officical.bin','a2f664dfca034059eb0fd6e18ab08684c326b4a034d85c164dad7e1ec9b5655f'],
   gr3:['bin/fwdc239b-gr3-official.bin','d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4'],
   gr3x:['bin/fwdc243b-gr3x-official.bin','708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7'],
@@ -26,9 +28,10 @@ export async function readModelOfficial(model){
 let inspectingGr4=false;
 export async function inspectModelFirmware(data){
   if(!Buffer.isBuffer(data))throw new Error('firmware must be bytes');
-  const identity=hash(data),model=Object.keys(profiles).find(key=>profiles[key][1]===identity);
+  const identity=hash(data),model=identity===GR3_220_SHA256?'gr3':Object.keys(profiles).find(key=>profiles[key][1]===identity);
   if(!model)throw new Error('unsupported firmware identity');
   if(model==='gr2')return {...inspectGr2(data),workspace_url:'/gr2/'};
+  if(model==='gr1')return {...inspectGr1(data),workspace_url:'/gr1/'};
   if(model==='gr3'||model==='gr3x')return {...inspectOfficial(data),workspace_url:'/gr3/'};
   if(inspectingGr4)throw new Error('GR IV inspection is already running');
   inspectingGr4=true;let folder;

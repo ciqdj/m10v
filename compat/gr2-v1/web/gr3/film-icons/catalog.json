@@ -1,0 +1,704 @@
+[
+  {
+    "id": 1,
+    "name": "M10V Neutral",
+    "title": "NEUTR",
+    "code": "",
+    "color": "#728d88",
+    "icon_url": "/gr3/film-icons/01.png",
+    "sha256": "6f900c4c4f8c1be3901f604ca0ece75b57cc9a10a983bbf9b06a8fabc4f1ffa0"
+  },
+  {
+    "id": 2,
+    "name": "Amber Day",
+    "title": "AMBER",
+    "code": "DAY",
+    "color": "#c78d48",
+    "icon_url": "/gr3/film-icons/02.png",
+    "sha256": "f25936dbc9554d0dd5a8291540745cd82e4fca8fbf27e4521b3ef2e3072d395b"
+  },
+  {
+    "id": 3,
+    "name": "Cool Dusk",
+    "title": "COOL",
+    "code": "DUSK",
+    "color": "#6a87a6",
+    "icon_url": "/gr3/film-icons/03.png",
+    "sha256": "55ba90a047a294ba33fa68a23bfed35ce5986eaf89463498eaa07e85db2c813d"
+  },
+  {
+    "id": 4,
+    "name": "Warm Fade",
+    "title": "WARM",
+    "code": "FADE",
+    "color": "#b48373",
+    "icon_url": "/gr3/film-icons/04.png",
+    "sha256": "01d5391542deffdea7fe3b37e0ba1db09dddf24c85fc39dab86d96b77c94ee7b"
+  },
+  {
+    "id": 5,
+    "name": "Deep Street",
+    "title": "DEEP",
+    "code": "STREE",
+    "color": "#626977",
+    "icon_url": "/gr3/film-icons/05.png",
+    "sha256": "9750058c9ca566375ad1f161f2262bf85cffc88be46c36ba33ec465a7786f643"
+  },
+  {
+    "id": 6,
+    "name": "Soft Portrait",
+    "title": "SOFT",
+    "code": "PORTR",
+    "color": "#b29597",
+    "icon_url": "/gr3/film-icons/06.png",
+    "sha256": "fb82c9797140c0ece1c13407eb5ecdcfd269ceb122436243c2c544c93446eb10"
+  },
+  {
+    "id": 7,
+    "name": "Ocean Blue",
+    "title": "OCEAN",
+    "code": "BLUE",
+    "color": "#508b9d",
+    "icon_url": "/gr3/film-icons/07.png",
+    "sha256": "1da741d7416f20ae33921e4b834fa4aa7e4e59acb93f3652a86110ca783bb7ab"
+  },
+  {
+    "id": 8,
+    "name": "Autumn Copper",
+    "title": "AUTMN",
+    "code": "COPPE",
+    "color": "#ba794f",
+    "icon_url": "/gr3/film-icons/08.png",
+    "sha256": "46a22e96b57aa407c302e2fe4a00744fbf8a576398ea177fca15628f40a3f429"
+  },
+  {
+    "id": 9,
+    "name": "Muted Olive",
+    "title": "MUTED",
+    "code": "OLIVE",
+    "color": "#858761",
+    "icon_url": "/gr3/film-icons/09.png",
+    "sha256": "7a43874b828a00330d0d6aa7709db4eb73e628a9f134c5fdec52717884f63b67"
+  },
+  {
+    "id": 10,
+    "name": "Clear Morning",
+    "title": "CLEAR",
+    "code": "MORN",
+    "color": "#aebcb1",
+    "icon_url": "/gr3/film-icons/10.png",
+    "sha256": "608c3ee1f0c17421049f20806cf87940b0fbe98107e6af943953d7858197d04f"
+  },
+  {
+    "id": 11,
+    "name": "Night Cyan",
+    "title": "NIGHT",
+    "code": "CYAN",
+    "color": "#498c92",
+    "icon_url": "/gr3/film-icons/11.png",
+    "sha256": "946d870aca21d2734ff6522297aa0b077103ac75f420042e52293ce861108e7e"
+  },
+  {
+    "id": 12,
+    "name": "Sunset Rose",
+    "title": "SUNSE",
+    "code": "ROSE",
+    "color": "#b47787",
+    "icon_url": "/gr3/film-icons/12.png",
+    "sha256": "cce125383e59f4c5344442dcb986d83bec0e3b1f335fb2a5cea9fd09923cfbd5"
+  },
+  {
+    "id": 13,
+    "name": "Bleached Noon",
+    "title": "BLEAC",
+    "code": "NOON",
+    "color": "#b2aa90",
+    "icon_url": "/gr3/film-icons/13.png",
+    "sha256": "8e0d60a00a37f05bf9eb0b9a55265d0db3a176280a248565af5478ce22d3f77c"
+  },
+  {
+    "id": 14,
+    "name": "Pastel Sky",
+    "title": "PASTE",
+    "code": "SKY",
+    "color": "#9caec1",
+    "icon_url": "/gr3/film-icons/14.png",
+    "sha256": "7b6c0397128aeacd292a423549b6b97d7bf608c6c191a8c81e4ab6e21e9a1b06"
+  },
+  {
+    "id": 15,
+    "name": "Dense Color",
+    "title": "DENSE",
+    "code": "COLOR",
+    "color": "#9c7a53",
+    "icon_url": "/gr3/film-icons/15.png",
+    "sha256": "65b0688f6bd861889e5457edc57e43204c69f93efc5f4acfa2e2e7dd10775b2c"
+  },
+  {
+    "id": 16,
+    "name": "Earth Tone",
+    "title": "EARTH",
+    "code": "TONE",
+    "color": "#917b61",
+    "icon_url": "/gr3/film-icons/16.png",
+    "sha256": "0fe2c2006500f5c6437da2fc031ad69f794b58fd7ef207659ed60af275850fea"
+  },
+  {
+    "id": 17,
+    "name": "Silver Mono",
+    "title": "SILVR",
+    "code": "MONO",
+    "color": "#899090",
+    "icon_url": "/gr3/film-icons/17.png",
+    "sha256": "9f754f3392d1bc1c5a5192844dd642106a25e01331541fad4b41fe132f22417c"
+  },
+  {
+    "id": 18,
+    "name": "Soft Mono",
+    "title": "SOFT",
+    "code": "MONO",
+    "color": "#b3b4a9",
+    "icon_url": "/gr3/film-icons/18.png",
+    "sha256": "66f209cced9f89e29383c5711ba39dac80aa6243d52cf2bdd77e34a2a1db68c2"
+  },
+  {
+    "id": 19,
+    "name": "Hard Mono",
+    "title": "HARD",
+    "code": "MONO",
+    "color": "#66696a",
+    "icon_url": "/gr3/film-icons/19.png",
+    "sha256": "ed68618231f168d438bf5d29235c131c2e7047c22deeb148445d50934fa9ff32"
+  },
+  {
+    "id": 20,
+    "name": "Warm Mono",
+    "title": "WARM",
+    "code": "MONO",
+    "color": "#a99988",
+    "icon_url": "/gr3/film-icons/20.png",
+    "sha256": "77b7fb4d86b5d21bda220221a06b94d1742a5d72d172efef61a81c86c69cc47d"
+  },
+  {
+    "id": 21,
+    "name": "Cold Mono",
+    "title": "COLD",
+    "code": "MONO",
+    "color": "#839ba5",
+    "icon_url": "/gr3/film-icons/21.png",
+    "sha256": "7b337472d56dfa20380b33817e0c3678a759fde6305f8962b6962a67fc589fb0"
+  },
+  {
+    "id": 22,
+    "name": "Green Glass",
+    "title": "GREEN",
+    "code": "GLASS",
+    "color": "#6c967c",
+    "icon_url": "/gr3/film-icons/22.png",
+    "sha256": "87e59a0ee9b49cb20358e22f41a54aca95f801e34b3b17ae8e4823bc4e360d6b"
+  },
+  {
+    "id": 23,
+    "name": "Lilac Haze",
+    "title": "LILAC",
+    "code": "HAZE",
+    "color": "#a08baa",
+    "icon_url": "/gr3/film-icons/23.png",
+    "sha256": "89f69d14999de828f7217e0d4caa49d0cad7a39461c3b03843ab3c0513aca1d0"
+  },
+  {
+    "id": 24,
+    "name": "Desert Light",
+    "title": "DESER",
+    "code": "LIGHT",
+    "color": "#c1a275",
+    "icon_url": "/gr3/film-icons/24.png",
+    "sha256": "3f0d27b67c5244f1203e9f7f74115a0961df74ea1e93396195aa6718e0a0a08c"
+  },
+  {
+    "id": 25,
+    "name": "Urban Steel",
+    "title": "URBAN",
+    "code": "STEEL",
+    "color": "#748895",
+    "icon_url": "/gr3/film-icons/25.png",
+    "sha256": "c1930041148ced9f12374444854e5878c622eed63ce55e31d5355dc87c903314"
+  },
+  {
+    "id": 26,
+    "name": "Spring Leaf",
+    "title": "SPRIN",
+    "code": "LEAF",
+    "color": "#8eab6a",
+    "icon_url": "/gr3/film-icons/26.png",
+    "sha256": "b369c125c9357a3a3413a39088849ec767a185865b04a09d8b79ab536e496b6a"
+  },
+  {
+    "id": 27,
+    "name": "Red Brick",
+    "title": "RED",
+    "code": "BRICK",
+    "color": "#bb6655",
+    "icon_url": "/gr3/film-icons/27.png",
+    "sha256": "75334a3ded636dc139f860bf6f9e995c4904bf6d3e04165a84020732b2c616cc"
+  },
+  {
+    "id": 28,
+    "name": "Paper White",
+    "title": "PAPER",
+    "code": "WHITE",
+    "color": "#c9c6b5",
+    "icon_url": "/gr3/film-icons/28.png",
+    "sha256": "4beceb76480eeb9bcc76066c7d40232a28b25292a30326fbc29f6c62e9026a3c"
+  },
+  {
+    "id": 29,
+    "name": "Blue Hour",
+    "title": "BLUE",
+    "code": "HOUR",
+    "color": "#667fa7",
+    "icon_url": "/gr3/film-icons/29.png",
+    "sha256": "3da99109b31d4ae9a45de384aeb666a6ed81dbe0f96440ffe0248aa10ff6b99e"
+  },
+  {
+    "id": 30,
+    "name": "Golden Shade",
+    "title": "GOLDN",
+    "code": "SHADE",
+    "color": "#bca26c",
+    "icon_url": "/gr3/film-icons/30.png",
+    "sha256": "b46729b4b7157317ec3914ac10fc27cda47f250bb09eb2463327459443219d21"
+  },
+  {
+    "id": 31,
+    "name": "Low Key Color",
+    "title": "LOW",
+    "code": "KEY",
+    "color": "#687469",
+    "icon_url": "/gr3/film-icons/31.png",
+    "sha256": "d00ac49e64ebec64a052a734df9281558fc724ca035cd9820157e96bd34bab00"
+  },
+  {
+    "id": 32,
+    "name": "High Key Color",
+    "title": "HIGH",
+    "code": "KEY",
+    "color": "#bab7a4",
+    "icon_url": "/gr3/film-icons/32.png",
+    "sha256": "4db333f65960ef6c6e7a14e1b965054cd3a329ebc15a93b4058658aa44da7058"
+  },
+  {
+    "id": 33,
+    "name": "800T",
+    "title": "CINE",
+    "code": "800T",
+    "color": "#c83737",
+    "icon_url": "/gr3/film-icons/33.png",
+    "sha256": "97eecea20607c3db5e15d562245f5ef6378c5ad73251a181eaaf76ee4bd77acf"
+  },
+  {
+    "id": 34,
+    "name": "Ektar 100",
+    "title": "EKTAR",
+    "code": "100",
+    "color": "#c94c47",
+    "icon_url": "/gr3/film-icons/34.png",
+    "sha256": "c23700510bb8fc765c931fc6539e9c0b83094ffa56820e1c93854e6c14b93fdc"
+  },
+  {
+    "id": 35,
+    "name": "Gold 200",
+    "title": "KODA",
+    "code": "200",
+    "color": "#d5a844",
+    "icon_url": "/gr3/film-icons/35.png",
+    "sha256": "93adcc69493cbcd7fb632736555caf69b5daa92168b9b3ece3c1398a464d8738"
+  },
+  {
+    "id": 36,
+    "name": "Pro 400H",
+    "title": "FUJI",
+    "code": "400H",
+    "color": "#669c7a",
+    "icon_url": "/gr3/film-icons/36.png",
+    "sha256": "f2127e7e9d6969eb6698aff3ba2732bfdc69224014375d4ef01e10ccbbcf3541"
+  },
+  {
+    "id": 37,
+    "name": "Portra 400",
+    "title": "PORTR",
+    "code": "400",
+    "color": "#a484ad",
+    "icon_url": "/gr3/film-icons/37.png",
+    "sha256": "9f4544adc9a08ebe005c70dcefb43b0e5e689ff664c23da8f2401d8dc48cd6e5"
+  },
+  {
+    "id": 38,
+    "name": "Vision3 250D",
+    "title": "V3",
+    "code": "250D",
+    "color": "#c6a450",
+    "icon_url": "/gr3/film-icons/38.png",
+    "sha256": "fa99011628a64fba4332f2b78b3460266af42d0b83ccc00dd7f3c4ebe514a773"
+  },
+  {
+    "id": 39,
+    "name": "HB HNCS",
+    "title": "HB",
+    "code": "HNCS",
+    "color": "#508b9d",
+    "icon_url": "/gr3/film-icons/39.png",
+    "sha256": "9edc386248f868896c27e140e3c806a639d32fe56d517c31aa2a8c159a46312f"
+  },
+  {
+    "id": 40,
+    "name": "HB Portrait",
+    "title": "HB",
+    "code": "PORTR",
+    "color": "#ba794f",
+    "icon_url": "/gr3/film-icons/40.png",
+    "sha256": "8dc894b9fb9194bf9b5107949936f6c069469d29a6bcbb77c5ad19197a7d4746"
+  },
+  {
+    "id": 41,
+    "name": "HB LowSat",
+    "title": "HB",
+    "code": "LOWSA",
+    "color": "#858761",
+    "icon_url": "/gr3/film-icons/41.png",
+    "sha256": "44f2ca8f4ec3e072ca471d3ee18c7fd30307a600775f13ab865e8cc3197c7357"
+  },
+  {
+    "id": 42,
+    "name": "HB HiCon",
+    "title": "HB",
+    "code": "HICON",
+    "color": "#aebcb1",
+    "icon_url": "/gr3/film-icons/42.png",
+    "sha256": "9077cc7a827c3a530b1df27d444e032527f4dbebc681436f966001eea2fd5f66"
+  },
+  {
+    "id": 43,
+    "name": "PX Miyabi",
+    "title": "PX",
+    "code": "MYABI",
+    "color": "#498c92",
+    "icon_url": "/gr3/film-icons/43.png",
+    "sha256": "b1636a3cffe38cf8fef95754e52710c1c1302e56d4bf04406eaea63f94957992"
+  },
+  {
+    "id": 44,
+    "name": "PX Gold",
+    "title": "PX",
+    "code": "GOLD",
+    "color": "#b47787",
+    "icon_url": "/gr3/film-icons/44.png",
+    "sha256": "1d3f825975d012085448fc1a61535784e29db1b3918ee4a90a5dbc7ee2aeb5e3"
+  },
+  {
+    "id": 45,
+    "name": "PX Reversal",
+    "title": "PX",
+    "code": "REVRS",
+    "color": "#b2aa90",
+    "icon_url": "/gr3/film-icons/45.png",
+    "sha256": "bda51e3e0ecca1b833681f3bb86a076cca53f0d4cc9b9c6e268a526581039467"
+  },
+  {
+    "id": 46,
+    "name": "PX Kyushu",
+    "title": "PX",
+    "code": "KYUSH",
+    "color": "#9caec1",
+    "icon_url": "/gr3/film-icons/46.png",
+    "sha256": "937135a7eaf48cb285c305c4a2edca0e30e586ee9e5eabc117181d4935f953c1"
+  },
+  {
+    "id": 47,
+    "name": "PX Harubeni",
+    "title": "PX",
+    "code": "HARUB",
+    "color": "#9c7a53",
+    "icon_url": "/gr3/film-icons/47.png",
+    "sha256": "69d6bcbb8351c15dffff595bc585726e148bf55a915f6916e16f2c50f51a1bac"
+  },
+  {
+    "id": 48,
+    "name": "PX Muted",
+    "title": "PX",
+    "code": "MUTED",
+    "color": "#917b61",
+    "icon_url": "/gr3/film-icons/48.png",
+    "sha256": "4bbdb4c47fac5436f2737368c95907eb87d691d889f24e7f576c900307e7df1a"
+  },
+  {
+    "id": 49,
+    "name": "PX Radiant",
+    "title": "PX",
+    "code": "RADNT",
+    "color": "#899090",
+    "icon_url": "/gr3/film-icons/49.png",
+    "sha256": "719e621d124b676d474451e72449141095c9002154f8788d7629530343c8a0ca"
+  },
+  {
+    "id": 50,
+    "name": "PX Fuyuno",
+    "title": "PX",
+    "code": "FUYUN",
+    "color": "#b3b4a9",
+    "icon_url": "/gr3/film-icons/50.png",
+    "sha256": "dbbc945ac2a17ef9cdfc7288645312165e24666911d7a65c1a635eba25f12373"
+  },
+  {
+    "id": 51,
+    "name": "PX Katen",
+    "title": "PX",
+    "code": "KATEN",
+    "color": "#66696a",
+    "icon_url": "/gr3/film-icons/51.png",
+    "sha256": "80a81aa0fceaac81e499066077fd600ec4d39cb7cd25b7738078ddaf0aa02c24"
+  },
+  {
+    "id": 52,
+    "name": "PX Satobi",
+    "title": "PX",
+    "code": "SATOB",
+    "color": "#a99988",
+    "icon_url": "/gr3/film-icons/52.png",
+    "sha256": "443666afa1d0b0fbed283c89fb667f30c197d026adf336ef612cd079694d15c4"
+  },
+  {
+    "id": 53,
+    "name": "PX Bleach",
+    "title": "PX",
+    "code": "BLEAC",
+    "color": "#839ba5",
+    "icon_url": "/gr3/film-icons/53.png",
+    "sha256": "13aca2c0f977a9c61a8e2396299649ef718a3f14c235384d4cb19df3a38b79c8"
+  },
+  {
+    "id": 54,
+    "name": "M9",
+    "title": "M9",
+    "code": "",
+    "color": "#6c967c",
+    "icon_url": "/gr3/film-icons/54.png",
+    "sha256": "488d47e719b7fa369ccecae1b220733d1d879c1b8ce7f3d4c7e3f4d2577ca316"
+  },
+  {
+    "id": 55,
+    "name": "M9 Std",
+    "title": "M9",
+    "code": "STD",
+    "color": "#a08baa",
+    "icon_url": "/gr3/film-icons/55.png",
+    "sha256": "df755773fb574649e545cb8063e5df3c5ac55f816147210d3c4377041c7fa264"
+  },
+  {
+    "id": 56,
+    "name": "Superia 200",
+    "title": "SUPRA",
+    "code": "200",
+    "color": "#c1a275",
+    "icon_url": "/gr3/film-icons/56.png",
+    "sha256": "61106892e62a1ded9f6cc4dd472cafead8093c0c7c5fe9f152d46436bd4d941a"
+  },
+  {
+    "id": 57,
+    "name": "Superia 200B",
+    "title": "SUPRA",
+    "code": "200B",
+    "color": "#748895",
+    "icon_url": "/gr3/film-icons/57.png",
+    "sha256": "09d96de364f4410aa6c546e64ca88f950c0de64938b1de22fbdf7efd15147a49"
+  },
+  {
+    "id": 58,
+    "name": "UMax 400",
+    "title": "UMAX",
+    "code": "400",
+    "color": "#8eab6a",
+    "icon_url": "/gr3/film-icons/58.png",
+    "sha256": "355549d2946cf65857e315c5d6aa634ea72ed3e48f23094b265abaf201f8f573"
+  },
+  {
+    "id": 59,
+    "name": "UMax 400 W",
+    "title": "UMAX",
+    "code": "400",
+    "color": "#bb6655",
+    "icon_url": "/gr3/film-icons/59.png",
+    "sha256": "441e69a089ee5f89e638bb13c5d95d3881cfb860b461a37f362e70c095f94c66"
+  },
+  {
+    "id": 60,
+    "name": "UMax 400 RC",
+    "title": "UMAX",
+    "code": "400",
+    "color": "#c9c6b5",
+    "icon_url": "/gr3/film-icons/60.png",
+    "sha256": "961cc6fd715844dbc90f2d32503f16172b0909db60f064758428528509034d7c"
+  },
+  {
+    "id": 61,
+    "name": "V3 250D Flat",
+    "title": "V3",
+    "code": "250DF",
+    "color": "#c6a450",
+    "icon_url": "/gr3/film-icons/61.png",
+    "sha256": "cbbb82d7e17872572a438f3c5284e723e7c90fd99f05dc0bd3bce623edba58f5"
+  },
+  {
+    "id": 62,
+    "name": "V3 500T",
+    "title": "5219",
+    "code": "500T",
+    "color": "#bca26c",
+    "icon_url": "/gr3/film-icons/62.png",
+    "sha256": "e9a7916659f3027569848b969c5f5489910e628777a4d4a508932c2f5c28c422"
+  },
+  {
+    "id": 63,
+    "name": "V3 500T N",
+    "title": "5219",
+    "code": "500TN",
+    "color": "#687469",
+    "icon_url": "/gr3/film-icons/63.png",
+    "sha256": "fe84dc26a9c298ef2719e72ffc8e4154a8b88edca0054fba9d620ffcc49fac07"
+  },
+  {
+    "id": 64,
+    "name": "V3 5207",
+    "title": "V3",
+    "code": "5207",
+    "color": "#bab7a4",
+    "icon_url": "/gr3/film-icons/64.png",
+    "sha256": "3593a9b5ba8ca30d26a4e6322bed112f2133e2cb2d6937e5a5c81018651ff7e8"
+  },
+  {
+    "id": 65,
+    "name": "GR2 Vivid",
+    "title": "GR2",
+    "code": "VIVID",
+    "color": "#728d88",
+    "icon_url": "/gr3/film-icons/65.png",
+    "sha256": "2fc3bb558742d9d3f7f6038396117d39b3d3067fb6347002fc5dbf9d465c1e00"
+  },
+  {
+    "id": 66,
+    "name": "5207",
+    "title": "5207",
+    "code": "250D",
+    "color": "#b59a45",
+    "icon_url": "/gr3/film-icons/66.png",
+    "sha256": "ea1314fa70780072a975fbad719c31020acdb4bd5200d1d52fb04c8ed27a7ab9"
+  },
+  {
+    "id": 67,
+    "name": "蓝凤凰",
+    "title": "PHNX",
+    "code": "II200",
+    "color": "#397ac4",
+    "icon_url": "/gr3/film-icons/67.png",
+    "sha256": "8ef8145b0fd0a55b7d78979c6808ea5cbb71f02802f27afbc5bd5a22a0b6055e"
+  },
+  {
+    "id": 68,
+    "name": "哈曼 RED",
+    "title": "RED",
+    "code": "125",
+    "color": "#c74435",
+    "icon_url": "/gr3/film-icons/68.png",
+    "sha256": "b993b6e0faf757fe61a474a7c15fae86eaeae3d988fa5fa7ad6f786292c30198"
+  },
+  {
+    "id": 69,
+    "name": "Portra 160",
+    "title": "PORTR",
+    "code": "160",
+    "color": "#a484ad",
+    "icon_url": "/gr3/film-icons/69.png",
+    "sha256": "41dff0c39745e6517e24b5f10cef90f19ca9b8da6e2eaa69fb541e08040d33b7"
+  },
+  {
+    "id": 70,
+    "name": "富士业务用 100",
+    "title": "FUJI",
+    "code": "100",
+    "color": "#41a66b",
+    "icon_url": "/gr3/film-icons/70.png",
+    "sha256": "6cccbbdd48299b364db295f8b17231304521479c3b0d9f5ef6b6a528bacb7715"
+  },
+  {
+    "id": 71,
+    "name": "乐凯 C200",
+    "title": "LUCKY",
+    "code": "C200",
+    "color": "#d94735",
+    "icon_url": "/gr3/film-icons/71.png",
+    "sha256": "a8705bcc4b7af0e14402798c0d38d86b877903e74c9a9f6304f5a7a883253751"
+  },
+  {
+    "id": 72,
+    "name": "CCD Classic",
+    "title": "GR",
+    "code": "CCD",
+    "color": "#567f8e",
+    "icon_url": "/gr3/film-icons/72.png",
+    "sha256": "9410856276b9b2d20b0e31afbefc76213a5db341cba9f03ceeb8cc05b9c35d1d"
+  },
+  {
+    "id": 73,
+    "name": "富士 C200",
+    "title": "FUJI",
+    "code": "C200",
+    "color": "#41995b",
+    "icon_url": "/gr3/film-icons/73.png",
+    "sha256": "95d177e2af55d6e9ec2a107f5f66f2c9f21f32d70fb4b309621aca0a52d0a595"
+  },
+  {
+    "id": 74,
+    "name": "Kodak ProImage 100",
+    "title": "PROIM",
+    "code": "100",
+    "color": "#c7a357",
+    "icon_url": "/gr3/film-icons/74.png",
+    "sha256": "dbb8f37dc1403e875a0dd2c5f60be095b368a8bc775faea007439272581541c7"
+  },
+  {
+    "id": 75,
+    "name": "T-Max 100",
+    "title": "TMAX",
+    "code": "100",
+    "color": "#84817b",
+    "icon_url": "/gr3/film-icons/75.png",
+    "sha256": "a9d4455e14017e8a86c1e5eed440965daf969e3b7f5a3cf427a6dbc78f460c49"
+  },
+  {
+    "id": 76,
+    "name": "Aerochrome III 1443",
+    "title": "AERO",
+    "code": "1443",
+    "color": "#ca527d",
+    "icon_url": "/gr3/film-icons/76.png",
+    "sha256": "885860c84e14f57a4ee1d8c7709879871b3c19f98bf1624b6bfef43679463a3e"
+  },
+  {
+    "id": 77,
+    "name": "Aerocolor IV 2460",
+    "title": "AERO",
+    "code": "2460",
+    "color": "#58a3a8",
+    "icon_url": "/gr3/film-icons/77.png",
+    "sha256": "530ff737c28e4fc79371c1683d521373d592eea174f7185e01394e6d908b30ae"
+  },
+  {
+    "id": 78,
+    "name": "VISION3 50D 5203",
+    "title": "5203",
+    "code": "50D",
+    "color": "#bfaa4c",
+    "icon_url": "/gr3/film-icons/78.png",
+    "sha256": "861f2a071357ee0468adb83f407851485077b7f5d6472472be20efee0554b647"
+  }
+]

@@ -35,3 +35,12 @@ test('GR II desk rejects firmware belonging to another model before exposing its
  vm.runInContext(app,context);node('firmware').files=[{arrayBuffer:async()=>new ArrayBuffer(4)}];await context.inspect();
  assert.equal(node('report').hidden,true);assert.match(node('notice').textContent,/GR IV.*GR II/);
 });
+test('GR II inspection reports proved update checksums while retaining native research status',async()=>{
+ const app=await readFile(new URL('../web/gr2/inspect.js',import.meta.url),'utf8'),nodes=new Map();
+ const node=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,disabled:false,textContent:'',files:[],replaceChildren(){},addEventListener(){}});return nodes.get(id);};
+ const context=vm.createContext({document:{getElementById:node,createElement:()=>({append(){}})},fetch:async url=>({ok:true,json:async()=>url.endsWith('status')?{session_token:'token'}:{model:'GR II',public_version:'3.00',sha256:'a'.repeat(64),proof:{byte_exact_roundtrip:true,modified_update_checksum:true},components:[],resources:[]}})});
+ vm.runInContext(app,context);await context.inspect(true);
+ assert.match(node('proof').textContent,/更新校验.*通过/);
+ assert.match(node('notice').textContent,/原生.*逆向|加载.*逆向/);
+ assert.doesNotMatch(node('notice').textContent,/修改校验.*未完成/);
+});

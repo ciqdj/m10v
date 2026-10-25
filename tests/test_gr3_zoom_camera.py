@@ -43,8 +43,8 @@ class CameraZoom(unittest.TestCase):
   for r,v in zip([UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3],args):self.u.reg_write(r,v)
   self.u.reg_write(UC_ARM_REG_LR,STOP);self.u.emu_start(self.symbols['m10v_zoom_'+name],STOP,count=100000);return self.u.reg_read(UC_ARM_REG_R0)
  def test_lazy_cache_load_once_and_unchanged_stride(self):
-  self.u.mem_write(PAGE+704,b'KEEP');self.call('camera_bits',0);n=self.reads
-  self.call('camera_bits',1);self.assertEqual(self.reads,n);self.assertEqual(n,2);self.assertEqual(bytes(self.u.mem_read(PAGE+704,4)),b'KEEP')
+  self.u.mem_write(PAGE+852,b'KEEP');self.call('camera_bits',0);n=self.reads
+  self.call('camera_bits',1);self.assertEqual(self.reads,n);self.assertEqual(n,2);self.assertEqual(bytes(self.u.mem_read(PAGE+852,4)),b'KEEP')
  def test_durable_commit_then_active_apply(self):
   s=RAM+0x800;e=RAM+0x900;self.call('camera_load',s);self.call('camera_select',0)
   self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0)
@@ -59,7 +59,7 @@ class CameraZoom(unittest.TestCase):
   self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0);self.assertFalse(self.apply)
  def test_write_failure_does_not_apply_or_publish(self):
   s=RAM+0x800;e=RAM+0x900;self.call('camera_load',s);self.call('camera_select',0);self.fail_write=True
-  self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff);self.assertFalse(self.apply);self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+696,4)),(35,50))
+  self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff);self.assertFalse(self.apply);self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+844,4)),(35,50))
  def test_apply_failure_preserves_durable_new_value(self):
   s=RAM+0x800;e=RAM+0x900;self.call('camera_load',s);self.call('camera_select',0);self.fail_apply=True
   self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff);self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(36,50))
@@ -69,14 +69,14 @@ class CameraZoom(unittest.TestCase):
   self.u.mem_write(e,struct.pack('<III',1,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff)
   self.assertEqual(self.apply,[0,0]);self.assertEqual(self.writes,1)
   self.fail_apply=False;self.assertEqual(self.call('camera_save',s,e),0)
-  self.assertEqual(self.apply,[0,0,0]);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+700,4))[0]&4,0)
+  self.assertEqual(self.apply,[0,0,0]);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+848,4))[0]&4,0)
  def test_other_slot_save_preserves_pending_and_manual_selection_clears_it(self):
   s=RAM+0x800;e=RAM+0x900;self.call('camera_load',s);self.call('camera_select',0);self.fail_apply=True
   self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff)
   self.u.mem_write(e,struct.pack('<III',1,1,49));self.assertEqual(self.call('camera_save',s,e),0)
-  self.assertEqual(self.apply,[0]);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+700,4))[0]&7,4)
-  self.call('camera_load',s);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+700,4))[0]&7,4)
-  self.call('camera_select',1);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+700,4))[0]&7,1)
+  self.assertEqual(self.apply,[0]);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+848,4))[0]&7,4)
+  self.call('camera_load',s);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+848,4))[0]&7,4)
+  self.call('camera_select',1);self.assertEqual(struct.unpack('<I',self.u.mem_read(PAGE+848,4))[0]&7,1)
   self.actual_bits=struct.unpack('<I',struct.pack('<f',49/28))[0]
   self.u.mem_write(e,struct.pack('<III',2,0,36));self.assertEqual(self.call('camera_save',s,e),0);self.assertEqual(self.apply,[0])
  def test_invalid_save_does_not_touch_storage(self):
@@ -86,23 +86,23 @@ class CameraZoom(unittest.TestCase):
  def test_no_owner_does_not_lazy_read(self):
   self.word(0x55063910,0);self.call('camera_bits',0);self.assertEqual(self.reads,0)
 class SeedZoom(CameraZoom):
- seed_flags=['-DM10V_ZOOM_SEED_LO=123u','-DM10V_ZOOM_SEED_HI=456u','-DM10V_ZOOM_SEED_FIRST=50u','-DM10V_ZOOM_SEED_SECOND=80u']
+ seed_flags=['-DM10V_ZOOM_SEED_LO=123u','-DM10V_ZOOM_SEED_HI=456u','-DM10V_ZOOM_SEED_FIRST=40u','-DM10V_ZOOM_SEED_SECOND=48u']
  # Inherited tests describe the disabled configuration; only seed tests apply.
  def test_seed_writes_both_slots_once_and_preserves_later_camera_changes(self):
   s=RAM+0x800;e=RAM+0x900
   self.assertNotEqual(self.call('camera_load',s),0xffffffff)
-  self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(50,80))
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(40,48))
   self.assertIn(b'M10VZW.bin',self.files);writes=self.writes
   self.call('camera_load',s);self.assertEqual(self.writes,writes)
   seq=struct.unpack('<I',self.u.mem_read(s,4))[0]
-  self.u.mem_write(e,struct.pack('<III',seq,1,75));self.assertEqual(self.call('camera_save',s,e),0)
-  self.call('camera_load',s);self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(50,75))
+  self.u.mem_write(e,struct.pack('<III',seq,1,47));self.assertEqual(self.call('camera_save',s,e),0)
+  self.call('camera_load',s);self.assertEqual(struct.unpack('<HH',self.u.mem_read(s+4,4)),(40,47))
  def test_failed_marker_keeps_error_until_retry_and_does_not_publish(self):
   s=RAM+0x800;self.fail_marker=True
   self.assertEqual(self.call('camera_load',s),0xffffffff)
-  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+696,4)),(0,0))
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+844,4)),(0,0))
   self.fail_marker=False;self.assertNotEqual(self.call('camera_load',s),0xffffffff)
-  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+696,4)),(50,80))
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+844,4)),(40,48))
 # Avoid rerunning the disabled-only cases against the enabled build.
 for _name in list(CameraZoom.__dict__):
  if _name.startswith('test_'):setattr(SeedZoom,_name,None)

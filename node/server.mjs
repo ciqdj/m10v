@@ -1,3 +1,4 @@
+import {handleGr2NativeRequest} from './gr2-native-routes.mjs';
 import {bindPowerPreparation,applyPowerImages,previewPowerImages} from './gr3-power-images.mjs';
 import {createHash} from 'node:crypto';
 import {handleGr4CustomizationRequest} from './gr4-customization.mjs';
@@ -93,6 +94,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const allowedHosts=[new URL(localOrigin).host,new URL(origin).host];
     if (!allowedHosts.includes(request.headers.host)) return send(response, 403, { error: 'invalid host' });
     if (await handleGr4CustomizationRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
+    if (await handleGr2NativeRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
     if (await handleGr4NativeRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
     if (request.url?.startsWith('/api/gr4/')) {
       await handleGr4Request({ request, response, runtime: gr4, token, readBody, send, origin });
@@ -112,6 +114,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }catch{return send(response,503,{error:'deployment receiver unavailable'});}
     }
     if (request.method === 'GET') {
+      if(['/gr2','/gr2/'].includes(pathname))return send(response,200,await readFile(path.join(web,'gr2/workbench.html')),'text/html; charset=utf-8');
+      if(pathname==='/gr2/inspect/')return send(response,200,await readFile(path.join(web,'gr2/index.html')),'text/html; charset=utf-8');
       if(['/gr4','/gr4/'].includes(pathname))return send(response,200,Buffer.from(gr4WorkbenchHtml(await readFile(path.join(web,'gr3/index.html'),'utf8'))),'text/html; charset=utf-8');
       if(pathname==='/gr4/sd-library.html')return send(response,200,Buffer.from(gr4SdLibraryHtml(await readFile(path.join(web,'gr3/sd-library.html'),'utf8'))),'text/html; charset=utf-8');
       if(pathname==='/gr4/sd-library.js')return send(response,200,await readFile(path.join(web,'gr3/sd-library.js')),'text/javascript; charset=utf-8');

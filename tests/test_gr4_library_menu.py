@@ -119,11 +119,15 @@ class MenuTests(unittest.TestCase):
   self.assertEqual(self.mode(u),1)
   self.assertEqual([e[2:4] for e in self.events if e[0]=='m10v_camera_library_select'],[(4,68),(4,68)])
   self.assertEqual([e[2] for e in self.events if e[0]=='activate'],[40])
- def test_nested_controls_route_and_save_field_contracts(self):
-  u=self.machine();self.group(u,1);self.select(u,2);self.assertEqual(self.mode(u),4)
-  self.group(u,3);self.select(u,4);self.assertEqual(self.mode(u),16)
-  self.select(u,2);self.assertEqual(self.mode(u),3)
-  effects=[e for e in self.events if e[0]=='m10v_camera_library_effects'];self.assertEqual(effects[-1][2:5],(0,0,2))
+ def test_nested_controls_keep_stamps_and_retire_texture_routes(self):
+  u=self.machine();self.group(u,1)
+  self.assertEqual([self.call(u,'index',MODEL,i) for i in range(self.call(u,'count',MODEL))],[129,132,133,214])
+  self.select(u,1);self.assertEqual(self.mode(u),5)
+  for group in [3,4,15,16,17,18,19,20]:
+   self.group(u,group);before=list(self.events)
+   self.assertEqual(self.call(u,'count',MODEL),0)
+   self.assertEqual(self.call(u,'index',MODEL,0),0)
+   self.select(u,0);self.assertEqual(self.events,before)
   self.group(u,5);self.select(u,4);self.assertEqual(self.mode(u),8)
   self.select(u,3);self.assertEqual(self.mode(u),5)
   stamps=[e for e in self.events if e[0]=='m10v_camera_library_stamp'];self.assertEqual(stamps[-1][2:5],(0,0,3))
@@ -135,7 +139,7 @@ class MenuTests(unittest.TestCase):
  def test_private_pages_have_exactly_two_footers_while_stock_retains_three(self):
   u=self.machine();self.assertEqual(self.call(u,'rows',CONTROLLER),29)
   self.group(u,2);self.assertEqual(self.call(u,'rows',CONTROLLER),48)
-  self.group(u,3);self.assertEqual(self.call(u,'rows',CONTROLLER),7)
+  self.group(u,3);self.assertEqual(self.call(u,'rows',CONTROLLER),2)
  def test_gr4_ok_key_and_back_events(self):
   u=self.machine();u.mem_write(LIST+0x110,struct.pack('<H',25));u.mem_write(0x10000100,struct.pack('<H',0xe0))
   self.call(u,'key',CONTROLLER,0x10000100);self.assertEqual(self.mode(u),1)

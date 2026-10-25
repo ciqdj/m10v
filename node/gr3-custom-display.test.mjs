@@ -16,11 +16,23 @@ test('custom display resources preserve stock cards and independently reject LUT
   assert.deepEqual(manifest.custom_film_display.name_resources,[1007,1011]);
   assert.deepEqual(manifest.resources.texts.slice(988-786,991-786),['胶卷名称：关闭','胶卷名称：开启','胶卷名称水印']);
   assert.equal(buildNativeLibrary(source,runtime,manifest).receipt.camera_tested,false);
-  for(const offset of [manifest.icons.pixels+78*6400-manifest.base,manifest.icons.descriptors+83*8+4-manifest.base]){
+  assert.equal(manifest.icons.payload_bytes,46*6400);
+  assert.equal(manifest.icons.retired_generic_count,32);
+  const original=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
+  const generic=readFileSync(new URL('../native/gr3/m10v_custom_icon.rgba',import.meta.url));
+  for(let i=0;i<78;i++){
+   const descriptor=runtime.readUInt32LE(manifest.icons.table-manifest.base+(671+i)*4);
+   const pixel=runtime.readUInt32LE(descriptor-manifest.base+4)*4-manifest.base;
+   assert.deepEqual(runtime.subarray(pixel,pixel+6400),i<32?generic:original.subarray(i*6400,(i+1)*6400));
+  }
+  const aliased=Buffer.from(runtime);
+  aliased.writeUInt32LE((manifest.icons.pixels+6400)/4,manifest.icons.descriptors-manifest.base+4);
+  assert.throws(()=>buildNativeLibrary(source,aliased,{...manifest,code_sha256:createHash('sha256').update(aliased).digest('hex')}),/icon descriptor differs/);
+  for(const offset of [manifest.icons.pixels+manifest.icons.payload_bytes-manifest.base,manifest.icons.descriptors+83*8+4-manifest.base]){
    const changed=Buffer.from(runtime);changed[offset]^=1;
    assert.throws(()=>buildNativeLibrary(source,changed,{...manifest,code_sha256:createHash('sha256').update(changed).digest('hex')}),/custom LUT icon differs/);
   }
-  for(const offset of [manifest.icons.pixels+80*6400-manifest.base,manifest.icons.descriptors+85*8+4-manifest.base]){
+  for(const offset of [manifest.icons.pixels+manifest.icons.payload_bytes+2*6400-manifest.base,manifest.icons.descriptors+85*8+4-manifest.base]){
    const changed=Buffer.from(runtime);changed[offset]^=1;
    assert.throws(()=>buildNativeLibrary(source,changed,{...manifest,code_sha256:createHash('sha256').update(changed).digest('hex')}),/Charmera color artwork differs/);
   }

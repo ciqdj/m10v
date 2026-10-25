@@ -48,6 +48,7 @@ class AppendedRecipeTests(unittest.TestCase):
         for tone in (25,26,27,28,29):
             for stage in (0,1):
                 e,r,o,i,c,si=self.fixture(tone,stage)
+                e.u.mem_write(si+0x77c,bytes([tone])) # encoder identity alongside stage1 sub-shot
                 initial=native.state((33,35,67,68,69))
                 result,source=self.snapshot(e,r,initial);self.assertEqual(result,1)
                 e.u.mem_write(source,native.state((65,)*5,sequence=9))

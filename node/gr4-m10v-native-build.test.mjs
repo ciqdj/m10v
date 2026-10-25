@@ -5,7 +5,7 @@ import {normalizeGr4Request,validateGr4Source,GR4_OFFICIAL_SHA256} from './gr4-m
 import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 test('GR IV shares full five-slot semantics but rejects invalid source and unsupported version adaptation',async()=>{
  const configuration=defaultConfiguration();configuration.slots[4].effects.leakGain=8;configuration.stamp=2;
- assert.deepEqual(normalizeGr4Request({configuration}).configuration,configuration);
+ assert.deepEqual(normalizeGr4Request({configuration}).configuration,{...configuration,slots:configuration.slots.map(s=>({...s,effects:{...s.effects,leakGain:0}}))});
  assert.throws(()=>normalizeGr4Request({configuration,debug_mode:'true'}));
  assert.throws(()=>normalizeGr4Request({configuration,version_unlock:{enabled:true}}));
  assert.throws(()=>validateGr4Source(Buffer.alloc(256)));

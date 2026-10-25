@@ -6,7 +6,7 @@
 #define M10V_ISP_RECIPE_COLOR_MAGIC 0x31435349u
 enum {M10V_ISP_RECIPE_EMPTY=0,M10V_ISP_RECIPE_READY=1,
       M10V_ISP_RECIPE_APPLIED=2,M10V_ISP_RECIPE_REJECTED=3,
-      M10V_ISP_RECIPE_MISMATCH=4,M10V_ISP_RECIPE_BUSY=5,M10V_ISP_RECIPE_UNSUPPORTED=6,M10V_ISP_RECIPE_OBSERVED=7};
+      M10V_ISP_RECIPE_MISMATCH=4,M10V_ISP_RECIPE_BUSY=5,M10V_ISP_RECIPE_UNSUPPORTED=6,M10V_ISP_RECIPE_OBSERVED=7,M10V_ISP_RECIPE_MUTATING=8};
 typedef struct {
     uint32_t magic,version,bytes,status,sequence;
     uint16_t tone,selected_tone; /* selected carrier frozen at producer ingress */
@@ -29,6 +29,5 @@ int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info);
 int m10v_isp_frame_recipe_finish(const void *context);
 uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,uint32_t execution);
 void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uint32_t result);
-int m10v_isp_frame_recipe_grain_noise(const void *context,uint8_t *noise,uint32_t bytes,uint32_t width,uint32_t height,uint32_t stride);
 uint32_t m10v_isp_frame_recipe_completed(void *recipe,uint32_t shooting,uint32_t tone,const m10v_library_state *);
 #endif

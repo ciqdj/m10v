@@ -17,22 +17,24 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const workspace=await (await fetch(base+'/gr3/')).text();assert.ok(workspace.includes('id="native-editor"'));
   const status=await (await fetch(base+'/api/status')).json();
   const catalog=await fetch(base+'/api/gr3/native-library/catalog'); assert.equal(catalog.status,200);
-  const data=await catalog.json();assert.equal(data.films.length,48);assert.deepEqual(data.films.filter(f=>f.group==='M10V精选').map(f=>f.name),['800T','5207','蓝凤凰','哈曼 RED','Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203','Kodak Charmera','方块世界']);assert.ok(data.films.every(f=>f.id>=33));assert.equal(data.external_film_pack,true);
+  const data=await catalog.json();assert.equal(data.films.length,30);assert.deepEqual([...new Set(data.films.map(f=>f.group))],['ECN2','C41','D76','创意','影像']);assert.ok(data.films.every(f=>f.id>=33));assert.equal(data.external_film_pack,true);
   const post=(url,body,auth=true)=>fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{'X-M10V-Token':status.session_token}:{})},body:JSON.stringify(body)});
   assert.equal((await post('/api/gr3/native-library/import-official',{},false)).status,403);
   const ximport=await post('/api/gr3/native-library/import-official',{model:'gr3x'});assert.equal(ximport.status,200);const xid=(await ximport.json()).project_id;
   const imported=await post('/api/gr3/native-library/import-official',{});assert.equal(imported.status,200);
   const {project_id:id}=await imported.json();
   const route=`/api/projects/${id}/native-library/`;
-  const config=normalizeConfiguration({slots:[{film:33,grain:3,soft:2},{film:7,grain:1,soft:3},{film:16,grain:0,soft:1},{film:21,grain:2,soft:0},{film:1,grain:0,soft:0}],stamp:2,format:3,corner:2,color:1});
+  const config=normalizeConfiguration({slots:[{film:33,grain:3,soft:2},{film:77,grain:1,soft:3},{film:298,grain:0,soft:1},{film:75,grain:2,soft:0},{film:291,grain:0,soft:0}],stamp:2,format:3,corner:2,color:1});
   assert.equal((await post(route+'prepare',{configuration:{...config,stamp:9}})).status,400);
+  const xconfig=normalizeConfiguration({...config,slots:config.slots.map(s=>({...s,grain:0}))});
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,400);
   const nrExtensions={aspect:false,level:false,negativeGrain:false,rawNr:{mode:'off'}};
   for(const rawNr of [{mode:'stock'},{mode:'off'},{mode:'threshold',iso:6400}]){
    const nr=await post(route+'prepare',{configuration:config,extensions:{...nrExtensions,rawNr}});
    assert.equal(nr.status,200);assert.deepEqual((await nr.json()).extensions.rawNr,rawNr);
   }
   assert.equal((await post(route+'prepare',{configuration:config,extensions:{...nrExtensions,rawNr:{mode:'threshold',iso:6300}}})).status,400);
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,extensions:nrExtensions})).status,200);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:xconfig,extensions:nrExtensions})).status,200);
   const p=await post(route+'prepare',{configuration:config});assert.equal(p.status,200);const plan=await p.json();
   assert.deepEqual(plan.configuration,config);assert.equal(plan.debug_mode,false);
   assert.deepEqual(plan.version_unlock,{enabled:false});
@@ -43,7 +45,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal((await post(route+'prepare',{configuration:config,version_unlock:{enabled:true}})).status,400);
   assert.equal((await post(route+'prepare',{configuration:config,version_unlock:{...version_unlock,cpu:'2.11.21.27'}})).status,400);
   assert.equal((await post(route+'build',{configuration:config,version_unlock,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config,debug_mode:true})).status,200);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:xconfig,debug_mode:true})).status,200);
   const dp=await post(route+'prepare',{configuration:config,debug_mode:true});assert.equal(dp.status,200);const debugPlan=await dp.json();
   assert.notEqual(debugPlan.configuration_sha256,plan.configuration_sha256);
   assert.equal((await post(route+'build',{configuration:config,debug_mode:true,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
@@ -52,10 +54,10 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(built.status,200,await built.clone().text());
   const bytes=Buffer.from(await built.arrayBuffer());const receipt=JSON.parse(Buffer.from(built.headers.get('X-M10V-Native-Receipt'),'base64'));
   assert.equal(receipt.candidate_sha256,createHash('sha256').update(bytes).digest('hex'));
-  // Two next-buffer film snapshot Hooks are replaced by one current-submit
-  // Hook; this no-HDF export therefore has one fewer independently verified patch.
+  // The retired CPU grain-size RNG hook is absent; the original RNG is preserved.
+  // Current-submit ownership and all other independently verified hooks remain.
   assert.deepEqual(receipt.configuration,config);assert.equal(receipt.camera_tested,false);assert.equal(receipt.verified_hooks,147);assert.deepEqual(receipt.appended_slots.tones,[25,26,27,28,29]);assert.equal(receipt.appended_slots.stock_presets_preserved,true);
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,200);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:xconfig})).status,200);
   assert.equal((await post(`/api/projects/${xid}/native-library/build`,{configuration:config,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
   const nrPlan=await (await post(route+'prepare',{configuration:config,extensions:nrExtensions})).json();
   assert.equal((await post(route+'build',{configuration:config,extensions:nrExtensions,accepted_configuration_sha256:plan.configuration_sha256})).status,400);
@@ -72,7 +74,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const debugReceipt=JSON.parse(Buffer.from(debugBuilt.headers.get('X-M10V-Native-Receipt'),'base64'));
   assert.equal(debugReceipt.debug_mode,true);assert.equal(debugReceipt.debug_log.build_id,debugPlan.configuration_sha256.slice(0,8));
   assert.equal(debugReceipt.candidate_sha256,createHash('sha256').update(Buffer.from(await debugBuilt.arrayBuffer())).digest('hex'));
-  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,148);assert.equal(debugReceipt.capture_pipeline,'gr3-native-v8');assert.equal(debugReceipt.experimental_capture.native_color,true);assert.equal(debugReceipt.experimental_capture.native_grain,true);
+  assert.notEqual(debugReceipt.candidate_sha256,receipt.candidate_sha256);assert.equal(debugReceipt.verified_hooks,147);assert.equal(debugReceipt.capture_pipeline,'gr3-native-v8');assert.equal(debugReceipt.experimental_capture.native_color,true);assert.equal(debugReceipt.experimental_capture.native_grain,true);
   assert.equal(receipt.external_film_pack,true);assert.equal(receipt.initial_state_hex.length,208);
   assert.equal(receipt.version_unlock.enabled,false);
   const unlocked=await post(route+'build',{configuration:config,version_unlock,accepted_configuration_sha256:unlockPlan.configuration_sha256});
@@ -94,7 +96,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   assert.equal(sb.readUInt32BE(0x38),0x020affff);assert.equal(sb.readUInt32BE(0x50),0x020a151b);
   assert.equal(sr.version_unlock.mode,'dsp-package-only');assert.equal(sr.version_unlock.current_versions,null);
   assert.equal(sr.version_unlock.checks.cpu_payload_unchanged,true);assert.equal(sr.version_unlock.camera_verified,false);
-  const xoptions={configuration:config,debug_mode:true,extensions:{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'off'}},version_unlock:{enabled:true,mode:'dsp-package-only'}};
+  const xoptions={configuration:xconfig,debug_mode:true,extensions:{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'off'}},version_unlock:{enabled:true,mode:'dsp-package-only'}};
   const xp=await (await post(`/api/projects/${xid}/native-library/prepare`,xoptions)).json();
   assert.equal(xp.model,'GR IIIx');assert.equal(xp.filename,'fwdc243b.bin');assert.equal(xp.external_film_pack,true);
   const xb=await post(`/api/projects/${xid}/native-library/build`,{...xoptions,accepted_configuration_sha256:xp.configuration_sha256});

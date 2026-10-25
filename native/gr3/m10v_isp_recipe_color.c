@@ -3,9 +3,6 @@
 #include <stddef.h>
 #if M10V_ISP_NATIVE_LOOK
 #include "m10v_isp_native_look.h"
-#if M10V_ISP_NATIVE_GRAIN_MODE
-#include "m10v_isp_native_effects.h"
-#endif
 #endif
 #ifndef M10V_ISP_RECIPE_COLOR_OBSERVER
 #define M10V_ISP_RECIPE_COLOR_OBSERVER 1
@@ -100,9 +97,12 @@ int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *state)
 }
 int m10v_isp_frame_recipe_state(void *recipe,m10v_library_state *out){
     m10v_isp_recipe_color *s=owned(recipe);
-    if(!s||!out||s->magic!=M10V_ISP_RECIPE_COLOR_MAGIC||s->version!=1||s->bytes!=sizeof(*s))return 0;
+    if(!s||!out||s->status==M10V_ISP_RECIPE_MUTATING||s->magic!=M10V_ISP_RECIPE_COLOR_MAGIC||s->version!=1||s->bytes!=sizeof(*s))return 0;
     for(uint32_t i=0;i<sizeof(*out);i++)((uint8_t *)out)[i]=((const uint8_t *)&s->state)[i];
     return m10v_library_valid(out);
+}
+static int producer_mutating(m10v_isp_recipe_color *s){
+ s->version=1;s->bytes=sizeof(*s);s->status=M10V_ISP_RECIPE_MUTATING;s->busy=0;s->selected_tone=0;s->magic=M10V_ISP_RECIPE_COLOR_MAGIC;return 0;
 }
 int m10v_isp_frame_recipe_producer(void *recipe){
 #if M10V_ISP_RECIPE_COLOR_PRODUCER
@@ -117,11 +117,18 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     /* A validated owner cache is published only after journal readback. Avoid
      * two AppData reads per exposure; unavailable/busy caches retain the
      * durable loader fallback before queueing. */
+    if(m10v_camera_library_mutation_busy())return producer_mutating(s);
     if(!m10v_camera_library_preview(&state)&&m10v_camera_library_load(&state)<0)return 0;
+    if(state.reserved&510u)return producer_mutating(s);
+    uint32_t producer_tone=committed_tone(0);
+    if(m10v_camera_library_mutation_busy())return producer_mutating(s);
+    m10v_library_state verify;
+    if(m10v_camera_library_preview(&verify)&&verify.sequence!=state.sequence)return producer_mutating(s);
+    if(committed_tone(0)!=producer_tone)return producer_mutating(s);
     if(!m10v_isp_frame_recipe_snapshot(recipe,&state))return 0;
     /* This selection belongs to the producer event, never a later UI change.
      * Keep s->tone/SI for the raw frame identity and completion handoff. */
-    s->selected_tone=(uint16_t)committed_tone(0);
+    s->selected_tone=(uint16_t)producer_tone;
     return 1;
 #else
     (void)recipe;return 0;
@@ -149,11 +156,14 @@ int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info){
     /* Stock base neutralization only owns carrier frames. Never turn an
      * unrelated stock frame into a custom recipe because UI selection is newer. */
     uint32_t raw_tone=shot[0x77c];
-    if(m10v_tone_slot(raw_tone)>=5)return 0;
+    if(m10v_tone_slot(raw_tone)>=M10V_SLOT_COUNT)return 0;
     uint32_t tone=selected_tone(s,raw_tone),slot;
-    if(m10v_tone_slot(tone)<5)slot=m10v_tone_slot(tone);
+    if(m10v_tone_slot(tone)<M10V_SLOT_COUNT)slot=m10v_tone_slot(tone);
     else return 0;
-    s->tone=shot[0x77c];s->si=si;
+    if(!s->state.slots[slot].film)return 0;
+    /* Encoder identity is base SI even when tuning uses a stage1 sub-shot. */
+    if(!s->selected_tone)s->selected_tone=(uint16_t)tone;
+    s->tone=((const uint8_t *)(uintptr_t)si)[0x77c];s->si=si;
 #if !M10V_ISP_RECIPE_COLOR_OBSERVER && !M10V_ISP_NATIVE_LOOK
     uint32_t film=s->state.slots[slot].film;
     if(film<34||film>65){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
@@ -188,9 +198,11 @@ int m10v_isp_frame_recipe_finish(const void *context){
     uint32_t tone=selected_tone(s,s->tone);
     uint32_t slot=m10v_tone_slot(tone);
     uint32_t film=s->state.slots[slot].film;
-    /* Charmera's live ISP approximation is never completion evidence for
+    /* Style LUTs use their exact CPU colour transform for still JPEGs.
+     * Their fitted live ISP previews are never colour-completion evidence.
+     * Charmera's live ISP approximation is never completion evidence for
      * the exact still YUV threshold/pair chroma renderer. */
-    if(film==M10V_CHAR_ID||film==M10V_PIXEL_ID){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
+    if(M10V_D76(film)||film==77||film==M10V_5213_ID||film==M10V_CHAR_ID||film==M10V_PIXEL_ID||M10V_STYLE(film)){s->status=M10V_ISP_RECIPE_UNSUPPORTED;return 0;}
     uint32_t exposure=(film==67||film==68)?s->state.effects[slot].film_exposure:0;
     uint32_t generation=(uint32_t)(uintptr_t)s^s->si^s->sequence;
     if(!generation)generation=1;
@@ -217,8 +229,8 @@ uint32_t m10v_isp_frame_recipe_completed(void *recipe,uint32_t shooting,uint32_t
 #if M10V_ISP_NATIVE_GRAIN_MODE
     uint32_t effective=selected_tone(s,tone);
     uint32_t slot=m10v_tone_slot(effective);
-    if(slot<5&&s->native_grain.magic==0x374e5247u&&s->native_grain.si==shooting&&s->native_grain.tone==tone&&s->native_grain.done&&
-       s->native_grain.grain==state->slots[slot].grain&&s->native_grain.size==state->effects[slot].grain_size)completed|=M10V_NATIVE_GRAIN;
+    if(slot<M10V_SLOT_COUNT&&s->native_grain.magic==0x374e5247u&&s->native_grain.si==shooting&&s->native_grain.tone==tone&&s->native_grain.done&&
+       s->native_grain.grain==state->slots[slot].grain)completed|=M10V_NATIVE_GRAIN;
 #endif
     return completed;
 #else
@@ -248,23 +260,23 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
     if(!grain_ram(si,0x94c))return hdf;
     m10v_isp_recipe_color *s=grain_owner(context);
     uint32_t tone=*(const uint8_t *)(uintptr_t)(si+0x77c);
-    if(m10v_tone_slot(tone)>=5)return hdf;
+    if(m10v_tone_slot(tone)>=M10V_SLOT_COUNT)return hdf;
     uint32_t effective=s?selected_tone(s,tone):tone,slot;
-    slot=m10v_tone_slot(effective);if(slot>=5)return hdf;
+    slot=m10v_tone_slot(effective);if(slot>=M10V_SLOT_COUNT)return hdf;
     uintptr_t values=((const uint32_t *)params)[0x10/4];
     if(!grain_ram(values,12))return hdf;
     /* The carrier's original menu grain is not the queued custom grain. If
-     * ownership/planning rejects, keep native grain off for the CPU route. */
+     * ownership/planning rejects, keep grain off; never run a CPU fallback. */
     ((int16_t *)values)[2]=0;
-    if(!s)return hdf;
-    /* Pixel cells overwrite native grain; apply its selected texture on CPU
-     * after the spatial pass. Independent shared HDF still owns its result. */
-    if(s->state.slots[slot].film==M10V_PIXEL_ID){
+    if(!s||!s->state.slots[slot].film)return hdf;
+    /* Palette/cell renderers overwrite upstream grain. No software fallback.
+     * Imported old records remain readable; shared HDF remains independent. */
+    if(s->state.slots[slot].film==M10V_PIXEL_ID||s->state.slots[slot].film==M10V_CHAR_ID){
         s->native_grain.planned=0;s->native_grain.armed=0;s->native_grain.done=0;
         return hdf;
     }
-    uint32_t grain=s->state.slots[slot].grain,size=s->state.effects[slot].grain_size;
-    if(grain>3||size>2)return hdf;
+    uint32_t grain=s->state.slots[slot].grain,size=0;
+    if(grain>3)return hdf;
     if(execution){
         if(s->native_grain.magic!=0x374e5247u||!s->native_grain.planned||s->native_grain.si!=si||s->native_grain.tone!=tone||s->native_grain.grain!=grain||s->native_grain.size!=size)return hdf;
         s->native_grain.armed=1;s->native_grain.done=0;s->native_grain.noise_ready=0;
@@ -276,16 +288,6 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
     return grain!=0||hdf;
 #else
     (void)context;(void)params;(void)execution;return 0;
-#endif
-}
-int m10v_isp_frame_recipe_grain_noise(const void *context,uint8_t *noise,uint32_t bytes,uint32_t width,uint32_t height,uint32_t stride){
-#if M10V_ISP_NATIVE_GRAIN_MODE
-    m10v_isp_recipe_color *s=grain_owner(context);
-    if(!s||s->native_grain.magic!=0x374e5247u||!s->native_grain.armed||!s->native_grain.grain||s->native_grain.si!=((const uint32_t *)context)[0x34/4])return 0;
-    int result=m10v_isp_native_effects_noise_shape(noise,bytes,width,height,stride,s->native_grain.size);
-    s->native_grain.noise_ready=result==0;return result==0;
-#else
-    (void)context;(void)noise;(void)bytes;(void)width;(void)height;(void)stride;return 0;
 #endif
 }
 void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uint32_t result){
@@ -318,9 +320,9 @@ int m10v_isp_frame_live_color(void *tuning,void *info){
     uint32_t raw_tone=shot[0x77c];
     /* Original base hook neutralizes only raw carrier frames. Preserve stock
      * routing until SI itself enters that range, even if UI has moved ahead. */
-    if(m10v_tone_slot(raw_tone)>=5)return 0;
+    if(m10v_tone_slot(raw_tone)>=M10V_SLOT_COUNT)return 0;
     uint32_t tone=committed_tone(raw_tone),slot=m10v_tone_slot(tone);
-    if(slot>=5)return 0;
+    if(slot>=M10V_SLOT_COUNT)return 0;
     m10v_library_state state;if(!m10v_camera_library_preview(&state))return 0;
     uint32_t film=state.slots[slot].film,exposure=(film==67||film==68)?state.effects[slot].film_exposure:0;
     if(film==M10V_CHAR_ID)exposure=state.effects[slot].reserved[1];
@@ -343,7 +345,7 @@ void m10v_isp_frame_live_prepare(void *tuning,const void *info){
     uint32_t raw_slot=m10v_tone_slot(raw_tone);
     /* Clear the previous custom banks even when current UI tone is stock.
      * Raw stock frames remain entirely outside our base-neutralization route. */
-    if(raw_slot<5&&m10v_camera_library_preview(&state)&&state.slots[raw_slot].film>=33){
+    if(raw_slot<M10V_SLOT_COUNT&&m10v_camera_library_preview(&state)&&state.slots[raw_slot].film>=33){
         /* Original Live Make otherwise reuses already written frame banks.
          * Invalidate only its internal cached-tone byte; original Make restores
          * it from unmodified SI and reconstructs clean base parameters. */

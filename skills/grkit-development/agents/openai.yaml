@@ -1,0 +1,4 @@
+interface:
+  display_name: "M10V 开发与发布 · GRKit"
+  short_description: "保护 M10V 已有功能，先交付测试包，用户验收后发布 GitHub 与宝塔"
+  default_prompt: "使用 $grkit-development 对照已有功能开发并交付测试包，等用户验证通过后合并 main、推送 GitHub 和部署宝塔。"

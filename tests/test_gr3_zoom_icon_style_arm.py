@@ -67,7 +67,7 @@ class IconStyle(unittest.TestCase):
   def hook(m,a,s,d):
    if a!=0x536af2a8:return
    alloc.append(m.reg_read(A.UC_ARM_REG_R0));m.reg_write(A.UC_ARM_REG_R0,0 if oom else out);m.reg_write(A.UC_ARM_REG_PC,m.reg_read(A.UC_ARM_REG_LR))
-  u.hook_add(UC_HOOK_CODE,hook);call(u,self.symbols['m10v_zoom_icon_decode'],762+mm-28)
+  u.hook_add(UC_HOOK_CODE,hook);call(u,self.symbols['m10v_zoom_icon_decode'],782+mm-28)
   self.assertEqual(alloc,[4800]);self.assertEqual(u.reg_read(A.UC_ARM_REG_R0),0 if oom else out)
   self.assertEqual(bytes(u.mem_read(out-16,16)),b'\xa5'*16);self.assertEqual(bytes(u.mem_read(out+4800,16)),b'\xa5'*16)
   return bytes(u.mem_read(out,4800))

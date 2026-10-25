@@ -1,10 +1,11 @@
 #include "m10v_tone.h"
 #include "m10v_settings.h"
+#include "m10v_film_directory.h"
 #define CATALOG_LIMIT 256u
-static int ready(const m10v_settings_ops *o){return o&&o->load&&o->item&&o->install&&o->stamp&&o->film_name_stamp;}
+static int ready(const m10v_settings_ops *o){return o&&o->load&&o->item&&o->install&&o->remove&&o->stamp&&o->film_name_stamp;}
 static uint32_t item(const m10v_settings_ops *o,uint32_t i){
- if(i>=CATALOG_LIMIT)return 0;
- uint32_t id=o->item(o->context,i);return id>=33&&(id<=M10V_CUSTOM_MAX_ID||id==M10V_CHAR_ID||id==M10V_PIXEL_ID)?id:0;
+ if(i>=M10V_DIRECTORY_COUNT)return 0;
+ uint32_t id=o->item(o->context,i);return id==m10v_directory[i].id?id:0;
 }
 static uint32_t value(const m10v_library_state *s,uint32_t field){
  return field==0?s->stamp:field==1?s->format:field==2?s->corner:field==3?s->color:s->reserved&1u;
@@ -15,23 +16,29 @@ int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t scre
  if(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP&&screen!=M10V_SETTINGS_NAME&&screen!=M10V_SETTINGS_AB)return -1;
  if(o->load(o->context,&p->saved)<0)return -1;
  if(p->saved.stamp>2||p->saved.format>3||p->saved.corner>3||p->saved.color>3)return -1;
- for(uint32_t i=0;i<5;i++)if(!p->saved.slots[i].film||(p->saved.slots[i].film>M10V_CUSTOM_MAX_ID&&p->saved.slots[i].film!=M10V_CHAR_ID&&p->saved.slots[i].film!=M10V_PIXEL_ID))return -1;
- p->focus=p->slot=p->index=p->expected=p->value=p->error=0;
- p->screen=screen;if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
+ if(!m10v_library_valid(&p->saved))return -1;
+ p->focus=p->slot=p->index=p->expected=p->value=p->error=p->group=0;
+ p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_CATALOG:screen;
+ if(p->screen==M10V_SETTINGS_CATALOG){while(p->index+1<M10V_DIRECTORY_COUNT&&!item(o,p->index))p->index++;p->expected=item(o,p->index);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;}
+ if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
 }
 void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key){
- if(!p||!ready(o)||key>M10V_KEY_DISP)return;
+ if(!p||!ready(o)||key>M10V_KEY_CLEAN)return;
  uint32_t previous=key==M10V_KEY_LEFT||key==M10V_KEY_UP;
  uint32_t next=key==M10V_KEY_RIGHT||key==M10V_KEY_DOWN;
- if(p->screen==M10V_SETTINGS_FILMS){
-  if(p->focus>=5)return;
-  if(previous&&p->focus)p->focus--;
-  if(next&&p->focus<4)p->focus++;
-  if(key==M10V_KEY_BACK)p->screen=M10V_SETTINGS_CLOSED;
-  if(key==M10V_KEY_OK){
-   uint32_t id=item(o,0);p->error=id?0:M10V_SETTINGS_EMPTY;
-   if(id){p->slot=p->focus;p->index=0;p->expected=id;p->screen=M10V_SETTINGS_CATALOG;}
-  }
+ if(p->screen==M10V_SETTINGS_CATALOG&&key==M10V_KEY_CLEAN){
+   /* Explicit maintenance only: loading/browsing never migrates a journal. */
+   for(uint32_t n=0;n<M10V_SLOT_COUNT;n++){
+    m10v_library_state fresh;
+    if(o->load(o->context,&fresh)<0||!m10v_library_valid(&fresh)){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+    for(uint32_t b=0;b<sizeof(fresh);b++)((uint8_t *)&p->saved)[b]=((const uint8_t *)&fresh)[b];
+    uint32_t count=m10v_library_count(&fresh),slot=0;
+    while(slot<count&&m10v_directory_name(fresh.slots[slot].film))slot++;
+    if(slot==count){p->error=0;return;}
+    if(o->remove(o->context,slot)!=0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+   }
+   if(o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+   p->error=0;return;
  }else if(p->screen==M10V_SETTINGS_AB){
   p->value=0;
   if(key==M10V_KEY_UP&&p->focus)p->focus--;
@@ -44,19 +51,37 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
   if(key==M10V_KEY_OK&&p->focus>=2)p->value=p->focus-1;
  }else if(p->screen==M10V_SETTINGS_CATALOG){
-  if(p->slot>=5||p->index>=CATALOG_LIMIT)return;
-  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_FILMS;p->focus=p->slot;p->error=0;return;}
+  uint32_t first=0,end=M10V_DIRECTORY_COUNT;
+  if(p->index<first||p->index>=end)return;
+  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;return;}
   uint32_t i=p->index;
-  if(previous&&i)i--;
-  if(next)i++;
-  if(key==M10V_KEY_PREVIOUS||key==M10V_KEY_UP)i=p->index>=5?p->index-5:0;
-  if(key==M10V_KEY_NEXT||key==M10V_KEY_DOWN)i=p->index+5;
-  if(i!=p->index){uint32_t id=item(o,i);if(id){p->index=i;p->expected=id;p->error=0;}}
+  if(key==M10V_KEY_LEFT&&i>first)i--;
+  if(key==M10V_KEY_RIGHT)i++;
+  if(key==M10V_KEY_UP)i=p->index>=first+5?p->index-5:first;
+  if(key==M10V_KEY_DOWN)i=p->index+5;
+  if(key==M10V_KEY_PREVIOUS)i=p->index>=first+10?p->index-10:first;
+  if(key==M10V_KEY_NEXT)i=p->index+10;
+  if(i>=end)i=end-1;
+  if(i!=p->index){
+   uint32_t id=item(o,i);
+   if(i>p->index){
+    while(!id&&i+1<end){i++;id=item(o,i);}
+    while(!id&&i>p->index){i--;id=item(o,i);}
+   }else{
+    while(!id&&i>first){i--;id=item(o,i);}
+    while(!id&&i<p->index){i++;id=item(o,i);}
+   }
+   if(id){p->index=i;p->expected=id;p->error=0;}
+  }
   if(key==M10V_KEY_OK){
    if(!p->expected||item(o,p->index)!=p->expected){p->error=M10V_SETTINGS_CHANGED;return;}
-   if(o->install(o->context,p->index,p->expected,p->slot)!=0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
-   if(o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
-   p->focus=p->slot;p->screen=M10V_SETTINGS_FILMS;p->error=0;
+   m10v_library_state fresh;if(o->load(o->context,&fresh)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+   uint32_t count=m10v_library_count(&fresh),slot=0;
+   while(slot<count&&fresh.slots[slot].film!=p->expected)slot++;
+   if(slot==count&&count>=(M10V_APPENDED_SLOTS?10u:5u)){p->error=M10V_SETTINGS_FULL;return;}
+   int r=slot<count?o->remove(o->context,slot):o->install(o->context,p->index,p->expected,count);
+   if(r||o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+   p->error=0;
   }
  }else if(p->screen==M10V_SETTINGS_NAME){
   if(previous)p->value=0;

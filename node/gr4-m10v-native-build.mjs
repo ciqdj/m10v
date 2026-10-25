@@ -15,6 +15,8 @@ export function validateGr4Source(source){if(!Buffer.isBuffer(source)||hash(sour
 export function normalizeGr4Request(value={}){
  const configuration=normalizeConfiguration(value.configuration),extensions=normalizeExtensions(value.extensions);
  if(configuration.zoom.write)throw Error('裁切焦距写入仅支持 GR III');
+ if(configuration.slots.length>5)throw Error('GR IV 暂不支持导出超过 5 款胶卷');
+ if(configuration.slots.some(s=>s.grain>0))throw Error('颗粒仅支持 GR III 原厂原生成像管线，请关闭颗粒后导出 GR IV');
  if(configuration.hdf)throw Error('数字 HDF 模拟当前仅支持普通 GR III');
  if(configuration.filmNameStamp)throw Error('胶卷名称水印当前仅支持 GR III / GR IIIx');
  const debug_mode=value.debug_mode??false;if(typeof debug_mode!=='boolean')throw Error('调试模式必须为布尔值');

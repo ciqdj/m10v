@@ -31,7 +31,7 @@ class ZoomBuildTests(unittest.TestCase):
         self.assertTrue(compiler)
         with tempfile.TemporaryDirectory() as folder:
             obj=Path(folder)/'gr4-view.o'
-            subprocess.run([compiler,*FLAGS,'-c',str(ROOT/'native/gr4/m10v_settings_view.c'),'-o',str(obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*FLAGS,'-I',str(ROOT/'native/gr3'),'-c',str(ROOT/'native/gr4/m10v_settings_view.c'),'-o',str(obj)],check=True,capture_output=True)
             code,symbols=link_object(obj.read_bytes(),0x54400000,{'m10v_library_name':0x54410000},prefix='m10v_settings_view_')
             self.assertTrue(code)
             self.assertEqual(set(symbols),{'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'})

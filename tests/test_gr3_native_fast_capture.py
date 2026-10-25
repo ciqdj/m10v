@@ -35,7 +35,11 @@ class NativeFastCaptureTests(unittest.TestCase):
    if at==complete:uc.reg_write(A.UC_ARM_REG_R0,mask);uc.reg_write(A.UC_ARM_REG_PC,uc.reg_read(A.UC_ARM_REG_LR))
   u.hook_add(UC_HOOK_CODE,upstream)
   h.call(u,'m10v_camera_library_halation',0x55001000,1,halo,3,5,2)
-  h.call(u,'m10v_camera_library_effects',0x55001000,1,1,leak)
+  if leak:
+   # Old checksummed journals remain readable, but do not schedule CPU texture.
+   for filename,data in list(h.files.items()):
+    if len(data)==104:
+     legacy=bytearray(data);legacy[65]=leak;struct.pack_into('<I',legacy,100,zlib.crc32(legacy[:100]));h.files[filename]=bytes(legacy)
   h.allocations.clear();cache.clear();frees.clear();reads=[0];writes=[0]
   def access(uc,access,at,size,value,data):
    (writes if access==17 else reads)[0]+=1
@@ -58,10 +62,16 @@ class NativeFastCaptureTests(unittest.TestCase):
    h,u,c,y,uv,cache,frees,reads,writes=self.fixture(film,mask=0)
    self.assertEqual(h.call(u,'m10v_capture_library',c),0)
    self.assertTrue(cache);self.assertGreater(writes[0],0)
- def test_leak_remains_active_with_native_color_and_grain(self):
+ def test_style_filters_keep_cpu_lut_even_with_a_native_completion_mask(self):
+  for film,mask in ((291,3),(296,3),(297,0)):
+   h,u,c,y,uv,cache,frees,reads,writes=self.fixture(film,mask=mask)
+   self.assertEqual(h.call(u,'m10v_capture_library',c),0)
+   self.assertGreater(writes[0],0)
+   self.assertNotEqual((bytes(u.mem_read(0x55010000,len(y))),bytes(u.mem_read(0x55020000,len(uv)))),(bytes(y),bytes(uv)))
+ def test_imported_leak_does_not_touch_native_completed_planes(self):
   h,u,c,y,uv,cache,frees,reads,writes=self.fixture(66,leak=8)
   self.assertEqual(h.call(u,'m10v_capture_library',c),0)
-  self.assertEqual(h.allocations,[]);self.assertTrue(cache);self.assertGreater(writes[0],0)
+  self.assertEqual((h.allocations,cache,frees,reads,writes),([],[],[],[0],[0]))
 
  def test_cpu_color_fallback_also_reaches_both_independent_playback_thumbnails(self):
   for fmt in (1,2):

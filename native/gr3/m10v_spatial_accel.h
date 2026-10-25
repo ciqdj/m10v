@@ -15,14 +15,13 @@ int m10v_spatial_blur_u16(uint16_t *a,uint16_t *b,uint32_t capacity,
 
 /* Official Granulation workspace protocol, independently executed against
  * locked GR III 2.10 bytes: align16(width)*height + alignment headroom.
- * Pure query only; never allocates or substitutes official three-level grain
- * for the current multiscale/color grain. Address 0 queries an aligned buffer.
+ * Pure query only; never allocates. Address 0 queries an aligned buffer.
  * Returns 0 or -1 without changing *required on invalid input/overflow.
  */
 int m10v_spatial_grain_work_bytes(uint32_t width,uint32_t height,
     uint32_t work_address,uint32_t *required);
 
-/* EXPERIMENTAL native-stock adapter, NOT equivalent to current M10V grain.
+/* Native-stock adapter for the original three-level grain.
  * Accepts ORIGINAL 32-byte native image descriptors, never m10v_library_image.
  * Caller must already own the native IIP context/task, descriptors, planes and
  * full workspace until stock returns; establish scheduler/NEON/cache ownership
@@ -36,14 +35,4 @@ int m10v_spatial_grain_work_bytes(uint32_t width,uint32_t height,
 int m10v_spatial_stock_grain_execute(uint32_t context,const void *source,
     const void *destination,uint32_t stock_strength,void *workspace,uint32_t workspace_bytes);
 
-/* Eight normalized grain coordinates from ONE row, already calculated using
- * the existing grain_sx/grain_sy rules. Outputs the exact original random32 h
- * and bilinear grain noise INCLUDING the signed fine-noise /3 term, before
- * luminance weighting and color-channel perturbation. Does not replace seed,
- * coordinate resampling, LUT, intensity or RGB/chroma arithmetic.
- * Three 32-byte arrays must be aligned to four bytes and pairwise disjoint.
- * size=0..2; output independent of tile boundaries and lattice-cache history.
- */
-int m10v_spatial_grain_noise8(const uint32_t *gx,uint32_t gy,uint32_t seed,
-    uint32_t size,uint32_t *hashes,int32_t *noise);
 #endif

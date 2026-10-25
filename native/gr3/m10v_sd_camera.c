@@ -3,6 +3,7 @@
  * Read is BOOLEAN even on short reads: seek/tell deltas are mandatory. */
 #include "m10v_sd_library.h"
 #include "m10v_library.h"
+#include "m10v_film_directory.h"
 typedef uint32_t (*get_fn)(void);
 typedef void *(*alloc_fn)(uint32_t);
 typedef void (*free_fn)(void *);
@@ -25,7 +26,8 @@ static int exact(uint32_t fs,const uint32_t *v,uint32_t handle,uint32_t at,uint8
 /* Return selected ID after closing the file, with the complete record in out
  * when requested. Fixed 16 KiB scratch; header bounds all index arithmetic. */
 static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
- if(page>=32||row>=8||!memory)return 0;
+ uint32_t directory=page==32;
+ if(!memory||(directory?row>=M10V_DIRECTORY_COUNT:page>=32||row>=8))return 0;
  uint32_t manager=((get_fn)0x535847d8u)();if(!ram(manager,24))return 0;
  uint32_t fs=((const uint32_t *)(uintptr_t)manager)[5];if(!ram(fs,4))return 0;
  uint32_t vt=*(const uint32_t *)(uintptr_t)fs;if(!code(vt,56))return 0;
@@ -40,6 +42,7 @@ static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
     size>=4096&&size<=4096+M10V_SD_MAX_FILMS*M10V_SD_RECORD_BYTES&&
     exact(fs,v,handle,0,memory,4096)){
   uint32_t count=m10v_sd_header(memory,size),index=page*8+row;
+  if(directory){index=0;while(index<count&&m10v_sd_u32(memory+64+index*12)!=m10v_directory[row].id)index++;}
   if(count&&index<count){
    id=m10v_sd_u32(memory+64+index*12);
    if(full){uint32_t expected=m10v_sd_u32(memory+68+index*12);uint8_t *record=memory+4096;
@@ -56,6 +59,11 @@ uint32_t m10v_sd_camera_item(uint32_t page,uint32_t row){
  if(page>=32||row>=8)return 0;
  uint8_t *memory=allocate();if(!memory)return 0;
  uint32_t id=fetch(page,row,memory,0);((free_fn)0x536af2e4u)(memory);return id;
+}
+uint32_t m10v_sd_camera_directory_item(uint32_t index){
+ if(index>=M10V_DIRECTORY_COUNT)return 0;
+ uint8_t *memory=allocate();if(!memory)return 0;
+ uint32_t id=fetch(32,index,memory,0);((free_fn)0x536af2e4u)(memory);return id;
 }
 /* The stock AppData reader blindly copies the requested size. Instead use its
  * original file loader and header validator and check BOTH sizes before copy.
@@ -82,6 +90,9 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
+ if(M10V_D76(id))id=id-M10V_D76_FIRST+10;
+ if(id==M10V_5213_ID)id=9;
+ if(M10V_STYLE(id))id=id-M10V_STYLE_FIRST+2;
  if(id==M10V_PIXEL_ID)id=1;
  if(id==M10V_CHAR_ID)id=0; /* dedicated M10VS00 snapshot; legacy 33..78 unchanged */
  name[5]=primary[8]=(char)('0'+id/10);name[6]=primary[9]=(char)('0'+id%10);
@@ -94,22 +105,38 @@ static void custom_names(uint32_t slot,uint32_t bank,char *name,char *full){
  for(uint32_t i=0;i<12;i++)name[i]=base[i];for(uint32_t i=0;i<15;i++)full[i]=path[i];
  name[5]=full[8]=(char)('0'+slot);name[6]=full[9]=(char)('0'+bank);
 }
-static int persist_custom(const uint8_t *record,uint32_t slot,uint32_t bank){
+static void immutable_names(uint32_t id,uint32_t generation,char *name,char *full){
+ const char base[]="M000G000.bin",path[]="F:\\M000G000.bin";
+ for(uint32_t i=0;i<13;i++)name[i]=base[i];for(uint32_t i=0;i<16;i++)full[i]=path[i];
+ for(uint32_t i=0;i<3;i++){name[3-i]=full[6-i]=(char)('0'+id%10);id/=10;name[7-i]=full[10-i]=(char)('0'+generation%10);generation/=10;}
+}
+static uint32_t persist_custom(const uint8_t *record,uint32_t id){
  uint32_t manager=((get_fn)0x53828014u)();if(!ram(manager,12))return 0;
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
- char name[12],full[15];custom_names(slot,bank,name,full);
- if(snapshot_read(fs,full,record))return 1;
+ typedef uint32_t (*stat_fn)(uint32_t,const char *,void *);
  typedef int (*write_fn)(uint32_t,const char *,uint32_t,const void *);
- return ((write_fn)0x53825fa8u)(fs,name,M10V_SD_RECORD_BYTES,record)&&snapshot_read(fs,full,record);
+ uint32_t first_free=0;
+ /* Every previously published generation is immutable: recipes queued before
+  * removal or a later import retain their exact custom record. */
+ for(uint32_t generation=M10V_CUSTOM_IMMUTABLE_FIRST;generation<=255;generation++){
+  char name[13],full[16];immutable_names(id,generation,name,full);
+  if(snapshot_read(fs,full,record))return generation;
+  /* Stock5362e160 returns0 when its stat virtual method fails; valid
+   * published generations have the fixed nonzero framed record size. */
+  if(!first_free&&((stat_fn)0x5362e160u)(*(const uint32_t *)(uintptr_t)fs,full,0)==0u)first_free=generation;
+ }
+ if(!first_free)return 0;
+ char name[13],full[16];immutable_names(id,first_free,name,full);
+ return ((write_fn)0x53825fa8u)(fs,name,M10V_SD_RECORD_BYTES,record)&&snapshot_read(fs,full,record)?first_free:0;
 }
 int m10v_sd_camera_custom_record(const m10v_library_state *state,uint32_t slot,uint8_t *out,uint32_t bytes){
- if(!state||slot>=5||!ram((uint32_t)(uintptr_t)out,bytes)||bytes<M10V_SD_RECORD_BYTES)return 0;
- uint32_t id=state->slots[slot].film,which=state->effects[slot].reserved[0];if(id<79||id>288||which<1||which>2)return 0;
+ if(!state||slot>=M10V_SLOT_COUNT||!ram((uint32_t)(uintptr_t)out,bytes)||bytes<M10V_SD_RECORD_BYTES)return 0;
+ uint32_t id=state->slots[slot].film,which=state->effects[slot].reserved[0];if(id<79||id>288||which<1||which>M10V_CUSTOM_MAX_BANK+1)return 0;
  uint32_t manager=((get_fn)0x53828014u)();if(!ram(manager,12))return 0;
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
- char name[12],full[15];custom_names(slot,which-1,name,full);
+ char name[13],full[16];if(which>=M10V_CUSTOM_IMMUTABLE_FIRST)immutable_names(id,which,name,full);else custom_names((which-1)/2,(which-1)%2,name,full);
  typedef uint32_t (*stat_fn)(uint32_t,const char *,void *);typedef int (*read_fn)(uint32_t,const char *,uint32_t,void *);
  uint32_t file_manager=*(const uint32_t *)(uintptr_t)fs;
  if(((stat_fn)0x5362e160u)(file_manager,full,0)!=M10V_SD_RECORD_BYTES+8)return 0;
@@ -131,17 +158,24 @@ int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,ui
  int ok=fetch(index/8,index%8,memory,1)==expected_id&&record_name(memory+4096,out,capacity);
  ((free_fn)0x536af2e4u)(memory);return ok;
 }
-int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if(page>=32||row>=8||expected_id<33||(expected_id>M10V_CUSTOM_MAX_ID&&expected_id!=M10V_CHAR_ID&&expected_id!=M10V_PIXEL_ID)||slot>=5)return -1;
+static int install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
+ if((page==32?row>=M10V_DIRECTORY_COUNT:page>=32||row>=8)||expected_id<33||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){
   m10v_library_state state;
   if(m10v_camera_library_load(&state)>=0){
    if(M10V_BUILTIN(id)){if(persist(memory+4096,id))result=m10v_camera_library_select(&state,slot,id);}
-   else {uint32_t current=state.effects[slot].reserved[0],bank=current?2-current:0;
-    if(persist_custom(memory+4096,slot,bank))result=m10v_camera_library_select_custom(&state,slot,id,bank);}
+   else {uint32_t generation=persist_custom(memory+4096,id);if(generation)result=m10v_camera_library_select_custom(&state,slot,id,generation-1);}
   }
  }
  ((free_fn)0x536af2e4u)(memory);return result;
+}
+
+int m10v_sd_camera_install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
+ if(page>=32||row>=8)return -1;return install(page,row,expected_id,slot);
+}
+int m10v_sd_camera_directory_install(uint32_t index,uint32_t expected_id,uint32_t slot){
+ if(index>=M10V_DIRECTORY_COUNT||m10v_directory[index].id!=expected_id)return -1;
+ return install(32,index,expected_id,slot);
 }

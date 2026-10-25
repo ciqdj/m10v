@@ -44,3 +44,21 @@ class FirmwareTests(unittest.TestCase):
         rebuilt = _noop_repack(self.data)
         self.assertEqual(hashlib.sha256(rebuilt).hexdigest(), SHA)
         self.assertEqual(rebuilt, self.data)
+
+
+class Firmware220Tests(unittest.TestCase):
+    def test_official_220_identity_and_noop(self):
+        import os
+        fixture = os.environ.get('M10V_GR3_220_FIXTURE')
+        if not fixture or not Path(fixture).exists():
+            self.skipTest('set M10V_GR3_220_FIXTURE to the official 2.20 BIN')
+        data = Path(fixture).read_bytes()
+        report = inspect_official(data)
+        self.assertEqual((report.public_version, report.internal_version, report.size),
+                         ('2.20', '2.20.20.28', 30472516))
+        self.assertEqual(len(report.sections), 14)
+        self.assertEqual(_noop_repack(data), data)
+        changed = bytearray(data)
+        changed[200] ^= 1
+        with self.assertRaisesRegex(FirmwareIdentityError, 'identity'):
+            inspect_official(bytes(changed))

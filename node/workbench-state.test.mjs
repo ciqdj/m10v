@@ -11,10 +11,10 @@ test('custom film drafts migrate supported selections and block unresolved slots
  assert.deepEqual(result.unresolvedSlots,[{slot:1,id:'lut-old'}]);assert.deepEqual(result.rawNr,{mode:'threshold',iso:6400});
  assert.equal(old.recipes.length,1);
 });
-test('native draft and history preserve per-slot effects while enforcing compatible features',()=>{
+test('native draft and history retire leak while preserving active per-slot settings',()=>{
  const config=defaultConfiguration();config.slots[2].effects.leakGain=7;config.stamp=2;
  const result=normalizeWorkbenchDraft({profile:'native',features:['film','timestamp','level','recipes'],nativeConfiguration:config});
- assert.equal(result.nativeConfiguration.slots[2].effects.leakGain,7);assert.equal(result.nativeConfiguration.stamp,2);
+ assert.equal(result.nativeConfiguration.slots[2].effects.leakGain,0);assert.equal(result.nativeConfiguration.stamp,2);
  assert.deepEqual(result.features,['film','timestamp','level']);
  assert.equal(normalizeWorkbenchDraft({features:[]},[],config).nativeConfiguration.stamp,0);
 });

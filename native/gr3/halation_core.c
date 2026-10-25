@@ -39,7 +39,8 @@ int m10v_halation(const m10v_halo_image *image, uint32_t control,
     if (image->y_bytes < yn || image->chroma_bytes < cn ||
         !valid_range(ya, image->y_bytes) || !valid_range(ca, image->chroma_bytes) ||
         overlap(ya, image->y_bytes, ca, image->chroma_bytes)) return M10V_HALO_INVALID;
-    if ((!strength||!gain)&&!grain) return M10V_HALO_OK;
+    /* Historical grain bits are validated above but no longer render pixels. */
+    if (!strength||!gain) return M10V_HALO_OK;
     /* Keep a bounded normalized grid. Power-of-two cells scale the radius
      * with output dimensions without integer division or unbounded allocation. */
     uint32_t shift = 0, step = 1;
@@ -49,7 +50,6 @@ int m10v_halation(const m10v_halo_image *image, uint32_t control,
     if (scratch_bytes < need || !scratch) return M10V_HALO_SCRATCH;
     if ((sa&3) || !valid_range(sa, scratch_bytes) || overlap(sa, scratch_bytes, ya, image->y_bytes) ||
         overlap(sa, scratch_bytes, ca, image->chroma_bytes)) return M10V_HALO_INVALID;
-    if(!strength||!gain)goto apply_grain;
     uint8_t *a = scratch, *b = scratch + cells, *d = scratch + 2 * cells;
     for (uint32_t i = 0; i < cells; ++i) a[i] = 0;
     /* Max pooling preserves sub-grid point sources. Source mask is complete
@@ -200,19 +200,6 @@ int m10v_halation(const m10v_halo_image *image, uint32_t control,
             c[ci+cr] = add_sat(c[ci+cr],red);
             y[yi] = add_sat((uint8_t)y0,lift); y[yi+1] = add_sat((uint8_t)y1,lift);
         }
-    }
-    /* Fine zero-mean luminance grain. No chroma noise, no padding writes,
-     * and no noise at pure black/white. Scene values vary the deterministic
-     * seed without global mutable state or camera random-number calls. */
-apply_grain:;
-    uint32_t random=0x9e3779b9u^(w<<16)^h;
-    if(grain)for(uint32_t row=0;row<h;row++)for(uint32_t x=0;x<w;x++) {
-        uint32_t at=row*ys+x,light=y[at];
-        random+=light+17;random^=random<<13;random^=random>>17;random^=random<<5;
-        uint32_t envelope=light<128?light:255-light;
-        int32_t noise=((int32_t)(random&15)-(int32_t)((random>>4)&15))*(int32_t)(grain*envelope);
-        int32_t delta=noise>=0?(noise+1024)>>11:-((-noise+1024)>>11);
-        y[at]=(uint8_t)((int32_t)light+delta);
     }
     return M10V_HALO_OK;
 }

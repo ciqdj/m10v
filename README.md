@@ -50,7 +50,7 @@
 
 GR III／GR IIIx 工作台支持配方参数、原厂名称与图标、负片颗粒、RAW 降噪、画幅比例和水平仪等工具；GR IV 同步提供五槽胶卷、SD 换卷、时间戳、六位置配方、20原厂名称/图标、65:24、水平仪及RAW降噪工具。工作台按机型显示可用状态。
 
-GR IV 的 `/gr4/` 使用共享工作台与独立原生ABI，复用GR3颜色算法和46款当前胶卷；原厂参考编辑器保留在 `/gr4/reference/`。实现通过原始ARM、完整封包及网页下载验证，GR4刷入和成像仍待实机验收。[功能对照与验证](docs/research/gr4-native-m10v-parity-2026-10-18.md)。GR II 已解析嵌套 UNITY 容器和 121 项资源，但修改后的更新校验与原生接口尚未证明。[查看两款机型的逆向证据](docs/research/gr4-gr2-port-evidence.md)。
+GR IV 的 `/gr4/` 使用共享工作台与独立原生ABI，复用GR3颜色算法和46款当前胶卷；原厂参考编辑器保留在 `/gr4/reference/`。实现通过原始ARM、完整封包及网页下载验证，GR4刷入和成像仍待实机验收。[功能对照与验证](docs/research/gr4-native-m10v-parity-2026-10-18.md)。GR II 已解析嵌套 UNITY 容器和 121 项资源，更新加权校验已通过原厂 CPU 与完整组件对照，加载链和原生接口仍在逆向。[校验与加载进展](docs/research/gr2-checksum-loader-2026-10-20.md)。[查看两款机型的逆向证据](docs/research/gr4-gr2-port-evidence.md)。
 
 ### 使用边界
 
@@ -95,7 +95,8 @@ bin/
 ├── fwdc239b-gr3-official.bin       # GR III Street Edition 2.10
 ├── fwdc243b-gr3x-official.bin      # GR IIIx 1.60
 ├── fwdc248b-gr4-officical.bin      # GR IV 1.11，保留现有本地文件名
-└── rg2_v003/rg2_v003.frm           # GR II 3.00
+├── rg2_v003.frm                   # GR II 3.00
+└── rg1_v051.frm                   # GR 5.01（逆向研究输入）
 ```
 
 部分历史测试仍读取根目录别名，可创建符号链接：

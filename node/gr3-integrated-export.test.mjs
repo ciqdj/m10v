@@ -20,7 +20,10 @@ test('one accepted plan binds native slots, timestamp, aspect, level and native 
  assert.ok(joined.features.includes('aspect')&&joined.features.includes('level')&&joined.features.includes('negativeGrain'));
  await assert.rejects(()=>generateNative(source,c,plain.configuration_sha256,{extensions}),/变化/);
  const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.deepEqual(prepareNative(x,c,{extensions}).extensions,prepareNative(source,c,{extensions}).extensions);
+ assert.throws(()=>prepareNative(x,c,{extensions}),/颗粒.*GR III/);
+ assert.throws(()=>prepareNative(source,c,{extensions,live_color:false}),/颗粒.*GR III/);
+ const supported=structuredClone(c);supported.slots[4].grain=0;
+ assert.deepEqual(prepareNative(x,supported,{extensions}).extensions,prepareNative(source,supported,{extensions}).extensions);
 });
 
 test('final joined firmware contains all selected components and rejects repaired-checksum tampering',async()=>{
@@ -33,17 +36,17 @@ test('final joined firmware contains all selected components and rejects repaire
  assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.equal(result.manifest.base,0x540be000);
  assert.ok(result.receipt.composition.verified);
- assert.equal(result.receipt.composition.aspect_resource_id,1104);
+ assert.equal(result.receipt.composition.aspect_resource_id,1111);
  assert.equal(result.receipt.composition.native_resource_range[0],786);
- assert.equal(result.receipt.composition.native_resource_range[1],1103);
+ assert.equal(result.receipt.composition.native_resource_range[1],1110);
  assert.equal(sum32(result.candidate),0);
  const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
  let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
- // Independent opcode expectations: native resource bounds end at 1103;
- // aspect's caption ID follows at 1104.
- for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300344f);
- assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe3000450);
- for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c450);
+ // Independent opcode expectations: native resource bounds end at 1110;
+ // aspect's caption ID follows at 1111.
+ for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe3003456);
+ assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe3000457);
+ for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c457);
  assert.equal(d.readUInt32LE(at+16+0xb348c0),10);
  assert.equal(d.subarray(at+16+0xb3501e,at+16+0xb35020).toString('hex'),'020f');
  assert.deepEqual(auditIntegratedNative(source,result.candidate,result.nativeCandidate,result.runtime,result.manifest,result.component,extensions),result.receipt.composition);

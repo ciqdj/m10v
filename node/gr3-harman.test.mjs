@@ -5,17 +5,17 @@ import {nativeCatalog,initialState} from './gr3-native-library.mjs';
 import {defaultConfiguration,normalizeConfiguration,selectNativeFilm,resetNativeTexture,migrateSimulationSelection} from '../web/gr3/native-library-state.mjs';
 
 test('Harman films append stable IDs and shared 40px icon records',async()=>{
- const c=await nativeCatalog();assert.equal(c.films.length,48);
- for(const [id,name] of [[67,'蓝凤凰'],[68,'哈曼 RED']]){
-  const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'M10V精选');
+ const c=await nativeCatalog();assert.equal(c.films.length,30);
+ for(const [id,name] of [[67,'Harman Phoenix II'],[68,'Harman Red']]){
+  const f=c.films.find(f=>f.id===id);assert.equal(f.name,name);assert.equal(f.group,'C41');
   assert.equal(f.camera_calibrated,false);assert.equal(f.film_calibrated,false);
  }
  const icons=JSON.parse(await readFile(new URL('../web/gr3/film-icons/catalog.json',import.meta.url)));
- assert.equal(icons.length,80);assert.equal((await readFile(new URL('../native/gr3/m10v_icons.rgba',import.meta.url))).length,78*40*40*4);
+ assert.equal(icons.length,88);assert.equal((await readFile(new URL('../native/gr3/m10v_icons.rgba',import.meta.url))).length,78*40*40*4);
  assert.equal(icons[66].color,'#397ac4');assert.equal(icons[67].color,'#c74435');
 });
 test('film selection supplies the two stock defaults without changing other slots',()=>{
- for(const [film,grain,grainSize,gain] of [[67,0,0,0],[68,0,1,0]]){
+ for(const [film,grain,grainSize,gain] of [[67,0,0,0],[68,0,0,0]]){
   const old=defaultConfiguration(),c=selectNativeFilm(old,0,film),s=c.slots[0];
   assert.equal(s.film,film);assert.equal(s.grain,grain);assert.equal(s.soft,0);assert.equal(s.effects.grainSize,grainSize);
   assert.equal(s.effects.leakGain,0);assert.equal(s.effects.filmExposure,0);assert.equal(s.halo.gain,gain);
@@ -41,14 +41,14 @@ test('schema4 packs EI in each effects reserved byte and common reset preserves 
  c.slots[0].effects.filmExposure=2;c.slots[1].effects.filmExposure=1;
  c.slots[0].effects.leakGain=8;c.slots[0].halo.gain=5;
  const b=initialState(c);assert.equal(b.readUInt16LE(4),4);assert.equal(b.length,104);
- assert.equal(b[61],2);assert.equal(b[69],1);assert.equal(b[57],8);assert.equal(b[62],0);
+ assert.equal(b[61],2);assert.equal(b[69],1);assert.equal(b[57],0);assert.equal(b[62],0);
  const reset=resetNativeTexture(c,0);assert.equal(reset.slots[0].effects.filmExposure,2);
  assert.equal(reset.slots[0].effects.leakGain,0);assert.deepEqual(reset.slots[0].halo,{...c.slots[0].halo,gain:0});
 });
 test('both UI surfaces keep stock controls alongside shared texture',async()=>{
  for(const file of ['native-library.html','native-library-controls.html']){
   const html=await readFile(new URL('../web/gr3/'+file,import.meta.url),'utf8');
-  assert.match(html,/47 套/);assert.match(html,/id="effect-filmExposure"/);assert.match(html,/模拟曝光EI/);
+  assert.match(html,/30 套/);assert.match(html,/id="effect-filmExposure"/);assert.match(html,/模拟曝光EI/);
   for(const ei of [125,64,250])assert.match(html,new RegExp('EI '+ei));
   assert.match(html,/非机身 ISO|不改变机身 ISO/);assert.match(html,/非 push|不模拟增感冲洗/);
  }

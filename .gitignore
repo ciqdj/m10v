@@ -1,7 +1,7 @@
 /fwdc239b.bin
 /fwdc239b-modify.bin
 /.runtime
-/data/
+/data
 /.venv
 /node_modules/
 /dist/

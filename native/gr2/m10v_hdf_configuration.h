@@ -1,0 +1,21 @@
+#ifndef M10V_GR2_HDF_CONFIGURATION_H
+#define M10V_GR2_HDF_CONFIGURATION_H
+#include <stdint.h>
+/* UI-only publication creates the original nonrecursive mutex. Nonzero HDF
+ * requires an original layout declaring at least two JPEG blocks. These functions never switch
+ * pools or touch the SD card. Capture reads/freezes use timeout0; an existing
+ * frame snapshot survives later publication/clear without reacquiring a lock. */
+int gr2_hdf_configuration_publish(uint32_t strength,uint32_t sequence);
+int gr2_hdf_configuration_read(uint32_t *strength,uint32_t *sequence);
+int gr2_hdf_configuration_freeze(uint8_t *context);
+/* Original preparation owner under stage6 lock, before buffer reservations.
+ * Failure seals an off snapshot so worker fallback cannot adopt newer settings. */
+int gr2_hdf_configuration_begin(uint8_t *context);
+int gr2_hdf_reservation_required(uint8_t *context);
+/* Scheduling owner: parent and optional sibling are frozen from one cache
+ * read. Preparation consumes that marker once; a later recipe refreshes. */
+int gr2_hdf_configuration_policy(uint8_t *context,uint8_t *peer);
+int gr2_hdf_configuration_prepare(uint8_t *context);
+int gr2_hdf_configuration_clear(void);
+uint32_t gr2_hdf_configuration_needs_bank0(void);
+#endif

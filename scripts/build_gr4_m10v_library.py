@@ -24,20 +24,23 @@ def gr4_renderer_source():
     return source
 
 def default_state():
-    b=bytearray(104);struct.pack_into('<IHHI',b,0,0x5630314d,4,104,0)
+    b=bytearray(184);struct.pack_into('<IHHI',b,0,0x5630314d,5,184,0)
     for i in range(5):
         struct.pack_into('<H6B',b,12+8*i,33 if i==4 else 34+i,0,0,3,3,5,2)
-        b[56+8*i]=1;b[59+8*i]=4
-    struct.pack_into('<I',b,100,zlib.crc32(b[:100]));return bytes(b)
+        b[96+8*i]=1;b[99+8*i]=4
+    struct.pack_into('<I',b,180,zlib.crc32(b[:180]));return bytes(b)
 
 def validate_state(raw):
-    if len(raw)!=104 or struct.unpack_from('<IHHI',raw)!=(0x5630314d,4,104,0) or zlib.crc32(raw[:100])!=struct.unpack_from('<I',raw,100)[0]:raise ValueError('invalid GR4 initial state')
-    for i in range(5):
-        f,g,s,a,b,c,p=struct.unpack_from('<H6B',raw,12+i*8)
-        if not 1<=f<=78 or g>3 or s>3 or max(a,b,c)>8 or p>3:raise ValueError('invalid GR4 initial slot')
-        e=raw[56+i*8:64+i*8]
+    if len(raw)!=184 or struct.unpack_from('<IHHI',raw)!=(0x5630314d,5,184,0) or zlib.crc32(raw[:180])!=struct.unpack_from('<I',raw,180)[0]:raise ValueError('invalid GR4 initial state')
+    for i in range(10):
+        slot=raw[12+i*8:20+i*8];e=raw[96+i*8:104+i*8]
+        f,g,s,a,b,c,p=struct.unpack('<H6B',slot)
+        if not f:
+            if any(slot) or any(e):raise ValueError('disabled GR4 slots must be empty')
+            continue
+        if i>=5 or not 1<=f<=78 or g>3 or s>3 or max(a,b,c)>8 or p>3:raise ValueError('invalid GR4 initial slot')
         if any(x>v for x,v in zip(e,[2,8,5,8,1,2,0,0])) or (e[5]>1 if f==67 else f!=68 and e[5]):raise ValueError('invalid GR4 texture')
-    if raw[52]>2 or max(raw[53:56])>3 or any(raw[96:100]):raise ValueError('invalid GR4 stamp')
+    if raw[92]>2 or max(raw[93:96])>3 or any(raw[176:180]):raise ValueError('invalid GR4 stamp')
     return raw
 
 def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id=0):
@@ -50,7 +53,7 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
         if rtos[at:at+len(raw)]!=raw:raise ValueError('GR4 UI ABI preimage differs')
     compiler=os.environ.get('M10V_LLVM_CLANG') or next((p for p in ['/opt/homebrew/opt/llvm/bin/clang','/usr/local/opt/llvm/bin/clang',shutil.which('clang')] if p and Path(p).exists()),None)
     if not compiler:raise RuntimeError('ARM LLVM clang unavailable')
-    flags=[*FLAGS,'-I'+str(ROOT/'native/gr3'),'-I'+str(ROOT/'native/gr4'),f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u','-DM10V_SD_LIBRARY=1']
+    flags=[*FLAGS,'-I'+str(ROOT/'native/gr3'),'-I'+str(ROOT/'native/gr4'),f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u','-DM10V_SD_LIBRARY=1','-DM10V_LEGACY_SETTINGS=1']
     symbols={};image=bytearray(0x100);sources=set()
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='m10v-gr4-compile-') as tmp:
@@ -68,8 +71,9 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
             obj=compile_source(relative,extra);at=(base+len(image)+15)&~15
             omitted={
                 'm10v_camera_library_':('m10v_camera_library_preview','m10v_camera_library_preview_init',
-                    'm10v_camera_library_preview_clear','m10v_camera_library_select_custom','m10v_camera_library_film_name_stamp'),
-                'm10v_sd_camera_':('m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name'),
+                    'm10v_camera_library_preview_clear','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_remove','m10v_camera_library_shooting_count','m10v_camera_library_menu_index','m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_select_custom','m10v_camera_library_film_name_stamp'),
+                'm10v_sd_camera_':('m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name',
+                    'm10v_sd_camera_directory_item','m10v_sd_camera_directory_install'),
             }
             blob,entries=link_object(obj,at,symbols,prefix,
                 additional_exports=('m10v_menu_rows',) if prefix=='m10v_menu_' else (),
@@ -77,6 +81,10 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
             append(blob);symbols.update(entries)
         module('native/gr3/film_curated.c','m10v_curated_')
         module('native/gr3/film_newstocks.c','m10v_newstocks_')
+        module('native/gr3/film_style_filters_0.c','m10v_style_filters_0_')
+        module('native/gr3/film_style_filters_1.c','m10v_style_filters_1_')
+        module('native/gr3/film_d76_0.c','m10v_d76_0_')
+        module('native/gr3/film_d76_1.c','m10v_d76_1_')
         module('native/gr3/film_harman.c','m10v_harman_')
         module('native/gr3/film_5207.c','m10v_5207_')
         module('native/gr3/m10v_library.c','m10v_library_',('-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial)),))
@@ -84,7 +92,7 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
         module('native/gr3/m10v_sd_library.c','m10v_sd_')
         module('native/gr4/m10v_sd_camera.c','m10v_sd_camera_')
         if debug_mode:module('native/gr4/m10v_debug.c','m10v_debug_')
-        module('native/gr3/m10v_settings.c','m10v_settings_')
+        module('native/gr4/m10v_settings.c','m10v_settings_')
         module('native/gr4/m10v_settings_view.c','m10v_settings_view_')
         obj=compile_source('native/gr4/m10v_settings_controller.c');at=(base+len(image)+15)&~15
         external=['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable']
@@ -144,9 +152,9 @@ m10v_chain_capture:
     if any(bytes(image).find(p)<0 for p in payloads):raise ValueError('film table readback failed')
     sources.update(str(p.relative_to(ROOT)) for p in (ROOT/'native/gr3').glob('*.h'))
     sources.update(str(p.relative_to(ROOT)) for p in (ROOT/'native/gr4').glob('*.h'))
-    sources.update(['native/gr4/ui-abi.json','scripts/build_gr4_settings_hooks.py','scripts/build_gr4_native_detail.py'])
+    sources.update(['native/gr4/m10v_settings.h','native/gr4/m10v_settings_view.h','native/gr4/m10v_settings_controller.h','native/gr4/ui-abi.json','scripts/build_gr4_settings_hooks.py','scripts/build_gr4_native_detail.py'])
     m={'schema':'m10v-gr4-native-film-runtime/v1','base':base,'code_bytes':len(image),
-        'code_sha256':sha(image),'symbols':symbols,'film_count':78,'slots':5,'carrier_tones':[36,37,38,39,40],
+        'code_sha256':sha(image),'symbols':symbols,'film_count':78,'slots':sum(struct.unpack_from('<H',initial,12+i*8)[0]!=0 for i in range(5)),'slot_capacity':5,'state_version':5,'carrier_tones':[36,37,38,39,40],
         'initial_state_hex':initial.hex(),'initial_state_offset':bytes(image).find(initial),
         'settings_menu':settings,'detail':detail,'continuations':continuations,
         'debug_mode':debug_mode,'debug_build_id':debug_build_id,'sd_library':True,'camera_tested':False,

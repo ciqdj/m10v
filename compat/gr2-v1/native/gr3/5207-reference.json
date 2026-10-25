@@ -1,0 +1,106 @@
+{
+  "schema": "m10v-5207-reference/v2",
+  "film": "5207-inspired restrained display interpretation",
+  "input": "encoded display sRGB D65 after camera ISP; scene radiance not recovered",
+  "output": "encoded display sRGB D65",
+  "print_stock": null,
+  "model": "bounded-display-srgb-v1",
+  "parameters": {
+    "status": "assumed display-domain interpretation; not a measured Kodak transform",
+    "input": "encoded display sRGB D65 after camera ISP; scene radiance not recovered",
+    "output": "encoded display sRGB D65",
+    "mix_matrix": [
+      [
+        0.985,
+        0.015,
+        0.0
+      ],
+      [
+        0.006,
+        0.988,
+        0.006
+      ],
+      [
+        0.0,
+        0.02,
+        0.98
+      ]
+    ],
+    "warm_strength": 0.04,
+    "toe_lift": 0.08,
+    "shoulder_compression": 0.025,
+    "tone": "x + toe_lift*x*(1-x)^2 - shoulder_compression*x^4",
+    "white_endpoint": 0.975,
+    "neutral_axis": "row-stochastic matrix; warmth vanishes on neutrals; common monotone curve",
+    "rendering_intent": "restrained warm colour, neutral greys, retained blue/cyan and soft highlights"
+  },
+  "research_sources": [
+    {
+      "url": "https://github.com/JanLohse/spectral_film_lut",
+      "use": "prior spectral/APD research only; no upstream numerical model or code used in this mapping",
+      "license": "MIT; retained vendored attribution is independent of this assumed mapping"
+    },
+    {
+      "url": "https://janlohse.github.io/spectral_film_lut/reference/film_spectral/",
+      "use": "documents scene-referred input; motivates avoiding spectral exposure simulation on camera-rendered pixels"
+    }
+  ],
+  "quality_validation": {
+    "intent": "display quality constraints, not measured stock accuracy",
+    "grey_input": [
+      0.0,
+      0.1,
+      0.18,
+      0.25,
+      0.5,
+      0.75,
+      0.9,
+      0.95,
+      1.0
+    ],
+    "grey_output": [
+      0.0,
+      0.1064775,
+      0.189656316,
+      0.26115234374999996,
+      0.5084375,
+      0.74583984375,
+      0.8843175,
+      0.92982734375,
+      0.975
+    ],
+    "grey_max_channel_spread": 1.1102230246251565e-16,
+    "grey_max_abs_change": 0.025000000000000022,
+    "highlight_min_step_90_95_100": 0.04517265625
+  },
+  "spectral_calibrated": false,
+  "official_lut": false,
+  "scene_radiance_recovered": false,
+  "inversion_gamma": null,
+  "color_masking": null,
+  "neutral_correction": "neutral axis preserved algebraically before quantization",
+  "camera_calibrated": false,
+  "film_calibrated": false,
+  "table_size": 15,
+  "table_bits": 8,
+  "table_bytes": 10125,
+  "table_sha256": "0e5f40a27027cedb72595b2a4d655170e5a8bb4c9ce501eccac65487f1c7b5e7",
+  "sources": {
+    "scripts/build_gr3_5207_reference.py": "5bf6c564a19eaf27e728f371ab457ceefe74000e92ef60dccab299418195357b"
+  },
+  "dependencies": {
+    "numpy": "2.5.3",
+    "colour-science": "0.4.7"
+  },
+  "interpolation_validation": {
+    "samples": 4096,
+    "seed": 5207,
+    "encoded_domain": [
+      0.04,
+      0.96
+    ],
+    "delta_e_00_median": 0.07637046553614904,
+    "delta_e_00_p95": 0.19237138867922093,
+    "rgb_abs_p95": 0.0014899983378201976
+  }
+}

@@ -5,7 +5,7 @@ import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SAMPLE=ROOT/'bin/rg2_v003/rg2_v003.frm'
+SAMPLE=ROOT/'bin/rg2_v003.frm'
 
 
 @unittest.skipUnless(SAMPLE.exists(),'official GR II sample missing')
@@ -29,7 +29,8 @@ class Gr2UpdateTests(unittest.TestCase):
         self.assertEqual(result['header']['update_checksum'],'0x826a5e33')
         self.assertEqual([row['comparison_equal'] for row in result['cases']],[True,False,True])
         self.assertTrue(all(row['returned'] for row in result['cases']))
-        self.assertFalse(result['modified_checksum_proved'])
+        self.assertTrue(result['modified_checksum_proved'])
+        self.assertTrue(result['checksum_cpu']['accepted'])
 
     def test_unrecognized_updater_is_rejected_before_executing_cpu_code(self):
         with self.assertRaisesRegex(ValueError,'identity'):

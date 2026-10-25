@@ -10,7 +10,7 @@ if(!['gr3','gr3x'].includes(model)||args.some(v=>v.startsWith('--')&&!['--model'
 const positional=args.filter((v,i)=>!v.startsWith('--')&&(modelAt<0||i!==modelAt+1));
 const out=path.resolve(positional[0]||path.join(root,'builds/gr3-integrated-device-test'));
 const configuration=positional[1]?JSON.parse(await readFile(positional[1],'utf8')):{
- slots:[1,64,54,37,33].map((film,i)=>({film,grain:i===4?2:0,soft:0,halo:{gain:3,spread:3,threshold:5,profile:2}})),
+ slots:[298,77,75,37,33].map((film,i)=>({film,grain:i===4?2:0,soft:0,halo:{gain:3,spread:3,threshold:5,profile:2}})),
  stamp:2,format:0,corner:3,color:1};
 const extensions={aspect:true,level:true,negativeGrain:true},debug_mode=!process.argv.includes('--release');
 const version_unlock=process.argv.includes('--dsp-version-unlock')?{enabled:true,mode:'dsp-package-only'}:{enabled:false};

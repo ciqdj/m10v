@@ -27,7 +27,7 @@ test('independent settings audit binds owned controllers, original fallback and 
   const wrongZoom=structuredClone(m);wrongZoom.settings_menu.private_routes[4]=0x0200004e;
   assert.throws(()=>settingsPatches(wrongZoom),/route\/owner/);
   assert.equal(p.find(x=>x.address===0x53b36adc).replacement,0x211d1b19);
-  assert.equal(p.find(x=>x.address===0x5316fcec).replacement,0xe301093c);
+  assert.equal(p.find(x=>x.address===0x5316fcec).replacement,0xe302013c);
   for(const a of [m.settings_menu.vtable,m.settings_menu.exports.m10v_settings_factory_original,m.settings_menu.rows[0]]){
    const broken=Buffer.from(r);broken[a-m.base]^=1;
    assert.throws(()=>checkSettings(broken,m),/instruction/);

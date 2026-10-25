@@ -6,10 +6,10 @@ import {renderPreviewPixels} from '../web/gr3/film-preview.mjs';
 import {buildSdFilmPack,auditSdFilmPack} from './gr3-sd-film-pack.mjs';
 test('Pixel World can be selected and exported without changing other slots',async()=>{
  const catalog=await nativeCatalog(),film=catalog.films.find(f=>f.id===290);
- assert.equal(film?.name,'方块世界');assert.equal(film.group,'M10V精选');
+ assert.equal(film?.name,'Pixel Worlds');assert.equal(film.group,'创意');
  const original=defaultConfiguration(),c=selectNativeFilm(original,0,290);
  assert.equal(initialState(c).readUInt16LE(12),290);assert.deepEqual(c.slots.slice(1),original.slots.slice(1));
- assert.equal(c.slots[0].grain,0);assert.deepEqual(auditSdFilmPack(buildSdFilmPack([290,289,33])).ids,[290,289,33]);
+ assert.equal(c.slots[0].grain,0);assert.deepEqual(auditSdFilmPack(buildSdFilmPack([290,289,33])).ids,[33,289,290]);
 });
 test('Pixel World preview creates flat square cells, keeps alpha and rejects absent dimensions',async()=>{
  const src=new Uint8ClampedArray(6*3*4);
