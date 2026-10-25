@@ -8,7 +8,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {inspectGr2,GR2_SHA256} from './gr2-firmware.mjs';
 import {inspectGr1,GR1_SHA256} from './gr1-firmware.mjs';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectOfficial,GR3_220_SHA256} from './firmware.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url)),run=promisify(execFile);
 const profiles={
@@ -28,7 +28,7 @@ export async function readModelOfficial(model){
 let inspectingGr4=false;
 export async function inspectModelFirmware(data){
   if(!Buffer.isBuffer(data))throw new Error('firmware must be bytes');
-  const identity=hash(data),model=Object.keys(profiles).find(key=>profiles[key][1]===identity);
+  const identity=hash(data),model=identity===GR3_220_SHA256?'gr3':Object.keys(profiles).find(key=>profiles[key][1]===identity);
   if(!model)throw new Error('unsupported firmware identity');
   if(model==='gr2')return {...inspectGr2(data),workspace_url:'/gr2/'};
   if(model==='gr1')return {...inspectGr1(data),workspace_url:'/gr1/'};

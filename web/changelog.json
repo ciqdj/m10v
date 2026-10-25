@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.25.1",
+      "date": "2026-10-25",
+      "title": "修复 GR III 官方 2.20 固件导入长度报错",
+      "changes": [
+        "增加 GR III 2.20 官方文件身份、长度、版本及分区配置，修复导入时 size: unsupported firmware length；保留 2.10 和 GR IIIx 1.60 的识别。",
+        "同步 Node 网页入口、跨机型识别和 Python 检查入口，分区读取按对应版本布局处理。",
+        "本次为导入识别修复，未完成 2.20 原生补丁构建适配，未进行相机刷写验证；按用户直接发布授权上线。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.24.4",
       "date": "2026-10-24",
       "title": "D76新增七款独立黑白胶卷，保持原分组名称和顺序",
@@ -11,9 +24,9 @@
         "Tri-X 400、Delta 100、Rollei Infrared 400使用固定版本同型号社区LUT；其余按官方可得资料制作独立风格近似。两个红外款采用用户确认的滤镜风格近似，RGB不能恢复真实红外反射；所有效果均未标定为100%实体胶片还原。",
         "每款8192独立样本的目标LUT插值ΔE00 P95为0.12至0.54；这是实现误差，不是真实胶片还原率。按用户直接发布授权上线；本候选未进行相机实测。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "aa3760d595aa26e52669a8fcd3e6b4fd6bfadff1",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39992099084"
     },
     {
       "version": "2026.10.24.3",
