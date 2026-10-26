@@ -143,8 +143,35 @@ u32 m10v_aspect_live_region(u32 context,u32 mode,u32 ratio,u32 mag) {
     return CALL(0x540b6240,u32 (*)(u32,u32,u32))(context,4,mag);
 }
 
+u32 m10v_aspect_live_icon(u32 owner,u32 ratio);
+static void aspect_label(u32 view,u32 surface,u32 ratio) {
+    if((ratio!=4 && ratio!=5) || !view || !surface || !BYTE(view,0x9e) || !m10v_aspect_mask_active()) return;
+    u32 *canvas=(u32 *)(view+0x30),*clip=(u32 *)(view+0x64);
+    if(canvas[0] || canvas[1] || !((canvas[2]==720&&canvas[3]==480)||(canvas[2]==360&&canvas[3]==240))) return;
+    u32 id=m10v_aspect_live_icon(0,ratio);
+    if(!id) return;
+    u32 manager=CALL(0x5320804c,u32 (*)(void))();
+    if(!manager) return;
+    u32 graphics=CALL(0x53208298,u32 (*)(u32))(manager);
+    if(!graphics) return;
+    /* Native icon draw packet: surface, destination, clip, ID, rotation.
+     * Keep the top status row clear; use the native synchronous RGBA blitter. */
+    u32 x=canvas[2]-68,y=48;
+    u32 left=clip[0]>x?clip[0]:x,top=clip[1]>y?clip[1]:y;
+    u32 right=clip[0]+clip[2],bottom=clip[1]+clip[3];
+    if(right>x+60) right=x+60;
+    if(bottom>y+40) bottom=y+40;
+    if(left>=right || top>=bottom) return;
+    u32 packet[11]={surface,x,y,60,40,left,top,right-left,bottom-top,id,0};
+    CALL(0x5320a7a8,void (*)(u32,u32 *))(graphics,packet);
+}
 void m10v_aspect_draw(u32 view,u32 surface) {
-    if(m10v_aspect_current()!=5) { CALL(0x540b8000,void (*)(u32,u32))(view,surface); return; }
+    u32 ratio=m10v_aspect_current();
+    if(ratio!=5) {
+        CALL(0x540b8000,void (*)(u32,u32))(view,surface);
+        aspect_label(view,surface,ratio);
+        return;
+    }
     if(!view || !surface || !BYTE(view,0x9e)) return;
     u32 *canvas=(u32 *)(view+0x30),*clip=(u32 *)(view+0x64);
     if(canvas[0] || canvas[1] || !((canvas[2]==720&&canvas[3]==480)||(canvas[2]==360&&canvas[3]==240))) return;
@@ -159,6 +186,7 @@ void m10v_aspect_draw(u32 view,u32 surface) {
     draw(graphics,surface,canvas,clip,canvas[2]-mask,0,mask,canvas[3],16);
     draw(graphics,surface,canvas,clip,mask-scale,0,scale,canvas[3],2);
     draw(graphics,surface,canvas,clip,canvas[2]-mask,0,scale,canvas[3],2);
+    aspect_label(view,surface,ratio);
 }
 
 /* AF retains the native safety inset and follows all three crop magnifications. */
@@ -192,4 +220,19 @@ u32 m10v_aspect_af_bounds(u32 ratio,u32 crop,u32 *out) {
     if(crop>2) crop=0;
     for(u32 i=0;i<4;i++) out[i]=rects[crop][i];
     return 1;
+}
+
+/* Bound only by the verified integrated composer; zero means no private art. */
+u32 m10v_aspect_live_icon(u32 owner,u32 ratio);
+__attribute__((used)) const volatile u32 m10v_aspect_icon_record[4]={0x49413741,0,0,(u32)m10v_aspect_live_icon};
+u32 m10v_aspect_live_icon(u32 owner,u32 ratio) {
+    (void)owner;
+    switch(ratio) {
+    case 0: return 257;
+    case 3: return 256;
+    case 1: return 339;
+    case 4: return m10v_aspect_icon_record[1];
+    case 5: return m10v_aspect_icon_record[2];
+    default: return 0;
+    }
 }

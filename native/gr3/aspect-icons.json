@@ -1,0 +1,20 @@
+{
+  "schema": "m10v-aspect-icons/v1",
+  "labels": [
+    "XPan",
+    "6x7"
+  ],
+  "width": 60,
+  "height": 40,
+  "stock_frame_icon": 339,
+  "stock_glyph_icons": [
+    33,
+    258,
+    299,
+    609,
+    610
+  ],
+  "rtos_sha256": "8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67",
+  "iconbin_sha256": "cd74fb2be1ddc975d38444b28d672bffafa4e468586b235a82a00a8b5f319972",
+  "sha256": "81bc293bf772b141f6bb8eaf82439f7fd8c857beb0c9079ca3188e2152b12271"
+}

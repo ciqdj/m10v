@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.26.3",
+      "date": "2026-10-26",
+      "title": "补齐 XPan 与 6x7 原生样式取景标签",
+      "changes": [
+        "GR III／IIIx 的 M10V 原生胶卷组合在启用画幅扩展后，XPan、6x7取景增加对应标签；沿用原厂画幅图标外框、底色与原厂图标字形，交由原生图标绘制器显示。",
+        "标签跟随既有取景遮罩刷新与可见性控制，保留3:2、1:1、4:3原有显示和28–50mm焦距标签；不改裁切几何、JPEG／DNG生成和对焦逻辑。",
+        "已完成新增标签、原生绘制器逐像素回读、裁切／DNG及焦段图标风险项离线检查；按用户专项验证后直接发布授权上线，未进行相机实测。GR IV未修改。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.26.2",
       "date": "2026-10-26",
       "title": "GR III 新增逐胶卷光晕模式，保留特殊胶卷专属模拟",
@@ -11,9 +24,9 @@
         "旧光晕参数不会自动启用新模式；换入新自定义胶卷默认关闭，移除新能力后明确关闭的模式也不会被旧参数重新启用。保留当前main配套SD胶卷记录兼容性。",
         "本次GR III RC1候选已获用户真机确认通过后发布。光晕作用于保存的静态JPEG，不提供实时取景；开启后可能增加保存／回放等待，未公布真机耗时数值。GR IIIx／IV未开放新模式。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "d9b5a8933dc8a162741761e039ad1646c192ae36",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40273724457"
     },
     {
       "version": "2026.10.26.1",

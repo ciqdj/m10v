@@ -227,7 +227,8 @@ class AspectTests(unittest.TestCase):
                 for offset in [0x30,0x64]: u.mem_write(view+offset,struct.pack('<4I',0,0,720,480))
                 returns={0x53525d5c:RAM+0x100,0x5354a778:5,0x53549958:0,
                          0x53654150:RAM+0x300,0x53654220:0,0x5339c3b0:0,
-                         0x533ab9bc:0,0x5320804c:RAM+0x400,0x532081ec:RAM+0x500}
+                         0x533ab9bc:0,0x5320804c:RAM+0x400,0x532081ec:RAM+0x500,
+                         0x53208298:0} # Isolate mask drawing; final indicator test executes the icon renderer.
                 rectangles=[]
                 def native(uc,address,size,data):
                     if address==0x540b88b4:

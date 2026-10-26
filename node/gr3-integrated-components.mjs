@@ -104,6 +104,13 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
     const at=rtos.indexOf(marker,COMPONENT_END-LOAD);
     need(at>=COMPONENT_END-LOAD&&at+marker.length<=ASPECT_END-LOAD&&rtos.indexOf(marker,at+1)===-1,'6x7 resource binding differs');
     rtos.writeUInt32LE(manifest.resources.last_id+2,at+4);rtos.writeUInt32LE(manifest.resources.last_id,at+8);
+    if(manifest.film_library_enabled!==false){
+     const marker=Buffer.from('413741490000000000000000','hex'),iconAt=rtos.indexOf(marker,COMPONENT_END-LOAD);
+     need(iconAt>=COMPONENT_END-LOAD&&iconAt+16<=ASPECT_END-LOAD&&rtos.indexOf(marker,iconAt+1)===-1,'aspect icon binding differs');
+     const entry=rtos.readUInt32LE(iconAt+12),icons=manifest.aspect_icons;
+     need(entry>=0x540bc000&&entry<ASPECT_END&&entry%4===0&&icons?.last_id===icons?.first_id+1,'aspect icon adapter differs');
+     rtos.writeUInt32LE(icons.first_id,iconAt+4);rtos.writeUInt32LE(icons.last_id,iconAt+8);
+    }
    }
   }
  }
@@ -123,6 +130,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   component_range:c?[COMPONENT_BASE,componentEnd]:null,native_range:[manifest.base,manifest.base+runtime.length],
   native_resource_range:[786,manifest.resources.last_id],aspect_resource_id:e.aspect?manifest.resources.last_id+1:null,
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
+  aspect_indicator:e.aspect&&componentEnd===ASPECT_END&&manifest.film_library_enabled!==false?{render_path:'native-grid-overlay/icon-blitter',first_id:manifest.aspect_icons.first_id,last_id:manifest.aspect_icons.last_id,width:60,height:40}:null,
   six_by_seven_resource_id:e.aspect&&componentEnd===ASPECT_END?manifest.resources.last_id+2:null,
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
   raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,
