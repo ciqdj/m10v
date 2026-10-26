@@ -8,6 +8,7 @@
 | 参数/设置/UI生命周期 | native/gr3/m10v_library_menu.c；m10v_settings*.c/.h；node/gr3-settings-menu.mjs | tests/test_gr3_settings.py；test_gr3_settings_controller.py；test_gr3_settings_view.py；test_gr3_settings_root.py；test_gr3_menu_readonly.py；test_gr3_m10v_adj_arm.py |
 | SD/custom LUT/存档迁移 | native/gr3/m10v_sd_library.h/.c；m10v_sd_camera.c；m10v_library_camera.c；node/gr3-sd-film-pack.mjs | tests/test_gr3_sd_library.py；test_gr3_sd_camera.py；test_gr3_sd_menu.py；node/gr3-custom-lut.test.mjs；gr3-sd-film-pack.test.mjs；gr3-sd-film-routes.test.mjs |
 | 捕获/首张/排队冻结 | native/gr3/m10v_library_capture.c；m10v_isp_recipe_color.c；scripts/build_gr3_m10v_library.py | tests/test_gr3_capture_snapshot.py；test_gr3_m10v_capture.py；test_gr3_native_recipe_handoff.py；test_gr3_native_fast_capture.py |
+| ISP性能硬门槛 | [isp-performance.md](isp-performance.md)；原厂任务投递→快照→Still→完成校验→编码 | tests/test_gr3_film_pipeline_current.py；test_gr3_isp_sd_compatibility.py；必须执行真实投递与未映射像素，不接受手造完成标记 |
 | RAW归属/释放/回退 | native/gr3/m10v_capture_raw_lifetime.c/.h；m10v_capture_lifecycle.c | tests/test_gr3_capture_raw_lifetime.py；test_gr3_capture_released_raw.py；test_gr3_capture_lifecycle_integration.py；test_gr3_capture_lifetime.py |
 | 水印/胶卷名 | native/gr3/m10v_library.c；scripts/preview_gr3_stamp.py；check_gr3_stamp_sanitizers.py | test_gr3_m10v_library.py 的分段字形/角落/小图/padding/date；test_gr3_m10v_capture.py 的时钟回退 |
 | HDF | native/gr3/m10v_digital_hdf.c；m10v_hdf_menu.c；node/gr3-digital-hdf.mjs | tests/test_gr3_digital_hdf.py；test_gr3_hdf_menu.py；test_gr3_shared_hdf.py；node/gr3-digital-hdf.test.mjs |

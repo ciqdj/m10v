@@ -13,6 +13,17 @@ description: Use when modifying M10V Ricoh GR functionality, preventing regressi
 
 统一交付流程：**开发及回归 → 交付可识别的测试包 → 等用户明确验证通过 → 合并 main → 推送 GitHub → 部署宝塔并核验**。细则见 [测试包与发布门槛](references/release-workflow.md)。测试包未获确认前不合并 main、不推送 GitHub、不触发生产部署。用户对同一候选明确验证通过后，按既定流程完成发布，无需再索取重复批准。
 
+## 滤镜开发的 ISP 性能硬约束
+
+后续普通滤镜新增、拟合、调参和管线迭代，保存照片的色彩处理必须走本机 ISP，并以原厂正片／负片的同条件流畅程度为验收基线。GR III 已验收入口和完整检查契约见 [ISP 性能与回归门槛](references/isp-performance.md)，任何滤镜相关改动都必须先读。
+
+- 取景使用 ISP 不代表成片使用 ISP；必须证明真实拍摄任务投递 → 本张快照 → Still Make → 原生完成校验 → JPEG 编码的完整链路。测试不得手工构造快照或伪造完成 mask 来替代入口验证。
+- 普通卷在颗粒、光晕、HDF、水印关闭时，编码桥必须零像素工作，不读写整张图像、不分配整图临时内存、不执行 CPU LUT。保留的异常回退是正确性保护；普通配置一旦实际触发 CPU 调色，应视为性能回归并阻止发布，不能用“测试通过”“有回退”“预览流畅”放行。
+- 自定义 3D LUT 和特殊风格优先在构建前完成可追溯的 ISP 拟合；不可精确表达时沿用用户已接受的拟合原则，不得静默退回 CPU 色彩处理。尚未完成 ISP 接入的历史能力须明确标记，不能据此给新滤镜开例外。
+- Charmera、像素风保留已授权的特殊路径；800T、蓝凤凰开启光晕可有空间处理开销。保留线上已有显式开启的光晕、HDF、水印等能力，只处理残余阶段，关闭时必须跳过。例外不得扩大为普通胶卷的 CPU 色彩路径。
+- 拍摄缓存独立于取景预览开关；任务入口不做文件读取、分配或阻塞等待；已曝光帧不由后来的 UI 选择改色。其他机型须证明本机 ISP 能力与地址，不能照搬 GR III，也不能为迁移删掉线上功能。
+- 合并最新 main 后复核功能矩阵、默认构建路径和已验收产物身份；发布前必须取得原厂对照的即时回放、相册与连续拍摄实机反馈。没有测量数值就记录定性反馈，不编造耗时或把模拟器结果当真机性能。
+
 ## 每次迭代以线上最新 main 为基线
 
 所有后续迭代先 fetch 远端 main，核对宝塔当前部署 SHA，记录最新 main 与线上提交；若两者不一致，先查清待发布差异。以最新 main 创建独立工作树/分支，再移植本次功能的最小改动。历史候选仅作为修复参考，不能用旧分支、旧文件或旧产物覆盖 main 的其他逻辑。
@@ -46,6 +57,7 @@ git -C /path/to/grkit status --short
 | 任务 | 先读 |
 | --- | --- |
 | 任何 M10V 功能迭代或迁移 | [m10v-preservation.md](references/m10v-preservation.md)、[m10v-regression.md](references/m10v-regression.md) |
+| 滤镜新增、ISP 拟合、拍摄／回放／连拍性能 | [isp-performance.md](references/isp-performance.md)；必须执行真实投递与零像素工作回归 |
 | 测试包、用户验收、main/GitHub/宝塔 | [release-workflow.md](references/release-workflow.md)，生产执行再读 m10v-baota-publish |
 | 启动、Linux→RTOS、内存和重定位 | [chain-and-source-map.md](references/chain-and-source-map.md) |
 | 新增功能、修改插件、构建打包 | [development.md](references/development.md) |

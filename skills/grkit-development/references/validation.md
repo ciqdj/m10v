@@ -37,3 +37,10 @@ clang -std=c11 -O2 -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast -DGRKIT_HOS
 GR III 2.10 实机完成 CoreBluetooth 发现／连接、型号／固件／电量／工作模式／AF 读取及 AF／模式通知订阅；收到模式变化，未捕获 AF 变化，之后连接超时。用户确认触屏只移动框由机内设置导致，28mm 当前稳定；自定义焦距双画面和卡死尚未验收。详见 [蓝牙诊断](bluetooth-diagnostics.md)。
 
 随附 Objective-C 探针和 runner 基于该实测版本整理，已执行 Clang 编译、签名和技能结构／本地链接检查；整理后版本未再次连接相机，未修改固件、封包或发布。前文 2026-10-21 的“没有接相机”是当时的研究范围，不代表本次没有设备证据。
+# 2026-10-26 GR III ISP 性能验收补充
+
+用户确认GR III2.10 RC2修复通过并明确授权合并与发布。BIN SHA-256为
+`8346ff292a57727eb57d2d6fad919d330848ad9a37117284f5396919fdbf6992`，
+build_id `0c9a0164`。这是本机型／本候选的定性确认，不扩展为IIIx／IV验收，
+未提供修复后计时。后续滤镜开发遵守[ISP性能契约](isp-performance.md)：普通色彩走ISP、
+真实投递与本张快照完成交接、默认配置零像素工作。此前CPU色彩18.823秒是故障样本。

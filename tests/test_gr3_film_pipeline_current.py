@@ -369,6 +369,18 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
             self.make(e, recipe, obj, frame)
             self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25, data), 0)
 
+    def test_all_factory_tones_bypass_custom_color_without_pixel_or_storage_work(self):
+        # Include both official positive/negative looks without relying on UI
+        # labels: every original tone 11..22 keeps the factory encoder path.
+        for tone in range(11, 23):
+            with self.subTest(tone=tone):
+                e, recipe, obj, frame, si, request, data = self.fixture(62)
+                e.u.mem_write(si + 0x77c, bytes([tone]))
+                e.u.mem_write(si + 0x71248 + 0x77c, bytes([tone]))
+                self.make(e, recipe, obj, frame)
+                self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, tone, data), 0)
+                self.assertEqual(self.capture(e, recipe, si, request), 0xfffffffc)
+
     def test_wrong_frame_or_changed_configuration_cannot_skip_cpu_color(self):
         e, recipe, obj, frame, si, request, data = self.fixture()
         self.make(e, recipe, obj, frame)

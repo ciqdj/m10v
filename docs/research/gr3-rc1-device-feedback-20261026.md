@@ -1,5 +1,7 @@
 # GR III 2.10: measured CPU fallback and processing-ingress repair
 
+> Acceptance update: the user confirmed RC2 fixes the issue and authorized main/GitHub/Baota publication. The release rebuild preserves the accepted BIN byte for byte; see [release verification](../testing/gr3-isp-release-20261026.md). No post-fix timing figures were supplied.
+
 Base: GitHub main `a2fdbf26ded914687a94a426d2898d8420045571` (fetched again
 for this iteration). Prior ISP-fit candidate d124947 was replayed as a8826a8.
 The later main update adds2.20 updater compatibility, retained by merge; this
