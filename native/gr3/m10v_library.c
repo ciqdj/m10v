@@ -13,6 +13,9 @@
 #endif
 #include "m10v_legacy_data.h"
 #include "halation_energy.h"
+#if M10V_UNIVERSAL_HALATION
+#include "m10v_universal_halation.h"
+#endif
 
 typedef struct {
     char name[24];
@@ -98,7 +101,7 @@ int m10v_library_valid(const m10v_library_state *state) {
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
         if (( state->slots[i].film > M10V_CUSTOM_MAX_ID && !M10V_BUILTIN(state->slots[i].film)) ||
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
-            state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>3) return 0;
+            state->slots[i].halo_threshold>8 || state->slots[i].halo_profile>6) return 0;
     for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){const m10v_film_effects *e=&state->effects[i];
         if(!state->slots[i].film){for(uint32_t j=0;j<sizeof(m10v_slot);j++)if(((const uint8_t *)&state->slots[i])[j])return 0;for(uint32_t j=0;j<sizeof(*e);j++)if(((const uint8_t *)e)[j])return 0;continue;}
         if(M10V_LEGACY_SETTINGS&&i>=5)return 0;
@@ -174,6 +177,7 @@ int m10v_library_select_custom(m10v_library_state *state,uint32_t slot,uint32_t 
  if(!M10V_LEGACY_SETTINGS)for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(i!=slot&&state->slots[i].film==id)return M10V_LIBRARY_INVALID;
  m10v_library_state next;copy_state(&next,state);next.slots[slot].film=(uint16_t)id;
  next.slots[slot].grain=next.slots[slot].soft=next.slots[slot].halo_gain=0;
+ if(state->slots[slot].film!=id||state->effects[slot].reserved[0]!=(uint8_t)(bank+1))next.slots[slot].halo_profile=2;
  if(state->slots[slot].film!=id)next.effects[slot].leak_gain=0;
  next.effects[slot].reserved[1]=0;next.effects[slot].film_exposure=0;next.effects[slot].reserved[0]=(uint8_t)(bank+1);
  return commit(state,&next,store,context);
@@ -188,7 +192,7 @@ int m10v_library_texture(m10v_library_state *state, uint32_t slot, uint32_t grai
     return commit(state, &next, store, context);
 }
 int m10v_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t profile,m10v_library_store store,void *context) {
-    if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||!state->slots[slot].film||(state->slots[slot].film==66||state->slots[slot].film==68)||gain>8||spread>8||threshold>8||profile>3)return M10V_LIBRARY_INVALID;
+    if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||!state->slots[slot].film||(!M10V_UNIVERSAL_HALATION&&(state->slots[slot].film==66||state->slots[slot].film==68)&&profile<=3)||gain>8||spread>8||threshold>8||profile>6)return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     next.slots[slot].halo_gain=(uint8_t)gain;next.slots[slot].halo_spread=(uint8_t)spread;
     next.slots[slot].halo_threshold=(uint8_t)threshold;next.slots[slot].halo_profile=(uint8_t)profile;
@@ -537,19 +541,24 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
         gw = (image->width + mask) >> shift; gh = (image->height + mask) >> shift;
     }
     uint32_t cells = gw * gh;
-    uint32_t use_halo = !(completed&M10V_NATIVE_HALO) && (choice->film == 33 || choice->film == 67) && choice->halo_gain;
+    uint32_t use_halo = !(completed&M10V_NATIVE_HALO) && m10v_halo_enabled(choice->film,choice->halo_gain,choice->halo_profile);
+    uint32_t special_halo=use_halo;
+#if M10V_UNIVERSAL_HALATION
+    special_halo=use_halo && choice->halo_profile==M10V_HALO_SPILL && (choice->film==33||choice->film==67);
+#endif
     /* Legacy per-film soft is retired, including imported SD/journal values.
      * Digital HDF runs upstream in the original native Clarity owner. */
     const uint32_t soft=0;
     (void)seed; /* Grain is exclusively owned by the native ISP. */
     m10v_film_effects effects=state->effects[slot];
-    uint32_t needed = ((((choice->film == 33 || choice->film == 67) ? 6 : 2)) * cells + 3) & ~3u;
+    uint32_t needed = (m10v_halo_workspace_planes(choice->film,choice->halo_profile) * cells + 3) & ~3u;
     if ((soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
         (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
         overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
         overlap(scratch, needed, image, sizeof(*image)) ||
         (state->stamp && overlap(scratch, needed, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
     if (use_halo) {
+        if(custom_lut&&overlap(scratch,needed,custom_lut,6591u))return M10V_LIBRARY_INVALID;
         /* Keep the previous full-capacity preflight without linking the
          * retired halation renderer; the energy model below owns 800T. */
         if((uintptr_t)image->y>UINTPTR_MAX-image->y_bytes ||
@@ -564,7 +573,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     }
     /* Optional exact color cache follows spatial storage. Missing capacity
      * keeps the previous ABI and renderer. Validate before the first write. */
-    uint32_t spatial=(choice->film==67&&use_halo)?4*cells:0;
+    uint32_t spatial=(use_halo && !(choice->film==33&&special_halo))?4*cells:0;
     void *color_memory=0;
     if(choice->film>33 && scratch && !((uintptr_t)scratch&3) &&
        scratch_bytes>=spatial+M10V_COLOR_CACHE_BYTES &&
@@ -575,13 +584,16 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
        !overlap(scratch,scratch_bytes,image,sizeof(*image)) &&
        !(state->stamp&&overlap(scratch,scratch_bytes,date,sizeof(*date))))
         color_memory=scratch+spatial;
-    if(choice->film==33 && (use_halo || soft)){
+    if(choice->film==33 && (special_halo || soft)){
         m10v_slot spatial_choice=*choice;
         if(completed&M10V_NATIVE_HALO)spatial_choice.halo_gain=0;
         spatial_choice.soft=(uint8_t)soft;
         m10v_800t_effects(image,&spatial_choice,scratch,gw,gh,shift);
     }
-    if(choice->film==67&&use_halo)phoenix_halation_source(image,choice,scratch,gw,gh,shift);
+    if(choice->film==67&&special_halo)phoenix_halation_source(image,choice,scratch,gw,gh,shift);
+#if M10V_UNIVERSAL_HALATION
+    if(use_halo&&!special_halo)m10v_universal_halation_source(image,choice,scratch,gw,gh,shift);
+#endif
     M10V_PROFILE(7);
     uint32_t *texture_stats=0;
 #if M10V_CAPTURE_PROFILE
@@ -639,7 +651,10 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     }
 #endif
     M10V_PROFILE(8);
-    if(choice->film==67&&use_halo)phoenix_halation_compose(image,choice,scratch,gw,gh,shift);
+    if(choice->film==67&&special_halo)phoenix_halation_compose(image,choice,scratch,gw,gh,shift);
+#if M10V_UNIVERSAL_HALATION
+    if(use_halo&&!special_halo)m10v_universal_halation_compose(image,choice,scratch,gw,gh,shift);
+#endif
     M10V_PROFILE(9);
     if (state->stamp||(state->reserved&1u))stamp(image,state,date,M10V_CUSTOM(choice->film)?custom_name:m10v_library_name(choice->film));
     M10V_PROFILE(10);

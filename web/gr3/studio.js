@@ -36,6 +36,7 @@ const slots = [
   ['custom2', 'Custom2', 'Standard'],
 ];
 const definitions = [
+  ['halation', '光晕', '写入高光溢出与横向拉丝。写入后默认关闭，需在机内针对胶卷开启；800T 与蓝凤凰保留专属溢出。开启后可能增加保存与回放等待。', 'GR III · 所有胶卷 · 机内设置'],
   ['digitalHdf', 'HDF 模拟', '普通 GR III 的独立数字柔焦。机内入口：MENU → 设置 → HDF 模拟；可单独使用。', '普通 GR III · 独立机内菜单'],
   ['timestamp', '时间戳', '在 JPEG 中写入拍摄日期、时间和胶卷名称，机内也可调整。', '拍摄时间'],
   ['aspect', '画幅比例', '增加 4:3、6x7、XPan 画幅与取景蒙版。', '4:3 / 6x7 / XPan'],
@@ -206,7 +207,7 @@ function renderLedger() {
     ledger.append(row);
   }
   const unlockValid=renderVersionUnlock();
-  const canConfigure=unlockValid&&(state.profile==='native'?((state.features.has('film')||state.features.has('digitalHdf'))&&(!state.features.has('film')||!state.unresolvedSlots.length)&&(!state.features.has('digitalHdf')||chosenModel==='gr3')):(state.features.size&&(!state.features.has('recipes')||state.recipes.size)));
+  const canConfigure=unlockValid&&(state.profile==='native'?((state.features.has('film')||state.features.has('digitalHdf'))&&(!state.features.has('film')||!state.unresolvedSlots.length)&&(!state.features.has('digitalHdf')||chosenModel==='gr3')&&(!state.features.has('halation')||(chosenModel==='gr3'&&state.features.has('film')))):(state.features.size&&(!state.features.has('recipes')||state.recipes.size)));
   $('prepare-build').disabled = Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('build-firmware').disabled = saving||Boolean(activeBuildController)||!state.projectId||!canConfigure;
   $('features-next').disabled=!canConfigure;
@@ -225,6 +226,7 @@ function enterNativeSelection(){
  state.profile='native';
 }
 function renderFeatures() {
+  nativeEditor?.setHalationWrite?.(state.features.has('halation'));
   const target = $('feature-list');
   let zoomControls=$('studio-zoom-controls');
   if(!zoomControls){zoomControls=document.createElement('section');zoomControls.id='studio-zoom-controls';zoomControls.className='feature-row';target.before(zoomControls);}
@@ -245,8 +247,8 @@ function renderFeatures() {
     button.type = 'button';
     button.setAttribute('aria-pressed',String(active));
     if(gr4Workbench&&id==='timestamp'&&state.profile!=='native'&&!active){button.disabled=true;button.textContent='在胶卷库设置';}
-    if(id==='timestamp'&&!state.features.has('film')){button.disabled=true;button.textContent='需启用胶卷库';}
-    if(id==='digitalHdf'&&chosenModel!=='gr3'){button.disabled=true;button.textContent='仅支持 GR III';}
+    if((id==='timestamp'||(id==='halation'&&!active))&&!state.features.has('film')){button.disabled=true;button.textContent='需启用胶卷库';}
+    if((id==='digitalHdf'||(id==='halation'&&!active))&&chosenModel!=='gr3'){button.disabled=true;button.textContent='仅支持 GR III';}
     button.addEventListener('click', () => {
       if(id==='digitalHdf'&&active&&!state.features.has('film')){notice('可将档位设为关闭以保留独立菜单；或先启用胶卷库。');return;}
       active?state.features.delete(id):state.features.add(id);
@@ -260,10 +262,12 @@ function renderFeatures() {
     if (active) {
       const detail = document.createElement('div');
       detail.className = 'feature-detail';
-      if (id === 'digitalHdf') {
+      if (id === 'halation') {
+        detail.append(textNode('p','机内在图像控制中选中胶卷，按 FN 进入详细设置：光晕模式 0关闭 / 1高光溢出 / 2横向拉丝。强度、范围和阈值按胶卷保存；取景不显示光晕。'));
+      } else if (id === 'digitalHdf') {
         const levels=document.createElement('div');levels.className='hdf-levels';levels.setAttribute('role','group');levels.setAttribute('aria-label','HDF 模拟默认档位');
         ['关闭','弱','中','强'].forEach((label,value)=>{const b=textNode('button',label);b.type='button';b.setAttribute('aria-pressed',String(state.nativeConfig.hdf===value));b.onclick=()=>nativeEditor.setHdf(value);levels.append(b);});
-        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){state.features.delete('film');state.features.delete('timestamp');state.nativeConfig.stamp=0;}else state.features.add('film');invalidate();renderFeatures();};
+        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){state.features.delete('film');state.features.delete('halation');state.features.delete('timestamp');state.nativeConfig.stamp=0;}else state.features.add('film');invalidate();renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
       } else if (id === 'recipes') renderRecipeDetail(detail);
       else if (id === 'film') renderFilmDetail(detail);
@@ -490,7 +494,7 @@ function renderBuildSummary() {
   if(state.profile==='native'){
     $('build-feature-count').textContent=`${state.nativeCatalog.length} 套胶卷 / 已选 ${state.nativeConfig.slots.length}/${chosenModel==='gr3'?10:5} / 专属参数 / 质感 / 时间戳`+(state.features.has('aspect')?' / 画幅':'')+(state.features.has('level')?' / 水平仪':'')+(state.features.has('negativeGrain')?' / 负片颗粒':'');
     $('runtime-state').textContent='胶卷库 · 全部内置';
-    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`槽位 ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]}`)),textNode('p',`专属光晕 · ${state.nativeConfig.slots.filter(v=>[33,67].includes(v.film)).map(v=>`${v.film===67?'Harman Phoenix II':'800T'} 强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`Harman Red · ${state.nativeConfig.slots.filter(v=>v.film===68).map(v=>`模拟曝光EI ${[125,64,250][v.effects.filmExposure]}`).join(' / ')||'未装入'}`),...(chosenModel==='gr3'?[textNode('p',zoomSummary(state.nativeConfig))]:[]),textNode('p',`HDF 模拟（全局） · ${['关闭','弱','中','强'][state.nativeConfig.hdf||0]}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>id==='film'?'胶卷库':featureName[id]).join('、')}。机内入口：菜单 → 设置 → 胶卷库；快捷菜单保留原厂列表。`));
+    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`槽位 ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]}`)),textNode('p',state.features.has('halation')?'光晕：已写入；机内默认关闭，按胶卷选择高光溢出或横向拉丝。':`专属光晕 · ${state.nativeConfig.slots.filter(v=>[33,67].includes(v.film)).map(v=>`${v.film===67?'Harman Phoenix II':'800T'} 强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`Harman Red · ${state.nativeConfig.slots.filter(v=>v.film===68).map(v=>`模拟曝光EI ${[125,64,250][v.effects.filmExposure]}`).join(' / ')||'未装入'}`),...(chosenModel==='gr3'?[textNode('p',zoomSummary(state.nativeConfig))]:[]),textNode('p',`HDF 模拟（全局） · ${['关闭','弱','中','强'][state.nativeConfig.hdf||0]}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>id==='film'?'胶卷库':featureName[id]).join('、')}。机内入口：菜单 → 设置 → 胶卷库；快捷菜单保留原厂列表。`));
     return;
   }
   $('build-feature-count').textContent = `${state.features.size} 项 / ${state.recipes.size} 个配方位置`;
@@ -515,7 +519,7 @@ async function importSource(file,local=false) {
       report=gr4Workbench?imported:await (await api(`/api/projects/${imported.project_id}`)).json();
     }else report=await (await api(gr4Workbench?nativeApi+'/import':'/api/import',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})).json();
     if(!(gr4Workbench?['GR IV']:['GR III','GR IIIx']).includes(report.model))throw Error('当前工作台仅支持 GR III 和 GR IIIx 官方包。');
-    chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3';modelLabel=report.model;nativeEditor?.setModel(chosenModel);
+    chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3';if(chosenModel!=='gr3')state.features.delete('halation');modelLabel=report.model;nativeEditor?.setModel(chosenModel);
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
     $('build-model').textContent=`${report.model} · ${report.public_version}`;
@@ -544,7 +548,7 @@ async function download(response, filename) {
 }
 async function prepare() {
   if (!state.projectId) return;
-  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel==='gr3'?{power_images:powerImages?.getConfiguration()||{}}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel==='gr3'?{power_images:powerImages?.getConfiguration()||{}}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();
   $('prepare-build').disabled = true;

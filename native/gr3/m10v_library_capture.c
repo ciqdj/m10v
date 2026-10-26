@@ -351,11 +351,11 @@ int m10v_capture_library(uint32_t context) {
     while (((width+step-1)>>shift)>384 || ((height+step-1)>>shift)>256){step<<=1;++shift;}
     uint32_t cells=((width+step-1)>>shift)*((height+step-1)>>shift);
     if(use_halo)
-        required=(((state.slots[slot].film==33||state.slots[slot].film==67)?6:2)*cells+3)&~3u;
+        required=(m10v_halo_workspace_planes(state.slots[slot].film,state.slots[slot].halo_profile)*cells+3)&~3u;
     scratch_bytes=required;
     if(M10V_CUSTOM(state.slots[slot].film)){
 #if M10V_SD_LIBRARY
-        required=M10V_SD_RECORD_BYTES;
+        required+=M10V_SD_RECORD_BYTES;
         scratch_bytes=required;
 #else
         REJECT(-5,19,state.slots[slot].film,0);
@@ -364,7 +364,7 @@ int m10v_capture_library(uint32_t context) {
         /* Phoenix's source occupies 4*cells; the old 6*cells allocation
          * already leaves room at full size. Other spatial passes finish
          * before color or run afterward, so reuse their storage. */
-        uint32_t desired=(state.slots[slot].film==67&&use_halo?4*cells:0)+M10V_COLOR_CACHE_BYTES;
+        uint32_t desired=(use_halo?4*cells:0)+M10V_COLOR_CACHE_BYTES;
         if(desired>scratch_bytes)scratch_bytes=desired;
     }
     if(scratch_bytes){
@@ -414,7 +414,7 @@ int m10v_capture_library(uint32_t context) {
 #if M10V_SD_LIBRARY
     if(M10V_CUSTOM(state.slots[slot].film))
         result=m10v_library_render_custom(&image,&state,slot,(const m10v_library_date *)time,
-                                           seed,0,0,completed,scratch+64,(const char *)(scratch+16));
+                                           seed,use_halo?scratch+M10V_SD_RECORD_BYTES:0,use_halo?scratch_bytes-M10V_SD_RECORD_BYTES:0,completed,scratch+64,(const char *)(scratch+16));
     else
 #endif
 #if M10V_CAPTURE_PROFILE

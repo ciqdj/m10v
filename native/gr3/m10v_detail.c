@@ -33,13 +33,14 @@ uint32_t m10v_detail_table(uint32_t ui){
 }
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
+ if(field==4)return v->halo_profile==M10V_HALO_SPILL?1:v->halo_profile==M10V_HALO_STREAK?2:0;
  if(field==11)return s->effects[target].reserved[1];
  if(field==0)return v->halo_gain;if(field==1)return v->halo_spread;
  if(field==2)return v->halo_threshold;if(field==3)return v->grain;
  return field==10?s->effects[target].film_exposure:0;
 }
 static uint32_t limit(uint32_t field){
- static const uint8_t limits[12]={8,8,8,3,0,0,0,0,0,0,2,3};return limits[field];
+ static const uint8_t limits[12]={8,8,8,3,0,0,0,0,0,0,2,3};return field==4&&M10V_UNIVERSAL_HALATION?2:limits[field];
 }
 static void defaults(m10v_library_state *s,uint32_t target,uint32_t film){
  m10v_library_init(s);
@@ -73,7 +74,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==4)field=((fn1)0x531b01d0u)(ui)-18;
  uint32_t film=s.slots[target].film;
  if(op==9)return film==67?1:2;
- if(op!=7&&(field>11||(field==11&&film!=M10V_CHAR_ID)||(field>=4&&field<=9)||(field==3&&(!M10V_ISP_NATIVE_GRAIN_MODE||film==M10V_CHAR_ID||film==290))||(field<3&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
+ if(op!=7&&(field>11||(field==11&&film!=M10V_CHAR_ID)||((field>=4&&field<=9)&&!(M10V_UNIVERSAL_HALATION&&field==4))||(field==3&&(!M10V_ISP_NATIVE_GRAIN_MODE||film==M10V_CHAR_ID||film==290))||(field<3&&!M10V_UNIVERSAL_HALATION&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
  if(op==4){m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
  const m10v_slot *old=&s.slots[target];
  if(op==1)return value(&s,(uint32_t)target,field);
@@ -82,11 +83,16 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   uint32_t previous=op==2?value(&s,(uint32_t)target,field):0;
   int result;
   if(op==7)result=m10v_camera_library_reset(&s,(uint32_t)target);
+  else if(op==2&&M10V_UNIVERSAL_HALATION&&field==4){
+   uint32_t profile=v==1?M10V_HALO_SPILL:v==2?M10V_HALO_STREAK:M10V_HALO_OFF;
+   uint32_t gain=old->halo_gain;if(v&&!gain)gain=3;
+   result=m10v_camera_library_halation(&s,(uint32_t)target,gain,old->halo_spread,old->halo_threshold,profile);
+  }
   else if(op==2&&field>=5)result=m10v_camera_library_effects(&s,(uint32_t)target,field==11?7:field==10?6:field-5,v);
   else {
    uint32_t gain=old->halo_gain,spread=old->halo_spread,threshold=old->halo_threshold,grain=M10V_ISP_NATIVE_GRAIN_MODE?old->grain:0,soft=old->soft;
    if(field==0)gain=v;else if(field==1)spread=v;else if(field==2)threshold=v;else if(field==3)grain=v;else soft=v;
-   if(film==33)result=m10v_camera_library_detail(&s,(uint32_t)target,gain,spread,threshold,grain,soft);
+   if(film==33&&!M10V_UNIVERSAL_HALATION)result=m10v_camera_library_detail(&s,(uint32_t)target,gain,spread,threshold,grain,soft);
    else if(field<3)result=m10v_camera_library_halation(&s,(uint32_t)target,gain,spread,threshold,old->halo_profile);
    else result=m10v_camera_library_texture(&s,(uint32_t)target,grain,soft);
   }
@@ -107,8 +113,9 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    * waves, histogram, grain and exposure compensation. No resource directory is modified.
    * Enum values retain the slider's exact 0-based range; RED uses EI125/64/250.
    * Its three-digit value alone gets 60px, still inside the native 120px rail. */
-  static const uint16_t icons[12]={484,473,398,478,0,0,0,0,0,0,648,648};
+  static const uint16_t icons[12]={484,473,398,478,484,0,0,0,0,0,648,648};
   v=value(&s,(uint32_t)target,field);char text[4]={(char)('0'+v),0,0,0};
+  if(field==4){const char *m=v==1?"GLO":v==2?"STR":"OFF";for(uint32_t k=0;k<3;k++)text[k]=m[k];}
   if(field==10){text[0]=v==1?'6':v==2?'2':'1';text[1]=v==1?'4':v==2?'5':'2';text[2]=v==1?0:v==2?'0':'5';}
   if(field==10&&film==67){text[0]=v?'1':'2';text[1]=v?'2':'0';text[2]='0';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x194);if(!ram(list,4))return 0;

@@ -159,13 +159,15 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False):
     if type(custom_zoom)is not bool:raise ValueError('custom zoom must be boolean')
     if zoom_seed is not None and not (custom_zoom and film_library and sd_library):raise ValueError('zoom seed requires GR III film/SD library')
     custom_zoom=custom_zoom and film_library
     if type(appended_slots)is not bool or (appended_slots and (not film_library or not sd_library)):raise ValueError('appended slots require the film/SD library')
-    compile_flags=FLAGS+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
-    render_flags=RENDER_FLAGS+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
+    if type(universal_halation)is not bool or (universal_halation and (not film_library or not sd_library or not live_color)):raise ValueError('universal halation requires GR III live-color film library')
+    halo_flags=['-DM10V_UNIVERSAL_HALATION=1'] if universal_halation else []
+    compile_flags=FLAGS+halo_flags+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
+    render_flags=RENDER_FLAGS+halo_flags+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
     native_owned=bool(native_color and native_grain and recipe_snapshot and lifecycle_trace)
     if live_color and (not native_color or not sd_library):raise ValueError('live color requires native color and owned settings')
     if type(texture_neon) is not bool or (texture_neon and (not spatial_neon or not (debug_mode or native_owned))):raise ValueError('full texture blocks require debug NEON ownership')
@@ -215,6 +217,11 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         film=struct.unpack_from('<H',initial,12+i*8)[0]
         exposure_limit=2 if film==68 else 1 if film==67 else 0
         if e[5]>exposure_limit or any(v>limit for v,limit in zip(e,[2,8,5,8,1,2,0,3 if film==289 else 0])):raise ValueError('invalid film texture effects')
+    if universal_halation:
+        initial=bytearray(initial)
+        for i in range(10):
+            if struct.unpack_from('<H',initial,12+i*8)[0]:initial[16+i*8]=0;initial[19+i*8]=2
+        struct.pack_into('<I',initial,180,zlib.crc32(initial[:180]))
     initial = bytes(initial)
     from scripts.verify_gr3_5207_reference import verify
     film_payload=verify(ROOT)
@@ -452,7 +459,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         detail_base=(base+len(image)+15)&~15
         provisional,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,**{n:detail_base for n in ['m10v_detail_tables','m10v_detail_common_tables','m10v_detail_red_tables','m10v_detail_phoenix_tables','m10v_detail_charmera_tables','m10v_detail_pixel_tables']}},'m10v_detail_')
         shims_base=(detail_base+len(provisional)+15)&~15
-        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols},sd_library=sd_library,appended_slots=appended_slots,native_grain=native_grain)
+        shims,detail_report=build_detail(shims_base,{**symbols,**detail_symbols},sd_library=sd_library,appended_slots=appended_slots,native_grain=native_grain,universal_halation=universal_halation)
         detail,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,'m10v_detail_tables':detail_report['tables'],'m10v_detail_common_tables':detail_report['variant_tables']['common'],'m10v_detail_red_tables':detail_report['variant_tables']['red'],'m10v_detail_phoenix_tables':detail_report['variant_tables']['phoenix'],'m10v_detail_charmera_tables':detail_report['variant_tables']['charmera'],'m10v_detail_pixel_tables':detail_report['variant_tables']['pixel']},'m10v_detail_')
         image+=bytes(detail_base-base-len(image))+detail
         image+=bytes(shims_base-base-len(image))+shims
@@ -534,6 +541,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             for g in display_directory():
                 for film in g['films']:texts[film_resource_id(film['id'])-786]=film['name']
         else:texts+=['5213']+[s['name'] for s in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']]
+        if universal_halation:
+            if not sd_library or 786+len(texts)!=1137:raise ValueError('halation mode resource allocation differs')
+            texts+=['光晕模式 0关 1高光溢出 2横向拉丝']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -796,8 +806,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest = {'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 95, 'slots': 10,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
-                            ('native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
-                             'native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py',
+                            ('native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
+                             'native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py',
                              'native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py',
                              'native/gr3/m10v_library_camera.c', 'native/gr3/m10v_library_menu.c',
                              'native/gr3/m10v_library_capture.c',
@@ -819,6 +829,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['digital_hdf']=hdf_report
     manifest['hdf_default']=hdf_default
     manifest['hdf_enabled']=hdf_enabled
+    manifest['universal_halation']=universal_halation
     manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py']})
     manifest['capture_lifecycle']=lifecycle_report
     manifest['experimental_capture']={'candidate_color':candidate_color,'spatial_neon':spatial_neon,'full_isp_effects':False,'save_chain_fixed':False}
@@ -912,6 +923,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'builds/gr3-m10v-library')
+    parser.add_argument('--universal-halation',action='store_true')
     parser.add_argument('--appended-slots',action='store_true')
     parser.add_argument('--base',type=lambda v:int(v,0),default=0x540b6000)
     parser.add_argument('--initial-state-hex')
@@ -935,4 +947,4 @@ if __name__ == '__main__':
     parser.add_argument('--with-hdf',action='store_true')
     parser.add_argument('--zoom-seed',help='Validated one-time two-slot preset JSON')
     parser.add_argument('--no-custom-zoom',action='store_true',help='Keep original focal crop hooks and hide custom zoom menu (GR IIIx)')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))

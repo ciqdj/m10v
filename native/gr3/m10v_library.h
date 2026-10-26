@@ -2,6 +2,28 @@
 #define M10V_LIBRARY_H
 #include <stdint.h>
 
+#ifndef M10V_UNIVERSAL_HALATION
+#define M10V_UNIVERSAL_HALATION 0
+#endif
+/* Legacy 0..3 never opts an old journal into the new capability. */
+#define M10V_HALO_OFF 6u
+#define M10V_HALO_SPILL 4u
+#define M10V_HALO_STREAK 5u
+static inline uint32_t m10v_halo_enabled(uint32_t film,uint32_t gain,uint32_t profile){
+#if M10V_UNIVERSAL_HALATION
+    (void)film;return gain && (profile==M10V_HALO_SPILL||profile==M10V_HALO_STREAK);
+#else
+    return gain && profile<=3 && (film==33||film==67);
+#endif
+}
+static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile){
+#if M10V_UNIVERSAL_HALATION
+    if(profile==M10V_HALO_STREAK || (profile==M10V_HALO_SPILL&&film!=33&&film!=67))return 4;
+#else
+    (void)film;(void)profile;
+#endif
+    return 6;
+}
 #define M10V_FILM_COUNT 78u
 #define M10V_CUSTOM_MAX_ID 288u
 /* 79..288 are existing custom identities. Never reuse them. */
@@ -76,7 +98,7 @@ static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,u
     if(!state||slot>=M10V_SLOT_COUNT||!state->slots[slot].film)return 0;
     const m10v_slot *v=&state->slots[slot];
     uint32_t stages=(v->film>M10V_FILM_COUNT||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
-    if((v->film==33||v->film==67)&&v->halo_gain&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
+    if(m10v_halo_enabled(v->film,v->halo_gain,v->halo_profile)&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
     if(state->stamp||(state->reserved&1u))stages|=M10V_CPU_STAMP;
     return stages;
 }
