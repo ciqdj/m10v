@@ -308,6 +308,24 @@ assert.throws(()=>buildNativeLibrary(s,r,m),/snapshot submission wrapper instruc
 """
             subprocess.run(['node', '--input-type=module', '-e', js, str(folder)], cwd=ROOT, check=True, capture_output=True)
 
+    def test_still_snapshot_cache_exists_when_live_color_preview_is_disabled(self):
+        with tempfile.TemporaryDirectory() as d:
+            js = """import{writeFileSync}from'node:fs';
+import{readNativeOfficial,prepareNative,generateNative}from'./node/gr3-native-library.mjs';
+import{defaultConfiguration}from'./web/gr3/native-library-state.mjs';import{decodeFrameMap}from'./node/gr3-frames.mjs';
+const s=await readNativeOfficial('gr3'),c=defaultConfiguration(),o={debug_mode:true,live_color:false,hdf_enabled:false};
+const p=prepareNative(s,c,o),r=await generateNative(s,c,p.configuration_sha256,o);
+const b=decodeFrameMap(r.candidate).decoded;
+writeFileSync(process.argv[1]+'/rtos.bin',b.subarray(0x10870,0x10870+b.readUInt32LE(0x1086c)));
+writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
+"""
+            subprocess.run(['node', '--input-type=module', '-e', js, d], cwd=ROOT, check=True, capture_output=True)
+            self.manifest = json.loads((Path(d) / 'manifest.json').read_text())
+            self.image = (Path(d) / 'rtos.bin').read_bytes()
+            self.assertFalse(self.manifest['capture_lifecycle']['snapshot']['live_color'])
+            self.assertEqual(self.manifest['settings_menu']['owner_bytes'], 0x223c)
+            self.test_durable_ui_load_publishes_owner_used_by_actual_task_submission()
+
     def test_ordinary_builtin_profiles_complete_under_native_parameter_changes(self):
         for film in range(33, 79):
             for extra in ({}, {0x77d: 1, 0x77e: 7, 0x780: 2, 0x793: 6, 0x794: 2}):

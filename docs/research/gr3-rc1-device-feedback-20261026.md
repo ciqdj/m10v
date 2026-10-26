@@ -67,7 +67,7 @@ OS mode/setup and transport are explicit service boundaries. This covers the
 actual device command order19/0/16/1/8/9/2/4 rather than manually supplying a
 snapshot or invoking a buffer-retirement hook first.
 
-40 targeted ARM/final-BIN checks passed: all24 task kinds, stage0/1,
+41 targeted ARM/final-BIN checks passed: all24 task kinds, stage0/1,
 post-submission UI/state changes, real journal-load/cache publication, cold/busy
 cache zero-I/O, GPR/SP/LR/NZCV/D0-D31/FPSCR preservation, ordinary built-in fits,
 Charmera/Pixel exclusions, SD compatibility, view recovery and debug-page
@@ -84,6 +84,15 @@ Node-path and route tests reproduce the same3 failures as this branch (e.g.
 95 vs88 films and37 vs30 visible entries). Not every failure was separately
 classified, and no unrelated expectations were rewritten for a green result.
 
+Independent review caught the supported non-live-preview debug v7 path: its
+cache had previously been compiled out with Live Make. Cache ownership, UI
+publication, controller allocation and HDF offsets now follow snapshot ingress
+independently of the actual live-preview hook. A full v7 export regression
+failed before the follow-up fix and passes afterward, including durable cache
+publication and zero-pixel encode. Headless direct Python research builds
+without the SD settings owner must supply snapshots through the explicit API;
+automatic cache-based ingress is not available in that research configuration.
+
 User's MENU hang has no supplied menu-channel evidence and remains unlocalized.
 Do not claim it fixed because the capture bottleneck is repaired. No ISP
 hardware, DMA, physical scheduling or camera performance is emulated.
@@ -94,6 +103,6 @@ GR III2.10 only; debug enabled for confirmation. Existing camera journals have
 priority; no reset or ABI migration is introduced. Charmera/Pixel retain their
 special CPU renderers. Halo and custom-LUT exceptions remain explicit.
 
-BIN SHA256: `c467f441781cc4fe72f9c1cf86f51f9458f698bb34feb033b8944fdf2dde204c`.
+BIN SHA256: `5d329f546bcd7df52962a4fd99da0e590da3e805aa4f8205db8b53a4f31c083f`.
 151 checked hooks,32,111,448 bytes. Receipt/manifest record the complete source
 and configuration fingerprints; camera_tested remains false.
