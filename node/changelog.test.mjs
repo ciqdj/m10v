@@ -14,7 +14,7 @@ test('release history is available without JavaScript and linked from product pa
    const r=await fetch(base+route);assert.equal(r.status,200);
    assert.match(r.headers.get('content-type'),/text\/html/);
    const html=await r.text();assert.ok(html.startsWith('<!doctype html>'));assert.match(html,/<a href="\/gr3\/">/);assert.match(html,/更新日志/);assert.match(html,/800T/);
-   assert.match(html,/c3d54fe/);assert.match(html,/历史源码回补/);assert.doesNotMatch(html,/<!-- RELEASES -->/);
+   assert.match(html,/<h3>优化<\/h3>/);assert.doesNotMatch(html,/c3d54fe|历史源码回补|查看发布状态|查看记录 ↗/);assert.doesNotMatch(html,/<!-- RELEASES -->/);
   }
   for(const route of ['/','/guide/','/gr3/','/gr4/','/gr2/'])assert.match(await(await fetch(base+route)).text(),/href="\/changelog\/"/);
  }finally{await new Promise(r=>server.close(r));}
@@ -49,4 +49,20 @@ test('release guard rejects missing or reused notes and accepts a new release',a
   await save({...next,releases:[next.releases[0]]});assert.throws(()=>checkReleaseChangelog(repo,base),/历史发布记录/);
   assert.throws(()=>checkReleaseChangelog(repo,'main; echo nope'),/base/);
  }finally{await rm(repo,{recursive:true,force:true});}
+});
+
+
+test('customer sections keep categories, notices and escaping without exposing internal evidence', async()=>{
+ const {validateChangelog,renderReleases,readChangelog}=await import('./changelog.mjs');
+ const data=readChangelog();
+ data.releases=[{...data.releases[0], title:'简明更新',changes:['支持新功能','修复 <误触>','改善速度'], sections:[{type:'added',items:['支持新功能']},{type:'fixed',items:['修复 <误触>']},{type:'improved',items:['改善速度']}],notice:'仅 GR III <测试版>'}];
+ const html=renderReleases(data);
+ assert.match(html,/<h3>新增<\/h3>/);assert.match(html,/<h3>修复<\/h3>/);assert.match(html,/<h3>优化<\/h3>/);
+ assert.match(html,/修复 &lt;误触&gt;/);assert.match(html,/仅 GR III &lt;测试版&gt;/);
+ assert.doesNotMatch(html,/actions\/runs|commit\//);
+ for(const mutate of [d=>d.releases[0].sections[0].type='unknown',d=>d.releases[0].sections[0].items=[],d=>d.releases[0].sections.push(d.releases[0].sections[0]),d=>d.releases[0].sections[0].items=['文案不一致'],d=>d.releases[0].notice=42]){
+  const invalid=structuredClone(data);mutate(invalid);assert.throws(()=>validateChangelog(invalid));
+ }
+ const legacy=structuredClone(data);delete legacy.releases[0].sections;
+ assert.match(renderReleases(legacy),/支持新功能/);
 });

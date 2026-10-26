@@ -2,1046 +2,1891 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
-      "version": "2026.10.26.7",
-      "date": "2026-10-26",
-      "title": "修复 GR III 普通胶卷慢回放、即时回放无效果与连拍黑屏",
+      "version": "2026.10.27.1",
+      "date": "2026-10-27",
+      "title": "优化更新日志展示",
       "changes": [
-        "依据实机日志定位整图 CPU 调色耗时18.823秒：原快照钩子位于缓冲回收路径，已改为真实处理任务投递前冻结本张胶卷状态，恢复普通卷的 ISP 色彩与快速编码路径。",
-        "独立保留拍摄缓存及其所有权，不再依赖取景预览开关；原厂色调、十槽胶卷、旧存档／SD记录、Charmera／像素风、已存在的光晕、HDF、水印、画幅、焦距和机型边界保留。",
-        "GR III 2.10 RC2 已获用户真机确认修复通过；验收 BIN 与本次重建逐字节一致。默认关闭日志的构建及全部原厂色调通过42项相关检查；全库既有失败另做基线记录，不宣称全部测试通过。",
-        "测试包页提供已验收包；GRKit 技能新增 ISP 性能硬约束、真实投递和零像素工作回归要求，后续普通滤镜不得以 CPU 整图调色替代 ISP。"
+        "更新日志按「新增、修复、优化」分类，精简各版本说明。"
+      ],
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "更新日志按「新增、修复、优化」分类，精简各版本说明。"
+          ]
+        }
       ],
       "commit": null,
       "evidence": "current",
       "evidence_url": null
     },
     {
+      "version": "2026.10.26.7",
+      "date": "2026-10-26",
+      "title": "修复 GR III 胶卷回放与连拍问题",
+      "changes": [
+        "修复 GR III 普通胶卷回放等待过长、即时回放不显示胶卷效果和连拍黑屏问题。"
+      ],
+      "commit": "55a1aaa7ebecddeec95b5eeb5015275ab345d186",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40351910356",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 普通胶卷回放等待过长、即时回放不显示胶卷效果和连拍黑屏问题。"
+          ]
+        }
+      ],
+      "notice": "适用于 GR III 2.10，修复包可从「测试包」页面下载。"
+    },
+    {
       "version": "2026.10.26.6",
       "date": "2026-10-26",
-      "title": "修复 GR III 2.20 机身拒绝修改固件更新",
+      "title": "修复 GR III 2.20 更新包被拒绝",
       "changes": [
-        "GR III 上传官方 2.20 后，最终功能包的外层、RTOS 与 CPU 安装版本统一为 2.20.21.28，重算 CPU 与容器校验，修复旧输出 2.10 被更新器拒绝的问题。胶卷及功能代码仍基于已适配的 2.10，不宣称完成 2.20 原生移植。",
-        "参考 Ricoh-GRMod 的版本及恢复准入机制，针对 GR III 独立实现更新器差分；原胶卷、资源、图片构建及独立审计保留。2.20 来源隐藏不适用的旧桥接入口，并在预检拒绝叠加旧版本适配。GR IIIx、GR IV 输出不变。",
-        "60 项专项验证通过，包含真实 2.20 更新器指令、CPU 校验及最终包恢复准入；全量对照保留 32 项既有失败。按用户明确发布指令上线，尚未取得本候选真机刷入与物理回刷验收。"
+        "修复使用 GR III 官方 2.20 构建的功能包被相机更新器拒绝的问题。",
+        "隐藏 2.20 来源不适用的旧版适配选项，减少配置错误。"
       ],
       "commit": "a2fdbf26ded914687a94a426d2898d8420045571",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40343083741"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40343083741",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复使用 GR III 官方 2.20 构建的功能包被相机更新器拒绝的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "隐藏 2.20 来源不适用的旧版适配选项，减少配置错误。"
+          ]
+        }
+      ],
+      "notice": "功能仍基于已适配的 GR III 2.10，未完成 2.20 原生移植；本候选尚未经真机刷入及恢复官方固件验证。"
     },
     {
       "version": "2026.10.26.5",
       "date": "2026-10-26",
-      "title": "修复官方 2.20 固件导入与构建基线识别",
+      "title": "修复官方 2.20 导入与构建",
       "changes": [
-        "修复 GR III 官方 2.20 上传后出现 invalid frame sizes：共用解码与重封包按容器声明的展开长度处理，保留边界与校验限制。",
-        "按用户确认方案，已登记的 GR III 2.10／2.20、IIIx 1.60 官方来源使用同机型已适配的构建基线；GR III 输出基线为 2.10，IIIx 为 1.60。上传原包与备份保持不变，导入、预检、保存与构建记录明确区分上传版本和输出基线；未知来源仍拒绝。",
-        "修复预设编辑重封包时跨帧回指历史的复用判断；保留胶卷、功能选择和独立回读。已用官方 2.20 完成网页上传、原生构建与最终封包回读，专项回归通过；本次候选已获用户验收确认后发布。GR IV 未修改。"
+        "修复 GR III 官方 2.20 导入报错，以及编辑预设后重新打包异常。",
+        "已支持的官方固件来源可使用同机型适配基线构建，并明确显示上传版本与输出基线。"
       ],
       "commit": "2d5fc71870cccb65d4a81adfec6114256e2ec448",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40292903282"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40292903282",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 官方 2.20 导入报错，以及编辑预设后重新打包异常。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "已支持的官方固件来源可使用同机型适配基线构建，并明确显示上传版本与输出基线。"
+          ]
+        }
+      ],
+      "notice": "GR III 使用 2.10 功能基线，GR IIIx 使用 1.60 功能基线；支持导入 2.20 不代表完成 2.20 原生移植。"
     },
     {
       "version": "2026.10.26.4",
       "date": "2026-10-26",
-      "title": "新增独立测试包板块",
+      "title": "新增测试包下载入口",
       "changes": [
-        "全站导航新增「测试包」，集中列出临时包的适用机型、测试范围、已知问题和 GitHub 下载链接。",
-        "上架 GR III 2.10 ISP 胶卷测试 RC1；这是尚未经相机验收的独立预发布包，5207／5219 慢回放和连拍黑屏尚未确认修复。",
-        "本次网站更新不合入测试固件源码，不改变 GR III／IIIx／IV 正式在线构建行为。"
+        "新增「测试包」页面，集中查看适用机型、测试范围、已知问题并下载临时包。",
+        "提供 GR III 2.10 ISP 胶卷测试 RC1。"
       ],
       "commit": "a4aefd2238afc1dc3f3b8405976a51a330f7cf9c",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40287910920"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40287910920",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "新增「测试包」页面，集中查看适用机型、测试范围、已知问题并下载临时包。",
+            "提供 GR III 2.10 ISP 胶卷测试 RC1。"
+          ]
+        }
+      ],
+      "notice": "RC1 为尚未经相机验收的测试包，5207／5219 慢回放和连拍黑屏当时仍待确认修复。"
     },
     {
       "version": "2026.10.26.3",
       "date": "2026-10-26",
-      "title": "补齐 XPan 与 6x7 原生样式取景标签",
+      "title": "新增 XPan 与 6x7 取景标签",
       "changes": [
-        "GR III／IIIx 的 M10V 原生胶卷组合在启用画幅扩展后，XPan、6x7取景增加对应标签；沿用原厂画幅图标外框、底色与原厂图标字形，交由原生图标绘制器显示。",
-        "标签跟随既有取景遮罩刷新与可见性控制，保留3:2、1:1、4:3原有显示和28–50mm焦距标签；不改裁切几何、JPEG／DNG生成和对焦逻辑。",
-        "已完成新增标签、原生绘制器逐像素回读、裁切／DNG及焦段图标风险项离线检查；按用户专项验证后直接发布授权上线，未进行相机实测。GR IV未修改。"
+        "GR III／IIIx 使用 M10V 原生胶卷组合并启用画幅扩展后，取景画面新增原厂样式的 XPan、6x7 标签。"
       ],
       "commit": "a7c17392296ee01cd3d70e33f19c052cea5b2ac1",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40279596800"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40279596800",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx 使用 M10V 原生胶卷组合并启用画幅扩展后，取景画面新增原厂样式的 XPan、6x7 标签。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.26.2",
       "date": "2026-10-26",
-      "title": "GR III 新增逐胶卷光晕模式，保留特殊胶卷专属模拟",
+      "title": "GR III 新增逐胶卷光晕设置",
       "changes": [
-        "GR III 工作台新增独立光晕写入开关，默认不写入；写入后机内仍默认关闭，可在图像控制中选中胶卷、按FN设置关闭／高光溢出／横向拉丝，逐胶卷保存强度、范围与高光阈值。",
-        "全部内置胶卷与自定义LUT均可使用；800T高光溢出保留原红敏感与近远场扩散，蓝凤凰保留原较弱橙红模拟，横向拉丝与专属溢出互斥。关闭时跳过光晕空间处理，不影响原有取景、RAW保护及28–50mm裁切。",
-        "旧光晕参数不会自动启用新模式；换入新自定义胶卷默认关闭，移除新能力后明确关闭的模式也不会被旧参数重新启用。保留当前main配套SD胶卷记录兼容性。",
-        "本次GR III RC1候选已获用户真机确认通过后发布。光晕作用于保存的静态JPEG，不提供实时取景；开启后可能增加保存／回放等待，未公布真机耗时数值。GR IIIx／IV未开放新模式。"
+        "GR III 可选写入光晕功能，机内按 FN 为每款内置胶卷或自定义 LUT 单独设置高光溢出、横向拉丝及强度、范围与阈值。",
+        "保留 800T 与蓝凤凰的专属光晕风格，新功能及新换入的自定义胶卷默认关闭光晕。"
       ],
       "commit": "d9b5a8933dc8a162741761e039ad1646c192ae36",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40273724457"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40273724457",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 可选写入光晕功能，机内按 FN 为每款内置胶卷或自定义 LUT 单独设置高光溢出、横向拉丝及强度、范围与阈值。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "保留 800T 与蓝凤凰的专属光晕风格，新功能及新换入的自定义胶卷默认关闭光晕。"
+          ]
+        }
+      ],
+      "notice": "仅支持 GR III，作用于保存的静态 JPEG，不提供实时取景；开启后可能增加保存与回放等待。"
     },
     {
       "version": "2026.10.26.1",
       "date": "2026-10-26",
-      "title": "GR III 裁切回到28–50mm稳定链路，恢复原厂样式焦距标签",
+      "title": "优化 GR III 裁切与焦距标签",
       "changes": [
-        "GR III 2.10：保留两档机内裁切，支持28–50mm、1mm步进与保存；旧存档超过50mm的档位按50mm读取，停用未通过实测的扩展取景/LCD/AF实验链路。",
-        "40mm等自定义焦距恢复原厂尺寸、字形、底色和边框；35mm/50mm沿用原厂图标，关闭裁切时隐藏。标签资源使用独立编号，保留线上现有胶卷图标、37款目录和十款选择能力。",
-        "影像方案新增两档裁切焦距配置及是否写入相机的开关，默认保留机内设置；选择写入时随固件更新生效一次，后续机内调整继续保存。",
-        "28–50mm与焦距标签候选已获用户真机确认后发布。保留GR III官方2.20导入识别，但未新增2.20原生补丁适配，不开放超过50mm裁切。"
+        "影像方案可配置两档裁切焦距，并选择是否随固件写入相机。",
+        "恢复自定义焦距的原厂样式标签。",
+        "GR III 2.10 裁切恢复为已验证的 28–50mm 范围，支持 1mm 步进及保存，旧存档中超过 50mm 的设置按 50mm 读取。"
       ],
       "commit": "c2aed1e9f582819cd1dd8783effeef36b83867cf",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40215003524"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40215003524",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "影像方案可配置两档裁切焦距，并选择是否随固件写入相机。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "恢复自定义焦距的原厂样式标签。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "GR III 2.10 裁切恢复为已验证的 28–50mm 范围，支持 1mm 步进及保存，旧存档中超过 50mm 的设置按 50mm 读取。"
+          ]
+        }
+      ],
+      "notice": "不开放超过 50mm 的裁切；本次未新增 GR III 2.20 原生适配。"
     },
     {
       "version": "2026.10.25.1",
       "date": "2026-10-25",
-      "title": "修复 GR III 官方 2.20 固件导入长度报错",
+      "title": "修复 GR III 官方 2.20 导入报错",
       "changes": [
-        "增加 GR III 2.20 官方文件身份、长度、版本及分区配置，修复导入时 size: unsupported firmware length；保留 2.10 和 GR IIIx 1.60 的识别。",
-        "同步 Node 网页入口、跨机型识别和 Python 检查入口，分区读取按对应版本布局处理。",
-        "本次为导入识别修复，未完成 2.20 原生补丁构建适配，未进行相机刷写验证；按用户直接发布授权上线。"
+        "修复导入 GR III 官方 2.20 时提示固件长度不支持的问题。"
       ],
       "commit": "9cded6efd7a1bf48643c5b5a74a68a4a3959189c",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40201493696"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40201493696",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复导入 GR III 官方 2.20 时提示固件长度不支持的问题。"
+          ]
+        }
+      ],
+      "notice": "本次仅修复导入识别，尚未完成 2.20 原生适配及相机刷写验证。"
     },
     {
       "version": "2026.10.24.4",
       "date": "2026-10-24",
-      "title": "D76新增七款独立黑白胶卷，保持原分组名称和顺序",
+      "title": "D76 新增七款黑白胶卷",
       "changes": [
-        "D76在T-Max 100后依次增加Tri-X 400、Ilford Delta 100、Ilford Pan 400、Rollei Infrared 400、Ilford SFX 200、Fomapan 400、CatLABS X Film 80；CatLABS参考MKII，显示名保持原样。目录共37款，机内直接平铺，每页最多10款。",
-        "新增七款独立LUT、机内卡片、ADJ图标和存档编号299至305。原30款LUT不变；保留旧SD包和十槽存档，图标查询上限同步扩展至781。",
-        "Tri-X 400、Delta 100、Rollei Infrared 400使用固定版本同型号社区LUT；其余按官方可得资料制作独立风格近似。两个红外款采用用户确认的滤镜风格近似，RGB不能恢复真实红外反射；所有效果均未标定为100%实体胶片还原。",
-        "每款8192独立样本的目标LUT插值ΔE00 P95为0.12至0.54；这是实现误差，不是真实胶片还原率。按用户直接发布授权上线；本候选未进行相机实测。"
+        "D76 新增 Tri-X 400、Ilford Delta 100、Ilford Pan 400、Rollei Infrared 400、Ilford SFX 200、Fomapan 400、CatLABS X Film 80，胶卷库增至 37 款。"
       ],
       "commit": "aa3760d595aa26e52669a8fcd3e6b4fd6bfadff1",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39992099084"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39992099084",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "D76 新增 Tri-X 400、Ilford Delta 100、Ilford Pan 400、Rollei Infrared 400、Ilford SFX 200、Fomapan 400、CatLABS X Film 80，胶卷库增至 37 款。"
+          ]
+        }
+      ],
+      "notice": "胶卷效果为风格模拟；红外款无法还原真实红外反射，不代表实体胶片的完全还原。"
     },
     {
       "version": "2026.10.24.3",
       "date": "2026-10-24",
-      "title": "精简已下架图标资源，保留当前30款及原固件空间检查",
+      "title": "修复胶卷图标并优化资源占用",
       "changes": [
-        "GR III SD胶卷库不再重复嵌入已下架1至32号胶卷图片；保留编号、旧SD包解码与存档，旧槽位显示通用LUT图标。当前30款图片、效果、名称顺序不变，原厂图标目录不变。",
-        "释放204800字节只读资源，适应服务器与本地编译差异；保持原有RTOS空间上限、完整功能及校验。",
-        "包含5213 ADJ图标修复和2460官方独立R/G/B曲线修正。依据用户直接发布授权上线；未以模型误差冒充实体胶片100%还原或真机验收。"
+        "修复 5213 在 ADJ 菜单中不显示图标的问题。",
+        "依据官方独立色彩曲线优化 2460 胶卷效果。",
+        "精简已下架胶卷的图片资源，保留旧胶卷包与存档兼容，旧槽位显示通用 LUT 图标。"
       ],
       "commit": "526f56969ad8db9d99795f3a96ab5765fd127fe9",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39988893836"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39988893836",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 5213 在 ADJ 菜单中不显示图标的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "依据官方独立色彩曲线优化 2460 胶卷效果。",
+            "精简已下架胶卷的图片资源，保留旧胶卷包与存档兼容，旧槽位显示通用 LUT 图标。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.24.2",
       "date": "2026-10-24",
-      "title": "完成5213 ADJ图标与2460官方曲线发布，隔离服务器校验依赖",
+      "title": "完善胶卷浏览与效果修正",
       "changes": [
-        "将光谱校验与离线拟合工具分离：正式构建只读取已生成的曲线、LUT及其摘要，不再要求安装scipy等科研依赖；保留完整指令、数据、资源和固件空间校验。",
-        "包含指定五组30款顺序、机内直接平铺及MENU/DISP退出修复；5213 ADJ图标774上限修正，2460采用KODAK AEROCOLOR IV2460官方独立R/G/B中反差曲线和明确的模型曝光假设。",
-        "保留旧SD胶卷包、十槽存档及其他胶卷效果；本次依赖隔离不改变胶片LUT或相机逻辑。按用户直接发布授权重新构建和核验，不将离线模型误差或发布成功表述为100%实体胶片还原。",
-        "本次服务器构建因Ubuntu产物超过原固件空间上限3036字节而失败，已自动回退到41f6f77；不作为上线成功。"
+        "修复胶卷库 MENU／DISP 退出操作及 5213 的 ADJ 图标显示。",
+        "30 款胶卷按指定顺序平铺浏览，并依据官方色彩曲线优化 2460 效果。"
       ],
       "commit": "42fafd241d213d9b2d3416004e82de0d1ad91911",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39987563335"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39987563335",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复胶卷库 MENU／DISP 退出操作及 5213 的 ADJ 图标显示。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "30 款胶卷按指定顺序平铺浏览，并依据官方色彩曲线优化 2460 效果。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线，相关改进已在后续版本提供。"
     },
     {
       "version": "2026.10.24.1",
       "date": "2026-10-24",
-      "title": "胶卷按指定顺序平铺，修复5213 ADJ图标并校正2460官方曲线",
+      "title": "优化胶卷浏览并修复图标显示",
       "changes": [
-        "后台与机内保留指定五组、30款及精确名称顺序；新增独立5213，移除未列出的可选胶卷。机内取消分类目录，30款按原顺序每页10张直接浏览。",
-        "移除错位卡外名称，图片内标明品牌型号；修复胶卷库黑屏、MENU返回与DISP直接回拍摄，保留十槽存档、浏览零写入及显式旧卷清理。",
-        "修复5213资源774被原厂773图标上限拦截导致ADJ无图标；三个查询/绘制入口同步修正并回读。",
-        "2460对应KODAK AEROCOLOR IV Negative Film2460；依据官方AS-2652原始矢量R/G/B曲线纠正社区数据中蓝绿重复，明确中反差冲洗与曝光归一化假设，重建LUT和预览拟合。",
-        "新增上一版SD胶卷包严格兼容；压缩重复卡片只读数据以保持原固件空间上限。按用户本次直接发布授权上线，未进行本候选相机/实体胶片标定，不承诺100%物理还原。",
-        "此提交首次宝塔部署因服务器未安装scipy、校验模块误导入离线拟合依赖而失败，已自动回退到41f6f77；不作为上线成功。"
+        "新增独立 5213 胶卷。",
+        "修复胶卷库黑屏、MENU 返回、DISP 回到拍摄及 5213 的 ADJ 图标显示问题。",
+        "30 款胶卷按指定顺序直接浏览，每页 10 款，卡片内标明品牌与型号。",
+        "依据官方色彩曲线优化 2460 效果，并兼容上一版 SD 胶卷包。"
       ],
       "commit": "a7adfc9a092b0438d5708fefa25e56efd787aed8",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39986806288"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39986806288",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "新增独立 5213 胶卷。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复胶卷库黑屏、MENU 返回、DISP 回到拍摄及 5213 的 ADJ 图标显示问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "30 款胶卷按指定顺序直接浏览，每页 10 款，卡片内标明品牌与型号。",
+            "依据官方色彩曲线优化 2460 效果，并兼容上一版 SD 胶卷包。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线，相关改进已在后续版本提供。"
     },
     {
       "version": "2026.10.23.9",
       "date": "2026-10-23",
-      "title": "修复机内胶卷库名称遮挡，改用右上角三角启用标记",
+      "title": "修复胶卷库名称遮挡",
       "changes": [
-        "修复 GR III / IIIx 胶卷库使用原厂大号文字造成名称截断、横向溢出及第二排与操作提示重叠；每卡使用独立的 28 像素名称带，保留中文原名和长名称的完整内容。",
-        "已启用胶卷改为右上角实心小三角，当前浏览胶卷继续使用黄色外框；重新安排两排卡片和底部提示，启用上限及保存错误改在标题区域提示。",
-        "固定名称字形与压缩资源，保持相同构建结果；同步位图尺寸、内存归属、构建清单和校验，不修改胶卷编号、启用容量、存档或成像参数。",
-        "按用户要求完成离线回归、正式固件导出及上线核验后直接发布；本次未进行相机实测。"
+        "修复 GR III／IIIx 胶卷库名称截断、溢出及遮挡操作提示的问题。",
+        "已启用胶卷改用右上角三角标记，黄色外框标识当前浏览胶卷，数量限制与保存错误提示更清晰。"
       ],
       "commit": "41f6f777ee4abe5c25ef74a9bfd693eb335dbb66",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39963349468"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39963349468",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III／IIIx 胶卷库名称截断、溢出及遮挡操作提示的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "已启用胶卷改用右上角三角标记，黄色外框标识当前浏览胶卷，数量限制与保存错误提示更清晰。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.23.8",
       "date": "2026-10-23",
-      "title": "上线 GR II 实验工作台，整合最新 GR III 十胶卷版本",
+      "title": "新增 GR II 实验工作台",
       "changes": [
-        "新增 GR II 官方固件导入、五槽胶卷与影像方案、配置草稿和撤销重做、SD 胶卷导出、原生构建与完整 FRM 独立回读。",
-        "GR II 页面复用 GR III 的品牌、布局和交互样式，补齐功能卡片和开关机图片区；画幅、原厂负片颗粒、RAW 降噪、水平仪及图片替换仍标为接入中，不能作为已实现能力。",
-        "合并最新线上 main/develop，保留 GR III 十胶卷及 IIIx/IV 数量限制；GR II 固定独立五槽 v4 配置、渲染与 SD 合同，避免共享升级改变原生 ABI。",
-        "GR II 为实验离线候选，完整相机更新、冷启动、缓存和拍摄仍待真机验证；不将网页构建成功当作实机通过。"
+        "GR II 实验工作台支持官方固件导入、五槽胶卷与影像方案配置、草稿、撤销重做、SD 胶卷导出及固件构建。",
+        "GR II 工作台采用统一的 M10V 页面布局与操作方式。"
       ],
       "commit": "197a6f11814c066a1886f0ba7bd1b6e5928d68e5",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39923069723"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39923069723",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR II 实验工作台支持官方固件导入、五槽胶卷与影像方案配置、草稿、撤销重做、SD 胶卷导出及固件构建。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "GR II 工作台采用统一的 M10V 页面布局与操作方式。"
+          ]
+        }
+      ],
+      "notice": "GR II 为实验候选，更新、冷启动与拍摄等仍待真机验证；画幅、原厂负片颗粒、RAW 降噪、水平仪及图片替换仍在接入中。"
     },
     {
       "version": "2026.10.23.7",
       "date": "2026-10-23",
-      "title": "发布清晰方形胶卷图标，补齐十卷原生处理范围",
+      "title": "完善方形图标与十胶卷支持",
       "changes": [
-        "统一机内胶卷库、影像控制和网页的清晰方形胶卷图标，胶卷名称保持不变，菜单描述中文化；GR III 支持两排多选，最多十卷追加到 Custom2 下方。",
-        "将 GR III 第6–10卷纳入原生 ISP、颗粒和详细参数表范围，保留 GR IIIx、GR IV 五卷容量与原机型边界。",
-        "上一候选因底层范围复核而撤回到原稳定版本；本次重新执行正式固件构建、导出回读与发布校验。按用户要求不运行本地测试套件，未进行本轮相机实测。"
+        "补齐 GR III 第 6–10 款已启用胶卷的成像、颗粒与详细参数支持。",
+        "统一机内胶卷库、影像控制与网页的清晰方形图标，菜单说明改为中文。"
       ],
       "commit": "7a7fd23d343526eaad64b96565eb68492eabb56e",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39911972686"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39911972686",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "补齐 GR III 第 6–10 款已启用胶卷的成像、颗粒与详细参数支持。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "统一机内胶卷库、影像控制与网页的清晰方形图标，菜单说明改为中文。"
+          ]
+        }
+      ],
+      "notice": "GR III 最多启用十卷，GR IIIx／GR IV 仍为五卷；本轮尚未经相机实测。"
     },
     {
       "version": "2026.10.23.6",
       "date": "2026-10-23",
-      "title": "发布方形胶卷图标和多选菜单，补齐机型数量限制",
+      "title": "完善胶卷多选与机型数量限制",
       "changes": [
-        "统一清晰方形胶卷图标，保留胶卷名称并中文化菜单描述；GR III 胶卷库每页5列×2排，最多启用10卷，按选择顺序追加在影像控制 Custom2 下方。",
-        "补齐 GR IIIx 机内启用数量限制，与导出端的五卷容量一致；GR IV 保留私有五位置菜单与原有配方位置，不套用 GR III 追加地址。",
-        "包含固定字体栅格数据，消除本机和 Linux 字体库差异；原资源、补丁、固件回读及部署校验保持。上一发布流程在最终兼容检查时取消，未作为上线成功。",
-        "按用户要求跳过本地测试套件；完成构建与上线核验，不将本轮菜单与拍摄行为标记为实机验证。"
+        "修复 GR IIIx 机内启用数量限制，使其与五卷容量一致。",
+        "统一清晰方形胶卷图标与中文菜单提示，GR III 以两排卡片选择最多十卷。"
       ],
       "commit": "6a249af75d3b8ac4fe6b484eed8d4ace284d9c7f",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/6a249af75d3b8ac4fe6b484eed8d4ace284d9c7f"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/6a249af75d3b8ac4fe6b484eed8d4ace284d9c7f",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR IIIx 机内启用数量限制，使其与五卷容量一致。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "统一清晰方形胶卷图标与中文菜单提示，GR III 以两排卡片选择最多十卷。"
+          ]
+        }
+      ],
+      "notice": "该候选已撤回，相关改进由后续版本提供；GR IIIx／GR IV 保留五卷容量。"
     },
     {
       "version": "2026.10.23.5",
       "date": "2026-10-23",
-      "title": "固定字体栅格数据，发布方形图标与十卷多选",
+      "title": "完善方形胶卷图标与十卷多选",
       "changes": [
-        "包含清晰正方形胶卷图标、GR III 两排十卷多选和中文操作提示，胶卷名称不变；GR IIIx、GR IV 保留五卷容量并同步图标。",
-        "修复服务器与本机字体栅格库差异引起的生成资源校验失败：保存带字体来源及摘要校验的固定字形覆盖数据，构建时确定性生成；机内字形头文件和自定义图标像素与上一候选逐字节一致，不跳过资源校验。",
-        "上一提交在宝塔固件构建检查阶段失败并已自动回退，未作为上线成功；本次沿原发布流水线重新构建与核验。"
+        "统一清晰方形胶卷图标，GR III 胶卷库提供两排十卷多选及中文操作提示。"
       ],
       "commit": "9b84a89f367c0ce08ce30fec482f51a46fd55352",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/9b84a89f367c0ce08ce30fec482f51a46fd55352"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/9b84a89f367c0ce08ce30fec482f51a46fd55352",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "统一清晰方形胶卷图标，GR III 胶卷库提供两排十卷多选及中文操作提示。"
+          ]
+        }
+      ],
+      "notice": "该候选未完成发布，相关改进由后续版本提供；GR IIIx／GR IV 仍保留五卷容量。"
     },
     {
       "version": "2026.10.23.4",
       "date": "2026-10-23",
-      "title": "统一清晰方形胶卷图标，GR III 支持十卷多选",
+      "title": "优化胶卷图标与多选菜单",
       "changes": [
-        "统一全部87款内置胶卷与自定义胶卷的正方形包装图标，采用平滑字体与高清网页资源；机内胶卷库、影像控制及网页展示同步更新，胶卷原有名称不变。",
-        "GR III 胶卷库改为每页5列×2排，确认键启用或停用，最多10卷；已启用胶卷按选择顺序追加至影像控制 Custom2 下方，保留原厂效果与 Custom1、Custom2，菜单操作与提示中文化。",
-        "新增十卷存档与旧五槽配置迁移，保留每卷参数、时间水印和 SD 胶卷包兼容；删除胶卷后调整当前选择，自定义胶卷使用不可覆盖的缓存版本，保护已排队照片的配方归属。",
-        "GR IIIx、GR IV 本次同步图标与存档兼容，仍保留原有五卷容量和各自机型菜单边界，不使用 GR III 的追加菜单地址。",
-        "按用户要求跳过本地测试套件并直接发布；执行构建、固件回读及上线检查，菜单视觉与拍摄效果尚未进行本轮实机验证。"
+        "GR III 胶卷库支持最多启用十卷，按选择顺序排列在 Custom2 下方。",
+        "统一内置与自定义胶卷的方形包装图标，机内及网页同步展示。",
+        "保留旧五槽配置与 SD 胶卷包兼容，升级后可继续使用已有配方。"
       ],
       "commit": "ab3321dd28af03a6c8fc5342d48e56dce4df5fb9",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/ab3321dd28af03a6c8fc5342d48e56dce4df5fb9"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ab3321dd28af03a6c8fc5342d48e56dce4df5fb9",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 胶卷库支持最多启用十卷，按选择顺序排列在 Custom2 下方。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "统一内置与自定义胶卷的方形包装图标，机内及网页同步展示。",
+            "保留旧五槽配置与 SD 胶卷包兼容，升级后可继续使用已有配方。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线，相关改进已在后续版本提供；GR IIIx／GR IV 仍保留五卷容量。"
     },
     {
       "version": "2026.10.23.3",
       "date": "2026-10-23",
-      "title": "颗粒统一原厂原生处理，移除漏光及软件质感回退",
+      "title": "优化颗粒处理并精简质感设置",
       "changes": [
-        "GR III：颗粒只保留原厂原生强度档位，删除逐像素 CPU 颗粒、软件回退和额外的颗粒尺寸噪声加工；原生处理失败时不追加慢速软件处理。",
-        "移除机内及网页漏光、颗粒尺寸控件和渲染算法；旧存档和 SD 胶卷包保留兼容，退休字段不再生效。IIIx／IV 及不支持原生颗粒的方案不再提供该设置；Charmera、方块世界关闭颗粒选项。",
-        "修复原生调色完成标记与编码器在部分处理阶段的色调编号交接，避免已处理照片再次执行全图软件 LUT；保留原厂预设切入时的正确颜色回退、800T／蓝凤凰可选光晕和 RAW 安全检查。",
-        "按用户本轮明确授权，在离线回归、固件回读与上线检查后直接发布；实际保存秒数、回放响应及连拍稳定性尚待机身验证。",
-        "合并并保留已提交的七款精选滤镜、55款目录和既有成片颜色路径；本次不把风格 LUT 的逐像素颜色处理标记为原生完成。"
+        "修复部分已调色照片重复处理的问题。",
+        "GR III 颗粒统一使用原厂强度档位，避免额外软件颗粒处理带来等待。",
+        "移除漏光与颗粒尺寸设置，旧存档和 SD 胶卷包仍可读取，对应旧设置不再生效。"
       ],
       "commit": "f9fa1dd6e5762b7baba3b3b7e79b0e0b3bfeeb13",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39899588239"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39899588239",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复部分已调色照片重复处理的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "GR III 颗粒统一使用原厂强度档位，避免额外软件颗粒处理带来等待。",
+            "移除漏光与颗粒尺寸设置，旧存档和 SD 胶卷包仍可读取，对应旧设置不再生效。"
+          ]
+        }
+      ],
+      "notice": "GR IIIx／GR IV 及不支持原生颗粒的方案不提供颗粒设置，Charmera 与方块世界也关闭该选项；实际保存与连拍表现仍待真机确认。"
     },
     {
       "version": "2026.10.23.2",
       "date": "2026-10-23",
-      "title": "发布七款精选滤镜，兼容服务器编译体积",
+      "title": "提供七款精选滤镜",
       "changes": [
-        "包含七款精选滤镜ID291–297，保留方块世界290；r3已获用户GR III2.10验收并授权发布。",
-        "修复服务器Ubuntu clang完整调试构建比原1088KiB上限多992字节而被拒绝的问题；仅将独立审计预算增加16KiB至1104KiB，保留全部指令、只读映射、段边界及非目标字节校验。",
-        "上一提交首次部署失败并回退，未作为上线成功；本次不修改滤镜参数、相机代码或编译选项，重新构建核对验收固件字节一致。"
+        "提供七款精选滤镜，保留方块世界及既有胶卷效果。"
       ],
       "commit": "f4066416ab9bbf6fd91a344dfa4e4e7bb94dc91f",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/f4066416ab9bbf6fd91a344dfa4e4e7bb94dc91f"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/f4066416ab9bbf6fd91a344dfa4e4e7bb94dc91f",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "提供七款精选滤镜，保留方块世界及既有胶卷效果。"
+          ]
+        }
+      ],
+      "notice": "七款滤镜的 r3 候选已通过 GR III 2.10 用户真机确认，GR IIIx 未经本轮真机验证。"
     },
     {
       "version": "2026.10.23.1",
       "date": "2026-10-23",
-      "title": "新增七款 M10V 精选滤镜",
+      "title": "新增七款精选滤镜候选",
       "changes": [
-        "GR III / IIIx：新增 Leica Monochrome、Lomography、Polaroid、Fujifilm Velvia 50、Cyberpunk、Cyanotype、德系冷调；精选及历史目录共55款，新增ID291–297，保留方块世界290。",
-        "接入七款成片LUT、ISP取景近似、胶卷卡片、菜单及SD配方；颗粒、光晕与漏光默认关闭。社区LUT保留来源和许可证；未经物理胶片标定，不承诺100%复刻。",
-        "用户已确认r3在GR III 2.10验证通过（BIN SHA-256 bf933a672cf570ddae5202c18faf79f1a9dc880427ab4f4ccde34026da21ac65）。GR IIIx本次未声明机身实测；r2用户更新SD包后需重新选择五槽，避免沿用试验编号。"
+        "GR III／IIIx 新增 Leica Monochrome、Lomography、Polaroid、Fujifilm Velvia 50、Cyberpunk、Cyanotype、德系冷调。",
+        "七款滤镜配套成片效果、取景近似预览、胶卷卡片与 SD 配方。"
       ],
       "commit": "78b681c1134ebd1069415a548a7fb8e8a74883b8",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39898185062"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39898185062",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx 新增 Leica Monochrome、Lomography、Polaroid、Fujifilm Velvia 50、Cyberpunk、Cyanotype、德系冷调。",
+            "七款滤镜配套成片效果、取景近似预览、胶卷卡片与 SD 配方。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线，相关滤镜已在后续版本提供；GR IIIx 未经本轮真机验证，r2 用户更新 SD 包后需重新选择胶卷槽位。"
     },
     {
       "version": "2026.10.22.9",
       "date": "2026-10-22",
-      "title": "修复 ADJ 方块世界胶卷图标缺失",
+      "title": "修复方块世界胶卷图标缺失",
       "changes": [
-        "GR III / IIIx：修正原厂图标尺寸读取、绘制上限及像素地址转换范围，ADJ 与影像控制可正常读取「方块世界」40×40 图标。",
-        "同时覆盖启用与关闭 SD 胶卷库的构建，保留原有胶卷编号、效果、五槽设置及自定义焦距；新增执行最终固件图标解码器的 ARM 回归。",
-        "按用户授权完成离线回归后直接发布，尚未完成此次修复的机身实测。"
+        "修复 GR III／IIIx 的 ADJ 与影像控制中「方块世界」图标缺失的问题。"
       ],
       "commit": "0818cfeb00d92b09c89a68d1795707560343c0de",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39801464128"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39801464128",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III／IIIx 的 ADJ 与影像控制中「方块世界」图标缺失的问题。"
+          ]
+        }
+      ],
+      "notice": "本次修复发布时尚未经相机实测。"
     },
     {
       "version": "2026.10.22.8",
       "date": "2026-10-22",
-      "title": "发布两档自定义焦距，修复 GR IV 共享构建隔离",
+      "title": "GR III 新增两档自定义裁切焦距",
       "changes": [
-        "GR III 2.10：MENU → 设置 → 自定义裁切焦距，可分别按 1mm 调整两档为 28–100mm 并保存；默认 35mm／50mm，关闭裁切为 28mm。",
-        "将自定义焦距视图接口限定为 GR III 链接扩展，恢复 GR IV 的原有接口清单；继续严格校验导出接口，GR IIIx／GR IV 不启用自定义焦距。",
-        "保留有界 976 KiB 固件增长预算、逐张照片裁切记录、保存失败提示和既有胶卷／画幅功能。完整离线构建与回读不代表机身实拍或 DNG 验收。"
+        "GR III 2.10 可在「设置 → 自定义裁切焦距」分别调整并保存两档焦距，支持 1mm 步进。"
       ],
       "commit": "0e3c3b93d467d0480e82b1d5cadcf2feda678cab",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39780432107"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39780432107",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 2.10 可在「设置 → 自定义裁切焦距」分别调整并保存两档焦距，支持 1mm 步进。"
+          ]
+        }
+      ],
+      "notice": "本版 28–100mm 为未经机身实拍与完整 DNG 验收的实验范围，后续已收敛为 28–50mm；GR IIIx／GR IV 不开放此功能。"
     },
     {
       "version": "2026.10.22.7",
       "date": "2026-10-22",
-      "title": "上线两档自定义焦距，补齐服务器构建体积预算",
+      "title": "完善两档自定义裁切焦距候选",
       "changes": [
-        "GR III 保留两档裁切，支持机内分别设置 28–100mm、1mm 步进并保存；入口为 MENU → 设置 → 自定义裁切焦距。",
-        "在原有 960 KiB 固件增长预算上，为新增焦距模块、文字和画幅适配预留有界 16 KiB；各构建器与独立回读共用 976 KiB 上限，继续检查原始指令、区段、校验和及机型隔离。",
-        "修复上一提交在服务器调试构建阶段触发预算拒绝的问题，并为超限错误增加实际字节数。保留方块世界等既有功能；GR IIIx／GR IV 不启用自定义焦距。离线验证不替代机身实拍及完整 DNG 验收。",
-        "服务器 GR III／IIIx 检查通过，GR IV 因共享链接接口清单不匹配失败，整次部署自动回退，未成功上线。"
+        "GR III 可在机内分别设置并保存两档裁切焦距，支持 1mm 步进。"
       ],
       "commit": "567fd11bf91032fdaa1007010eb41437d11e3d0a",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/567fd11bf91032fdaa1007010eb41437d11e3d0a"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/567fd11bf91032fdaa1007010eb41437d11e3d0a",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 可在机内分别设置并保存两档裁切焦距，支持 1mm 步进。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线，相关功能后续提供；原 28–100mm 实验范围后续已收敛为 28–50mm，GR IIIx／GR IV 不开放此功能。"
     },
     {
       "version": "2026.10.22.6",
       "date": "2026-10-22",
-      "title": "GR III 支持机内自定义两档裁切焦距",
+      "title": "新增两档自定义裁切焦距候选",
       "changes": [
-        "GR III 2.10 保留两档裁切，在 MENU → 设置 → 自定义裁切焦距中分别按 1mm 调整 28–100mm，OK 保存、MENU 取消；默认仍为原厂 35mm／50mm，关闭裁切为 28mm。",
-        "接通焦距切换、数码裁切取景、JPEG 尺寸和逐张照片裁切记录，兼容已有画幅；两份带 CRC 的机内存档支持回读校验与损坏恢复，保存失败显示提示。",
-        "GR IIIx／GR IV 不启用此项。保留方块世界、Charmera、五槽胶卷库、自定义 LUT 和现有水印；最终固件已做离线 Hook 回读与 ARM 执行验证，未完成机身实拍及完整 DNG 验收。",
-        "此提交的宝塔部署因服务器调试固件超出旧体积预算而失败，已自动回退；源码已推送，不代表该版本成功上线。"
+        "GR III 2.10 可在机内分别调整两档裁切焦距，支持 1mm 步进、保存与取消。",
+        "裁切设置支持损坏恢复及保存失败提示。"
       ],
       "commit": "59d80c167553591b35ab7a29249ae1b23a055bb6",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/59d80c167553591b35ab7a29249ae1b23a055bb6"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/59d80c167553591b35ab7a29249ae1b23a055bb6",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 2.10 可在机内分别调整两档裁切焦距，支持 1mm 步进、保存与取消。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "裁切设置支持损坏恢复及保存失败提示。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线；原 28–100mm 实验范围未经机身实拍与完整 DNG 验收，后续已收敛为 28–50mm。GR IIIx／GR IV 不开放此功能。"
     },
     {
       "version": "2026.10.22.5",
       "date": "2026-10-22",
-      "title": "M10V 精选新增方块世界像素胶卷",
+      "title": "新增方块世界像素胶卷",
       "changes": [
-        "GR III / IIIx 精选新增「方块世界 / Pixel World」：方块像素、有限色阶与轻微增色，提供原创草地方块图标、网页预览、五槽配置与 SD 胶卷包。",
-        "新胶卷使用独立 ID 290，保留历史胶卷、自定义 LUT 与 Charmera 编号，兼容此前合法 SD 胶卷包；颗粒与漏光默认关闭，开启颗粒时在像素化后处理。",
-        "效果只处理静态 JPEG，取景与 RAW 不像素化；需更新固件后使用新胶卷。GR IV 不开放本效果。按用户授权完成离线验证后直接发布，尚未实机验收。"
+        "GR III／IIIx 新增「方块世界 / Pixel World」，提供方块像素与有限色阶效果，配套图标、网页预览及 SD 胶卷包。"
       ],
       "commit": "028270bdf3ece83ec6bacfddfee723a93eaa037f",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39776198431"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39776198431",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx 新增「方块世界 / Pixel World」，提供方块像素与有限色阶效果，配套图标、网页预览及 SD 胶卷包。"
+          ]
+        }
+      ],
+      "notice": "需更新固件；效果仅作用于静态 JPEG，取景与 RAW 不像素化，GR IV 不开放。本候选尚未经真机验收。"
     },
     {
       "version": "2026.10.22.4",
       "date": "2026-10-22",
-      "title": "修复裁切对焦跳动与回放滤镜，额外质感默认关闭",
+      "title": "修复裁切对焦跳动与回放效果缺失",
       "changes": [
-        "GR III 2.10 修复 XPan／6x7 配合焦距裁切时，对焦与取景刷新使用不同画面范围引发的拉伸跳动；保留 JPEG／DNG 最终裁切尺寸和身份。",
-        "修复逐张配方已选胶卷但原厂色调信息滞后时的滤镜跳过，并补齐 CPU 处理路径的独立 JPEG 缩略图着色；保护 RAW、配方及图像缓冲边界，避免回放预览偶发缺少滤镜。",
-        "胶卷颗粒、柔化、光晕和漏光在新建、换卷及重置时默认关闭，可在机内自行开启；网页与机内默认值一致，保留已有用户设置及上一版合法 SD 胶卷包。共用胶卷默认值也适用于 GR IIIx，其他机型未获得本轮真机验收。",
-        "用户已确认 GR III 2.10 的 r3 测试包通过（BIN 4c3dea9e…）并授权发布；保留线上已有 A/B、独立五槽、HDF、首张换卷、实时取景和低内存构建时限修复。"
+        "修复 GR III 2.10 使用 XPan／6x7 与焦距裁切时，对焦画面拉伸跳动的问题。",
+        "修复部分照片与回放缩略图偶发不显示胶卷效果的问题。",
+        "新建、换卷及重置时，颗粒、柔化、光晕与漏光默认关闭，已有用户设置保留。"
       ],
       "commit": "1ce2ca9f13298970d19fb5300ef7f1fdefdcc7fb",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39751329190"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39751329190",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 2.10 使用 XPan／6x7 与焦距裁切时，对焦画面拉伸跳动的问题。",
+            "修复部分照片与回放缩略图偶发不显示胶卷效果的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "新建、换卷及重置时，颗粒、柔化、光晕与漏光默认关闭，已有用户设置保留。"
+          ]
+        }
+      ],
+      "notice": "本轮已通过 GR III 2.10 用户真机确认，其他机型未经本轮真机验证。"
     },
     {
       "version": "2026.10.22.3",
       "date": "2026-10-22",
-      "title": "GR III 新增 6x7 裁切，宽幅统一命名 XPan",
+      "title": "GR III 新增 6x7 裁切",
       "changes": [
-        "GR III 裁切菜单新增 6x7（横幅 7:6），同步接通 JPEG 四档尺寸、三档焦距裁切、取景蒙版、AF 范围、RAW 默认裁切信息与拍摄／回放身份。",
-        "原 65:24 选项统一显示为 XPan，保留原有裁切尺寸、存储身份及旧照片解释；网页工作台同步更新名称与选项说明，GR IV 工具保持现有范围。",
-        "新增源码构建和固件前像校验，裁切模块与时间戳、水平仪、胶卷库资源独立组合；保留已发布 A/B、独立五槽、HDF、首张换卷和实时取景修复。",
-        "本轮按用户明确授权完成离线回归后直接发布，测试包与线上均保留 camera_tested=false；6x7 的真实机身显示、拍摄、RAW 显影与重启恢复仍需实机确认。"
+        "GR III 裁切菜单新增 6x7 横幅比例，配套取景蒙版、JPEG 尺寸与 RAW 默认裁切信息。",
+        "原 65:24 宽幅选项统一命名为 XPan，网页同步更新，既有照片与裁切尺寸保持兼容。"
       ],
       "commit": "5db685d3d12e202e3359bee2512d6653be1599c0",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39713263550"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39713263550",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 裁切菜单新增 6x7 横幅比例，配套取景蒙版、JPEG 尺寸与 RAW 默认裁切信息。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "原 65:24 宽幅选项统一命名为 XPan，网页同步更新，既有照片与裁切尺寸保持兼容。"
+          ]
+        }
+      ],
+      "notice": "本候选尚未经相机实测，真实取景、拍摄、RAW 显影与重启恢复仍待确认。"
     },
     {
       "version": "2026.10.22.2",
       "date": "2026-10-22",
-      "title": "发布 A/B 快切修复，完善低内存构建时限",
+      "title": "修复 A/B 快切退出问题",
       "changes": [
-        "GR III 2.10 合入已获用户确认的 A/B 退出修复：完整移除取景控件及转换时同步日志，MENU／ADJ 沿用原厂路径，取景不再叠加 A/B 信息。",
-        "保留 DISP 直接选择 A／B 和取景正式切换、全部原厂风格及高对比度黑白、五独立胶卷槽、HDF、Fn 原功能，以及已发布的首张换卷和预览初始化修复。",
-        "修复低内存服务器 GR III／IIIx 兼容构建被统一180秒限时提前终止的问题：构建单独设为最多300秒，预检保留180秒，继续保留取消、内存、机型审计和服务器600秒整组上限；失败信息明确显示超时。",
-        "上一提交在 GR IIIx 构建阶段退出并已自动恢复旧版服务；本次只调整电脑端构建时限和诊断，不修改已验收的相机运行时代码或成像参数。"
+        "修复 GR III 2.10 开启 A/B 后通过 MENU／ADJ 返回原厂页面的问题。",
+        "移除 A/B 取景叠加提示，保留 DISP 选择与切换操作。",
+        "减少低内存环境中固件构建提前超时的问题，并明确显示超时原因。"
       ],
       "commit": "a90cf59fbebbe8ddd5448c5c866d2c8a11796f0d",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39636659246"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39636659246",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 2.10 开启 A/B 后通过 MENU／ADJ 返回原厂页面的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "移除 A/B 取景叠加提示，保留 DISP 选择与切换操作。",
+            "减少低内存环境中固件构建提前超时的问题，并明确显示超时原因。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.22.1",
       "date": "2026-10-22",
-      "title": "完善 A/B 快切退出，移除取景提示",
+      "title": "完善 A/B 快切退出与取景显示",
       "changes": [
-        "GR III 2.10 修复开启 A/B 后通过 MENU／ADJ 返回原厂页面时的控件生命周期问题；完整移除 A/B 取景控件及相关退出清理，转换与普通影像控制确认路径不再同步写入诊断日志。",
-        "取景不再叠加滤镜名、图标、A/B: 或 A/B 字母；保留影像控制 DISP 直接选择 A、B，取景 DISP 正式切换，高对比度黑白等原厂风格、独立五槽、HDF 与 Fn 原功能。",
-        "本次仅合入已验收 A/B 源码与回归，保留线上已发布的首张换卷与实时取景初始化修复，不回退成像、RAW、连拍或回放路径。",
-        "用户已确认 GR III 测试候选 d6709de3… 整体通过并授权发布；其他机型、全部配置组合及性能指标不扩大为本次真机验收范围。"
+        "修复 GR III 2.10 开启 A/B 后，通过 MENU／ADJ 返回原厂页面的问题。",
+        "移除滤镜名、图标与 A/B 字母等取景叠加提示，保留 DISP 选择与切换操作。"
       ],
       "commit": "394720ee2c5bc1b950dce4cd3e62ea0c83fbb944",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/394720ee2c5bc1b950dce4cd3e62ea0c83fbb944"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/394720ee2c5bc1b950dce4cd3e62ea0c83fbb944",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 2.10 开启 A/B 后，通过 MENU／ADJ 返回原厂页面的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "移除滤镜名、图标与 A/B 字母等取景叠加提示，保留 DISP 选择与切换操作。"
+          ]
+        }
+      ],
+      "notice": "该版本未上线，已验收的 A/B 改进在后续版本提供；本轮真机验收仅限 GR III。"
     },
     {
       "version": "2026.10.21.5",
       "date": "2026-10-21",
-      "title": "修复换卷首张滞后一张及实时取景滤镜偶尔缺失",
+      "title": "修复换卷首张滞后与取景效果缺失",
       "changes": [
-        "GR III 2.10 将胶卷配方冻结从预留下一张缓冲移到本张 recipe 提交前，避免换卷后首张仍使用上一卷；提交后的照片继续保留各自独立快照。",
-        "GR III 进入正常实时取景时在 UI 生命周期内准备并恢复已保存胶卷缓存，解决需要进入胶卷库才恢复滤镜的问题；缓存有效时不重复读盘，ISP 回调不新增文件访问。",
-        "发布构建保留已验收测试包中的独立五槽、原生 A/B 选择与退出适配、Charmera、HDF、颗粒与水印依赖，按配置重建并核对验收 BIN 哈希，不重排胶卷 ID、不清空存档。",
-        "用户已在 GR III 真机确认换卷首张和实时取景正常，验收候选为 m10v-gr3-film-timing-r1-20261021；其他机型、A/B 操作及全部效果组合不扩大为本次真机验证通过。"
+        "修复 GR III 2.10 换卷后首张照片仍使用上一卷效果的问题。",
+        "修复实时取景偶尔缺少胶卷效果、需要进入胶卷库才恢复的问题。"
       ],
       "commit": "a895cda0e347a33c0a2db04a8cfa615dcd939161",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39627538376"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39627538376",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 2.10 换卷后首张照片仍使用上一卷效果的问题。",
+            "修复实时取景偶尔缺少胶卷效果、需要进入胶卷库才恢复的问题。"
+          ]
+        }
+      ],
+      "notice": "上述问题已通过 GR III 用户真机确认，其他机型未经本轮真机验证。"
     },
     {
       "version": "2026.10.21.4",
       "date": "2026-10-21",
-      "title": "修复 Charmera 颜色选择、胶卷库显示和实时取景",
+      "title": "完善 Charmera 颜色选择与预览",
       "changes": [
-        "GR III／GR IIIx 将 Charmera 颜色参数的 R/Y/B/G 和颗粒 OFF 刻度替换为带完整颜色名的四色色块与专用刻度，保留红、黄、蓝、灰的原有存档值。",
-        "修复289号 Charmera 被胶卷库旧编号上限过滤的问题，恢复已装槽位与目录中的名称、胶卷卡片，并补齐内存分配失败时的小图标。",
-        "GR III 2.10 实时取景读取当前槽位已提交的四色配置，经原生 ISP 生成双色近似；切换颜色和切出胶卷重建参数，不新增逐帧文件访问。JPEG继续使用原有二值调色，RAW像素与其他胶卷路径保持不变。",
-        "按本轮明确授权完成离线回归后直接发布；本候选尚未相机实测，取景和成片阈值一致性、LCD显示与帧率仍待实机确认。GR IIIx 不开放本次GR III专用取景，GR IV目录不变。"
+        "GR III 2.10 实时取景新增当前 Charmera 颜色的近似预览。",
+        "修复 Charmera 在胶卷库中缺少名称与卡片的问题。",
+        "GR III／IIIx 的 Charmera 颜色选择改为带完整名称的红、黄、蓝、灰色块。"
       ],
       "commit": "a5742282b66516405cfe984b4d0974d1e06ae6f4",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39613472663"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39613472663",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 2.10 实时取景新增当前 Charmera 颜色的近似预览。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复 Charmera 在胶卷库中缺少名称与卡片的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "GR III／IIIx 的 Charmera 颜色选择改为带完整名称的红、黄、蓝、灰色块。"
+          ]
+        }
+      ],
+      "notice": "本候选尚未经相机实测；GR IIIx 不开放本次新增的实时取景预览。"
     },
     {
       "version": "2026.10.21.3",
       "date": "2026-10-21",
-      "title": "GR III 在 Custom2 后新增独立五槽，保留全部原厂预设",
+      "title": "GR III 新增独立五胶卷槽位",
       "changes": [
-        "GR III 2.10 胶卷库改用五个独立位置，MENU 与 ADJ 均排列在 Custom1／Custom2 后；原 Vivid、Bleach Bypass、Retro、HDR Tone、Cross Processing 恢复原厂名称、图标与处理路径。",
-        "旧五槽存档、槽位顺序、胶卷 ID 与 FILMS.M10 保持兼容；新槽 FN 提供该胶卷支持的 M10V 参数，原厂参数页仍归原厂风格。升级后手动选择新增槽位即可继续使用原有配方。",
-        "新增 tone 接通逐张配方冻结、原生色调、颗粒、HDF 和 EXIF；换卷激活使用普通拍摄 bank，保护 Custom1／Custom2 保存设置，A/B 配对兼容旧记录并扩展选择范围。",
-        "网页默认采用独立五槽，构建预检与最终固件审计绑定布局；CLI 提供 --legacy-slots 保留旧布局。GR IIIx／GR IV 保持各自原有槽位与机型保护。"
+        "GR III 2.10 在 Custom2 后新增五个独立胶卷槽，MENU 与 ADJ 均可选择。",
+        "恢复原有原厂预设，使用胶卷时保留 Custom1／Custom2 的已存设置。",
+        "兼容旧五槽存档、配方及 SD 胶卷包，升级后手动选择新增槽位即可继续使用。"
       ],
       "commit": "c20140e2cbc48a9f13e305fd70c3830712459d77",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39596852906"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39596852906",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 2.10 在 Custom2 后新增五个独立胶卷槽，MENU 与 ADJ 均可选择。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "恢复原有原厂预设，使用胶卷时保留 Custom1／Custom2 的已存设置。",
+            "兼容旧五槽存档、配方及 SD 胶卷包，升级后手动选择新增槽位即可继续使用。"
+          ]
+        }
+      ],
+      "notice": "本次独立槽位调整仅适用于 GR III，GR IIIx／GR IV 保持各自原有布局。"
     },
     {
       "version": "2026.10.21.2",
       "date": "2026-10-21",
-      "title": "新增 Kodak Charmera 四色胶卷，统一胶卷编号与数量",
+      "title": "新增 Kodak Charmera 四色胶卷",
       "changes": [
-        "GR III／GR IIIx 精选胶卷新增 Kodak Charmera，机内影像控制提供红、黄、蓝、灰四种颜色，按槽位保存并作用于静态 JPEG。",
-        "胶卷目录增至47款，网页目录与SD列表连续编号；历史内建胶卷和自定义LUT身份不变，保留旧配置与上一版合法资源包兼容。",
-        "新增独立高反差双色处理与统一颜色预览；重置公共质感保留颜色，完整重置恢复默认红色，保存失败保留原值。",
-        "保持线上自定义胶卷卡片修复及HDF、时间水印、画幅、水平仪等组合能力；GR IV 保留现有46款目录。"
+        "GR III／GR IIIx 新增 Kodak Charmera 高反差双色胶卷，可在机内选择红、黄、蓝、灰，并按槽位保存。",
+        "统一网页与 SD 胶卷目录编号，保留历史胶卷、自定义 LUT 与旧配置兼容。"
       ],
       "commit": "2ec67bf7c02fa42bcd8adafc2aaa634a3d9e7858",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39571095591"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39571095591",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／GR IIIx 新增 Kodak Charmera 高反差双色胶卷，可在机内选择红、黄、蓝、灰，并按槽位保存。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "统一网页与 SD 胶卷目录编号，保留历史胶卷、自定义 LUT 与旧配置兼容。"
+          ]
+        }
+      ],
+      "notice": "Charmera 效果作用于静态 JPEG，GR IV 本次不新增该胶卷。"
     },
     {
       "version": "2026.10.21.1",
       "date": "2026-10-21",
-      "title": "修复自定义 LUT 的机内胶卷卡片、名称和图标",
+      "title": "修复自定义 LUT 卡片与名称显示",
       "changes": [
-        "GR III／GR IIIx 自定义 LUT 胶卷卡片按填写名称生成字样与稳定配色，保留完整名称，不再错误套用 800T 图片。",
-        "影像控制与 ADJ 使用当前槽位已校验快照中的真实名称，并显示独立 LUT 图标；名称读取失败和图片内存分配失败均有安全回退。",
-        "保持旧 FILMS.M10、五槽存档、双 bank 快照、胶卷 ID 和 LUT 调色数值兼容，补充名称生命周期、图标篡改拒绝、目录翻页与原厂控件回归。",
-        "按用户本轮明确指令直接发布；尚未完成本候选相机实测。此次发布不包含本地 A/B 实验及其他未提交改动。"
+        "GR III／GR IIIx 的自定义 LUT 卡片改为显示填写的完整名称与独立配色，不再误用 800T 图片。",
+        "影像控制与 ADJ 显示当前自定义胶卷的真实名称及独立 LUT 图标。"
       ],
       "commit": "9ad99b0e999fb5dd041acb26994281c9cca31b18",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39555466597"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39555466597",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "GR III／GR IIIx 的自定义 LUT 卡片改为显示填写的完整名称与独立配色，不再误用 800T 图片。",
+            "影像控制与 ADJ 显示当前自定义胶卷的真实名称及独立 LUT 图标。"
+          ]
+        }
+      ],
+      "notice": "本次修复发布时尚未经相机实测。"
     },
     {
       "version": "2026.10.20.9",
       "date": "2026-10-20",
-      "title": "修复主机交换策略并重新验证完整发布",
+      "title": "优化网站稳定性",
       "changes": [
-        "核实内核 global OOM 先后杀掉网站处理与部署构建进程；主机虽已配置 1 GiB swap，但 vm.swappiness=0，本轮构建 swap 峰值仍为 0。已备份原主机配置并调整为 60，保留现有 swap 大小。",
-        "保留上一轮 600 MiB 提前回收、700 MiB 内存硬上限与 384 MiB 交换上限，继续执行三机型顺序构建、型号保护和失败回滚；之前失败尝试不作为上线成功证据。",
-        "包含水印放大、切卷首张选择与 ProImage 100／Aerochrome／2460／5203 名称调整；固件构建和线上检查仍不能替代相机刷入、首张效果与保存耗时实测。"
+        "优化网站稳定性，减少服务意外中断。"
       ],
       "commit": "830907b6def12f2b5fa4a25a82a2ae1cb4084bc9",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39451274337"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39451274337",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "优化网站稳定性，减少服务意外中断。"
+          ]
+        }
+      ],
+      "notice": "水印与切卷首张修复仍待相机确认。"
     },
     {
       "version": "2026.10.20.8",
       "date": "2026-10-20",
-      "title": "收紧发布构建内存限制，保留系统运行余量",
+      "title": "优化网站运行稳定性",
       "changes": [
-        "部署构建增加 600 MiB 提前回收阈值，将内存硬上限从 900 MiB 降为 700 MiB，并将受限交换空间从 64 MiB 调整为 384 MiB；保留三机型顺序构建、单核 CPU、十分钟超时、型号保护与失败回滚。",
-        "此前两次 GR III 构建期间服务器 SSH 失联，失联前全机可用内存约 73 MiB；尚无内核 OOM 证据，不能认定内存压力为唯一原因。本次优先为约 1.6 GiB 可用物理内存的主机保留余量。",
-        "包含上一条水印放大、切卷首张选择及四款胶卷改名的源码修复。此前发布未取得完整成功标记，未将其归档为已验证部署；相机刷入与首张效果仍待实机确认。"
+        "优化网站运行稳定性，减少资源不足带来的影响。"
       ],
       "commit": "4b777678977eeb79760a7e664b10d0db853d0510",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/4b777678977eeb79760a7e664b10d0db853d0510"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/4b777678977eeb79760a7e664b10d0db853d0510",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "优化网站运行稳定性，减少资源不足带来的影响。"
+          ]
+        }
+      ],
+      "notice": "此前更新未确认完成，水印与切卷首张修复仍待相机确认。"
     },
     {
       "version": "2026.10.20.7",
       "date": "2026-10-20",
-      "title": "放大数码分段水印，修复切卷首张归属并统一胶卷名称",
+      "title": "放大水印并修正切卷首张效果",
       "changes": [
-        "GR III／GR IIIx／GR IV 共享水印改为斜体数码分段字形，6000×4000 照片日期高约 108px、胶卷名称约 96px；保留日期格式、颜色和四角位置，小尺寸与长名称自动适配。",
-        "GR III／GR IIIx 修正影像控制换卷后首张使用旧效果的选择来源：优先读取原厂前端当前拍摄 bank，并在捕获入口冻结，避免后端配置副本滞后一张；原厂 setter、排队冻结及回退均已离线回归，仍待机身复拍确认。",
-        "胶卷库、网页和照片印字统一名称为 ProImage 100、Aerochrome、2460、5203；固定胶卷 ID 与调色数值不变。水印渲染合同更新，请重新生成并下载配套 SD 胶卷包。",
-        "用户诊断日志确认旧实现有首张错槽；其中完整 CPU 后处理约 2–3ms，不代表全部保存耗时，蓝凤凰／UMax 400 持续 loading 仍不能认定已彻底解决。"
+        "修正 GR III／IIIx 换卷后首张仍使用旧效果的问题。",
+        "GR III／IIIx／IV 放大日期及胶卷名称水印，采用斜体数码字形。",
+        "统一 ProImage 100、Aerochrome、2460、5203 名称，色彩不变。"
       ],
       "commit": "c988e7a907d22fa68a8412a656f3c8b0bb40ff1a",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/c988e7a907d22fa68a8412a656f3c8b0bb40ff1a"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/c988e7a907d22fa68a8412a656f3c8b0bb40ff1a",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修正 GR III／IIIx 换卷后首张仍使用旧效果的问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "GR III／IIIx／IV 放大日期及胶卷名称水印，采用斜体数码字形。",
+            "统一 ProImage 100、Aerochrome、2460、5203 名称，色彩不变。"
+          ]
+        }
+      ],
+      "notice": "需重新下载配套 SD 胶卷包；首张修复待相机确认，蓝凤凰／UMax 400 持续等待问题尚未确认解决。"
     },
     {
       "version": "2026.10.20.6",
       "date": "2026-10-20",
-      "title": "修复胶卷激活与名称显示，独立胶卷名称水印菜单",
+      "title": "修复胶卷激活并独立名称水印设置",
       "changes": [
-        "GR III／GR IIIx 修复胶卷库安装时借用影像控制遗留上下文导致设置写入错误目标的问题，限定为拍摄上下文并在返回前恢复原状态；机身偶发取景／成片未生效仍需实机验收。",
-        "GR III／GR IIIx 恢复影像控制的胶卷名称资源编号，新增 MENU → 设置 → 胶卷名称水印，独立开关静态 JPEG 名称印字；时间水印恢复四项设置，名称共用其位置和颜色，照片使用英文胶卷名称。",
-        "GR III 拍摄参数快照优先使用已校验且保存回读后发布的配置缓存，避免每次曝光重复读取两份持久化配置；缓存不可用时保留原有读取路径。",
-        "补充五槽切换、名称资源、独立菜单、46 卷原生快速路径与最终固件回读验证。GR III 蓝凤凰／UMax 400 关闭附加效果仍持续 loading 的用户反馈尚未实机复现，不能认定已彻底修复；已提供诊断候选及日志步骤。"
+        "GR III／IIIx 新增独立胶卷名称水印菜单，共用时间水印的位置与颜色。",
+        "修正 GR III／IIIx 胶卷激活设置写入错误位置及名称显示问题。",
+        "减少 GR III 拍摄时重复读取胶卷设置。"
       ],
       "commit": "af4caf0d45d1745f97abaaeb389c648ae8f65fc4",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39417624064"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39417624064",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx 新增独立胶卷名称水印菜单，共用时间水印的位置与颜色。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修正 GR III／IIIx 胶卷激活设置写入错误位置及名称显示问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "减少 GR III 拍摄时重复读取胶卷设置。"
+          ]
+        }
+      ],
+      "notice": "激活修复待相机确认；蓝凤凰／UMax 400 持续等待问题尚未确认解决。"
     },
     {
       "version": "2026.10.20.5",
       "date": "2026-10-20",
-      "title": "新增六款胶卷、蓝凤凰 EI 档位与开关机图片替换",
+      "title": "新增六款胶卷与开关机图片替换",
       "changes": [
-        "GR III 2.10 新增开机／关机图片上传、裁剪、最终压缩预览、恢复默认和统一固件导出；开机资源替换已离线验证，正常开机显示与关机显示仍待实机验收，暂不支持 GR IIIx／GR IV 图片替换。",
-        "GR III／GR IIIx／GR IV 共享胶卷目录新增富士 C200、Kodak ProImage 100、T-Max 100、Aerochrome III 1443、Aerocolor IV 2460 和 VISION3 50D 5203，公开目录增至 46 款；更新机内图标、SD 胶卷包与原生色彩参数，旧 SD 包须重新生成。",
-        "蓝凤凰增加 EI 200／120 模拟档，五槽独立保存并接通网页预览、机内调节、静态／实时原生色彩及固件初始配置；模拟档不改变机身 ISO。",
-        "修复新增目录后的机内菜单定位及 GR IV 设置接口初始化；补充官方技术资料、开源数据来源和拟合误差记录。胶卷效果为显示域近似，尤其 Aerochrome 无法从 RGB 恢复红外信息，尚未完成相机／真实胶片标定。"
+        "GR III 新增开关机图片上传、裁剪、效果预览及恢复默认。",
+        "GR III／IIIx／IV 新增 C200、ProImage 100、T-Max 100、Aerochrome III 1443、Aerocolor IV 2460、5203，目录增至 46 款。",
+        "蓝凤凰新增 EI 200／120 模拟档，可逐槽保存，不改变机身 ISO。"
       ],
       "commit": "a3773e406c14216ce6b0b3929e64f08854b026cc",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39397869654"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39397869654",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 新增开关机图片上传、裁剪、效果预览及恢复默认。",
+            "GR III／IIIx／IV 新增 C200、ProImage 100、T-Max 100、Aerochrome III 1443、Aerocolor IV 2460、5203，目录增至 46 款。",
+            "蓝凤凰新增 EI 200／120 模拟档，可逐槽保存，不改变机身 ISO。"
+          ]
+        }
+      ],
+      "notice": "需重新下载配套 SD 胶卷包；图片替换仅限 GR III，机身显示待确认。胶卷为风格近似，Aerochrome 不会恢复真实红外信息。"
     },
     {
       "version": "2026.10.20.4",
       "date": "2026-10-20",
-      "title": "修复 GR IV 发布兼容并上线自定义胶卷",
+      "title": "支持自定义胶卷并修复 GR IV 兼容",
       "changes": [
-        "GR III／GR IIIx 影像方案统一时间水印，支持机内设置，并可独立将胶卷名称写入静态 JPEG。",
-        "SD 胶卷库可命名导入 sRGB 3D .cube，导出后在 GR III／GR IIIx 机内装入；兼容上一版内置胶卷包。",
-        "修复 GR IV 构建器对共享配置中关闭的胶卷名称字段及 GR III 专用接口的误拒绝，保留 GR IV 原有型号保护和独立固件回读。",
-        "HDF 菜单已做 GR III 离线组合回归，网友缺菜单反馈尚无实机记录可复现；新增功能仍待真机验收。"
+        "GR III／IIIx 支持导入并命名 .cube 胶卷，导出至 SD 卡后机内装入。",
+        "GR III／IIIx 统一时间水印设置，并支持独立胶卷名称印字。",
+        "修复 GR IV 无法生成固件的问题。"
       ],
       "commit": "6ddfa465b24481ea6f2e4ba2ef830b749294b058",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39383470000"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39383470000",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx 支持导入并命名 .cube 胶卷，导出至 SD 卡后机内装入。",
+            "GR III／IIIx 统一时间水印设置，并支持独立胶卷名称印字。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR IV 无法生成固件的问题。"
+          ]
+        }
+      ],
+      "notice": "新增功能待相机确认；GR III 的 HDF 菜单缺失反馈尚未复现。"
     },
     {
       "version": "2026.10.20.3",
       "date": "2026-10-20",
-      "title": "统一时间水印并支持自定义 LUT 胶卷",
+      "title": "统一时间水印并支持自定义胶卷",
       "changes": [
-        "GR III／GR IIIx 的时间水印统一在影像方案设置，机内也可调整；可独立开启胶卷名称，以胶卷时间戳风格写入静态 JPEG。",
-        "SD 胶卷库支持命名导入 sRGB 3D .cube，生成新版胶卷包并在机内装入；自定义效果作用于保存的 JPEG，旧版内置胶卷包仍可读取。",
-        "修复开启胶卷名称水印时初始配置被固件构建器拒绝的问题；补充 HDF 菜单离线回归，启用 HDF 且档位为关闭时仍应保留机内菜单。",
-        "GR III 的 HDF 缺菜单反馈尚无固件记录或机内照片，当前离线构建未复现；自定义 LUT、名称水印及 HDF 组合仍待真机验收。"
+        "GR III／IIIx 支持命名导入 sRGB .cube 胶卷，效果用于保存的 JPEG，兼容旧内置胶卷包。",
+        "时间水印统一在影像方案及机内设置，可独立开启胶卷名称。",
+        "修复开启胶卷名称水印后无法生成固件的问题。"
       ],
       "commit": "9847672609c2e6b05dc987b46d434343e884fcbc",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/9847672609c2e6b05dc987b46d434343e884fcbc"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/9847672609c2e6b05dc987b46d434343e884fcbc",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx 支持命名导入 sRGB .cube 胶卷，效果用于保存的 JPEG，兼容旧内置胶卷包。",
+            "时间水印统一在影像方案及机内设置，可独立开启胶卷名称。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复开启胶卷名称水印后无法生成固件的问题。"
+          ]
+        }
+      ],
+      "notice": "自定义胶卷与水印组合待相机确认；GR III 的 HDF 菜单缺失反馈尚未复现。"
     },
     {
       "version": "2026.10.20.2",
       "date": "2026-10-20",
-      "title": "CCD 改为 IXUS 70 色彩方向，修复已配置槽位切换延迟",
+      "title": "调整 CCD 色彩并修正换卷延迟",
       "changes": [
-        "CCD Classic 改用佳能 DIGITAL IXUS 70／PowerShot SD1000 的选择性色彩方向，调整红色、青蓝、肤色及高光；数值为独立设计参数，尚非实机标定。",
-        "GR III 取景读取已提交的当前槽位；GR III／GR IIIx 拍摄入口固定所选槽位，原生色彩、颗粒与 CPU 后处理沿用同一照片快照，避免首张仍使用旧槽位。",
-        "保留原始 ShootingInfo、RAW 保护与排队照片归属；仍使用 15³ 色表和原厂 ISP 参数，不增加全图处理步骤。更新后需下载匹配的 M10V/FILMS.M10。",
-        "补全此前 GR IV 内存优化的本地修改来源哈希，保留上游身份与独立固件验证。补充槽位切换、排队冻结和色彩回归检查；离线验证不等同真机验收。"
+        "修正 GR III 取景及 GR III／IIIx 拍摄时的槽位切换延迟，避免首张沿用旧效果。",
+        "CCD Classic 改为佳能 IXUS 70 色彩方向，调整红色、青蓝、肤色及高光。"
       ],
       "commit": "feaf5e8817651eea19758b741f72c4ab6d967e25",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39362650461"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39362650461",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修正 GR III 取景及 GR III／IIIx 拍摄时的槽位切换延迟，避免首张沿用旧效果。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "CCD Classic 改为佳能 IXUS 70 色彩方向，调整红色、青蓝、肤色及高光。"
+          ]
+        }
+      ],
+      "notice": "需下载匹配的 SD 胶卷包；色彩尚未实机标定，切换修复待相机确认。"
     },
     {
       "version": "2026.10.20.1",
       "date": "2026-10-20",
-      "title": "精选新增 CCD Classic，模拟老 GR DIGITAL 色彩",
+      "title": "新增 CCD Classic 胶卷",
       "changes": [
-        "M10V 精选新增 CCD Classic，公开目录扩展到 40 款；参考老 GR DIGITAL 的清透直出方向，默认关闭颗粒、柔光、光晕和漏光，保留灰阶中性。",
-        "沿用 15³ 整数色表与原厂 ISP 拟合路径，兼顾色彩与速度；同步 GR III／GR IIIx／GR IV 共享目录、机内图标、大卡片及重置默认值。",
-        "更新配套 SD 胶卷包身份合同与资源边界，保留已有胶卷 ID 和五槽存储格式；更新固件后需重新下载匹配胶卷包。",
-        "完成 CCD 色表／ISP 专项、89 项原生与 ARM 集成测试、组合功能复测及 GR III／GR IIIx 候选构建；提供参数来源与离线对照，尚未完成老 GR 同场景真机标定。"
+        "GR III／IIIx／IV 新增 CCD Classic，目录增至 40 款。",
+        "参考老 GR DIGITAL 清透色彩，默认关闭颗粒、柔光、光晕和漏光。"
       ],
       "commit": "9ed4a5a65844ddbc23c4ab4918886b5d0848836f",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/9ed4a5a65844ddbc23c4ab4918886b5d0848836f"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/9ed4a5a65844ddbc23c4ab4918886b5d0848836f",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx／IV 新增 CCD Classic，目录增至 40 款。",
+            "参考老 GR DIGITAL 清透色彩，默认关闭颗粒、柔光、光晕和漏光。"
+          ]
+        }
+      ],
+      "notice": "需重新下载配套 SD 胶卷包；尚未完成与老 GR 的同场景色彩标定。"
     },
     {
       "version": "2026.10.19.14",
       "date": "2026-10-19",
-      "title": "降低 GR IV 固件重打包内存峰值",
+      "title": "优化 GR IV 固件生成稳定性",
       "changes": [
-        "将 GR IV 校验和工作区改为 64 KiB 分块，避免为完整解码固件额外复制整幅 word 数组及切片；计算结果保持一致。",
-        "完成来源与重放核验后立即释放大型临时副本，再执行独立解码回读；不取消型号、资源、版本、恢复与逐字节完整性检查。",
-        "上一轮资源隔离已使超限构建单独退出并自动回滚，网站保持运行；本次降低构建峰值后重新执行三机型发布检查。"
+        "优化 GR IV 固件生成稳定性，减少内存不足造成的失败。"
       ],
       "commit": "61ac87619ee492b8f6f5775844c0aca0cb93272d",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/61ac87619ee492b8f6f5775844c0aca0cb93272d"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/61ac87619ee492b8f6f5775844c0aca0cb93272d",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "优化 GR IV 固件生成稳定性，减少内存不足造成的失败。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.19.13",
       "date": "2026-10-19",
-      "title": "隔离发布构建资源，避免拖住服务器",
+      "title": "优化网站稳定性",
       "changes": [
-        "三机型构建改为独立 systemd 进程组，限制总内存 900 MiB、交换 64 MiB、单核 CPU 与进程数；限制覆盖 Node 缓冲区、Python 和编译器。",
-        "每机型构建最多 10 分钟，失败或连接中断会停止整组子进程并执行原有回滚；增加阶段开始和失败日志。",
-        "发布任务等待窗口覆盖三个受限构建阶段，保留 GR III、GR IIIx、GR IV 全量构建和服务健康校验。"
+        "减少固件生成任务对网站运行的影响，改善异常中断时的恢复。"
       ],
       "commit": "ee8215d81fce287bef1e8d1bf35a850f1c8583bf",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/ee8215d81fce287bef1e8d1bf35a850f1c8583bf"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ee8215d81fce287bef1e8d1bf35a850f1c8583bf",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "减少固件生成任务对网站运行的影响，改善异常中断时的恢复。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.19.12",
       "date": "2026-10-19",
-      "title": "新增三款精选胶卷，机内精选置顶",
+      "title": "新增三款精选胶卷",
       "changes": [
-        "M10V 精选新增 Portra 160、富士业务用 100、新版乐凯 C200，共 39 款公开胶卷；同步网页预览、机内名称、图标、大卡片及独立质感默认值。",
-        "机内内置胶卷目录与新导出的 SD 胶卷包将 M10V 精选置顶，保留已有胶卷 ID 和五槽配置；更新后需重新下载配套 SD 胶卷包。",
-        "保留官方资料、社区 LUT 来源和推定参数记录；富士采用同类社区 LUT 近似参考，新版乐凯独立建模，不混用旧 Super 200，不宣称实拍完全一致。",
-        "同步 GR III／GR IIIx／GR IV 的共享目录与资源容量，修正大卡片目录偏移，并完成相关 ARM、构建及固件回读检查；新增三卷尚未真机校准。"
+        "GR III／IIIx／IV 新增 Portra 160、富士业务用 100、新版乐凯 C200，目录增至 39 款。",
+        "机内及新 SD 胶卷包将 M10V 精选置顶。"
       ],
       "commit": "178525158f42bb3244a2ff5e81bd19ddf9d35f20",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/178525158f42bb3244a2ff5e81bd19ddf9d35f20"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/178525158f42bb3244a2ff5e81bd19ddf9d35f20",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III／IIIx／IV 新增 Portra 160、富士业务用 100、新版乐凯 C200，目录增至 39 款。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "机内及新 SD 胶卷包将 M10V 精选置顶。"
+          ]
+        }
+      ],
+      "notice": "需重新下载配套 SD 胶卷包；新增胶卷为风格近似，尚未经实机色彩标定。"
     },
     {
       "version": "2026.10.19.11",
       "date": "2026-10-19",
-      "title": "修复 GR IV 与 GR III 原生接口的构建兼容",
+      "title": "修复 GR IV 固件生成兼容问题",
       "changes": [
-        "将 GR III 专用的取景缓存与胶卷卡片目录接口从 GR IV 的链接契约中分离，修复多机型发布检查中的 runtime API incomplete。",
-        "保留 GR IV 原有界面、拍摄处理和完整固件检查，GR III 原厂 ISP、HDF 与调试开关方案不变。",
-        "上一轮部署因 GR IV 检查失败已自动回退，本次重新执行全部服务器机型构建与服务校验。"
+        "修复 GR IV 固件生成兼容问题。"
       ],
       "commit": "16366bfd4119a516d26a59f080b4ced0db501547",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39261036065"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39261036065",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR IV 固件生成兼容问题。"
+          ]
+        }
+      ],
+      "notice": "上一轮更新失败并已恢复原版本。"
     },
     {
       "version": "2026.10.19.10",
       "date": "2026-10-19",
-      "title": "GR III 原厂 ISP 胶卷、取景色彩与 HDF 发布",
+      "title": "GR III 加入实时取景色彩与 HDF",
       "changes": [
-        "普通 GR III 胶卷导出默认使用经本轮测试机验收的原厂 ISP 色彩与颗粒路径，修正拍摄配置偏移错误，避免原生调色后再次进行 CPU 全图调色。",
-        "接入实时取景色彩，保留 800T 与蓝凤凰光晕；合并 HDF 独立菜单、逐张配置与原厂 Clarity 处理，保留原厂缓冲、RAW 与保存所有权。",
-        "修复胶卷库卡片元数据写入只读固件导致的菜单退出问题，卡片数据改由页面拥有并随页面释放。",
-        "将原厂处理路径与调试日志开关分离；关闭调试仍使用原生处理，开启时记录 HDF 配置、门控、参数和处理返回，便于继续排查。",
-        "上述实机确认来自当前测试机；GR IIIx 与 GR IV 保持各自既有机型处理和发布保护。"
+        "GR III 接入实时胶卷取景色彩与独立 HDF 模拟菜单，保留 800T、蓝凤凰光晕。",
+        "修复机内胶卷库卡片导致的菜单退出问题。",
+        "GR III 普通胶卷改用原厂色彩与颗粒处理，避免重复调色。"
       ],
       "commit": "6c5a2d388efc189b2feda81c38f906caed293e0b",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/6c5a2d388efc189b2feda81c38f906caed293e0b"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/6c5a2d388efc189b2feda81c38f906caed293e0b",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 接入实时胶卷取景色彩与独立 HDF 模拟菜单，保留 800T、蓝凤凰光晕。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复机内胶卷库卡片导致的菜单退出问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "GR III 普通胶卷改用原厂色彩与颗粒处理，避免重复调色。"
+          ]
+        }
+      ],
+      "notice": "已通过当时的 GR III 用户真机确认；GR IIIx／IV 沿用各自原有处理。"
     },
     {
       "version": "2026.10.19.9",
       "date": "2026-10-19",
-      "title": "GR III 新增独立 HDF 模拟菜单，退役胶卷柔光",
+      "title": "GR III 新增独立 HDF 模拟菜单",
       "changes": [
-        "普通 GR III 的「影像方案」新增独立 HDF 模拟入口，机内通过 MENU → 设置 → HDF 模拟选择关闭、弱、中、强，不依赖胶卷库。",
-        "HDF 使用独立配置与双页校验存储，换卷及重置胶卷不改变档位；旧胶卷柔光调节与全帧软件柔光处理停用，旧数值不自动迁移为 HDF。",
-        "数字柔焦复用原厂 Clarity 处理链，不增加全帧扫描或整帧缓冲；已完成离线 ARM、菜单与候选回读验证，机身连拍、写卡耗时和成像仍待实机验收。",
-        "合并已发布的宝塔迁移、官方固件基线提取及工作台更新，保留现有机型与发布保护。"
+        "GR III 可在影像方案及机内设置独立 HDF 模拟，支持关闭、弱、中、强。",
+        "HDF 档位独立保存，不受换卷或胶卷重置影响。"
       ],
       "commit": "f6078af731a32f498104bf65db8ca29ef663376a",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/f6078af731a32f498104bf65db8ca29ef663376a"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/f6078af731a32f498104bf65db8ca29ef663376a",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 可在影像方案及机内设置独立 HDF 模拟，支持关闭、弱、中、强。",
+            "HDF 档位独立保存，不受换卷或胶卷重置影响。"
+          ]
+        }
+      ],
+      "notice": "停用旧胶卷柔光，旧数值不转为 HDF；成像、连拍与保存等待仍待相机确认。"
     },
     {
       "version": "2026.10.19.8",
       "date": "2026-10-19",
-      "title": "移除运行体人为体积阈值并发布机内胶卷大卡片",
+      "title": "更新机内胶卷大卡片",
       "changes": [
-        "移除本次 Linux 构建触发的659456字节运行体拒绝条件，不再将固定编译产物体积阈值描述为机身硬性大小上限。",
-        "清理更新日志及研究、测试文档中的旧体积预算表述；地址、分区布局、机型、校验和、非目标字节与独立回读验证继续执行。",
-        "发布彩色胶卷大卡片、竖排片名、齿孔与黄色选中框；机内显示仍待真机验收。"
+        "机内胶卷卡片采用彩色卷标、竖排片名、齿孔与黄色选中框。"
       ],
       "commit": "785154172dc4db382fd81245c3f31d2fcd142c3f",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39212147396"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39212147396",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "机内胶卷卡片采用彩色卷标、竖排片名、齿孔与黄色选中框。"
+          ]
+        }
+      ],
+      "notice": "机内显示待相机确认。"
     },
     {
       "version": "2026.10.19.7",
       "date": "2026-10-19",
-      "title": "放大机内胶卷卡片与片名，优化选卷界面",
+      "title": "放大机内胶卷卡片与片名",
       "changes": [
-        "GR III／GR IIIx 机内胶卷设置和选择页采用大号彩色卷标与竖排片名，加入胶片齿孔和黄色选中框，保留一屏五卷、完整片名和原有操作。",
-        "紧凑菜单继续使用原有小图标；新卡片缓冲按需申请、翻页复用，关闭时释放，内存不足时回退至小图标。",
-        "通过 ARM 界面、绘图边界、两种运行时基址和固件回读检查，提供实际代码生成的离线预览；真机显示与运行表现仍待验收。"
+        "GR III／IIIx 胶卷选择页采用大号彩色卷标与竖排片名，保持一屏五卷。",
+        "内存不足时自动使用小图标。"
       ],
       "commit": "3db4a63d60bb3c649dd882242d306a47aebe3b0e",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/3db4a63d60bb3c649dd882242d306a47aebe3b0e"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/3db4a63d60bb3c649dd882242d306a47aebe3b0e",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "GR III／IIIx 胶卷选择页采用大号彩色卷标与竖排片名，保持一屏五卷。",
+            "内存不足时自动使用小图标。"
+          ]
+        }
+      ],
+      "notice": "机内显示与运行表现待相机确认。"
     },
     {
       "version": "2026.10.19.6",
       "date": "2026-10-19",
-      "title": "统一胶卷工作台、导航与配置流程",
+      "title": "统一工作台与胶卷配置流程",
       "changes": [
-        "网页只保留胶卷库配置主线，移除与胶卷库互斥的配方入口；扩展功能独立分组，旧草稿迁移前保留本地备份。",
-        "统一工作台、SD胶卷、说明和日志页导航；默认进入胶卷设置，目录与当前槽位参数并列显示，优化导入、撤销与保存状态。",
-        "精简中文说明和操作名称，移除装饰性英文与重复提示；保留机型、胶卷专有名称及必要使用限制。"
+        "工作台以胶卷库为主入口，移除互斥的配方入口，扩展功能独立分组。",
+        "统一导航，并排显示胶卷目录与槽位参数，优化导入、撤销和保存提示。",
+        "迁移旧草稿前保留本地备份，精简操作说明。"
       ],
       "commit": "689c0fd344a03456af6c36a0e2bca9721d40f414",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/689c0fd344a03456af6c36a0e2bca9721d40f414"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/689c0fd344a03456af6c36a0e2bca9721d40f414",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "工作台以胶卷库为主入口，移除互斥的配方入口，扩展功能独立分组。",
+            "统一导航，并排显示胶卷目录与槽位参数，优化导入、撤销和保存提示。",
+            "迁移旧草稿前保留本地备份，精简操作说明。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.19.5",
       "date": "2026-10-19",
-      "title": "修复 GR III V7 服务器构建对调试缓存的依赖",
+      "title": "修复 GR III 固件生成兼容问题",
       "changes": [
-        "GR III V7 原厂处理链的补丁基线直接从已安装官方固件提取，校验完整RTOS SHA-256后再生成补丁；不再要求服务器存在开发机的builds调试缓存。",
-        "修正LLVM18生成的ROM运行体构建兼容性，保留独立回读验证；未增加图像缓冲、降低画质或关闭效果。",
-        "补齐无调试缓存的真实构建回归，保留原厂色彩、颗粒、回放恢复和全部效果；本次不改变相机端算法及实机验收结论。"
+        "修复 GR III 固件生成兼容问题，保持原有胶卷效果。"
       ],
       "commit": "b0bc96e961cdc5b758b183baeb0de9134a8fcc88",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/b0bc96e961cdc5b758b183baeb0de9134a8fcc88"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/b0bc96e961cdc5b758b183baeb0de9134a8fcc88",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 固件生成兼容问题，保持原有胶卷效果。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.19.4",
       "date": "2026-10-19",
-      "title": "GR III 调试导出接入原厂色彩、颗粒与回放恢复",
+      "title": "GR III 调试版改进胶卷处理",
       "changes": [
-        "GR III 调试导出采用 V7：逐张在原厂 ISP 中应用胶卷色彩，重做5207、蓝凤凰与RED不同EI；非调试导出及GR IIIx保持既有处理链。",
-        "颗粒复用原厂计划、分配、执行与释放流程，记录逐张完成状态，防止软件重复叠加；光晕、柔光、漏光保留全分辨率软件处理，需同步更新匹配胶卷资源。",
-        "修补原厂回放完成通知与停止回复交错时的等待状态，隔离连拍旧消息；保留实际保存与RAW释放诊断，不强制释放保存缓冲。",
-        "69项本地／ARM回归、11项交付固件回读及扩展组合检查已通过；秒回放、持续连拍、成像与卡上照片完整性仍待实机验收，不宣称已经修复。"
+        "GR III 调试版改用原厂色彩与颗粒处理，调整 5207、蓝凤凰及 RED 曝光模拟。",
+        "改进回放与连拍结束时的恢复处理。"
       ],
       "commit": "ffee8aa1006045c7b6c26da0bfe0577519a5faab",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/ffee8aa1006045c7b6c26da0bfe0577519a5faab"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ffee8aa1006045c7b6c26da0bfe0577519a5faab",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "GR III 调试版改用原厂色彩与颗粒处理，调整 5207、蓝凤凰及 RED 曝光模拟。",
+            "改进回放与连拍结束时的恢复处理。"
+          ]
+        }
+      ],
+      "notice": "需更新配套 SD 胶卷包；仅限 GR III 调试版，快速回放、持续连拍与成像仍待相机确认。"
     },
     {
       "version": "2026.10.19.3",
       "date": "2026-10-19",
-      "title": "完善新站 HTTPS 与宝塔维护流程",
+      "title": "完善网站 HTTPS 访问",
       "changes": [
-        "为新站配置受信任的域名证书、TLS 1.2/1.3、HTTP/2 和 HTTPS 跳转。",
-        "技能补充 DNS 证书验证、备案后自动续期切换、宝塔 HTTPS IP 入口及来源限制的验证方法。",
-        "仅更新 GR III、GR IIIx、GR IV 的部署维护说明，不改变固件补丁。"
+        "完善网站 HTTPS 访问，自动跳转至加密连接。"
       ],
       "commit": "615b7351cf1058c4ccf150fda31f6b5947c18679",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39144825619"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39144825619",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "完善网站 HTTPS 访问，自动跳转至加密连接。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.19.2",
       "date": "2026-10-19",
-      "title": "补齐独立服务器的组合构建依赖与建站说明",
+      "title": "优化网站运行稳定性",
       "changes": [
-        "为 GR III 扩展组合及 GR IV 定制补齐锁定兼容运行时，并校验 www 服务用户可读及逐文件完整性。",
-        "记录宝塔静态缓存规则导致 JS、CSS、图片 404 的处理，以及改密后的面板入口查询方式。",
-        "适用于 GR III、GR IIIx、GR IV 的服务器部署；不改变相机补丁或实机验证结论。"
+        "优化网站运行与固件生成稳定性。"
       ],
       "commit": "32327df550b55b981db7380a9eed52fb9b1998ad",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/32327df550b55b981db7380a9eed52fb9b1998ad"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/32327df550b55b981db7380a9eed52fb9b1998ad",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "优化网站运行与固件生成稳定性。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.19.1",
       "date": "2026-10-19",
-      "title": "迁移 Ubuntu 宝塔服务器并修复固件保存超时",
+      "title": "优化网站并修复固件保存超时",
       "changes": [
-        "GR III、GR IIIx、GR IV 工作台迁至独立 Ubuntu 服务器，GitHub 推送 main 经专用受限 SSH 自动部署。",
-        "为低内存节点设置 Node 堆回收参数，并扩大固件审计响应头的 Nginx 代理缓冲区。",
-        "保留固件构建、独立回读与型号保护；服务器验证不代表相机刷入或成像验证。"
+        "修复固件保存超时问题。",
+        "优化 GR III／IIIx／IV 工作台运行稳定性。"
       ],
       "commit": "e8f3f255297d0641bdbc86ed5603ebe147d1ea99",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/e8f3f255297d0641bdbc86ed5603ebe147d1ea99"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/e8f3f255297d0641bdbc86ed5603ebe147d1ea99",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复固件保存超时问题。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "优化 GR III／IIIx／IV 工作台运行稳定性。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.18.5",
       "date": "2026-10-18",
-      "title": "按实测 DSP 子版本修正 GR III 桥接包",
+      "title": "调整 GR III 实验桥接版本",
       "changes": [
-        "用户 JPG 与 DNG 均记录 DSP 2.10.32.27，高于旧桥接 2.10.22.27，确认旧版本覆盖不足。",
-        "桥接更新为 2.10.33.27，保持 2.10 与尾号27，仅增加第三段；同步外层DSP/CPU、RTOS和CPU载荷版本与补数，保留两阶段更新流程。",
-        "恢复新版测试套件下载并使旧预检失效；回执明确CPU版本未知、新版完整刷写与恢复待实机验证，不再标记实机通过。"
+        "针对机内更高版本，将 GR III 两阶段实验桥接包调整为 2.10.33.27。"
       ],
       "commit": "7fce12e034943bdf12fd8951ecc52fc1841160db",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39130646879"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39130646879",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "针对机内更高版本，将 GR III 两阶段实验桥接包调整为 2.10.33.27。"
+          ]
+        }
+      ],
+      "notice": "当时恢复新版实验包下载，旧预检作废；完整更新与恢复尚待相机确认，不代表当前可用。"
     },
     {
       "version": "2026.10.18.4",
       "date": "2026-10-18",
-      "title": "修复 GR IV 服务器构建缺少链接器",
+      "title": "修复 GR IV 固件生成失败",
       "changes": [
-        "补齐 GR IV 固件构建所需的 LLD 链接器依赖，修正服务器安装说明。",
-        "发布检查加入 GR IV 实际编译、封包及独立回读，避免只检查 GR III／IIIx 而遗漏 GR IV 依赖。",
-        "本次验证范围为服务器构建与下载；GR IV 刷入和成像仍待实机验收。"
+        "修复 GR IV 固件生成失败的问题。"
       ],
       "commit": "41bbab10489710382794726033e90f95d12253db",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/41bbab10489710382794726033e90f95d12253db"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/41bbab10489710382794726033e90f95d12253db",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR IV 固件生成失败的问题。"
+          ]
+        }
+      ],
+      "notice": "GR IV 刷入与成像仍待相机确认。"
     },
     {
       "version": "2026.10.18.3",
       "date": "2026-10-18",
-      "title": "暂停实机失败的 GR III 桥接下载",
+      "title": "暂停失败的 GR III 桥接下载",
       "changes": [
-        "最新实机反馈：GR III 2.10.22.27 一阶桥接包确认后立即失败，仍可正常开机；撤销此前实机通过结论。",
-        "主工作台与独立导出页显示调查状态，服务端拒绝旧预检和新预检的桥接下载；保留普通固件与 GR IIIx、GR IV 功能。",
-        "记录离线验证边界：版本门禁模拟不代表机身解压硬件或完整更新流程验收；失败原因仍在调查，未将版本盲目提高作为修复。"
+        "暂停 GR III 2.10.22.27 桥接包下载，页面显示调查状态。"
       ],
       "commit": "a62a5fe88b593f8d11bec044c2778d6995d2fcfd",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/a62a5fe88b593f8d11bec044c2778d6995d2fcfd"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/a62a5fe88b593f8d11bec044c2778d6995d2fcfd",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "暂停 GR III 2.10.22.27 桥接包下载，页面显示调查状态。"
+          ]
+        }
+      ],
+      "notice": "机身确认更新后立即失败，但仍可正常开机；撤回此前通过结论，原因尚在调查。普通固件及 GR IIIx／IV 不受影响。"
     },
     {
       "version": "2026.10.18.2",
       "date": "2026-10-18",
-      "title": "GR IV 原生胶卷库与完整工作台",
+      "title": "GR IV 加入胶卷库与完整工作台",
       "changes": [
-        "GR IV 1.11 接入五槽、36款胶卷、SD换卷、机内参数与时间水印；保持GR3的状态协议和颜色算法，使用GR4独立菜单、按键、存储与拍摄ABI。",
-        "支持六位置配方、20原厂名称与图标，以及65:24裁切、中央水平仪滑块、原生负片颗粒和RAW降噪选择。",
-        "复用导入、草稿、预检、构建、备份和SD导出流程，输出fwdc248b.bin；原厂参考工具保留在/gr4/reference/。",
-        "新增原始ARM交互、绘图对照、存储故障、完整分辨率和最终封包回读验证；网页构建下载通过，GR IV刷入、LCD和成像仍待实机验收。"
+        "GR IV 1.11 加入 36 款胶卷、五槽配置、SD 换卷、机内参数与时间水印。",
+        "支持六位置配方、原厂名称与图标、65:24 裁切、中央水平仪、负片颗粒及 RAW 降噪。",
+        "工作台支持导入、草稿、备份及 SD 胶卷导出。"
       ],
       "commit": "a88fcffaf9c384cf48a768d759514ab2042c45ee",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39111543232"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39111543232",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR IV 1.11 加入 36 款胶卷、五槽配置、SD 换卷、机内参数与时间水印。",
+            "支持六位置配方、原厂名称与图标、65:24 裁切、中央水平仪、负片颗粒及 RAW 降噪。",
+            "工作台支持导入、草稿、备份及 SD 胶卷导出。"
+          ]
+        }
+      ],
+      "notice": "GR IV 刷入、机内显示与成像仍待相机确认。"
     },
     {
       "version": "2026.10.18.1",
       "date": "2026-10-18",
-      "title": "GR III 两阶段桥接纳入正式工作流",
+      "title": "引入 GR III 两阶段桥接方案",
       "changes": [
-        "GR III 官方包因机内隐藏版本较高而无法更新时，可下载 2.10.22.27 两阶段桥接套件，先刷桥接包，再刷官方 2.10，之后按普通流程生成 M10V 功能包。",
-        "本次桥接方案已获用户实机测试通过反馈；回执按桥接 BIN 的精确 SHA-256 绑定该反馈，不扩大到其他机型、服务版本或异常恢复。",
-        "主工作台与独立导出页收起 GR III 旧单包版本适配，保留 GR IIIx 独立适配；套件包含两阶段固件、使用说明、实机反馈记录及文件校验清单。"
+        "曾为隐藏版本较高、无法更新官方固件的 GR III 提供两阶段桥接方案。"
       ],
       "commit": "6544a9cc9de64cc89017a0eb3f1cceb0775f8618",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39111063374"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39111063374",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "曾为隐藏版本较高、无法更新官方固件的 GR III 提供两阶段桥接方案。"
+          ]
+        }
+      ],
+      "notice": "当时收到通过反馈，后因机身更新失败，于 2026.10.18.3 暂停下载并撤回通过结论；不代表当前可用。"
     },
     {
       "version": "2026.10.17.4",
       "date": "2026-10-17",
-      "title": "更新纯文字 Logo，开放 GR IIIx 完整功能导出",
+      "title": "更新标志并开放 GR IIIx 功能",
       "changes": [
-        "全站共享 Logo 和 favicon 改为确认的黑底暗金 m10v 纯文字图，统一首页、工作台、说明和日志页。",
-        "GR IIIx 1.60 开放原生胶卷库、800T／5207／蓝凤凰／RED、FN 参数、SD 换卷、时间戳、画幅、水平仪、负片颗粒与 RAW 降噪。",
-        "GR IIIx 同步开放配方、原厂预设、调试日志及版本适配；正确生成 fwdc243b.bin，并绑定 IIIx 来源及配置摘要。",
-        "通过共用代码差异移植保留 IIIx 独立型号、版本、焦距相关19个原厂 word和完整 CPU 载荷，逐分区独立回读；不直接刷入 GR III 型号内容。",
-        "新增 IIIx 实际组合构建、网页 HTTP、型号保护与最终固件 ARM 路径验证；IIIx 实机启动和成像仍待验收。"
+        "GR IIIx 1.60 开放胶卷库、FN 参数、SD 换卷、时间水印及画幅、水平仪、负片颗粒、RAW 降噪。",
+        "GR IIIx 支持配方、原厂预设及可选版本适配。",
+        "全站统一为黑底暗金 m10v 文字标志。"
       ],
       "commit": "b47f32db06d31cf87a39da8592f3168808b0c264",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39046964394"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39046964394",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR IIIx 1.60 开放胶卷库、FN 参数、SD 换卷、时间水印及画幅、水平仪、负片颗粒、RAW 降噪。",
+            "GR IIIx 支持配方、原厂预设及可选版本适配。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "全站统一为黑底暗金 m10v 文字标志。"
+          ]
+        }
+      ],
+      "notice": "GR IIIx 启动与成像仍待相机确认。"
     },
     {
       "version": "2026.10.17.3",
       "date": "2026-10-17",
-      "title": "修复胶卷显示与显示域调色，新增可选版本准入适配",
+      "title": "修正胶卷色彩与参数显示",
       "changes": [
-        "五个胶卷槽的静态 JPEG 色彩参数采用 Standard 基底，实机已确认胶卷处理生效；取景同时改用 Standard 原色，不提供实时胶卷色彩预览。",
-        "FN 参数行改用不同原厂图标与数值，保留中文完整标题及原厂滑杆；哈曼 RED 显示实际 EI125／64／250。",
-        "红晕滚动复用重复能量计算；5207／哈曼 LUT 展开精确四顶点权重，全 RGB 输入与原算法逐字节一致，离线指令数和耗时下降。",
-        "移除调试额外整图扫描，拍摄日志改为渲染前后两个批次；日常版不写诊断日志。速度、取景和参数页新修复仍待实机验收。",
-        "保留五槽独立参数写后回读与整卷 Reset，胶卷包同步绑定更新后的运行体契约。",
-        "替换 5207 失配的场景域反演，消除过早高光截断；蓝凤凰改用中性灰稳定的显示域解释，并在调色后合成橙红光晕。两者均未完成真实胶片与相机标定。",
-        "新增默认关闭的「突破版本锁」开关；开启默认仅适配DSP包头并保持CPU整区不变，无需输入未知版本。CPU更高时仍可能被原厂拒绝；高级模式需实际完整版本。已独立校验差异并执行原厂ARM比较，周年机实际刷写及恢复仍待验证。"
+        "新增默认关闭的「突破版本锁」选项。",
+        "修正胶卷 JPEG 色彩与 FN 参数显示，RED 显示 EI125／64／250。",
+        "改善 5207 高光截断与蓝凤凰灰阶、橙红光晕表现。",
+        "优化胶卷处理效率，取景使用 Standard 原色。"
       ],
       "commit": "ddd1f8b6556ad271eb6760f33a3a058bce79c314",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39041757507"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/39041757507",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "新增默认关闭的「突破版本锁」选项。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修正胶卷 JPEG 色彩与 FN 参数显示，RED 显示 EI125／64／250。",
+            "改善 5207 高光截断与蓝凤凰灰阶、橙红光晕表现。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "优化胶卷处理效率，取景使用 Standard 原色。"
+          ]
+        }
+      ],
+      "notice": "当时不提供实时胶卷取景；色彩未完成实物标定，新修复及版本适配、恢复仍待相机确认，更高机内版本仍可能拒绝更新。"
     },
     {
       "version": "2026.10.17.2",
       "date": "2026-10-17",
-      "title": "修复宝塔服务中 GR III 固件导出的 Node 路径",
+      "title": "修复 GR III 胶卷固件导出失败",
       "changes": [
-        "修复宝塔 systemd 服务 PATH 不含 node 时，GR III SD 胶卷库构建失败的问题。",
-        "网页构建向 Python 子进程传递当前 Node 可执行文件的绝对路径，独立命令行构建仍支持配置路径或 PATH 查找。",
-        "新增精简 PATH 下的真实网页调试组合导出回归，校验 SD 胶卷库、画幅、水平仪、负片颗粒及固件摘要。"
+        "修复 GR III 网页导出 SD 胶卷库固件时失败的问题。"
       ],
       "commit": "e96704fd6eac27a29ee21dcaca6a6f11aee657de",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38933038366"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38933038366",
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 网页导出 SD 胶卷库固件时失败的问题。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.17.1",
       "date": "2026-10-17",
-      "title": "独立胶卷库与时间水印，融合全库新胶卷与质感设置",
+      "title": "新增独立胶卷库与时间水印菜单",
       "changes": [
-        "GR III 设置菜单新增独立中文胶卷库和时间水印入口，支持五槽替换及明确的黄色焦点与编辑状态。",
-        "修复 SD 文件大小查询误用文件句柄导致的黑屏；胶卷库和水印交互已获用户真机确认。",
-        "SD 胶卷包同步支持当前平台36款胶卷，包含5207、蓝凤凰与哈曼 RED；新固件需重新下载匹配的胶卷包。",
-        "融合主分支新版槽位保存与迁移、颗粒尺寸、柔光、漏光及专属光晕和曝光设置，保留800T与主分支成像实现。",
-        "既有质感设置入口保留；新增胶卷与整合后的完整固件仍以离线回归和部署验证为准，实时取景胶卷效果尚未接入。"
+        "GR III 设置菜单新增中文胶卷库与时间水印入口，支持五槽换卷。",
+        "SD 胶卷包扩展至 36 款，加入 5207、蓝凤凰与哈曼 RED。",
+        "修复 SD 胶卷库黑屏问题，胶卷库与水印操作已获机身确认。"
       ],
       "commit": "71dd3f741a14d6d5720a6f98181775e4317ba285",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38929755812"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38929755812",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 设置菜单新增中文胶卷库与时间水印入口，支持五槽换卷。",
+            "SD 胶卷包扩展至 36 款，加入 5207、蓝凤凰与哈曼 RED。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复 SD 胶卷库黑屏问题，胶卷库与水印操作已获机身确认。"
+          ]
+        }
+      ],
+      "notice": "需重新下载匹配胶卷包；整合后的新胶卷效果仍待相机确认，当时尚无实时胶卷取景。"
     },
     {
       "version": "2026.10.16.4",
       "date": "2026-10-16",
-      "title": "蓝凤凰与哈曼 RED 胶卷",
+      "title": "新增蓝凤凰与哈曼 RED 胶卷",
       "changes": [
-        "M10V精选新增蓝凤凰（HARMAN Phoenix II 200）与哈曼 RED125，使用独立参考色彩模型，保留原有胶卷 ID。",
-        "蓝凤凰提供独立高光扩散调节；哈曼 RED 提供 EI125、EI64、EI250 模拟曝光，调整发生在色彩响应之前。",
-        "两卷均支持网页及机内颗粒、柔光、漏光；公共质感重置保留专属光晕或曝光设置。",
-        "胶片模拟下拉按分类集中展示，800T、5207、蓝凤凰与哈曼 RED 归于同一个 M10V精选分组。",
-        "升级五槽配置并迁移已发布旧记录，补齐原厂菜单名称、图标、保存与渲染回归。",
-        "依据 HARMAN 官方资料自建参考 LUT，公开来源、假设及校验数据；尚未进行真实胶片与 GR III 实机标定。"
+        "精选胶卷加入蓝凤凰 Phoenix II 200 与哈曼 RED125。",
+        "蓝凤凰支持高光扩散调节，RED 支持 EI125／64／250 模拟曝光。",
+        "两卷支持颗粒、柔光与漏光，并归入 M10V 精选分组。"
       ],
       "commit": "b0ea721e01d091044a8e0db52851fd925b57442c",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38893121776"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38893121776",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "精选胶卷加入蓝凤凰 Phoenix II 200 与哈曼 RED125。",
+            "蓝凤凰支持高光扩散调节，RED 支持 EI125／64／250 模拟曝光。",
+            "两卷支持颗粒、柔光与漏光，并归入 M10V 精选分组。"
+          ]
+        }
+      ],
+      "notice": "效果为资料建模的风格近似，尚未完成真实胶片与 GR III 色彩标定。"
     },
     {
       "version": "2026.10.16.3",
       "date": "2026-10-16",
-      "title": "5207 胶卷与全库质感统一",
+      "title": "新增 5207 并统一质感设置",
       "changes": [
-        "GR III 胶卷库新增 M10V精选 5207，保留现有胶卷 ID；不叠加 800T 光晕。",
-        "所有胶卷支持颗粒强度及尺寸、柔光、漏光；网页与机内按槽位保存，800T 独立提供光晕配置。",
-        "精简 GR III / GR IIIx 工作台入口，胶卷库页签直接显示五槽配置，800T 从胶卷目录选取。",
-        "合入最新 800T 高光扩散及原厂 FN 详细菜单修复；隔离新旧设置文件并保留迁移与回退数据。",
-        "新增 LUT 内容校验、渲染及菜单回归；5207 色彩与机内表现仍待 GR III 实机和真实胶片标定。"
+        "GR III 新增精选胶卷 5207，不叠加 800T 光晕。",
+        "全胶卷支持颗粒强度与尺寸、柔光、漏光，并按槽保存。",
+        "精简 GR III／IIIx 工作台，胶卷库直接展示五槽配置。"
       ],
       "commit": "c0022840b0a70dfaee8bc43f75172763478cc362",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38881736309"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38881736309",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 新增精选胶卷 5207，不叠加 800T 光晕。",
+            "全胶卷支持颗粒强度与尺寸、柔光、漏光，并按槽保存。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "精简 GR III／IIIx 工作台，胶卷库直接展示五槽配置。"
+          ]
+        }
+      ],
+      "notice": "5207 色彩与机内表现仍待相机及真实胶片标定。"
     },
     {
       "version": "2026.10.16.2",
       "date": "2026-10-16",
-      "title": "更新日志与发布规范",
+      "title": "新增更新日志页面",
       "changes": [
-        "新增更新日志页面，在首页、工作台与说明页提供入口。",
-        "补齐历史更新，区分部署验证记录和早期源码记录。",
-        "发布前检查新增更新记录；宝塔发布技能同步记录维护步骤。"
+        "新增更新日志页面，首页、工作台与说明页均可进入。"
       ],
       "commit": "480a15e178204b52ccd81f80bb7cffa249134a39",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38769120329"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38769120329",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "新增更新日志页面，首页、工作台与说明页均可进入。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.16.1",
       "date": "2026-10-16",
-      "title": "800T 重建与机内五项调节",
+      "title": "重做 800T 并加入机内五项调节",
       "changes": [
-        "重做 800T 高光能量扩散，恢复红色高光溢出与偏青色调。",
-        "GR III 在【图像控制】按 FN，独立调节光晕强度、扩散范围、高光阈值、颗粒和柔光，设置可持久保存。",
-        "修复 FN 详细页黑屏，五项名称改为中文；颗粒、柔光刻度与关闭、弱、中、强四个位置一致。",
-        "修复 Linux clang 构建兼容问题；明确拦截未经验证的 GR IIIx 原生详细菜单导出。"
+        "GR III 可在图像控制按 FN 调节光晕强度、范围、阈值、颗粒与柔光并保存。",
+        "修复 FN 详情页黑屏，统一中文名称与强度刻度。",
+        "重做 800T 红色高光溢出与偏青色调。"
       ],
       "commit": "c3d54fe1f7cde4423eca0955cde3c3693a906dd6",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38765563035"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38765563035",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR III 可在图像控制按 FN 调节光晕强度、范围、阈值、颗粒与柔光并保存。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复 FN 详情页黑屏，统一中文名称与强度刻度。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "重做 800T 红色高光溢出与偏青色调。"
+          ]
+        }
+      ],
+      "notice": "当时暂不开放 GR IIIx 机内详细菜单导出。"
     },
     {
       "version": "2026.10.15.3",
       "date": "2026-10-15",
-      "title": "选卷体验、品牌与 RAW 降噪",
+      "title": "优化选卷并加入 RAW 降噪设置",
       "changes": [
-        "优化胶卷选择、分类和界面品牌展示。",
-        "将 RAW 降噪策略接入统一固件组合构建，支持原厂、关闭和 ISO 阈值设置。",
-        "完善参数校验和固件导出回读。"
+        "RAW 降噪支持原厂、关闭及 ISO 阈值设置。",
+        "优化胶卷选择、分类与品牌展示。"
       ],
       "commit": "21b4247c2f016d68a7e27e57ffb8434ca90153b3",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38725895243"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38725895243",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "RAW 降噪支持原厂、关闭及 ISO 阈值设置。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "优化胶卷选择、分类与品牌展示。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.15.2",
       "date": "2026-10-15",
-      "title": "GitHub 自动部署宝塔",
+      "title": "优化网站维护稳定性",
       "changes": [
-        "通过受限 SSH 传输校验过的 Git bundle，服务器无需连接 GitHub 拉取源码。",
-        "发布执行固件构建、服务重启与健康检查；失败时尝试回退。",
-        "修复受限 SSH 的文件权限问题，确保 www 服务可读取新部署源码。"
+        "优化网站维护稳定性与异常恢复。"
       ],
       "commit": "75779a662d17a150ba8eba19a8537a7de9177573",
       "evidence": "deployment",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38690617492"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38690617492",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "优化网站维护稳定性与异常恢复。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.15.1",
       "date": "2026-10-15",
-      "title": "多机型工作台与机内调试",
+      "title": "加入多机型工作台",
       "changes": [
-        "接入 GR IV 原厂编辑器和 GR II 只读固件检查，并统一各机型页面风格。",
-        "增加 SD 卡菜单与拍摄阶段调试日志。",
-        "保护原厂 ADJ 列表，统一胶卷效果、颗粒、柔光、时间戳及附加功能的固件导出。",
-        "此版本由后续成功发布日志中的服务器起始提交核实，准确上线时刻未保留。"
+        "接入 GR IV 原厂编辑器与 GR II 只读固件检查。",
+        "统一各机型页面风格及胶卷、质感、水印与附加功能导出。"
       ],
       "commit": "80d884aa399a971a7004613284ef6164659e9e04",
       "evidence": "documented",
-      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38690617492"
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/38690617492",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "接入 GR IV 原厂编辑器与 GR II 只读固件检查。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "统一各机型页面风格及胶卷、质感、水印与附加功能导出。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.14.2",
       "date": "2026-10-14",
-      "title": "宝塔部署与旧版 LLVM 兼容",
+      "title": "优化网站与固件生成稳定性",
       "changes": [
-        "补齐公网来源校验、Nginx 反向代理和 systemd 部署说明。",
-        "在 Alibaba Cloud Linux 3 环境核验 www 服务用户可构建固件。",
-        "修复柔光采样中的 ARM 除法辅助函数依赖，兼容服务器 LLVM。"
+        "优化网站运行与固件生成稳定性。"
       ],
       "commit": "83837f8c9e9dee67e0e63929e02f70dcea10fc3a",
       "evidence": "documented",
-      "evidence_url": "https://github.com/zhaoo/m10v/blob/83837f8c9e9dee67e0e63929e02f70dcea10fc3a/deploy/README.md"
+      "evidence_url": "https://github.com/zhaoo/m10v/blob/83837f8c9e9dee67e0e63929e02f70dcea10fc3a/deploy/README.md",
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "优化网站运行与固件生成稳定性。"
+          ]
+        }
+      ]
     },
     {
       "version": "2026.10.14.1",
       "date": "2026-10-14",
       "title": "M10V 工作台初始版本",
       "changes": [
-        "建立统一的固件导入、影像方案设置与保存流程。",
-        "提供胶卷目录、五槽配置、质感、800T 光晕和时间戳。",
-        "接入固件身份检查、导出回读与风险提示。此条依据首个源码提交回补，不作为独立上线证明。"
+        "提供固件导入、影像方案设置与保存。",
+        "提供胶卷目录、五槽配置、质感、800T 光晕及时间水印。",
+        "加入固件检查与风险提示。"
       ],
       "commit": "72303d8cb094e0274267401ba9f0a0300405fbb5",
       "evidence": "source",
-      "evidence_url": "https://github.com/zhaoo/m10v/commit/72303d8cb094e0274267401ba9f0a0300405fbb5"
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/72303d8cb094e0274267401ba9f0a0300405fbb5",
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "提供固件导入、影像方案设置与保存。",
+            "提供胶卷目录、五槽配置、质感、800T 光晕及时间水印。",
+            "加入固件检查与风险提示。"
+          ]
+        }
+      ],
+      "notice": "早期功能记录，尚无独立上线记录。"
     }
   ]
 }
