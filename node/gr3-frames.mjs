@@ -1,7 +1,6 @@
 // In-memory GR III frame replay used by the independently verified export path.
 import { inspectOfficial } from './firmware.mjs';
 
-const SIZE = 59718388;
 function check(ok, message) { if (!ok) throw new Error(message); }
 export function sum32(bytes) {
   check(bytes.length % 4 === 0, 'unaligned checksum');
@@ -10,11 +9,12 @@ export function sum32(bytes) {
   return sum;
 }
 
-export function decodeFrameMap(container, expectedDecodedSize = SIZE) {
+export function decodeFrameMap(container, expectedDecodedSize) {
   check(Buffer.isBuffer(container) && container.length >= 152, 'invalid container');
   const footer = container.length - 24;
   const encodedSize = container.readUInt32LE(footer + 12);
   const decodedSize = container.readUInt32LE(footer + 16);
+  expectedDecodedSize ??= decodedSize;
   check(decodedSize === expectedDecodedSize && decodedSize > 0 && decodedSize <= 128 * 1024 * 1024 &&
     128 + encodedSize <= footer, 'invalid frame sizes');
   const payload = container.subarray(128, 128 + encodedSize);
@@ -90,9 +90,9 @@ export function decodeFrameMap(container, expectedDecodedSize = SIZE) {
 
 export function repackWithTarget(official, targetDecoded) {
   inspectOfficial(official);
-  check(Buffer.isBuffer(targetDecoded) && targetDecoded.length === SIZE &&
-    sum32(targetDecoded) === 0, 'target length or decoded checksum differs');
   const { decoded, frames } = decodeFrameMap(official);
+  check(Buffer.isBuffer(targetDecoded) && targetDecoded.length === decoded.length &&
+    sum32(targetDecoded) === 0, 'target length or decoded checksum differs');
   if (targetDecoded.equals(decoded)) return { candidate: Buffer.from(official),
     reused_frames: frames.length, replaced_frames: 0 };
   const chunks = [];
@@ -100,7 +100,10 @@ export function repackWithTarget(official, targetDecoded) {
   let replaced = 0;
   for (const frame of frames) {
     const desired = targetDecoded.subarray(frame.decoded_start, frame.decoded_end);
-    if (desired.equals(decoded.subarray(frame.decoded_start, frame.decoded_end))) {
+    // Compressed frames can refer to the previous frame's 8191-byte history.
+    const historyStart = Math.max(0, frame.decoded_start - 8191);
+    if (targetDecoded.subarray(historyStart, frame.decoded_end)
+      .equals(decoded.subarray(historyStart, frame.decoded_end))) {
       chunks.push(official.subarray(128 + frame.encoded_start, 128 + frame.encoded_end));
       reused++;
     } else {
@@ -118,7 +121,7 @@ export function repackWithTarget(official, targetDecoded) {
   const pad = Buffer.alloc(-(128 + payload.length) & 3);
   const footer = Buffer.from(official.subarray(-24));
   footer.writeUInt32LE(payload.length, 12);
-  footer.writeUInt32LE(SIZE, 16);
+  footer.writeUInt32LE(targetDecoded.length, 16);
   footer.writeUInt32LE(0, 20);
   const candidate = Buffer.concat([official.subarray(0, 128), payload, pad, footer]);
   candidate.writeUInt32LE(-sum32(candidate) >>> 0, candidate.length - 4);

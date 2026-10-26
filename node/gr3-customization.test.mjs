@@ -10,6 +10,15 @@ test('native-only customization produces a source-bound zero-growth audited firm
  assert.equal(result.receipt.configuration_sha256,prepared.configuration_sha256);
  await assert.rejects(()=>custom.buildCustomization(source,{...selection,negativeGrainMenu:false},prepared.configuration_sha256),/变化/);
 });
+test('preset edits preserve compressed references into the previous frame',async()=>{
+ const selection={variant:'street',features:['presets'],stockPresets:[{slot:2,name:'Clear'}]};
+ const plan=await custom.prepareCustomization(source,selection);
+ const result=await custom.buildCustomization(source,selection,plan.configuration_sha256);
+ assert.deepEqual(result.receipt.audit.changedSections,['RTOS']);
+ const {decodeFrameMap,sum32}=await import('./gr3-frames.mjs');
+ assert.equal(sum32(result.candidate),0);
+ assert.equal(sum32(decodeFrameMap(result.candidate).decoded),0);
+});
 test('unknown fields, ignored options and recipe/film stock collisions are refused',()=>{
  assert.throws(()=>custom.normalizeCustomization({...selection,hidden:1}),/字段/);
  assert.throws(()=>custom.normalizeCustomization({...selection,features:['negativeGrain']}),/启用/);

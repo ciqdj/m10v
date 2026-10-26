@@ -16,5 +16,4 @@ test('shared import derives the model from official identity and keeps local cho
  assert.ok(app.includes("chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3'"));
  assert.ok(app.includes("model:$('local-source-model').value"));
  assert.ok(!app.includes('report.model!==modelLabel'));
- assert.ok(app.includes("$('build-model').textContent=`${report.model} · ${report.public_version}`"));
 });

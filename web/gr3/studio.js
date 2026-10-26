@@ -191,7 +191,8 @@ function renderLedger() {
   ledger.replaceChildren();
   const native=state.profile==='native';
   const rows = [
-    ['机型',state.source?`${state.source.model} · ${state.source.public_version}`:modelLabel],
+    ['机型',state.source?`${state.source.model} · 上传 ${state.source.public_version}`:modelLabel],
+    ['输出基线',state.source?`${state.source.model} · ${state.source.build_source?.public_version||state.source.public_version}`:'等待导入'],
     ['胶卷',native&&state.features.has('film')?state.nativeConfig.slots.map(s=>state.nativeCatalog.find(f=>f.id===s.film)?.name||`#${s.film}`).join(' / '):state.features.has('film')?`${state.filmIds.length} / 5 款`:'未启用'],
     ['固件来源',state.projectId?'官方文件已核验':'等待导入'],
     ['开关机图片',chosenModel==='gr3'?Object.keys(powerImages?.getConfiguration()||{}).map(k=>k==='startup'?'开机':'关机').join(' / ')||'原厂默认':'该机型未启用'],
@@ -522,7 +523,7 @@ async function importSource(file,local=false) {
     chosenModel=gr4Workbench?'gr4':report.model==='GR IIIx'?'gr3x':'gr3';if(chosenModel!=='gr3')state.features.delete('halation');modelLabel=report.model;nativeEditor?.setModel(chosenModel);
     $('local-source-model').value=chosenModel;
     $('studio-model-status').textContent=`${report.model} · ${report.public_version}`;
-    $('build-model').textContent=`${report.model} · ${report.public_version}`;
+    $('build-model').textContent=`${report.model} · 输出基线 ${report.build_source?.public_version||report.public_version}`;
     document.title=`m10v · GR固件工作台 · ${report.model}`;
     document.querySelector('.hero .kicker').textContent=`${report.model} · ${report.public_version}`;
     state.projectId = report.sha256; state.source = report; invalidate();
@@ -537,6 +538,8 @@ async function importSource(file,local=false) {
       dl.append(textNode('dt', key), textNode('dd', value));
     }
     node.append(dl);
+    node.append(textNode('p',`输出基线：${report.model} · ${report.build_source?.public_version||report.public_version}（${report.build_source?.internal_version||report.internal_version}）。`));
+    if(report.build_source?.normalized)node.append(textNode('p',`上传的 ${report.public_version} 官方原包用于机型与来源核验，并保留在备份中。M10V 将基于已适配的 ${report.build_source.public_version} 官方包生成，不包含上传版本的新功能；实际相机能否接受更新仍取决于机内版本。`));
     $('download-backup').disabled = false; $('source-next').disabled = false;
     showStep(globalThis.location?.hash==='#bridge'&&chosenModel==='gr3'?'build':'features');showSettingsTab(state.profile==='native'?'library':'imaging');notice('官方固件核验通过，继续设置方案。');
   } catch (error) { notice(error.message, true); }
@@ -561,7 +564,7 @@ async function prepare() {
     if(revision!==state.revision||activeBuildController!==controller)return;
     state.preparation = report.ready ? report : null;state.preparationRequest=report.ready?request:null;
     $('preflight-result').className = 'preflight-result ' + (report.ready ? 'ok' : 'error');
-    $('preflight-result').textContent = report.ready ? '方案核验通过，保存时继续构建与独立回读。'+(report.reset_required?'配方默认值在相机对应影像控制的详细设置内执行重置后生效；请仅重置该影像控制的参数。':'') :
+    $('preflight-result').textContent = report.ready ? '方案核验通过，保存时继续构建与独立回读。'+(report.build_source?`输出基线：${report.build_source.model} · ${report.build_source.public_version}。`:'')+(report.reset_required?'配方默认值在相机对应影像控制的详细设置内执行重置后生效；请仅重置该影像控制的参数。':'') :
       `预检未通过：${(report.blockers||[]).join('；')}`;
     $('build-firmware').disabled = !(report.ready && (riskAcceptedRevision===state.revision));
     renderLedger();return report.ready?revision:undefined;
@@ -593,7 +596,7 @@ async function build() {
       assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock,chosenModel);
     }
     await download(response, state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
-    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
+    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
     $('build-result').className = 'build-result error';
@@ -692,7 +695,7 @@ const firmwareSaveGate=createFirmwareSaveGate({
  }
 });
 $('build-firmware').addEventListener('click',()=>{
- $('disclaimer-target').textContent=state.source?`本次保存：${state.source.model} · ${state.source.public_version}`:'';
+ $('disclaimer-target').textContent=state.source?`本次保存：${state.source.model} · 输出基线 ${state.source.build_source?.public_version||state.source.public_version}（上传 ${state.source.public_version}）`:'';
  firmwareSaveGate.open();
 });
 $('cancel-build').addEventListener('click',()=>{activeBuildController?.abort();$('build-result').textContent='已取消构建，后台处理与临时文件会随请求清理。';});

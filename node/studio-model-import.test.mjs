@@ -9,7 +9,7 @@ function harness(model='gr3'){
  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'gr3',hidden:true,disabled:true,textContent:'',append(){},replaceChildren(){}});return nodes.get(id);};
  const state={profile:'native',features:new Set(['film']),nativeConfig:{slots:[{film:33}]},projectId:'',source:null};
  let imported;const calls=[],messages=[];
- const context=vm.createContext({gr4Workbench:model==='gr4',nativeApi:'/api/'+model+'/native-library',nativeSelection,nativeEditor:{setConfiguration(c){state.nativeConfig=c;}},state,$:node,document:{title:'',querySelector:()=>node('hero')},notice:(...v)=>messages.push(v),invalidate(){},renderFeatures(){},showStep(){},showSettingsTab(){},textNode:()=>node('text'),
+ const context=vm.createContext({gr4Workbench:model==='gr4',nativeApi:'/api/'+model+'/native-library',nativeSelection,nativeEditor:{setModel(){},setConfiguration(c){state.nativeConfig=c;}},state,$:node,document:{title:'',querySelector:()=>node('hero')},notice:(...v)=>messages.push(v),invalidate(){},renderFeatures(){},showStep(){},showSettingsTab(){},textNode:()=>node('text'),
  api:async(path,options={})=>{calls.push({path,options});return {json:async()=>path.endsWith('import-official')?(model==='gr4'?{...imported,project_id:imported.sha256}:{project_id:imported.sha256}):path.endsWith('stock-presets')?[]:imported};}});
  vm.runInContext("let chosenModel='gr3';let modelLabel='GR III';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+method,context);
  const report=(model,sha)=>({model,sha256:sha.repeat(64),public_version:model==='GR IIIx'?'1.60':'2.10',internal_version:'test',size:100,sections:[{}]});
@@ -17,9 +17,17 @@ function harness(model='gr3'){
 }
 test('the same import handler accepts both models and updates target labels from official identity',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));
- assert.equal(h.state.source.model,'GR IIIx');assert.equal(vm.runInContext('chosenModel',h.context),'gr3x');assert.equal(h.node('build-model').textContent,'GR IIIx · 1.60');
+ assert.equal(h.state.source.model,'GR IIIx');assert.equal(vm.runInContext('chosenModel',h.context),'gr3x');assert.equal(h.node('build-model').textContent,'GR IIIx · 输出基线 1.60');
  const config=h.state.nativeConfig;await h.run(h.report('GR III','b'));
- assert.equal(h.state.source.model,'GR III');assert.equal(vm.runInContext('chosenModel',h.context),'gr3');assert.equal(h.node('build-model').textContent,'GR III · 2.10');assert.equal(h.state.nativeConfig,config);
+ assert.equal(h.state.source.model,'GR III');assert.equal(vm.runInContext('chosenModel',h.context),'gr3');assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.10');assert.equal(h.state.nativeConfig,config);
+});
+test('2.20 upload shows its imported version separately from the actual 2.10 output baseline',async()=>{
+ const h=harness(),report={...h.report('GR III','a'),public_version:'2.20',internal_version:'2.20.20.28',
+  build_source:{public_version:'2.10',internal_version:'2.10.21.27',normalized:true}};
+ await h.run(report);
+ assert.equal(h.state.source,report);assert.equal(h.state.projectId,'a'.repeat(64));
+ assert.equal(h.node('studio-model-status').textContent,'GR III · 2.20');
+ assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.10');
 });
 test('local sample selection does not override the loaded target until import completes',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));h.node('local-source-model').value='gr3';

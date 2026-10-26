@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.26.5",
+      "date": "2026-10-26",
+      "title": "修复官方 2.20 固件导入与构建基线识别",
+      "changes": [
+        "修复 GR III 官方 2.20 上传后出现 invalid frame sizes：共用解码与重封包按容器声明的展开长度处理，保留边界与校验限制。",
+        "按用户确认方案，已登记的 GR III 2.10／2.20、IIIx 1.60 官方来源使用同机型已适配的构建基线；GR III 输出基线为 2.10，IIIx 为 1.60。上传原包与备份保持不变，导入、预检、保存与构建记录明确区分上传版本和输出基线；未知来源仍拒绝。",
+        "修复预设编辑重封包时跨帧回指历史的复用判断；保留胶卷、功能选择和独立回读。已用官方 2.20 完成网页上传、原生构建与最终封包回读，专项回归通过；本次候选已获用户验收确认后发布。GR IV 未修改。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.26.4",
       "date": "2026-10-26",
       "title": "新增独立测试包板块",
@@ -10,9 +23,9 @@
         "上架 GR III 2.10 ISP 胶卷测试 RC1；这是尚未经相机验收的独立预发布包，5207／5219 慢回放和连拍黑屏尚未确认修复。",
         "本次网站更新不合入测试固件源码，不改变 GR III／IIIx／IV 正式在线构建行为。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a4aefd2238afc1dc3f3b8405976a51a330f7cf9c",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40287910920"
     },
     {
       "version": "2026.10.26.3",

@@ -5,6 +5,20 @@ import { decodeFrameMap, repackWithTarget } from './gr3-frames.mjs';
 
 const original = readFileSync(new URL('../fwdc239b.bin', import.meta.url));
 
+test('frame lengths come from bounded container metadata, with optional exact-size validation',()=>{
+  const data=Buffer.alloc(160);data.writeUInt16BE(0x8004,128);data.write('test',130);
+  data.writeUInt32LE(8,148);data.writeUInt32LE(4,152);
+  assert.equal(decodeFrameMap(data).decoded.toString(),'test');
+  assert.throws(()=>decodeFrameMap(data,8),/frame sizes/);
+  for(const size of [0,128*1024*1024+1]){
+    const bad=Buffer.from(data);bad.writeUInt32LE(size,152);assert.throws(()=>decodeFrameMap(bad),/frame sizes/);
+  }
+  const truncated=Buffer.from(data);truncated.writeUInt32LE(100,148);
+  assert.throws(()=>decodeFrameMap(truncated),/frame sizes/);
+  const wrong=Buffer.from(data);wrong.writeUInt32LE(8,152);
+  assert.throws(()=>decodeFrameMap(wrong),/decoded length/);
+});
+
 test('no-op frame replay is byte-for-byte official', () => {
   const map = decodeFrameMap(original);
   const result = repackWithTarget(original, map.decoded);

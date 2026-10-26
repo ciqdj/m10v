@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createBackup, inspectBackup, restoreBytes } from './backup.mjs';
 import { inspectOfficial } from './firmware.mjs';
+import {resolveBuildSource} from './firmware-build-source.mjs';
 import { shutdownCatalog } from './features.mjs';
 import { Store } from './storage.mjs';
 import { listSdVolumes, resolveSdVolume } from './sd-volumes.mjs';
@@ -91,6 +92,13 @@ export function createServer(store = new Store(path.join(root, 'data')),
   }
   const token = randomBytes(32).toString('base64url');
   const server = http.createServer(async (request, response) => {
+    let buildSource;
+    const readBuildOriginal=async id=>{
+      const resolved=await resolveBuildSource(await store.readOriginal(id));
+      buildSource=resolved.report.build_source;
+      response.setHeader('X-M10V-Build-Source',Buffer.from(JSON.stringify(buildSource)).toString('base64'));
+      return resolved.source;
+    };
     const localOrigin = `http://127.0.0.1:${server.address().port}`;
     const origin=configuredOrigin||localOrigin;
     const allowedHosts=[new URL(localOrigin).host,new URL(origin).host];
@@ -155,7 +163,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         },
       });
       if (/^\/api\/projects\/[0-9a-f]{64}\/stock-presets$/.test(pathname)) {
-        try { return send(response, 200, stockPresetCapabilities(await store.readOriginal(pathname.split('/')[3]))); }
+        try { return send(response, 200, stockPresetCapabilities(await readBuildOriginal(pathname.split('/')[3]))); }
         catch (error) { return send(response, 400, {error:error.message}); }
       }
       if (pathname === '/api/sd/volumes') {
@@ -163,11 +171,11 @@ export function createServer(store = new Store(path.join(root, 'data')),
         catch (error) { return send(response, 503, { error: error.message || 'SD scan unavailable' }); }
       }
       if (/^\/api\/projects\/[0-9a-f]{64}\/shutdown-catalog$/.test(pathname)) {
-        try { return send(response, 200, shutdownCatalog(await store.readOriginal(pathname.split('/')[3]))); }
+        try { return send(response, 200, shutdownCatalog(await readBuildOriginal(pathname.split('/')[3]))); }
         catch { return send(response, 404, { error: 'official resource catalog unavailable' }); }
       }
       if (/^\/api\/projects\/[0-9a-f]{64}$/.test(pathname)) {
-        try { return send(response, 200, inspectOfficial(await store.readOriginal(pathname.split('/').at(-1)))); }
+        try { return send(response, 200, (await resolveBuildSource(await store.readOriginal(pathname.split('/').at(-1)))).report); }
         catch { return send(response, 404, { error: 'project not found' }); }
       }
       const asset = staticFiles[pathname];
@@ -228,24 +236,24 @@ export function createServer(store = new Store(path.join(root, 'data')),
         return send(response,200,{project_id:record.id,source_sha256:record.sha256});
       }
       if(bridgeMatch) {
-        const original=await store.readOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
+        const original=await readBuildOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
         if(bridgeMatch[2]==='prepare'){
           if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)throw Error('桥接预检不接受自定义版本或补丁');
-          return send(response,200,prepareGr3Bridge(original));
+          return send(response,200,{...prepareGr3Bridge(original),build_source:buildSource});
         }
         const {zip}=exportGr3Bridge(original,input);
         return send(response,200,zip,'application/zip','M10V-GRIII-bridge-2.10.33.27.zip');
       }
       if(nativeMatch) {
-        const original=await store.readOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
+        const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
         const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
-        if(nativeMatch[2]==='prepare')return send(response,200,powerPreparation);
+        if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});
         if(input.accepted_configuration_sha256!==powerPreparation.configuration_sha256)throw Error('方案已变化，请重新核验图片与固件');
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
         const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots});
         const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
-        const receipt={...nativeResult.receipt,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
+        const receipt={...nativeResult.receipt,build_source:buildSource,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
         return send(response,200,candidate,'application/octet-stream',receipt.filename);
       }
@@ -258,13 +266,13 @@ export function createServer(store = new Store(path.join(root, 'data')),
         return send(response,200,await (/\.xmp$/i.test(filename)?fitXmp:fitCube)(body,filename,{signal:cancellation.signal}));
       }
       if (haloMatch) {
-        const original = await store.readOriginal(haloMatch[1]);
+        const original = await readBuildOriginal(haloMatch[1]);
         const input = JSON.parse(body.toString('utf8'));
-        if (haloMatch[2] === 'prepare') return send(response, 200, prepare800T(original, input.selection));
+        if (haloMatch[2] === 'prepare') return send(response, 200, {...prepare800T(original, input.selection),build_source:buildSource});
         try {
           const {candidate,receipt} = await build800T(original, input.selection, input.accepted_configuration_sha256);
           response.setHeader('X-M10V-800T-Receipt', Buffer.from(JSON.stringify({
-            schema:'m10v-gr3-800t-build-download/v1',candidate_sha256:receipt.candidate_sha256,
+            schema:'m10v-gr3-800t-build-download/v1',candidate_sha256:receipt.candidate_sha256,build_source:buildSource,
             source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,
             configuration:receipt.configuration,color_provenance:receipt.color_provenance,
             kernel_sha256:receipt.kernel.codeSha256,adapter_sha256:receipt.adapter_sha256,
@@ -281,26 +289,26 @@ export function createServer(store = new Store(path.join(root, 'data')),
         const cancellation=new AbortController();
         response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
         const options={signal:cancellation.signal};
-        const original = await store.readOriginal(editMatch[1]);
+        const original = await readBuildOriginal(editMatch[1]);
         const input = JSON.parse(body.toString('utf8'));
         const prepared = await prepareCustomization(original, input.selection, options);
-        if (editMatch[2] === 'prepare') return send(response, 200, prepared);
+        if (editMatch[2] === 'prepare') return send(response, 200, {...prepared,build_source:buildSource});
         if (input.accepted_configuration_sha256 !== prepared.configuration_sha256 || !prepared.ready)
           return send(response, 409, { error: '方案已变化或预检未通过，请重新预检并确认风险。' });
         const { candidate, receipt } = await buildCustomization(original, input.selection, input.accepted_configuration_sha256, options);
-        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,audit:receipt.audit})).toString('base64'));
+        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,audit:receipt.audit,build_source:buildSource})).toString('base64'));
         return send(response, 200, candidate, 'application/octet-stream', receipt.filename);
       }
       if (versionMatch) {
-        const original = await store.readOriginal(versionMatch[1]);
+        const original = await readBuildOriginal(versionMatch[1]);
         return send(response, 200, analyzeVersionProbe(original));
       }
       if (candidateMatch) {
-        const original = await store.readOriginal(candidateMatch[1]);
+        const original = await readBuildOriginal(candidateMatch[1]);
         return send(response, 200, analyzeStreetCandidate(original, body));
       }
       if (candidateExportMatch) {
-        const original = await store.readOriginal(candidateExportMatch[1]);
+        const original = await readBuildOriginal(candidateExportMatch[1]);
         const built = buildStreetCandidate(original, body);
         return send(response, 200, built.candidate, 'application/octet-stream', 'fwdc239b.bin');
       }
@@ -314,8 +322,9 @@ export function createServer(store = new Store(path.join(root, 'data')),
         return send(response, 200, await sd.prepareOfficialSd(original, volume));
       }
       if (pathname === '/api/import') {
+        const {report}=await resolveBuildSource(body);
         const record = await store.importOfficial(body);
-        return send(response, 200, { project_id: record.id, ...inspectOfficial(body) });
+        return send(response, 200, { project_id: record.id, ...report });
       }
       if (backupMatch) {
         const original = await store.readOriginal(backupMatch[1]);

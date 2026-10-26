@@ -20,7 +20,8 @@ function pack(base,target){
  const size=base.readUInt32LE(base.length-8),{decoded,frames}=decodeFrameMap(base,size),chunks=[];
  for(const frame of frames){
   const bytes=target.subarray(frame.decoded_start,frame.decoded_end);
-  if(bytes.equals(decoded.subarray(frame.decoded_start,frame.decoded_end)))chunks.push(base.subarray(128+frame.encoded_start,128+frame.encoded_end));
+  const historyStart=Math.max(0,frame.decoded_start-8191);
+  if(target.subarray(historyStart,frame.decoded_end).equals(decoded.subarray(historyStart,frame.decoded_end)))chunks.push(base.subarray(128+frame.encoded_start,128+frame.encoded_end));
   else for(let at=0;at<bytes.length;at+=0x6000){const part=bytes.subarray(at,at+0x6000),prefix=Buffer.alloc(2);prefix.writeUInt16BE(0x8000|part.length);chunks.push(prefix,part);}
  }
  chunks.push(Buffer.alloc(2));const payload=Buffer.concat(chunks),footer=Buffer.from(base.subarray(-24));
