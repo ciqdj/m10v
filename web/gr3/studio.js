@@ -172,7 +172,7 @@ function versionUnlockSnapshot(){
  return normalizeVersionUnlock(option,chosenModel);
 }
 function renderVersionUnlock(){
- if($('bridge-option'))$('bridge-option').hidden=chosenModel!=='gr3';
+ if($('bridge-option'))$('bridge-option').hidden=chosenModel!=='gr3'||Boolean(state.source?.build_source?.update_compatibility);
  if($('bridge-open'))$('bridge-open').disabled=!state.projectId||saving||Boolean(activeBuildController)||bridgeBusy;
  const bridgeResult=$('bridge-result'),sourceHint='请先在“导入固件”中选择 GR III 官方包，再下载桥接测试套件。';
  if(bridgeResult){if(!state.projectId)bridgeResult.textContent=sourceHint;else if(bridgeResult.textContent===sourceHint)bridgeResult.textContent='官方来源已核验，可下载桥接测试套件。';}
@@ -540,6 +540,7 @@ async function importSource(file,local=false) {
     node.append(dl);
     node.append(textNode('p',`输出基线：${report.model} · ${report.build_source?.public_version||report.public_version}（${report.build_source?.internal_version||report.internal_version}）。`));
     if(report.build_source?.normalized)node.append(textNode('p',`上传的 ${report.public_version} 官方原包用于机型与来源核验，并保留在备份中。M10V 将基于已适配的 ${report.build_source.public_version} 官方包生成，不包含上传版本的新功能；实际相机能否接受更新仍取决于机内版本。`));
+    if(report.build_source?.update_compatibility)node.append(textNode('p',`2.20 机身更新：导出包版本 ${report.build_source.update_compatibility.package_version}，保留 2.10 功能基线并附带官方固件恢复准入；刷入与恢复待实机验证。`));
     $('download-backup').disabled = false; $('source-next').disabled = false;
     showStep(globalThis.location?.hash==='#bridge'&&chosenModel==='gr3'?'build':'features');showSettingsTab(state.profile==='native'?'library':'imaging');notice('官方固件核验通过，继续设置方案。');
   } catch (error) { notice(error.message, true); }
@@ -596,7 +597,7 @@ async function build() {
       assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock,chosenModel);
     }
     await download(response, state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
-    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
+    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+(state.source?.build_source?.update_compatibility?`本包更新版本 ${state.source.build_source.update_compatibility.package_version}。`:'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
     $('build-result').className = 'build-result error';

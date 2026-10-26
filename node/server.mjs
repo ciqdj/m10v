@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createBackup, inspectBackup, restoreBytes } from './backup.mjs';
 import { inspectOfficial } from './firmware.mjs';
+import {applyGr3UpdateCompatibility} from './gr3-version-unlock.mjs';
 import {resolveBuildSource} from './firmware-build-source.mjs';
 import { shutdownCatalog } from './features.mjs';
 import { Store } from './storage.mjs';
@@ -98,6 +99,23 @@ export function createServer(store = new Store(path.join(root, 'data')),
       buildSource=resolved.report.build_source;
       response.setHeader('X-M10V-Build-Source',Buffer.from(JSON.stringify(buildSource)).toString('base64'));
       return resolved.source;
+    };
+    // Final compatibility pass runs after feature/composition/power-image audits.
+    // All firmware download routes share it; backups and official SD writes do not.
+    const sendBuild=(candidate,filename)=>{
+      const result=applyGr3UpdateCompatibility(candidate,buildSource);
+      if(result.receipt.enabled){
+        for(const name of ['X-M10V-Native-Receipt','X-M10V-Build-Receipt','X-M10V-800T-Receipt']){
+          const encoded=response.getHeader(name);if(!encoded)continue;
+          const receipt=JSON.parse(Buffer.from(encoded,'base64').toString('utf8'));
+          receipt.pre_update_candidate_sha256=receipt.candidate_sha256;
+          receipt.candidate_sha256=result.receipt.candidate_sha256;receipt.candidate_bytes=result.candidate.length;
+          receipt.update_compatibility=result.receipt;
+          response.setHeader(name,Buffer.from(JSON.stringify(receipt)).toString('base64'));
+        }
+        response.setHeader('X-M10V-Update-Compatibility',Buffer.from(JSON.stringify(result.receipt)).toString('base64'));
+      }
+      return send(response,200,result.candidate,'application/octet-stream',filename);
     };
     const localOrigin = `http://127.0.0.1:${server.address().port}`;
     const origin=configuredOrigin||localOrigin;
@@ -237,6 +255,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(bridgeMatch) {
         const original=await readBuildOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
+        if(buildSource.update_compatibility)return send(response,409,{error:'2.20 来源请直接导出已适配更新版本的功能固件；旧 2.10 桥接包不适用于 2.20。'});
         if(bridgeMatch[2]==='prepare'){
           if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)throw Error('桥接预检不接受自定义版本或补丁');
           return send(response,200,{...prepareGr3Bridge(original),build_source:buildSource});
@@ -246,6 +265,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
+        if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('2.20 来源已自动适配更新版本，不能叠加旧版单包版本适配');
         const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
         if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});
@@ -255,7 +275,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
         const receipt={...nativeResult.receipt,build_source:buildSource,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
-        return send(response,200,candidate,'application/octet-stream',receipt.filename);
+        return sendBuild(candidate,receipt.filename);
       }
       if (pathname === '/api/gr3/film-bay/pack') {
         return send(response, 410, { error: '旧 SD 胶片库方案已废弃，不可用。' });
@@ -278,7 +298,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
             kernel_sha256:receipt.kernel.codeSha256,adapter_sha256:receipt.adapter_sha256,
             offline_audit_passed:true,camera_tested:false,dng_preview_may_share_jpeg_effect:true,
           })).toString('base64'));
-          return send(response, 200, candidate, 'application/octet-stream', 'fwdc239b.bin');
+          return sendBuild(candidate,'fwdc239b.bin');
         } catch (error) {
           if (error.code === 'M10V_800T_EVIDENCE_REQUIRED')
             return send(response, 409, { error: error.message, blockers: error.blockers });
@@ -297,7 +317,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
           return send(response, 409, { error: '方案已变化或预检未通过，请重新预检并确认风险。' });
         const { candidate, receipt } = await buildCustomization(original, input.selection, input.accepted_configuration_sha256, options);
         response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,audit:receipt.audit,build_source:buildSource})).toString('base64'));
-        return send(response, 200, candidate, 'application/octet-stream', receipt.filename);
+        return sendBuild(candidate,receipt.filename);
       }
       if (versionMatch) {
         const original = await readBuildOriginal(versionMatch[1]);
@@ -310,7 +330,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       if (candidateExportMatch) {
         const original = await readBuildOriginal(candidateExportMatch[1]);
         const built = buildStreetCandidate(original, body);
-        return send(response, 200, built.candidate, 'application/octet-stream', 'fwdc239b.bin');
+        return sendBuild(built.candidate,'fwdc239b.bin');
       }
       if (sdMatch) {
         const selection = JSON.parse(body.toString('utf8'));

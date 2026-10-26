@@ -41,3 +41,9 @@ test('source guidance clears once the official project is imported without erasi
  h.context.state.projectId='official';h.context.renderVersionUnlock();assert.doesNotMatch(h.$('bridge-result').textContent,/请先/);
  h.$('bridge-result').textContent='两阶段桥接套件已生成并发起下载。';h.context.renderVersionUnlock();assert.match(h.$('bridge-result').textContent,/已生成/);
 });
+
+test('2.20 automatic update compatibility hides the incompatible old bridge',()=>{
+ const h=controls(studio,'gr3');h.context.state.source={build_source:{update_compatibility:{package_version:'2.20.21.28'}}};
+ assert.equal(h.context.renderVersionUnlock(),true);assert.equal(h.$('bridge-option').hidden,true);
+ h.context.state.source={build_source:{public_version:'2.10'}};h.context.renderVersionUnlock();assert.equal(h.$('bridge-option').hidden,false);
+});

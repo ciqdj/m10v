@@ -8,12 +8,12 @@ const method=app.slice(app.indexOf('async function importSource('),app.indexOf('
 function harness(model='gr3'){
  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'gr3',hidden:true,disabled:true,textContent:'',append(){},replaceChildren(){}});return nodes.get(id);};
  const state={profile:'native',features:new Set(['film']),nativeConfig:{slots:[{film:33}]},projectId:'',source:null};
- let imported;const calls=[],messages=[];
- const context=vm.createContext({gr4Workbench:model==='gr4',nativeApi:'/api/'+model+'/native-library',nativeSelection,nativeEditor:{setModel(){},setConfiguration(c){state.nativeConfig=c;}},state,$:node,document:{title:'',querySelector:()=>node('hero')},notice:(...v)=>messages.push(v),invalidate(){},renderFeatures(){},showStep(){},showSettingsTab(){},textNode:()=>node('text'),
+ let imported;const calls=[],messages=[],texts=[];
+ const context=vm.createContext({gr4Workbench:model==='gr4',nativeApi:'/api/'+model+'/native-library',nativeSelection,nativeEditor:{setModel(){},setConfiguration(c){state.nativeConfig=c;}},state,$:node,document:{title:'',createElement:()=>({append(){}}),querySelector:()=>node('hero')},notice:(...v)=>messages.push(v),invalidate(){},renderFeatures(){},showStep(){},showSettingsTab(){},textNode:(tag,text)=>{texts.push(text);return node('text');},
  api:async(path,options={})=>{calls.push({path,options});return {json:async()=>path.endsWith('import-official')?(model==='gr4'?{...imported,project_id:imported.sha256}:{project_id:imported.sha256}):path.endsWith('stock-presets')?[]:imported};}});
  vm.runInContext("let chosenModel='gr3';let modelLabel='GR III';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+method,context);
  const report=(model,sha)=>({model,sha256:sha.repeat(64),public_version:model==='GR IIIx'?'1.60':'2.10',internal_version:'test',size:100,sections:[{}]});
- return {state,nodes,node,calls,messages,report,context,run:async(r,local=false)=>{imported=r;await context.importSource(local?null:{},local);}};
+ return {state,nodes,node,calls,messages,texts,report,context,run:async(r,local=false)=>{imported=r;await context.importSource(local?null:{},local);}};
 }
 test('the same import handler accepts both models and updates target labels from official identity',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));
@@ -23,8 +23,9 @@ test('the same import handler accepts both models and updates target labels from
 });
 test('2.20 upload shows its imported version separately from the actual 2.10 output baseline',async()=>{
  const h=harness(),report={...h.report('GR III','a'),public_version:'2.20',internal_version:'2.20.20.28',
-  build_source:{public_version:'2.10',internal_version:'2.10.21.27',normalized:true}};
+  build_source:{public_version:'2.10',internal_version:'2.10.21.27',normalized:true,update_compatibility:{package_version:'2.20.21.28'}}};
  await h.run(report);
+ assert.ok(h.texts.some(t=>t.includes('2.20.21.28')));assert.ok(!h.messages.some(v=>v[1]===true));
  assert.equal(h.state.source,report);assert.equal(h.state.projectId,'a'.repeat(64));
  assert.equal(h.node('studio-model-status').textContent,'GR III · 2.20');
  assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.10');
