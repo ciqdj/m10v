@@ -18,7 +18,7 @@ const options={appended_slots:true,hdf_enabled:true,debug_mode:false,
 const source=await readNativeOfficial('gr3'),plan=prepareNative(source,configuration,options);
 const result=await generateNative(source,configuration,plan.configuration_sha256,options);
 const snapshot=result.manifest.capture_lifecycle?.snapshot;
-if(!snapshot?.live_color||snapshot.producer_sites?.length!==1||snapshot.producer_sites[0]!==0x5351ae44||
+if(!snapshot?.live_color||snapshot.producer_sites?.length!==1||snapshot.producer_sites[0]!==0x5351ea9c||
  !result.manifest.appended_slots||!result.manifest.hdf_enabled||!result.receipt.composition?.verified)
  throw Error('Film submission, live preview, independent slots, HDF or composition audit missing');
 const pack=buildSdFilmPack();auditSdFilmPack(pack);

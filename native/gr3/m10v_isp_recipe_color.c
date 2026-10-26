@@ -17,6 +17,8 @@ extern void m10v_hdf_done(uint32_t,uint32_t,uint32_t);
 _Static_assert(sizeof(m10v_isp_recipe_color)==M10V_SAVE_COLOR_BYTES,"recipe color extent");
 #if M10V_ISP_RECIPE_COLOR_PRODUCER || M10V_ISP_LIVE_COLOR
 static int config_ram(uintptr_t p,uint32_t bytes){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-bytes;}
+#endif
+#if M10V_ISP_LIVE_COLOR
 /* Original UI Property singleton: 5320b31c returns 55063f30 only after
  * guard55063ed0. Shooting setters5327b394/b3b4/b3d4 write data+1c2/4/6
  * synchronously; getter53244284 selects the bank via data+1c0. This UI
@@ -109,25 +111,27 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     m10v_isp_recipe_color *s=owned(recipe);
     if(!s)return 0;
     if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC)return 1;
-    /* Called at current-recipe submission BEFORE both producer mutexes.
-     * Reservation of the next raw buffer is too early: the user can switch
-     * film while it is waiting for an exposure. Never called from allocation,
-     * factory, ISP or encoder callbacks. Re-entry keeps a queued shot frozen. */
+    /* Original5351ea9c receives THIS recipe in r1 before constructing and
+     * sending its first processing packet. 5351ae2c is buffer retirement,
+     * not processing submission. Freeze once; later commands/UI cannot
+     * retarget this shot. The scheduler may hold backend locks, so this
+     * helper only reads the already published owner cache: no FS/alloc/lock. */
     m10v_library_state state;
-    /* A validated owner cache is published only after journal readback. Avoid
-     * two AppData reads per exposure; unavailable/busy caches retain the
-     * durable loader fallback before queueing. */
     if(m10v_camera_library_mutation_busy())return producer_mutating(s);
-    if(!m10v_camera_library_preview(&state)&&m10v_camera_library_load(&state)<0)return 0;
+    if(!m10v_camera_library_preview(&state))return 0;
     if(state.reserved&510u)return producer_mutating(s);
-    uint32_t producer_tone=committed_tone(0);
+    uintptr_t si=*(const uint32_t *)((const uint8_t *)recipe+0x44c8u);
+    if(!config_ram(si,0x94c))return 0;
+    uint32_t producer_tone=((const volatile uint8_t *)si)[0x77c];
+    if(!m10v_tone_valid(producer_tone))return 0;
     if(m10v_camera_library_mutation_busy())return producer_mutating(s);
     m10v_library_state verify;
-    if(m10v_camera_library_preview(&verify)&&verify.sequence!=state.sequence)return producer_mutating(s);
-    if(committed_tone(0)!=producer_tone)return producer_mutating(s);
+    if(!m10v_camera_library_preview(&verify)||verify.sequence!=state.sequence)return producer_mutating(s);
+    if(si!=*(const uint32_t *)((const uint8_t *)recipe+0x44c8u)||
+       producer_tone!=((const volatile uint8_t *)si)[0x77c])return producer_mutating(s);
     if(!m10v_isp_frame_recipe_snapshot(recipe,&state))return 0;
-    /* This selection belongs to the producer event, never a later UI change.
-     * Keep s->tone/SI for the raw frame identity and completion handoff. */
+    /* The exposed frame owns its tone. UI Property can already name a later
+     * shot by task submission; never use it to recolor a queued exposure. */
     s->selected_tone=(uint16_t)producer_tone;
     return 1;
 #else

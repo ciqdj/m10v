@@ -1,3 +1,5 @@
+> Update: measured device evidence and the processing-ingress repair are recorded in [gr3-rc1-device-feedback-20261026.md](gr3-rc1-device-feedback-20261026.md). The earlier isolated snapshot tests below did not cover actual task submission.
+
 # GR III 2.10 playback/performance investigation — 2026-10-26
 
 Status: **ISP MIGRATION IN PROGRESS; DEVICE SYMPTOMS NOT YET PROVEN FIXED**. The original main investigation below is followed by an explicitly authorized ISP migration.

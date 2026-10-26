@@ -372,14 +372,14 @@ function lifecyclePatches(manifest,runtime){
  }
  if(m.snapshot){
   need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1796&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
-  need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ae44,'snapshot must freeze current recipe at submission');
-  for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351ae44,0xe59000f0,false],...(m.snapshot.shared_hdf?[[2,0x5351aed4,0xe59420f0,false],[3,0x5351b068,0xe59420f0,false]]:[])]){
+  need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ea9c&&m.snapshot.filesystem_calls===0,'snapshot must freeze at processing-task submission without storage');
+  for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351ea9c,0xe1a0c00d,false],...(m.snapshot.shared_hdf?[[2,0x5351aed4,0xe59420f0,false],[3,0x5351b068,0xe59420f0,false]]:[])]){
    const row=m.snapshot.patches[i];need(row.address===address&&inRuntime(row.entry),'invalid snapshot hook');
    expected.push({address,expected:word,replacement:branch(address,row.entry,link),name:'per-frame snapshot '+address.toString(16)});
   }
   const at=m.snapshot.patches[1].entry,helper=m.snapshot.exports.m10v_isp_frame_recipe_producer;
   need(inRuntime(helper),'snapshot submission helper outside runtime');
-  const words=[0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20,0xe59000f0,branch(at+28,helper,true),0xecfd0b20,0xecbd0b20,0xe8bd5000,0xeee1ea10,0xe128f00c,0xe8bd5fff,0xe59000f0,branch(at+60,0x5351ae48)];
+  const words=[0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20,0xe1a00001,branch(at+28,helper,true),0xecfd0b20,0xecbd0b20,0xe8bd5000,0xeee1ea10,0xe128f00c,0xe8bd5fff,0xe1a0c00d,branch(at+60,0x5351eaa0)];
   words.forEach((word,i)=>need(runtime.readUInt32LE(at-manifest.base+i*4)===(word>>>0),'snapshot submission wrapper instruction differs'));
  }
  if(m.snapshot?.live_color){

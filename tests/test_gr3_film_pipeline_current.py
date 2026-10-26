@@ -49,13 +49,13 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         e.call(self.manifest['symbols'][name], *args)
         return e.u.reg_read(A.UC_ARM_REG_R0)
 
-    def fixture(self, film=66, slot=0):
+    def fixture(self, film=66, slot=0, stage=1):
         e = StockISP(self.image)
         recipe = e.alloc(0x5140)
         e.w32(recipe, 0x53d0fc90)
         e.w32(recipe + 0x4778, 0x31545653)
         obj = e.cursor
-        e.make(25 + slot, 1)
+        e.make(25 + slot, stage)
         frame = obj + 0x1400
         si = int.from_bytes(e.u.mem_read(frame + 0x82d0, 4), 'little')
         # Stage1 uses the embedded sub-shot; encoder identity remains base SI.
@@ -78,6 +78,71 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         e.u.mem_write(data, bytes(state))
         self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_snapshot', recipe, data), 1)
         return e, recipe, obj, frame, si, request, data
+
+    def publish_owner(self, e, data):
+        owner = e.alloc(0x223c)
+        e.w32(0x55063910, 1)
+        e.w32(0x55063914 + 0x74, owner)
+        e.w32(owner + 0x213c, 0x3856504d)
+        e.w32(owner + 0x2140, 2)
+        e.u.mem_write(owner + 0x2144, bytes(e.u.mem_read(data, 184)))
+        return owner
+
+    def enqueue(self, e, recipe, kind):
+        # Original task producer constructs both the packet and its recipe
+        # metadata. OS mode selection/setup and message transport are boundaries.
+        owner = e.alloc(0xb00)
+        plan = e.alloc(0x300)
+        e.w32(recipe + 0x1c, plan)
+        e.u.mem_write(plan + 0x204, struct.pack('<H', kind))
+        e.w32(owner + 0x9b4 + kind * 4, 0x60030000)
+        seen = []
+        def services(u, at, n, _):
+            if at in (0x5351e888, 0x5350e624):
+                u.reg_write(A.UC_ARM_REG_R0, 0)
+            elif at == 0x536abd28:
+                msg = u.reg_read(A.UC_ARM_REG_R1)
+                meta = int.from_bytes(u.mem_read(msg + 12, 4), 'little')
+                seen.append((msg, meta, int.from_bytes(u.mem_read(meta + 20, 4), 'little')))
+                u.reg_write(A.UC_ARM_REG_R0, 0)
+            elif at == self.manifest['symbols']['m10v_camera_library_load']:
+                raise AssertionError('task submission must not enter storage')
+            else:
+                return
+            u.reg_write(A.UC_ARM_REG_PC, u.reg_read(A.UC_ARM_REG_LR))
+        hook = e.u.hook_add(UC_HOOK_CODE, services)
+        try:
+            e.call(0x5351ea9c, owner, recipe)
+        finally:
+            e.u.hook_del(hook)
+        self.assertEqual(seen, [(recipe + 0x3b0 + kind * 24, recipe + 0x5f0 + kind * 32, recipe)])
+
+    def test_device_task_order_freezes_before_develop_without_buffer_retirement(self):
+        # Device log: kind19/0/16/1/8/9/2/4 precede JPEG kind6. The former
+        # 5351ae44 hook is in buffer retirement, which has not occurred here.
+        for film in (62, 299):
+            for stage in (0, 1):
+                with self.subTest(film=film, stage=stage):
+                    e, recipe, obj, frame, si, request, data = self.fixture(film, stage=stage)
+                    e.u.mem_write(recipe + 0x4a08, bytes(1796))
+                    owner = self.publish_owner(e, data)
+                    ui = e.alloc(0x200)
+                    e.w32(0x55063ed0, 1)
+                    e.w32(0x55063f34, ui)
+                    e.u.mem_write(ui + 0x1c2, bytes([34]))  # newer UI is not this shot
+                    for kind in (19, 0, 16, 1, 8, 9, 2, 4):
+                        self.enqueue(e, recipe, kind)
+                        self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_state', recipe, data), 1)
+                    self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x4a08 + 22, 2), 'little'), 25)
+                    # Changing the owner's configuration cannot retarget queued work.
+                    newer = bytearray(e.u.mem_read(data, 184))
+                    struct.pack_into('<I', newer, 8, 8)
+                    struct.pack_into('<I', newer, 180, zlib.crc32(newer[:180]))
+                    e.u.mem_write(owner + 0x2144, bytes(newer))
+                    e.w32(owner + 0x2140, 4)
+                    self.make(e, recipe, obj, frame)
+                    self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25, data), 1)
+                    self.assertEqual(self.capture(e, recipe, si, request), 0)
 
     def make(self, e, recipe, obj, frame):
         for reg, value in ((0, obj), (1, frame), (3, 0x536dd8f0), (6, recipe + 0x96c)):
@@ -134,6 +199,115 @@ class CurrentFilmPipelineTests(unittest.TestCase):
                 self.make(e, recipe, obj, frame)
                 self.assertEqual(bytes(e.u.mem_read(frame, 0x9000)), first)
 
+    def test_every_native_task_kind_freezes_once_without_storage(self):
+        for kind in range(24):
+            with self.subTest(kind=kind):
+                e, recipe, obj, frame, si, request, data = self.fixture(62)
+                e.u.mem_write(recipe + 0x4a08, bytes(1796))
+                self.publish_owner(e, data)
+                self.enqueue(e, recipe, kind)
+                self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_state', recipe, data), 1)
+
+    def test_unpublished_or_busy_cache_never_loads_storage_in_scheduler(self):
+        for version in (0, 1):
+            with self.subTest(version=version):
+                e, recipe, obj, frame, si, request, data = self.fixture(62)
+                e.u.mem_write(recipe + 0x4a08, bytes(1796))
+                owner = self.publish_owner(e, data)
+                e.w32(owner + 0x2140, version)
+                self.enqueue(e, recipe, 19)
+                self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_state', recipe, data), 0)
+
+    def test_durable_ui_load_publishes_owner_used_by_actual_task_submission(self):
+        e, recipe, obj, frame, si, request, data = self.fixture(62)
+        e.u.mem_write(recipe + 0x4a08, bytes(1796))
+        owner = e.alloc(0x223c)
+        e.w32(0x55063910, 1)
+        e.w32(0x55063988, owner)
+        self.call(e, 'm10v_camera_library_preview_init', owner)
+        manager, app, fs = e.alloc(12), e.alloc(4), e.alloc(0x24)
+        e.w32(manager + 8, app)
+        e.w32(app, fs)
+        e.u.mem_write(fs + 0x20, b'\1')
+        saved = bytes(e.u.mem_read(data, 184))
+        reads = []
+        def storage(u, at, n, _):
+            if at == 0x53828014:
+                u.reg_write(A.UC_ARM_REG_R0, manager)
+            elif at == 0x53825648:
+                self.assertEqual(u.reg_read(A.UC_ARM_REG_R2), 184)
+                reads.append(at)
+                u.mem_write(u.reg_read(A.UC_ARM_REG_R3), saved)
+                u.reg_write(A.UC_ARM_REG_R0, 1)
+            else:
+                return
+            u.reg_write(A.UC_ARM_REG_PC, u.reg_read(A.UC_ARM_REG_LR))
+        hook = e.u.hook_add(UC_HOOK_CODE, storage)
+        self.assertEqual(self.call(e, 'm10v_camera_library_load', data), 0)
+        e.u.hook_del(hook)
+        self.assertEqual(len(reads), 2)
+        self.enqueue(e, recipe, 19)
+        self.make(e, recipe, obj, frame)
+        self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25, data), 1)
+        self.assertEqual(self.capture(e, recipe, si, request), 0)
+
+    def test_submission_wrapper_preserves_stock_entry_and_fp_abi(self):
+        e, recipe, *_ = self.fixture(62)
+        registers = [0x12340000 + i for i in range(13)]
+        registers[1] = recipe
+        helper = self.manifest['symbols']['m10v_isp_frame_recipe_producer']
+        def adversarial_helper(u, at, n, _):
+            if at != helper:
+                return
+            for i in range(13):
+                u.reg_write(getattr(A, 'UC_ARM_REG_R' + str(i)), 0xdead0000 + i)
+            for i in range(32):
+                u.reg_write(getattr(A, 'UC_ARM_REG_D' + str(i)), 0xdeadbeef00000000 + i)
+            u.reg_write(A.UC_ARM_REG_FPSCR, 0x00400000)
+            u.reg_write(A.UC_ARM_REG_CPSR, 0x60000013)
+            u.reg_write(A.UC_ARM_REG_PC, u.reg_read(A.UC_ARM_REG_LR))
+        e.u.hook_add(UC_HOOK_CODE, adversarial_helper)
+        for i, value in enumerate(registers):
+            e.u.reg_write(getattr(A, 'UC_ARM_REG_R' + str(i)), value)
+        fpregs = [0xabcdef1200000000 + i for i in range(32)]
+        for i, value in enumerate(fpregs):
+            e.u.reg_write(getattr(A, 'UC_ARM_REG_D' + str(i)), value)
+        e.u.reg_write(A.UC_ARM_REG_FPSCR, 0x00800000)
+        e.u.reg_write(A.UC_ARM_REG_CPSR, 0xa0000013)
+        e.u.reg_write(A.UC_ARM_REG_SP, 0x5effff00)
+        e.u.reg_write(A.UC_ARM_REG_LR, 0x53123400)
+        e.u.emu_start(0x5351ea9c, 0x5351eaa0, count=100000)
+        registers[12] = 0x5effff00  # displaced stock mov ip,sp
+        self.assertEqual([e.u.reg_read(getattr(A, 'UC_ARM_REG_R' + str(i))) for i in range(13)], registers)
+        self.assertEqual(e.u.reg_read(A.UC_ARM_REG_SP), 0x5effff00)
+        self.assertEqual(e.u.reg_read(A.UC_ARM_REG_LR), 0x53123400)
+        self.assertEqual(e.u.reg_read(A.UC_ARM_REG_CPSR) & 0xf0000000, 0xa0000000)
+        self.assertEqual([e.u.reg_read(getattr(A, 'UC_ARM_REG_D' + str(i))) for i in range(32)], fpregs)
+        self.assertEqual(e.u.reg_read(A.UC_ARM_REG_FPSCR), 0x00800000)
+
+    def test_final_bin_retires_old_hook_and_independent_auditor_rejects_wrong_recipe(self):
+        old = 0x5351ae44 - 0x53000000
+        self.assertEqual(self.image[old:old + 4], self.rom[old:old + 4])
+        snapshot = self.manifest['capture_lifecycle']['snapshot']
+        self.assertEqual(snapshot['producer_sites'], [0x5351ea9c])
+        self.assertEqual(snapshot['filesystem_calls'], 0)
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            (folder / 'manifest.json').write_text(json.dumps(self.manifest))
+            at = self.manifest['base'] - 0x53000000
+            (folder / 'runtime.bin').write_bytes(self.image[at:at + self.manifest['code_bytes']])
+            js = """import{readFileSync}from'node:fs';import{createHash}from'node:crypto';
+import assert from'node:assert/strict';import{buildNativeLibrary}from'./node/gr3-m10v-native-build.mjs';
+const folder=process.argv[1],m=JSON.parse(readFileSync(folder+'/manifest.json')),
+r=readFileSync(folder+'/runtime.bin'),s=readFileSync('bin/fwdc239b-gr3-official.bin');
+buildNativeLibrary(s,r,m);
+const at=m.capture_lifecycle.snapshot.patches[1].entry-m.base;
+r.writeUInt32LE(0xe59000f0,at+24); // former owner+f0 recipe instead of this task's r1
+m.code_sha256=createHash('sha256').update(r).digest('hex');
+assert.throws(()=>buildNativeLibrary(s,r,m),/snapshot submission wrapper instruction differs/);
+"""
+            subprocess.run(['node', '--input-type=module', '-e', js, str(folder)], cwd=ROOT, check=True, capture_output=True)
+
     def test_ordinary_builtin_profiles_complete_under_native_parameter_changes(self):
         for film in range(33, 79):
             for extra in ({}, {0x77d: 1, 0x77e: 7, 0x780: 2, 0x793: 6, 0x794: 2}):
@@ -154,6 +328,22 @@ class CurrentFilmPipelineTests(unittest.TestCase):
                 self.make(e, recipe, obj, frame)
                 self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25, data), 1)
                 self.assertEqual(self.capture(e, recipe, si, request), 0)
+
+    def test_committed_film_with_stock_shooting_tone_does_not_complete_native_color(self):
+        # Reproduce a source-level coverage gap, not a claimed device diagnosis:
+        # encoder accepts frozen UI tone, while Still begin requires a carrier SI.
+        for film in (62, 299):
+            with self.subTest(film=film):
+                e, recipe, obj, frame, si, request, data = self.fixture(film)
+                e.u.mem_write(recipe + 0x4a08 + 22, struct.pack('<H', 25))
+                e.u.mem_write(si + 0x77c, b'\x0b')
+                e.u.mem_write(si + 0x71248 + 0x77c, b'\x0b')
+                self.make(e, recipe, obj, frame)
+                self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 11, data), 0)
+                # Capture must reach the real image-processing boundary instead
+                # of returning through the native-only zero-work route.
+                with self.assertRaisesRegex(AssertionError, 'pixel/allocation/filesystem boundary'):
+                    self.capture(e, recipe, si, request)
 
     def test_charmera_and_pixel_do_not_claim_native_color_completion(self):
         for film in (289, 290):

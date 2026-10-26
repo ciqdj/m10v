@@ -1,8 +1,8 @@
 """Install original Develop Still Make callback with per-recipe state ingress.
 
 Requires the extended recipe allocator from build_gr3_save_trace. ISP helpers
-never call filesystem services. The submission adapter freezes the completed
-current recipe, not the next recipe reserved by the buffer allocator.
+never call filesystem services. The submission adapter freezes the recipe at
+the genuine processing-task producer, before its first message is queued.
 """
 import hashlib,json,os,shutil,struct,subprocess,tempfile
 from pathlib import Path
@@ -25,7 +25,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     if type(external_noise)is not bool or external_noise:raise ValueError('CPU grain noise shaping has been removed')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native per-recipe color mode')
     if type(native_color)is not bool or (native_color and observer):raise ValueError('native color requires apply mode')
-    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_load','m10v_camera_library_mutation_busy') if producer_snapshot else ())
+    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
     compiler=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
     if not Path(compiler).is_file():compiler=shutil.which('clang')
@@ -41,15 +41,14 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     patch=dict(address=SITE,expected_hex=struct.pack('<I',EXPECTED).hex(),replacement_hex=struct.pack('<I',branch(SITE,entry,link=True)).hex(),entry=entry)
     patches=[patch]
     if producer_snapshot:
-        # BE5351ae2c submits owner+f0 at5351aea8, retires it, then reserves
-        # the NEXT raw buffer at5351aed4/b068 (also called at startup da3c).
-        # Freezing at reservation makes every subsequent selection one shot
-        # late. This block runs before either BE/RecipeManager mutex and
-        # before the current recipe can be queued or replaced.
-        site=0x5351ae44;expected=0xe59000f0
-        if struct.unpack_from('<I',rom,site-0x53000000)[0]!=expected:raise ValueError('current recipe submission load differs')
+        # Original5351ea9c(owner,r1=recipe) creates message+metadata and sends
+        # them via536abd28. In contrast5351ae2c retires owner+f0 buffers via
+        # 5352197c and only then reserves another recipe. Device879dccce
+        # reached Develop/JPEG with no snapshot from that former hook.
+        site=0x5351ea9c;expected=0xe1a0c00d
+        if struct.unpack_from('<I',rom,site-0x53000000)[0]!=expected:raise ValueError('processing task producer prologue differs')
         at=base+len(code)
-        code+=assembly('push {r0-r12,lr};mrs ip,cpsr;.word 0xeef1ea10;push {ip,lr};.word 0xed2d0b20;.word 0xed6d0b20;ldr r0,[r0,#0xf0];bl '+hex(exports['m10v_isp_frame_recipe_producer'])+';.word 0xecfd0b20;.word 0xecbd0b20;pop {ip,lr};.word 0xeee1ea10;msr cpsr_f,ip;pop {r0-r12,lr};.word '+hex(expected)+';b '+hex(site+4),at)
+        code+=assembly('push {r0-r12,lr};mrs ip,cpsr;.word 0xeef1ea10;push {ip,lr};.word 0xed2d0b20;.word 0xed6d0b20;mov r0,r1;bl '+hex(exports['m10v_isp_frame_recipe_producer'])+';.word 0xecfd0b20;.word 0xecbd0b20;pop {ip,lr};.word 0xeee1ea10;msr cpsr_f,ip;pop {r0-r12,lr};.word '+hex(expected)+';b '+hex(site+4),at)
         patches.append(dict(address=site,expected_hex=struct.pack('<I',expected).hex(),replacement_hex=struct.pack('<I',branch(site,at)).hex(),entry=at))
         # Independent HDF reservation timing is unchanged in this repair.
         for site in ((0x5351aed4,0x5351b068) if shared_hdf else ()):
@@ -66,7 +65,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         site=0x53dbd954;expected=0x536ddecc
         if struct.unpack_from('<I',rom,site-0x53000000)[0]!=expected:raise ValueError('Live Make vtable differs')
         patches.append(dict(address=site,expected_hex=struct.pack('<I',expected).hex(),replacement_hex=struct.pack('<I',at).hex(),entry=at))
-    manifest=dict(schema=1,base=base,bytes=len(code),exports=exports,patches=patches,required_rtos_sha256=SHA,required_owner_factory=0x53523e0c,color_offset=0x4a08,color_bytes=COLOR_BYTES,mutable_global_bytes=0,filesystem_calls='camera_library_load once per current recipe at pre-mutex submission only' if producer_snapshot else 0,isp_filesystem_calls=0,allocator_calls=0,camera_tested=False,quality_equivalence_proven=False,activation_requires=['Install matching owner factory allocation hook.','Snapshot current recipe before submission; never snapshot the next reserved raw buffer.' if producer_snapshot else 'Snapshot184-byte state before queueing on a proven safe producer.','CPU fallback uses recipe_state(), never reload another selected state.'],context_contract={'site':SITE,'stock_instruction':'blx r3','r0':'ImageTuningStill','r1':'module+40 R2Y info','r6':'Develop context C','C+30':'sourceRecipe+1a8','C+34':'ShootingInfo','scope':'only actual Develop process caller, stage0 or stage1','color_space':'shot+7be==1 as original536dc474..494'},unsupported='Observer preserves all film engines; experimental apply rejects IDs outside34..65 without3D LUT fit',native_color=native_color,native_grain=native_grain,live_color=live_color,shared_hdf=shared_hdf,snapshot_ingress_installed=producer_snapshot,observer=observer,producer_sites=[0x5351ae44] if producer_snapshot else [],producer_lock_contract='Before BE owner+a74 and RecipeManager mutex acquisition; preserves current recipe load, all GPRs, SP/LR, NZCV, d0-d31 and FPSCR')
+    manifest=dict(schema=1,base=base,bytes=len(code),exports=exports,patches=patches,required_rtos_sha256=SHA,required_owner_factory=0x53523e0c,color_offset=0x4a08,color_bytes=COLOR_BYTES,mutable_global_bytes=0,filesystem_calls=0,isp_filesystem_calls=0,allocator_calls=0,camera_tested=False,quality_equivalence_proven=False,activation_requires=['Install matching owner factory allocation hook.','Snapshot current recipe before submission; never snapshot the next reserved raw buffer.' if producer_snapshot else 'Snapshot184-byte state before queueing on a proven safe producer.','CPU fallback uses recipe_state(), never reload another selected state.'],context_contract={'site':SITE,'stock_instruction':'blx r3','r0':'ImageTuningStill','r1':'module+40 R2Y info','r6':'Develop context C','C+30':'sourceRecipe+1a8','C+34':'ShootingInfo','scope':'only actual Develop process caller, stage0 or stage1','color_space':'shot+7be==1 as original536dc474..494'},unsupported='Observer preserves all film engines; experimental apply rejects IDs outside34..65 without3D LUT fit',native_color=native_color,native_grain=native_grain,live_color=live_color,shared_hdf=shared_hdf,snapshot_ingress_installed=producer_snapshot,observer=observer,producer_sites=[0x5351ea9c] if producer_snapshot else [],producer_lock_contract='Processing-task producer; cached state only, no filesystem/allocator/mutex; preserves all GPRs, SP/LR, NZCV, d0-d31 and FPSCR')
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     (out/'isp-recipe-color.bin').write_bytes(code);(out/'isp-recipe-color.json').write_text(json.dumps(manifest,indent=2)+'\n')
     return code,manifest
