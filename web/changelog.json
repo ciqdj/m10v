@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.26.4",
+      "date": "2026-10-26",
+      "title": "新增独立测试包板块",
+      "changes": [
+        "全站导航新增「测试包」，集中列出临时包的适用机型、测试范围、已知问题和 GitHub 下载链接。",
+        "上架 GR III 2.10 ISP 胶卷测试 RC1；这是尚未经相机验收的独立预发布包，5207／5219 慢回放和连拍黑屏尚未确认修复。",
+        "本次网站更新不合入测试固件源码，不改变 GR III／IIIx／IV 正式在线构建行为。"
+      ],
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.26.3",
       "date": "2026-10-26",
       "title": "补齐 XPan 与 6x7 原生样式取景标签",
@@ -10,9 +23,9 @@
         "标签跟随既有取景遮罩刷新与可见性控制，保留3:2、1:1、4:3原有显示和28–50mm焦距标签；不改裁切几何、JPEG／DNG生成和对焦逻辑。",
         "已完成新增标签、原生绘制器逐像素回读、裁切／DNG及焦段图标风险项离线检查；按用户专项验证后直接发布授权上线，未进行相机实测。GR IV未修改。"
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a7c17392296ee01cd3d70e33f19c052cea5b2ac1",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40279596800"
     },
     {
       "version": "2026.10.26.2",
