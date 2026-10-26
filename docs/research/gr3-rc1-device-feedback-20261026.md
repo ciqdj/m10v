@@ -1,8 +1,10 @@
 # GR III 2.10: measured CPU fallback and processing-ingress repair
 
-Base: GitHub main `2d5fc71870cccb65d4a81adfec6114256e2ec448` (fetched again
+Base: GitHub main `a2fdbf26ded914687a94a426d2898d8420045571` (fetched again
 for this iteration). Prior ISP-fit candidate d124947 was replayed as a8826a8.
-This branch remains a test candidate; no firmware merge into main.
+The later main update adds2.20 updater compatibility, retained by merge; this
+candidate still uses the exact official2.10 input. This branch remains a test
+candidate; no firmware merge into main.
 
 ## Device measurements
 
@@ -76,11 +78,10 @@ on pixel/cache/allocation/storage access; the repaired path returns without
 those accesses. Independent Node auditing accepts the final BIN and rejects
 an owner+f0/wrong-recipe wrapper even with its runtime hash repaired.
 
-Full Node run:364 tests,310 passed,44 failed,10 skipped. It is not a green
+Full Node run:368 tests,314 passed,44 failed,10 skipped. It is not a green
 repository suite. Failures include stale version4/five-slot/catalog expectations
-and missing .runtime compatibility assets. On untouched main, selected
-catalog/slot/Charmera/SD tests reproduce7 failures out of20; native-build,
-Node-path and route tests reproduce the same3 failures as this branch (e.g.
+and missing .runtime compatibility assets. On untouched latest main, the combined catalog/slot/Charmera/SD/native-build/
+Node-path/route subset has24 tests,14 passed and the same10 failures (e.g.
 95 vs88 films and37 vs30 visible entries). Not every failure was separately
 classified, and no unrelated expectations were rewritten for a green result.
 
@@ -103,6 +104,6 @@ GR III2.10 only; debug enabled for confirmation. Existing camera journals have
 priority; no reset or ABI migration is introduced. Charmera/Pixel retain their
 special CPU renderers. Halo and custom-LUT exceptions remain explicit.
 
-BIN SHA256: `5d329f546bcd7df52962a4fd99da0e590da3e805aa4f8205db8b53a4f31c083f`.
+BIN SHA256: `8346ff292a57727eb57d2d6fad919d330848ad9a37117284f5396919fdbf6992`.
 151 checked hooks,32,111,448 bytes. Receipt/manifest record the complete source
 and configuration fingerprints; camera_tested remains false.
