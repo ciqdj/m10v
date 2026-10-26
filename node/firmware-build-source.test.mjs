@@ -48,6 +48,8 @@ test('2.20 upload keeps its backup and builds from the disclosed 2.10 baseline',
   assert.equal(prepared.status,200,await prepared.clone().text());const plan=await prepared.json();
   assert.equal(plan.ready,true);assert.equal(plan.source_sha256,baselineSha);
   assert.equal(plan.build_source.imported_public_version,'2.20');assert.equal(plan.build_source.public_version,'2.10');
+  const incompatible=await post(`/api/projects/${id}/native-library/prepare`,{configuration:defaultConfiguration(),version_unlock:{enabled:true,mode:'dsp-package-only'}});
+  assert.equal(incompatible.status,400);assert.match((await incompatible.json()).error,/不能叠加/);
   const selection={variant:'street',features:['presets'],stockPresets:[{slot:2,name:'Clear'}]};
   const editPlan=await post(`/api/projects/${id}/edit/prepare`,{selection});
   assert.equal(editPlan.status,200,await editPlan.clone().text());const edit=await editPlan.json();assert.equal(edit.ready,true);
@@ -56,8 +58,9 @@ test('2.20 upload keeps its backup and builds from the disclosed 2.10 baseline',
   const receipt=JSON.parse(Buffer.from(built.headers.get('X-M10V-Build-Receipt'),'base64'));
   assert.equal(receipt.build_source.imported_sha256,id);assert.equal(receipt.build_source.sha256,baselineSha);
   const candidate=Buffer.from(await built.arrayBuffer());
-  assert.equal(candidate.readUInt32BE(0x38),0x020a151b);assert.equal(decodeFrameMap(candidate).decoded.length,59718388);
+  assert.equal(candidate.readUInt32BE(0x38),0x0214151c);assert.equal(candidate.readUInt32BE(0x50),0x0214151c);
+  assert.equal(receipt.update_compatibility.package_version,'2.20.21.28');assert.equal(decodeFrameMap(candidate).decoded.length,59718388);
   const bridge=await post(`/api/projects/${id}/bridge/prepare`,{});
-  assert.equal(bridge.status,200,await bridge.clone().text());assert.equal((await bridge.json()).package_version,'2.10.33.27');
+  assert.equal(bridge.status,409);assert.match((await bridge.json()).error,/2.20/);
  }finally{await new Promise(resolve=>server.close(resolve));await rm(folder,{recursive:true,force:true});}
 });

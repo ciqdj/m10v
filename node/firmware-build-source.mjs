@@ -13,5 +13,6 @@ export async function resolveBuildSource(uploaded) {
   sha256:baseline.sha256,imported_sha256:imported.sha256,
   imported_public_version:imported.public_version,imported_internal_version:imported.internal_version,
   normalized:baseline.sha256!==imported.sha256,
+  ...(imported.public_version==='2.20'?{update_compatibility:{package_version:'2.20.21.28',runtime_baseline:'2.10',recoverable_updater:true,camera_verified:false}}:{}),
  }}};
 }
