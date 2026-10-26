@@ -1,6 +1,6 @@
 # GR III 通用光晕 RC1 · 2026-10-26
 
-源码基线为已 fetch 的最新 main：`c2aed1e9f582819cd1dd8783effeef36b83867cf`，包括已集成的 28–50mm 裁切。当前候选等待用户实机验证，不推送、不部署。
+源码基线为已 fetch 的最新 main：`c2aed1e9f582819cd1dd8783effeef36b83867cf`，包括已集成的 28–50mm 裁切。用户已于2026-10-26确认当前RC1“通过”，并授权合并main、发布GitHub与宝塔。验收绑定记录见 `gr3-universal-halation-user-acceptance-20261026.json`；以下保留构建时的离线证据与验收清单，不推导未提供的耗时数值。
 
 ## 本次变化
 

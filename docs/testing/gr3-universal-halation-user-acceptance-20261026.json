@@ -1,0 +1,15 @@
+{
+  "schema": "m10v-user-validation/v1",
+  "date": "2026-10-26",
+  "timezone": "Asia/Shanghai",
+  "status": "USER_VALIDATED",
+  "model": "GR III",
+  "candidate": "M10V-GR3-HALO-RC1-20261026",
+  "candidate_source_commit": "b51d9ee88185f8aaccded9c6ca7bfd6b8677e8c5",
+  "bin_sha256": "6c7eb9a7c81535a2a9cb53ee1558d099ceac6ef43929153fbe4a668a17071bd4",
+  "zip_sha256": "d55df4d6f0a2a9e70202249c6e0380fc0d056db764995b31cb92180698dd8c70",
+  "user_feedback": "通过",
+  "release_authorization": "合并main发布宝塔和github",
+  "measured_latency_seconds": null,
+  "note": "用户确认当前候选通过；不推导未提供的逐项覆盖或设备耗时。发布后配置与构建选项不同的生成包不宣称逐字节等于验收候选。"
+}
