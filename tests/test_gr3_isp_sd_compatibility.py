@@ -32,6 +32,8 @@ class ISPSdCompatibilityTests(unittest.TestCase):
 
     def old_record(self, index):
         record = bytearray(self.records[index*12288:(index+1)*12288])
+        if index<63 and self.prior['ids'][index]==294:
+            record[16:40]=b'Fujifilm Velvia 50'.ljust(24,b'\0')
         record[8448:8480] = bytes.fromhex(self.prior['renderer'])
         struct.pack_into('<I', record, 12284, zlib.crc32(record[:-4]))
         return record
@@ -56,9 +58,10 @@ class ISPSdCompatibilityTests(unittest.TestCase):
         js = """import assert from 'node:assert/strict';
         import {readFileSync} from 'node:fs';
         import {buildSdFilmPack,auditSdFilmPack,sdCrc} from './node/gr3-sd-film-pack.mjs';
-        const old=Buffer.from(JSON.parse(readFileSync('node/gr3-sd-pre-isp-still-contract.json')).renderer,'hex');
+        const prior=JSON.parse(readFileSync('node/gr3-sd-pre-isp-still-contract.json'));
+        const old=Buffer.from(prior.renderer,'hex');
         for(const custom of [[],[{name:'Identity',rgb:Buffer.alloc(6591,128),sha256:'identity'}]]){
-          const b=buildSdFilmPack(undefined,custom),n=b.readUInt32LE(16);
+          const b=buildSdFilmPack(auditSdFilmPack(buildSdFilmPack()).ids.filter(id=>prior.ids.includes(id)&&id!==294),custom),n=b.readUInt32LE(16);
           for(let i=0;i<n;i++){
             const r=b.subarray(4096+i*12288,4096+(i+1)*12288);old.copy(r,8448);
             r.writeUInt32LE(sdCrc(r.subarray(0,-4)),12284);b.writeUInt32LE(r.readUInt32LE(12284),68+i*12);

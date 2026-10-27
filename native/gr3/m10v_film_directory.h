@@ -2,8 +2,8 @@
 #ifndef M10V_FILM_DIRECTORY_H
 #define M10V_FILM_DIRECTORY_H
 #include <stdint.h>
-#define M10V_DIRECTORY_COUNT 37u
-#define M10V_DIRECTORY_GROUPS 5u
+#define M10V_DIRECTORY_COUNT 44u
+#define M10V_DIRECTORY_GROUPS 6u
 #define M10V_DIRECTORY_GROUP_RESOURCE 1129u
 static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]={
 {33,0,"800T"},
@@ -26,24 +26,31 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {67,1,"Harman Phoenix II"},
 {68,1,"Harman Red"},
 {292,1,"Lomography"},
-{75,2,"T-Max 100"},
-{299,2,"Tri-X 400"},
-{300,2,"Ilford Delta 100"},
-{301,2,"Ilford Pan 400"},
-{302,2,"Rollei Infrared 400"},
-{303,2,"Ilford SFX 200"},
-{304,2,"Fomapan 400"},
-{305,2,"CatLABS X Film 80"},
-{289,3,"Kodak Charmera"},
-{72,3,"CCD"},
-{293,3,"Polaroid"},
-{296,3,"Cyanotype"},
-{290,3,"Pixel Worlds"},
-{76,3,"Aerochrome"},
-{291,4,"Leica Monochrome"},
-{297,4,"German Cool"},
-{65,4,"GR2"},
+{294,2,"Fuji Velvia 50"},
+{309,2,"Fuji Provia 100F"},
+{310,2,"Kodak Ektachrome E100"},
+{311,2,"5294"},
+{75,3,"T-Max 100"},
+{299,3,"Tri-X 400"},
+{300,3,"Ilford Delta 100"},
+{301,3,"Ilford Pan 400"},
+{302,3,"Rollei Infrared 400"},
+{303,3,"Ilford SFX 200"},
+{304,3,"Fomapan 400"},
+{305,3,"CatLABS X Film 80"},
+{289,4,"Kodak Charmera"},
+{72,4,"CCD"},
+{293,4,"Polaroid"},
+{296,4,"Cyanotype"},
+{290,4,"Pixel Worlds"},
+{76,4,"Aerochrome"},
+{306,4,"Makoto Shinkai"},
+{307,4,"Ghibli"},
+{308,4,"1970s"},
+{291,5,"Leica Monochrome"},
+{297,5,"German Cool"},
+{65,5,"GR2"},
 };
-static const uint8_t m10v_directory_first[6]={0,6,20,28,34,37};
+static const uint8_t m10v_directory_first[7]={0,6,20,24,32,41,44};
 static inline const char *m10v_directory_name(uint32_t id){for(uint32_t i=0;i<M10V_DIRECTORY_COUNT;i++)if(m10v_directory[i].id==id)return m10v_directory[i].name;return 0;}
 #endif

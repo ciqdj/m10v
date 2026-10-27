@@ -92,6 +92,27 @@
       ]
     },
     {
+      "name": "E6",
+      "films": [
+        {
+          "id": 294,
+          "name": "Fuji Velvia 50"
+        },
+        {
+          "id": 309,
+          "name": "Fuji Provia 100F"
+        },
+        {
+          "id": 310,
+          "name": "Kodak Ektachrome E100"
+        },
+        {
+          "id": 311,
+          "name": "5294"
+        }
+      ]
+    },
+    {
       "name": "D76",
       "films": [
         {
@@ -154,6 +175,18 @@
         {
           "id": 76,
           "name": "Aerochrome"
+        },
+        {
+          "id": 306,
+          "name": "Makoto Shinkai"
+        },
+        {
+          "id": 307,
+          "name": "Ghibli"
+        },
+        {
+          "id": 308,
+          "name": "1970s"
         }
       ]
     },

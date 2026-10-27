@@ -1,0 +1,38 @@
+[
+  {
+    "id": "film-luts-provia",
+    "url": "https://github.com/YahiaAngelo/Film-Luts/blob/af957b631a304e6be94778b96cb3395de3438e9f/luts/colorslide/fuji_provia_100f.cube",
+    "commit": "af957b631a304e6be94778b96cb3395de3438e9f",
+    "path": "third_party/anime-e6/fuji_provia_100f.cube",
+    "sha256": "96952f28c5f407d9978cd8dd015140bc4b1224ef87f0c49151f1105ee1740d2d",
+    "license": "MIT as declared by pinned repository; upstream cube header attributes G\u2019MIC",
+    "license_path": "third_party/anime-e6/Film-Luts-LICENSE",
+    "license_sha256": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",
+    "domain": "Assumed encoded display sRGB; upstream cube only declares normalized RGB, not measured scanner calibration",
+    "use": "Exact-name community Provia100F display target; not manufacturer LUT"
+  },
+  {
+    "id": "kodak-e100-official",
+    "url": "https://business.kodakmoments.com/sites/default/files/files/products/e4000_ektachrome_100.pdf",
+    "accessed": "2026-10-27",
+    "sha256": "d6e6fa1497c4fc16010997b1a8510d9df3b4692e34c48599c8a4338d5768fab6",
+    "license": "Manufacturer copyright; not redistributed or used as numeric transform data",
+    "use": "Qualitative only: neutral balance, moderately enhanced saturation, low contrast; no curves digitized"
+  },
+  {
+    "id": "kodak-5294-official",
+    "url": "https://www.kodak.com/content/products-brochures/Film/KODAK-EKTACHROME-100D-COLOR-REVERSAL-FILM-5294-7294-datasheet-EN.pdf",
+    "accessed": "2026-10-27",
+    "sha256": "23d4307ad51c9fce1ab5abe336b0db23da1b565fc3b3db94a0fcdc02a8b95471",
+    "license": "Manufacturer copyright; not redistributed or used as numeric transform data",
+    "use": "Qualitative stock identity only; distinct independently assumed contrast/saturation and mixing, not E100 reused"
+  },
+  {
+    "id": "fuji-provia-official",
+    "url": "https://asset.fujifilm.com/www/us/files/2020-03/dc6e1c21c643f82b7fb393cef94d524a/Provia100FAF3-036E.pdf",
+    "accessed": "2026-10-27",
+    "sha256": "e28d54e76e8fcdf44c8ffacc930b5b8f2ea54a7cdaeedfcc91790e68eb599de8",
+    "license": "Manufacturer copyright; not redistributed or used as numeric transform data",
+    "use": "Official exact stock identity and qualitative context only; community LUT is separate"
+  }
+]

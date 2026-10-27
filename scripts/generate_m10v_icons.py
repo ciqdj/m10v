@@ -156,6 +156,12 @@ def generate():
   im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_d76.rgba').write_bytes(d76_pixels)
+ anime_pixels=bytearray()
+ for spec in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks']:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();anime_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_anime_e6.rgba').write_bytes(anime_pixels)
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  # Include every sparse identity and custom artwork in the visual inventory.
  sheet=Image.new('RGBA',(1200,((len(meta)+10)//10)*130),'#171a18')

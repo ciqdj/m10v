@@ -1,0 +1,31 @@
+{
+  "schema": "m10v-anime-ui-raster/v1",
+  "caption": "漫画进阶",
+  "names": [
+    "关闭",
+    "线稿",
+    "色块",
+    "手绘"
+  ],
+  "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+  "font_source": "https://github.com/notofonts/noto-cjk/blob/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+  "license": "SIL Open Font License 1.1",
+  "value_rect": [
+    50,
+    10,
+    40,
+    40
+  ],
+  "value_size": [
+    40,
+    16
+  ],
+  "scale_size": [
+    400,
+    10
+  ],
+  "value_first": 864,
+  "scale_icon": 868,
+  "pixels_sha256": "440f62a14259f8abb3cdf29cd1aa327dd8ac46ce7bc33e389088147fb9878919",
+  "raster_sha256": "95ae9c68e8f9329b751fa18e58c1936362bb77d993aa03c7e9ab211fe9f951a1"
+}

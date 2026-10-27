@@ -71,9 +71,14 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
+let animeE6TablesPromise;
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=306&&film<=311){
+    animeE6TablesPromise??=fetch(new URL('./anime-e6-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('滤镜色表载入失败');return r.json();}).catch(e=>{animeE6TablesPromise=undefined;throw e;});
+    const lut=await animeE6TablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
+  }
   if(Number.isInteger(film)&&film>=299&&film<=305){
     d76TablesPromise??=fetch(new URL('./d76-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('D76 LUT unavailable');return r.json();}).catch(e=>{d76TablesPromise=undefined;throw e;});
     return previewD76Pixels(source,await d76TablesPromise,film);

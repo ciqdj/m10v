@@ -42,7 +42,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
@@ -71,7 +71,7 @@ function checkRuntime(runtime, manifest) {
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 95 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
+  need(manifest.film_count === 101 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
@@ -153,7 +153,7 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
-  const aspectFirst=focalIcons?855:782,iconCount=aspectFirst+2,descriptorCount=113+(focalIcons?1:0);
+  const aspectFirst=focalIcons?855:782,iconCount=869,descriptorCount=124+(focalIcons?1:0);
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
   const retired=manifest.sd_library?32:0, packedArt=artwork.subarray(retired*6400), packedCount=78-retired;
@@ -225,7 +225,21 @@ function checkRuntime(runtime, manifest) {
     need(manifest.d76_icons?.first_id===775&&manifest.d76_icons?.last_id===781&&art.length===7*6400&&manifest.d76_icons.sha256===sha(art)&&Number.isInteger(p)&&p>=BASE&&p+art.length<=BASE+runtime.length&&runtime.subarray(p-BASE,p-BASE+art.length).equals(art),'D76 artwork differs');
     for(let i=0;i<7;i++){const d=icons.descriptors+(104+i)*8,at=d-BASE;need(runtime.readUInt32LE(icons.table-BASE+(775+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===p+i*6400,'D76 icon descriptor differs');}
   }
-  const resourceCount=manifest.sd_library?356:183;
+  {
+    // Bind each newly appended film/enum descriptor and every pixel byte to
+    // checked-in artwork, independent of a rehashed runtime manifest.
+    const art=Buffer.concat([readFileSync(new URL('../native/gr3/m10v_anime_e6.rgba',import.meta.url)),readFileSync(new URL('../native/gr3/m10v_anime_ui.rgba',import.meta.url))]);
+    const shapes=[...Array.from({length:6},()=>[40,40]),...Array.from({length:4},()=>[40,16]),[400,10]];
+    const firstDescriptor=113+(focalIcons?1:0);let pixel=manifest.aspect_icons.pixels+19200,offset=0;
+    for(let i=0;i<11;i++){
+      const id=858+i,d=icons.descriptors+(firstDescriptor+i)*8,at=d-BASE,[w,h]=shapes[i],bytes=w*h*4;
+      need(runtime.readUInt32LE(icons.table-BASE+id*4)===d&&runtime.readUInt16LE(at)===w&&runtime.readUInt16LE(at+2)===h&&runtime.readUInt32LE(at+4)*4===pixel,'native anime icon descriptor differs');
+      need(runtime.subarray(pixel-BASE,pixel-BASE+bytes).equals(art.subarray(offset,offset+bytes)),'native anime artwork differs');
+      pixel+=bytes;offset+=bytes;
+    }
+    need(offset===art.length,'native anime artwork extent differs');
+  }
+  const resourceCount=364;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -244,7 +258,7 @@ const detailHooks=[
  [0x531b0008,0x979ff103,'row_dispatch',false],[0x531b000c,0xea000066,'row',false],[0x531b03f8,0xea000065,'current',false],
  [0x531b05e4,0xea00005c,'setup',false],[0x531b0bf4,0xea000093,'callback',false],
  [0x531acd24,0xeb0456c0,'reset',true]];
-const detailInstructions={"capacity":[0xe3a00016,0xe12fff1e],"table_ip":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223096,3904700419,3777818624,0xe3a0e00c,3904741375],"table_r3":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"table_selected":[3912065023,3775856640,3912040451,3852271640,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"row":[3796090898,3814457355,[8,false,1394278828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394278828],3796049938,3785369602,3783401476,3785363461,3818913795,[14,true,"m10v_detail_control"],[14,false,1394278500]],"current":[3796156434,3814457355,[8,false,1394279828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394279828],3796115474,3785363461,3818913793,[14,true,"m10v_detail_control"],3785375744,[14,false,1394279516]],"default":[3785363456,3818913796,3818921984,[14,false,"m10v_detail_control"]],"setup":[0xe240c012,0xe35c000b,[8,false,0x531b075c],0xe92d500f,0xe1a00004,[14,true,"m10v_detail_table"],0xe304c88c,0xe345c3b3,0xe150000c,0xe8bd500f,[0,false,0x531b075c],0xe1a0c000,0xe1a00004,0xe24bd010,0xe89d6810,[14,false,"slider_dispatch"]],"callback":[3796221970,3814457355,[8,false,1394282056],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394282056],3796181010,3785368578,3783401478,3785363460,3818913794,[14,true,"m10v_detail_control"],3813670912,[1,false,1394281580],3796619292,3902646512],"reset":[3912056848,[14,true,1395402796],3785363461,3818913799,3818921984,[14,true,"m10v_detail_control"],3904733200]};
+const detailInstructions={"capacity":[0xe3a00016,0xe12fff1e],"table_ip":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223096,3904700419,3777818624,0xe3a0e00c,3904741375],"table_r3":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"table_selected":[3912065023,3775856640,3912040451,3852271640,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"row":[3796090898,3814457356,[8,false,1394278828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394278828],3796049938,3785369602,3783401476,3785363461,3818913795,[14,true,"m10v_detail_control"],[14,false,1394278500]],"current":[3796156434,3814457356,[8,false,1394279828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394279828],3796115474,3785363461,3818913793,[14,true,"m10v_detail_control"],3785375744,[14,false,1394279516]],"default":[3785363456,3818913796,3818921984,[14,false,"m10v_detail_control"]],"setup":[0xe240c012,0xe35c000c,[8,false,0x531b075c],0xe92d500f,0xe1a00004,[14,true,"m10v_detail_table"],0xe304c88c,0xe345c3b3,0xe150000c,0xe8bd500f,[0,false,0x531b075c],0xe1a0c000,0xe1a00004,0xe24bd010,0xe89d6810,[14,false,"slider_dispatch"]],"callback":[3796221970,3814457356,[8,false,1394282056],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394282056],3796181010,3785368578,3783401478,3785363460,3818913794,[14,true,"m10v_detail_control"],3813670912,[1,false,1394281580],3796619292,3902646512],"reset":[3912056848,[14,true,1395402796],3785363461,3818913799,3818921984,[14,true,"m10v_detail_control"],3904733200]};
 detailInstructions.exposure_dispatch=[0xe92d5011,0xe1a01000,0xe3a00009,0xe3a02000,[14,true,'m10v_detail_control'],0xe3500001,0xe8bd5011,[0,false,'slider1'],[14,false,'slider2']];
 detailInstructions.row_dispatch=[0xe92d500f,0xe1a02803,0xe1822004,0xe1a01005,0xe3a00008,[14,true,'m10v_detail_control'],0xe8bd500f,0xe3530011,0x979ff103,[14,false,0x531b000c],
  0x531b009c,0x531b00ac,0x531b00bc,0x531b00cc,0x531b00dc,0x531b00ec,0x531b00fc,0x531b010c,0x531b011c,0x531b012c,0x531b013c,0x531b014c,0x531b015c,0x531b016c,0x531b017c,0x531b018c,0x531b019c,0x531b0058];
@@ -252,17 +266,17 @@ function checkDetail(runtime,manifest,raw) {
  const d=manifest.detail,base=manifest.base;
  const grain=manifest.experimental_capture?.native_grain===true;
  const halo=manifest.universal_halation;
- const ids=[18,19,20,...(grain?[21]:[]),...(halo?[22]:[]),28,29];
- const fields=['Halation Gain','Halation Spread','Highlight Gate',...(grain?['Film Grain']:[]),...(halo?['Halation Mode']:[]),'RED Exposure','Charmera Color'];
+ const ids=[18,19,20,...(grain?[21]:[]),...(halo?[22]:[]),28,29,30];
+ const fields=['Halation Gain','Halation Spread','Highlight Gate',...(grain?['Film Grain']:[]),...(halo?['Halation Mode']:[]),'RED Exposure','Charmera Color','Anime Mode'];
  need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&d.native_grain===grain&&
   JSON.stringify(d.ids)===JSON.stringify(ids)&&JSON.stringify(d.fields)===JSON.stringify(fields),'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
- const captions=read(d.captions,120);
- const variants={halo:[18,19,20,...(grain?[21]:[])],common:grain?[21]:[],red:[...(grain?[21]:[]),28],charmera:[29],phoenix:[18,19,20,...(grain?[21]:[]),28],pixel:[]};
+ const captions=read(d.captions,124);
+ const variants={halo:[18,19,20,...(grain?[21]:[])],common:grain?[21]:[],red:[...(grain?[21]:[]),28],charmera:[29],phoenix:[18,19,20,...(grain?[21]:[]),28],pixel:[],anime:[...(grain?[21]:[]),30]};
  if(halo)for(const name of Object.keys(variants))variants[name]=[22,18,19,20,...variants[name].filter(id=>![18,19,20].includes(id))];
  need(d.universal_halation===halo,'native detail capability differs');
  need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
- const expectedIds=[862,863,864,827,halo?1137:828,913,913,913,913,913,933,manifest.sd_library?1013:948];
+ const expectedIds=[862,863,864,827,halo?1137:828,913,913,913,913,913,933,manifest.sd_library?1013:948,1148];
  for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
@@ -289,15 +303,15 @@ function checkDetail(runtime,manifest,raw) {
     need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(suffix),'native detail list differs');
    }
   }
-  const maxima=[8,8,8,3,halo?2:3,2,8,5,8,1,2,3],dispatch=read(d.slider_dispatch,(ids.length*2+1)*4);
+  const maxima=[8,8,8,3,halo?2:3,2,8,5,8,1,2,3,3],dispatch=read(d.slider_dispatch,(ids.length*2+1)*4);
   for(let i=0;i<ids.length;i++){
    const id=ids[i];
    need(dispatch.readUInt32LE(i*8)===(0xe35c0000|id)>>>0,'native detail slider selector differs');
-   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(id===29?d.charmera_colors.slider:id===28?d.entries.exposure_dispatch:d.sliders[maxima[id-18]]))&0x0fffffff),'native detail slider target differs');
+   need(dispatch.readUInt32LE(i*8+4)===(branch(d.slider_dispatch+i*8+4,(id===30?d.anime_mode.slider:id===29?d.charmera_colors.slider:id===28?d.entries.exposure_dispatch:d.sliders[maxima[id-18]]))&0x0fffffff),'native detail slider target differs');
   }
   need(dispatch.readUInt32LE(ids.length*8)===branch(d.slider_dispatch+ids.length*8,d.sliders[8]),'native detail slider fallback differs');
   need(JSON.stringify(d.charmera_colors?.names)==='["RED","YELLOW","BLUE","GRAY"]'&&JSON.stringify(d.charmera_colors.value_icons)===JSON.stringify([0,1,2,3].map(i=>(manifest.sd_library?756:750)+i))&&d.charmera_colors.scale_icon===(manifest.sd_library?760:754),'native Charmera enum differs');
-  for(const [maximum,target,color] of [...[8,3,2,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true]]){
+  for(const [maximum,target,color,anime] of [...[8,3,2,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true,false],[3,d.anime_mode.slider,false,true]]){
    const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
    for(let a=start;a<stop;a+=4){
     const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
@@ -307,6 +321,7 @@ function checkDetail(runtime,manifest,raw) {
     if(a===0x531ad024)word=0xe1a00000;
     if(a===0x531ad03c&&maximum===3)word=0xe3a03039;
     if(a===0x531ad03c&&color)word=movw(3,manifest.sd_library?760:754);
+    if(a===0x531ad03c&&anime)word=movw(3,868);
     if(a===0x531ad060)word=(0xe3a02000|maximum)>>>0;
     if(a===0x531ad064)word=movw(3,360/maximum);
     need(code.readUInt32LE(at-target)===word,'native detail slider relocation differs at '+a.toString(16)+' expected '+word.toString(16)+' got '+code.readUInt32LE(at-target).toString(16));

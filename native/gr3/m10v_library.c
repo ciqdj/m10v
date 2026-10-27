@@ -3,6 +3,7 @@
  * with their source notices; no third-party camera runtime or signed film
  * package is loaded. Camera services have separately verified ABI boundaries. */
 #include "m10v_library.h"
+#include "m10v_anime.h"
 #include "m10v_film_directory.h"
 #include "halation_core.h"
 #include "film_5207.h"
@@ -106,7 +107,7 @@ int m10v_library_valid(const m10v_library_state *state) {
         if(!state->slots[i].film){for(uint32_t j=0;j<sizeof(m10v_slot);j++)if(((const uint8_t *)&state->slots[i])[j])return 0;for(uint32_t j=0;j<sizeof(*e);j++)if(((const uint8_t *)e)[j])return 0;continue;}
         if(M10V_LEGACY_SETTINGS&&i>=5)return 0;
         if(!M10V_LEGACY_SETTINGS)for(uint32_t j=0;j<i;j++)if(!state->slots[j].film||state->slots[j].film==state->slots[i].film||(M10V_CUSTOM(state->slots[i].film)&&M10V_CUSTOM(state->slots[j].film)&&state->effects[j].reserved[0]==e->reserved[0]&&e->reserved[0]<M10V_CUSTOM_IMMUTABLE_FIRST))return 0;
-        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->film_exposure>2||(state->slots[i].film==67?e->film_exposure>1:state->slots[i].film!=68&&e->film_exposure)||(state->slots[i].film==M10V_CHAR_ID?e->reserved[1]>3:e->reserved[1]!=0)||
+        if(e->grain_size>2||e->leak_gain>8||e->leak_position>5||e->leak_spread>8||e->leak_variation>1||e->film_exposure>2||(state->slots[i].film==67?e->film_exposure>1:state->slots[i].film!=68&&e->film_exposure)||((state->slots[i].film==M10V_CHAR_ID||M10V_ANIME(state->slots[i].film))?e->reserved[1]>3:e->reserved[1]!=0)||
            (M10V_BUILTIN(state->slots[i].film)?e->reserved[0]!=0:(e->reserved[0]<1||e->reserved[0]>M10V_CUSTOM_MAX_BANK+1)))return 0;}
     return 1;
 }
@@ -167,7 +168,7 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
         v->halo_spread=3;v->halo_threshold=5;v->halo_profile=id==66?1:2;
         m10v_film_effects e={0};next.effects[slot]=e;
     }
-    if(id!=M10V_CHAR_ID)next.effects[slot].reserved[1]=0;
+    if(id!=M10V_CHAR_ID&&!M10V_ANIME(id))next.effects[slot].reserved[1]=0;
     if(id==M10V_CHAR_ID&&state->slots[slot].film!=id)next.slots[slot].grain=0;
     if(id!=state->slots[slot].film||(id!=67&&id!=68))next.effects[slot].film_exposure=0;
     return commit(state, &next, store, context);
@@ -221,7 +222,7 @@ int m10v_library_film_name_stamp(m10v_library_state *state,uint32_t enabled,m10v
 }
 int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store store,void *ctx){
     if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||!state->slots[slot].film||field>7)return M10V_LIBRARY_INVALID;
-    if(field==7?(state->slots[slot].film!=M10V_CHAR_ID||value>3):field==6?(state->slots[slot].film==67?value>1:state->slots[slot].film!=68||value>2):field<=5?value!=0:0)return M10V_LIBRARY_INVALID;
+    if(field==7?((state->slots[slot].film!=M10V_CHAR_ID&&!M10V_ANIME(state->slots[slot].film))||value>3):field==6?(state->slots[slot].film==67?value>1:state->slots[slot].film!=68||value>2):field<=5?value!=0:0)return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     if(field==5){
         m10v_film_effects e={0,0,0,0,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
@@ -532,6 +533,8 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
         (state->stamp && date && (overlap(image->y, bytes, date, sizeof(*date)) ||
           overlap(image->chroma, bytes, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
     const m10v_slot *choice = &state->slots[slot];
+    /* New looks are ISP-only color. Never map these identities to old CPU LUTs. */
+    if(M10V_ANIME_E6(choice->film)&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
     if(M10V_CUSTOM(choice->film)&&!custom_lut)return M10V_LIBRARY_INVALID;
     uint32_t shift = 0, gw = image->width, gh = image->height;
     /* Power-of-two sampling must not depend on an ARM division runtime. */
@@ -551,8 +554,10 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     const uint32_t soft=0;
     (void)seed; /* Grain is exclusively owned by the native ISP. */
     m10v_film_effects effects=state->effects[slot];
-    uint32_t needed = (m10v_halo_workspace_planes(choice->film,choice->halo_profile) * cells + 3) & ~3u;
-    if ((soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
+    uint32_t anime=M10V_ANIME(choice->film)?effects.reserved[1]:0;
+    uint32_t needed = use_halo?((m10v_halo_workspace_planes(choice->film,choice->halo_profile) * cells + 3) & ~3u):0;
+    if(anime&&m10v_anime_workspace(image->width,anime)>needed)needed=m10v_anime_workspace(image->width,anime);
+    if ((soft || use_halo || anime) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
         (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
         overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
         overlap(scratch, needed, image, sizeof(*image)) ||
@@ -656,6 +661,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     if(use_halo&&!special_halo)m10v_universal_halation_compose(image,choice,scratch,gw,gh,shift);
 #endif
     M10V_PROFILE(9);
+    if(anime&&m10v_anime_render(image,anime,scratch,scratch_bytes))return M10V_LIBRARY_INVALID;
     if (state->stamp||(state->reserved&1u))stamp(image,state,date,M10V_CUSTOM(choice->film)?custom_name:m10v_library_name(choice->film));
     M10V_PROFILE(10);
     return M10V_LIBRARY_OK;

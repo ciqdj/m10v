@@ -90,6 +90,7 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
+ if(M10V_ANIME_E6(id))id=id-306+17;
  if(M10V_D76(id))id=id-M10V_D76_FIRST+10;
  if(id==M10V_5213_ID)id=9;
  if(M10V_STYLE(id))id=id-M10V_STYLE_FIRST+2;

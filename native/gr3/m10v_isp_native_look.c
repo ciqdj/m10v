@@ -4,10 +4,26 @@
 #include "m10v_isp_native_look_profiles.h"
 #include "m10v_spectral_native_profiles.h"
 #include "m10v_d76_native_profiles.h"
+#include "m10v_anime_e6_native_profiles.h"
 #include <stddef.h>
 _Static_assert(sizeof(m10v_isp_native_look)==1600,"bounded recipe color storage");
 _Static_assert(sizeof(native_frame_packed)==48,"lossless profile storage");
-static int supported(uint32_t film,uint32_t exposure){return film==M10V_CHAR_ID?exposure<4:(M10V_D76(film)||film==M10V_5213_ID||M10V_STYLE(film)||(film>=33&&film<=78))&&exposure<3&&(film==68||(film==67&&exposure==1)||!exposure);}
+static void unpack_frame(m10v_isp_frame_target *out,const native_frame_packed *t,const uint8_t *curve_stream){
+  for(uint32_t i=0;i<9;i++){out->matrix_q13[i]=t->matrix[i];out->post_q9[i]=t->post[i];}
+  for(uint32_t c=0;c<3;c++){
+   const uint8_t *stream=curve_stream+t->offset[c];
+   uint32_t value=t->first[c],previous=0,acc=0,bits=0;
+   out->curves[c][0]=(uint16_t)value;
+   for(uint32_t i=1;i<256;i++){
+    if(bits<2){acc|=(uint32_t)*stream++<<bits;bits+=8;}
+    uint32_t code=acc&3u;acc>>=2;bits-=2;
+    if(code==1)previous++;else if(code==2)previous--;
+    else if(code==3){if(bits<8){acc|=(uint32_t)*stream++<<bits;bits+=8;}previous=acc&255u;acc>>=8;bits-=8;}
+    value+=previous;out->curves[c][i]=(uint16_t)value;
+   }
+  }
+}
+static int supported(uint32_t film,uint32_t exposure){return film==M10V_CHAR_ID?exposure<4:(M10V_ANIME_E6(film)||M10V_D76(film)||film==M10V_5213_ID||M10V_STYLE(film)||(film>=33&&film<=78))&&exposure<3&&(film==68||(film==67&&exposure==1)||!exposure);}
 int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t exposure,uint32_t generation){
  if(!s)return 0;
  s->magic=M10V_ISP_NATIVE_LOOK_MAGIC;s->version=M10V_ISP_NATIVE_LOOK_VERSION;
@@ -29,6 +45,9 @@ int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t 
   for(uint32_t i=0;i<9;i++){s->target.matrix_q13[i]=t->matrix_q13[i];s->target.post_q9[i]=t->post_q9[i];}
   for(uint32_t c=0;c<3;c++)for(uint32_t i=0;i<256;i++)s->target.curves[c][i]=t->curves[c][i];
  }
+ else if(M10V_ANIME_E6(film)){
+  unpack_frame(&s->target,&native_anime_e6_frame[film-306],native_anime_e6_curve_stream);
+ }
  else if(M10V_D76(film)){
   const m10v_isp_frame_target *t=&native_d76_frame[film-M10V_D76_FIRST];
   for(uint32_t i=0;i<9;i++){s->target.matrix_q13[i]=t->matrix_q13[i];s->target.post_q9[i]=t->post_q9[i];}
@@ -44,26 +63,14 @@ int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t 
  else if(film>=34&&film<=65){uint16_t knots[99];if(m10v_library_tables(film,s->target.matrix_q13,s->target.post_q9,&s->target.curves[0][0],knots))return 0;}
  else {
   const native_frame_packed *t=film==33?&native_800t_frame:film==66?&native_5207_frame:film==67?(exposure?&native_phoenix120_frame:&native_phoenix_frame):film==68?&native_red_frame[exposure]:film>=73?&native_newstocks_frame[film-73]:&native_curated_frame[film-69];
-  for(uint32_t i=0;i<9;i++){s->target.matrix_q13[i]=t->matrix[i];s->target.post_q9[i]=t->post[i];}
-  for(uint32_t c=0;c<3;c++){
-   const uint8_t *stream=native_curve_stream+t->offset[c];
-   uint32_t value=t->first[c],previous=0,acc=0,bits=0;
-   s->target.curves[c][0]=(uint16_t)value;
-   for(uint32_t i=1;i<256;i++){
-    if(bits<2){acc|=(uint32_t)*stream++<<bits;bits+=8;}
-    uint32_t code=acc&3u;acc>>=2;bits-=2;
-    if(code==1)previous++;else if(code==2)previous--;
-    else if(code==3){if(bits<8){acc|=(uint32_t)*stream++<<bits;bits+=8;}previous=acc&255u;acc>>=8;bits-=8;}
-    value+=previous;s->target.curves[c][i]=(uint16_t)value;
-   }
-  }
+  unpack_frame(&s->target,t,native_curve_stream);
  }
  s->status=M10V_NATIVE_LOOK_READY;return 1;
 }
 /* Keep the sector workspace out of the frame gamma packer call chain. */
 static __attribute__((noinline)) void apply_native_sectors(void *frame,uint32_t film,uint32_t exposure){
   m10v_isp_multiaxis_target t;
-  const int16_t *h=M10V_D76(film)?native_d76_hue[film-M10V_D76_FIRST]:film==77||film==M10V_5213_ID?native_spectral_hue[film==77?0:1]:M10V_STYLE(film)?native_style_filters_hue[film-M10V_STYLE_FIRST]:film>=73?native_newstocks_hue[film-73]:film>=69?native_curated_hue[film-69]:film==66?native_5207_hue:exposure?native_phoenix120_hue:native_phoenix_hue;
+  const int16_t *h=M10V_ANIME_E6(film)?native_anime_e6_hue[film-306]:M10V_D76(film)?native_d76_hue[film-M10V_D76_FIRST]:film==77||film==M10V_5213_ID?native_spectral_hue[film==77?0:1]:M10V_STYLE(film)?native_style_filters_hue[film-M10V_STYLE_FIRST]:film>=73?native_newstocks_hue[film-73]:film>=69?native_curated_hue[film-69]:film==66?native_5207_hue:exposure?native_phoenix120_hue:native_phoenix_hue;
   const uint16_t boundaries[16]={1298,750,0,0,1448,843,0,0,1298,750,0,0,1205,843,0,0};
   const uint8_t selectors[20]={0,1,2,2,2,3,4,5,5,5,6,7,8,8,8,9,10,11,11,11};
   const uint16_t controls[21]={32,328,328,328,293,800,1600,2400,3200,32,1024,1024,1024,1024,0,0,0,0,0,640,1280};
@@ -85,7 +92,7 @@ int m10v_isp_native_look_apply(m10v_isp_native_look *s,const void *gamma,void *f
   * embedded multiaxis records are build-time certified; their writer writes
   * disjoint banks (CCA/CSP/gamma untouched), and cannot reject this frame. */
  if(!m10v_isp_frame_apply(gamma,frame,&s->target,cs)){s->status=M10V_NATIVE_LOOK_REJECTED;return 0;}
- if(M10V_D76(s->film)||s->film==M10V_5213_ID||s->film==66||s->film==67||(s->film>=69&&s->film<=78)||M10V_STYLE(s->film))apply_native_sectors(frame,s->film,s->exposure);
+ if(M10V_ANIME_E6(s->film)||M10V_D76(s->film)||s->film==M10V_5213_ID||s->film==66||s->film==67||(s->film>=69&&s->film<=78)||M10V_STYLE(s->film))apply_native_sectors(frame,s->film,s->exposure);
  s->applied_frame=(uint32_t)f;s->status=M10V_NATIVE_LOOK_APPLIED;return 1;
 }
 int m10v_isp_native_look_matches(const m10v_isp_native_look *s,uint32_t film,uint32_t exposure,uint32_t generation){

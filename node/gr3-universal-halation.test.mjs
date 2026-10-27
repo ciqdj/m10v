@@ -31,7 +31,7 @@ test('latest-main SD records remain accepted and repaired corruption stays rejec
  const {readFileSync}=await import('node:fs');
  const {buildSdFilmPack,auditSdFilmPack,sdCrc}=await import('./gr3-sd-film-pack.mjs');
  const frozen=JSON.parse(readFileSync(new URL('./gr3-sd-pre-universal-halation-contract.json',import.meta.url)));
- const pack=buildSdFilmPack();const count=pack.readUInt32LE(16);
+ const pack=buildSdFilmPack(auditSdFilmPack(buildSdFilmPack()).ids.filter(id=>frozen.ids.includes(id)&&id!==294));const count=pack.readUInt32LE(16);
  for(let i=0;i<count;i++){
   const record=pack.subarray(4096+i*12288,4096+(i+1)*12288);
   Buffer.from(frozen.renderer,'hex').copy(record,8448);

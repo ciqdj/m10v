@@ -122,6 +122,7 @@ static uint32_t resource(uint32_t tone) {
     return 0;
 }
 static uint32_t film_resource(uint32_t film) {
+    if(M10V_ANIME_E6(film))return 1142+film-306;
     if(M10V_D76(film))return (M10V_SD_LIBRARY?1130:962)+film-M10V_D76_FIRST;
     if(film==M10V_5213_ID)return M10V_SD_LIBRARY?1128:961;
     if(film==M10V_PIXEL_ID)return M10V_SD_LIBRARY?1023:953;
