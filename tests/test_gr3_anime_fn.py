@@ -35,7 +35,11 @@ class AnimeFnArmTests(unittest.TestCase):
      e=StockISP(self.rom);ui=e.alloc(0x1a0);row=e.alloc(0x700);slider=e.alloc(0x100)
      e.u.mem_write(ui+0x198,bytes([25,0,0,0,0,0]));e.w32(ui+0x194,e.alloc(4));e.w32(ui+0x164,slider);e.w32(ui+0x160,e.alloc(0x100))
      e.w32(row+0xf0,row+0x200);e.w32(row+0xf4,row+0x400)
-     state=bytearray.fromhex(m['initial_state_hex']);struct.pack_into('<H',state,12,film);state[103]=mode;struct.pack_into('<I',state,180,zlib.crc32(state[:180]))
+     state=bytearray.fromhex(m['initial_state_hex'])
+     # Candidate may already contain all three anime films. Use one enabled
+     # slot so switching the fixture identity cannot create a duplicate film.
+     state[20:92]=bytes(72);state[104:176]=bytes(72)
+     struct.pack_into('<H',state,12,film);state[103]=mode;struct.pack_into('<I',state,180,zlib.crc32(state[:180]))
      events=[];fail=[False]
      def service(u,at,n,_):
       args=[u.reg_read(getattr(A,'UC_ARM_REG_R'+str(i))) for i in range(4)];result=0
