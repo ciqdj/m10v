@@ -14,12 +14,12 @@ test('legacy retired effects migrate to neutral without losing other slot settin
 test('nonzero grain exports require the supported GR III native graph',async()=>{
  const c=defaultConfiguration();c.slots[0].grain=1;const gr3=await readNativeOfficial('gr3'),x=await readNativeOfficial('gr3x');
  assert.equal(prepareNative(gr3,c).capture_pipeline,'gr3-native-v8');
- assert.throws(()=>prepareNative(x,c),/颗粒.*GR III/);
+ assert.equal(prepareNative(x,c).capture_pipeline,'gr3-native-v8');
  assert.throws(()=>prepareNative(gr3,c,{live_color:false}),/颗粒.*GR III/);
  assert.throws(()=>prepareNative(gr3,{...c,hdf:1},{live_color:false}),/颗粒.*GR III/);
  assert.throws(()=>normalizeGr4Request({configuration:c}),/颗粒.*GR III/);
  for(const film of [289,290]){const special=selectNativeFilm(c,0,film);special.slots[0].grain=1;assert.throws(()=>prepareNative(gr3,special),/颗粒/);}
- assert.ok(!prepareNative(x,defaultConfiguration()).features.includes('grain'));
+ assert.ok(prepareNative(x,defaultConfiguration()).features.includes('grain'));
 });
 test('web controls remove retired effect widgets and promises',()=>{
  for(const file of ['native-library.html','native-library-controls.html']){

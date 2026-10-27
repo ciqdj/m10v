@@ -1,11 +1,26 @@
 #ifndef M10V_ZOOM_H
 #define M10V_ZOOM_H
 #include <stdint.h>
-/* Two persistent user-editable crop slots. Firmware adapters own selection,
+/* IIIx nominal71 uses the stock 50/28 ratio (RTOS literal53d2ffe8),
+ * not71/40: preserve original crop enum6 and native metadata/resolution.
+ * Two persistent user-editable crop slots. Firmware adapters own selection,
  * image geometry and per-photo metadata; this module never touches pixels. */
 #define M10V_ZOOM_BYTES 24u
+#if M10V_CAMERA_GR3X
+#define M10V_ZOOM_MIN_MM 40u
+#define M10V_ZOOM_MAX_MM 71u
+#define M10V_ZOOM_DEFAULT_SECOND_BITS 0x3fe49249u
+#define M10V_ZOOM_DEFAULT_FIRST 50u
+#define M10V_ZOOM_DEFAULT_SECOND 71u
+#define M10V_ZOOM_LEGACY_MAX_MM 71u
+#else
 #define M10V_ZOOM_MIN_MM 28u
 #define M10V_ZOOM_MAX_MM 50u
+#define M10V_ZOOM_DEFAULT_SECOND_BITS 0x3fe49249u
+#define M10V_ZOOM_DEFAULT_FIRST 35u
+#define M10V_ZOOM_DEFAULT_SECOND 50u
+#define M10V_ZOOM_LEGACY_MAX_MM 100u
+#endif
 #define M10V_ZOOM_STALE (-2)
 typedef struct { uint32_t sequence; uint16_t mm[2]; } m10v_zoom_state;
 typedef struct {

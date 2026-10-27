@@ -1,3 +1,7 @@
+#ifndef M10V_ZOOM_MAX_BITS_LO
+#define M10V_ZOOM_MAX_BITS_LO 0x9249
+#define M10V_ZOOM_MAX_BITS_HI 0x3fe4
+#endif
 .syntax unified
 .arm
 .fpu neon
@@ -94,8 +98,8 @@ entry guard_\name
  movt ip,#0x7f80
  cmp r3,ip
  bhs 1f
- movw ip,#0x9249
- movt ip,#0x3fe4
+ movw ip,#M10V_ZOOM_MAX_BITS_LO
+ movt ip,#M10V_ZOOM_MAX_BITS_HI
  cmp r3,ip
  vmovhi s0,ip
  pop {r4,pc}

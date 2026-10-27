@@ -43,7 +43,7 @@ void m10v_zoom_capture_marker_summary(uint32_t context, uint32_t summary, uint32
     /* Keep native enum handling. Unknown/custom enum is zero, never fake35/50.
      * Caller-side custom icon/text handling remains required separately. */
     m10v_zoom_original_marker_summary(context,summary,ifd);
-    if (mm && summary) m10v_zoom_native_summary_write(summary,0x11,(mm*100)/28);
+    if (mm && summary) m10v_zoom_native_summary_write(summary,0x11,(mm*100)/M10V_ZOOM_MIN_MM);
 }
 uint32_t m10v_zoom_capture_raw_count(uint32_t model) {
     uint32_t mm=m10v_zoom_mm(m10v_zoom_capture_raw_bits(model));
@@ -76,7 +76,7 @@ int m10v_zoom_capture_resolution(uint32_t bits,uint32_t quality,uint32_t ratio,
  * Caption uses caller-owned numeric resource IDs, never a RAM string pointer. */
 extern uint32_t m10v_zoom_caption(uint32_t bits);
 uint32_t m10v_zoom_capture_custom(uint32_t bits) {
-    return bits != 0x3f800000u && bits != 0x3fa00000u && bits != 0x3fe49249u;
+    return bits != 0x3f800000u && bits != 0x3fa00000u && bits != M10V_ZOOM_DEFAULT_SECOND_BITS;
 }
 uint32_t m10v_zoom_capture_caption(uint32_t bits) {
     if (!m10v_zoom_capture_custom(bits)) return UINT32_MAX;

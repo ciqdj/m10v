@@ -24,5 +24,5 @@ export function mountPowerImages(root,{api,onChange,model}){
   card.querySelector('[data-reset]').addEventListener('click',()=>{delete configuration[kind];onChange();showSaved();});
   cards[kind]={showSaved,card,tab,apply,hasPending:()=>!!bitmap||previewFailed};draw();
  }
- return {hasPending:()=>Object.values(cards).some(item=>item.hasPending()),applyPending:async()=>{for(const item of Object.values(cards))if(item.hasPending()&&!await item.apply())return false;return true;},getConfiguration:()=>structuredClone(configuration),setConfiguration:value=>{configuration=structuredClone(value||{});for(const item of Object.values(cards))item.showSaved();},setModel:()=>{root.hidden=model()!=='gr3';}};
+ return {hasPending:()=>Object.values(cards).some(item=>item.hasPending()),applyPending:async()=>{for(const item of Object.values(cards))if(item.hasPending()&&!await item.apply())return false;return true;},getConfiguration:()=>structuredClone(configuration),setConfiguration:value=>{configuration=structuredClone(value||{});for(const item of Object.values(cards))item.showSaved();},setModel:()=>{root.hidden=!['gr3','gr3x'].includes(model());}};
 }

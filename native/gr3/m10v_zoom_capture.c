@@ -1,6 +1,6 @@
 #include "m10v_zoom_capture.h"
 static int custom(uint32_t mm) {
-    return mm >= 28 && mm <= 100 && mm != 28 && mm != 35 && mm != 50;
+    return mm >= M10V_ZOOM_MIN_MM && mm <= M10V_ZOOM_LEGACY_MAX_MM && mm != M10V_ZOOM_MIN_MM && mm != M10V_ZOOM_DEFAULT_FIRST && mm != M10V_ZOOM_DEFAULT_SECOND;
 }
 int m10v_zoom_capture_marker_encode(uint32_t mm, uint8_t marker[3]) {
     if (!marker || !custom(mm)) return 0;
@@ -23,8 +23,8 @@ int m10v_zoom_capture_geometry(uint32_t mm, uint32_t source_w,
     if (!out || !custom(mm) || !source_w || !source_h ||
         source_w > 6000 || source_h > 4000 || !quality_w || !quality_h ||
         quality_w > source_w || quality_h > source_h) return 0;
-    w = ((source_w * 28) / mm) & ~15u;
-    h = ((source_h * 28) / mm) & ~15u;
+    w = ((source_w * M10V_ZOOM_MIN_MM) / mm) & ~15u;
+    h = ((source_h * M10V_ZOOM_MIN_MM) / mm) & ~15u;
     if (!w || !h) return 0;
     out->x = (6000 - w) / 2;
     out->y = (4000 - h) / 2;
@@ -36,7 +36,7 @@ int m10v_zoom_capture_geometry(uint32_t mm, uint32_t source_w,
 }
 uint32_t m10v_zoom_capture_quality_count(uint32_t mm) {
     if (!custom(mm)) return 0;
-    return mm < 35 ? 4 : mm < 50 ? 3 : 2;
+    return mm < M10V_ZOOM_DEFAULT_FIRST ? 4 : mm < M10V_ZOOM_DEFAULT_SECOND ? 3 : 2;
 }
 int m10v_zoom_capture_quality_value(uint32_t mm, uint32_t index) {
     uint32_t count = m10v_zoom_capture_quality_count(mm);

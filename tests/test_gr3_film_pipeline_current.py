@@ -28,7 +28,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
             folder = Path(delivery)
             cls.manifest = json.loads((folder / 'M10V-runtime-manifest.json').read_text())
             receipt = json.loads((folder / 'M10V-build-receipt.json').read_text())
-            binary = folder / 'fwdc239b.bin'
+            binary = folder / receipt['filename']
             assert hashlib.sha256(binary.read_bytes()).hexdigest() == receipt['candidate_sha256']
             js = "import{readFileSync}from'node:fs';import{decodeFrameMap}from'./node/gr3-frames.mjs';const b=readFileSync(process.argv[1]),d=decodeFrameMap(b,b.readUInt32LE(b.length-8)).decoded;process.stdout.write(d.subarray(0x10870,0x10870+d.readUInt32LE(0x1086c)));"
             cls.image = subprocess.check_output(['node', '--input-type=module', '-e', js, str(binary)], cwd=ROOT)
@@ -399,13 +399,13 @@ assert.throws(()=>buildNativeLibrary(s,r,m),/snapshot submission wrapper instruc
             js = """import{writeFileSync}from'node:fs';
 import{readNativeOfficial,prepareNative,generateNative}from'./node/gr3-native-library.mjs';
 import{defaultConfiguration}from'./web/gr3/native-library-state.mjs';import{decodeFrameMap}from'./node/gr3-frames.mjs';
-const s=await readNativeOfficial('gr3'),c=defaultConfiguration(),o={debug_mode:true,live_color:false,hdf_enabled:false};
+const model=process.argv[2],s=await readNativeOfficial(model),c=defaultConfiguration(model),o={debug_mode:true,live_color:false,hdf_enabled:false};
 const p=prepareNative(s,c,o),r=await generateNative(s,c,p.configuration_sha256,o);
 const b=decodeFrameMap(r.candidate).decoded;
 writeFileSync(process.argv[1]+'/rtos.bin',b.subarray(0x10870,0x10870+b.readUInt32LE(0x1086c)));
 writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
 """
-            subprocess.run(['node', '--input-type=module', '-e', js, d], cwd=ROOT, check=True, capture_output=True)
+            subprocess.run(['node', '--input-type=module', '-e', js, d, self.manifest.get('camera_model','gr3')], cwd=ROOT, check=True, capture_output=True)
             self.manifest = json.loads((Path(d) / 'manifest.json').read_text())
             self.image = (Path(d) / 'rtos.bin').read_bytes()
             self.assertFalse(self.manifest['capture_lifecycle']['snapshot']['live_color'])

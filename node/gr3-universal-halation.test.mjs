@@ -19,7 +19,7 @@ test('universal halation is explicit GR III film capability, bound into plan and
  assert.throws(()=>prepareNative(source,config,{halation_enabled:'yes'}),/光晕/);
  assert.throws(()=>prepareNative(source,config,{halation_enabled:true,film_library:false}),/光晕/);
  assert.throws(()=>prepareNative(source,config,{halation_enabled:true,live_color:false}),/光晕/);
- const x=await readNativeOfficial('gr3x');assert.throws(()=>prepareNative(x,config,{halation_enabled:true}),/光晕/);
+ const x=await readNativeOfficial('gr3x');assert.equal(prepareNative(x,config,{halation_enabled:true}).halation_enabled,true);
 });
 test('web draft preserves the independent halation write toggle',()=>{
  const draft=normalizeWorkbenchDraft({profile:'native',features:['film','halation'],nativeConfiguration:defaultConfiguration()});

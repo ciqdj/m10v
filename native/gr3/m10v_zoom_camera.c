@@ -7,8 +7,8 @@ extern uint32_t m10v_zoom_native_back_bits(uint32_t);
 #ifndef M10V_ZOOM_SEED_LO
 #define M10V_ZOOM_SEED_LO 0u
 #define M10V_ZOOM_SEED_HI 0u
-#define M10V_ZOOM_SEED_FIRST 35u
-#define M10V_ZOOM_SEED_SECOND 50u
+#define M10V_ZOOM_SEED_FIRST M10V_ZOOM_DEFAULT_FIRST
+#define M10V_ZOOM_SEED_SECOND M10V_ZOOM_DEFAULT_SECOND
 #endif
 #define MAGIC 0x5a4d1000u
 #define PENDING 4u
@@ -69,7 +69,7 @@ static m10v_settings_controller *ready(void){
 }
 uint32_t m10v_zoom_camera_bits(unsigned slot){
  if(slot>=2)return 0x3f800000u;
- m10v_settings_controller *p=ready();return m10v_zoom_bits(p?p->zoom_mm[slot]:slot?50:35);
+ m10v_settings_controller *p=ready();return m10v_zoom_bits(p?p->zoom_mm[slot]:slot?M10V_ZOOM_DEFAULT_SECOND:M10V_ZOOM_DEFAULT_FIRST);
 }
 unsigned m10v_zoom_camera_slot(uint32_t bits){
  m10v_settings_controller *p=ready();unsigned preferred=p?p->zoom_flags&3u:2;

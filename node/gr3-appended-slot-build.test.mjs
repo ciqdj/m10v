@@ -15,11 +15,11 @@ test('GR III preflight preserves factory choices and binds the new slot layout t
  assert.throws(()=>prepareNative(source,configuration,{appended_slots:1}),/布尔/);
 });
 
-test('IIIx and standalone HDF keep their existing layout until independently adapted',async()=>{
+test('IIIx shares the appended layout while standalone HDF preserves stock menus',async()=>{
  const configuration=defaultConfiguration();
  const x=await readNativeOfficial('gr3x');
- assert.equal(prepareNative(x,configuration).appended_slots,false);
- assert.throws(()=>prepareNative(x,configuration,{appended_slots:true}),/GR III/);
+ assert.equal(prepareNative(x,configuration).appended_slots,true);
+ assert.equal(prepareNative(x,configuration,{appended_slots:true}).appended_slots,true);
  const source=await readNativeOfficial();
  assert.equal(prepareNative(source,configuration,{film_library:false}).appended_slots,false);
  assert.throws(()=>prepareNative(source,configuration,{film_library:false,appended_slots:true}),/胶卷/);

@@ -32,7 +32,7 @@ test('power images reject wrong models and malformed JPEG data, with unchanged h
  assert.throws(()=>module.preparePowerImages(source,{shutdown:{jpeg_base64:truncated.toString('base64')}}),/JPEG|图片/);
  assert.throws(()=>module.preparePowerImages(source,{shutdown:{jpeg_base64:Buffer.from('not jpeg').toString('base64')}}),/JPEG|图片/);
  const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.throws(()=>module.preparePowerImages(x,{shutdown:{jpeg_base64:'abcd'}}),/GR III/);
+ assert.throws(()=>module.preparePowerImages(x,{shutdown:{jpeg_base64:'abcd'}}),/JPEG|图片/);
  const base={configuration_sha256:'a'.repeat(64),ready:true};
  assert.equal(module.bindPowerPreparation(base,source,{}).configuration_sha256,base.configuration_sha256);
 });

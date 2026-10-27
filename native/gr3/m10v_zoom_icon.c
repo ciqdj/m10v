@@ -1,6 +1,6 @@
 /* Native focal artwork style; each synchronous draw owns one60x20 RGBA heap.
  * Original stock35/50 dispatch stays unchanged. No global writable scratch. */
-#include <stdint.h>
+#include "m10v_zoom.h"
 extern uint32_t m10v_zoom_mm(uint32_t);
 extern void *m10v_zoom_native_icon_alloc(uint32_t);
 /* Exact original focal35/50/28 glyphs, original71 suffix and mm suffix.
@@ -97,7 +97,7 @@ static const uint8_t native_mm71[190]={
 
 uint32_t m10v_zoom_icon_id(uint32_t bits){
  uint32_t mm=m10v_zoom_mm(bits);
- return mm&&mm!=28&&mm!=35&&mm!=50?782+mm-28:0;
+ return mm&&mm!=M10V_ZOOM_MIN_MM&&mm!=M10V_ZOOM_DEFAULT_FIRST&&mm!=M10V_ZOOM_DEFAULT_SECOND?782+mm-28:0;
 }
 static uint32_t pixel(const uint8_t *table,unsigned i){
  unsigned bit=i*7,value=table[bit/8]|((unsigned)table[bit/8+1]<<8);
@@ -113,7 +113,7 @@ static uint32_t text_pixel(unsigned mm,unsigned x,unsigned y){
  return x<27&&y>=9&&y<17?pixel(mm==71?native_mm71:native_mm,(y-9)*27+x):0xff363535u;
 }
 uint32_t m10v_zoom_icon_decode(uint32_t id){
- if(id<782||id>804)return 0;
+ if(id<782+M10V_ZOOM_MIN_MM-28||id>782+M10V_ZOOM_MAX_MM-28)return 0;
  unsigned mm=id-782+28;
  uint32_t *p=m10v_zoom_native_icon_alloc(60*20*4);
  if(!p)return 0;

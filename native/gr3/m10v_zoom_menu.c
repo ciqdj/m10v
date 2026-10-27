@@ -6,7 +6,7 @@ static void draft(m10v_zoom_menu *s){
 }
 void m10v_zoom_menu_open(m10v_zoom_menu *s,const m10v_zoom_menu_ops *o){
  for(unsigned i=0;i<sizeof(*s);i++)((uint8_t *)s)[i]=0;
- s->saved.mm[0]=35;s->saved.mm[1]=50;
+ s->saved.mm[0]=M10V_ZOOM_DEFAULT_FIRST;s->saved.mm[1]=M10V_ZOOM_DEFAULT_SECOND;
  if(!o||!o->load||o->load(&s->saved)<0){s->error=2;return;}
  unsigned selected=o->current?o->current():2;
  s->selected=selected<2?selected:2;s->focus=s->selected==2?0:s->selected+1;draft(s);

@@ -6,15 +6,17 @@ uint32_t m10v_zoom_caption(uint32_t bits){
  uint32_t mm=m10v_zoom_mm(bits);return mm?1031+mm-28:2;
 }
 uint32_t m10v_zoom_bits(uint32_t mm){
+ if(mm==M10V_ZOOM_DEFAULT_SECOND)return M10V_ZOOM_DEFAULT_SECOND_BITS;
  if(mm<M10V_ZOOM_MIN_MM||mm>M10V_ZOOM_MAX_MM)return 0;
- uint32_t exponent=mm>=56?1u:0u;
- uint32_t mantissa=((mm<<(23-exponent))+14)/28;
+ uint32_t exponent=mm>=2*M10V_ZOOM_MIN_MM?1u:0u;
+ uint32_t mantissa=((mm<<(23-exponent))+M10V_ZOOM_MIN_MM/2)/M10V_ZOOM_MIN_MM;
  return ((127+exponent)<<23)|(mantissa-0x800000u);
 }
 uint32_t m10v_zoom_mm(uint32_t bits){
- if(bits<0x3f800000u||bits>0x40649249u)return 0;
+ if(bits==M10V_ZOOM_DEFAULT_SECOND_BITS)return M10V_ZOOM_DEFAULT_SECOND;
+ if(bits<0x3f800000u||bits>m10v_zoom_bits(M10V_ZOOM_MAX_MM))return 0;
  uint32_t exponent=(bits>>23)-127u,shift=23-exponent;
- uint32_t mm=(((bits&0x7fffffu)|0x800000u)*28u+(1u<<(shift-1)))>>shift;
+ uint32_t mm=(((bits&0x7fffffu)|0x800000u)*M10V_ZOOM_MIN_MM+(1u<<(shift-1)))>>shift;
  return m10v_zoom_bits(mm)==bits?mm:0;
 }
 static uint32_t get(const uint8_t *b){
@@ -31,8 +33,8 @@ static uint32_t crc(const uint8_t *b){
 static int focal(uint32_t mm){return mm>=M10V_ZOOM_MIN_MM&&mm<=M10V_ZOOM_MAX_MM;}
 static int decode(m10v_zoom_state *s,const uint8_t *b){
  if(get(b)!=0x315a304du||get(b+4)!=1||get(b+20)!=crc(b)||
-    !((get(b+12)>=28&&get(b+12)<=100)&&(get(b+16)>=28&&get(b+16)<=100)))return 0;
- s->sequence=get(b+8);s->mm[0]=(uint16_t)(get(b+12)>50?50:get(b+12));s->mm[1]=(uint16_t)(get(b+16)>50?50:get(b+16));return 1;
+    !((get(b+12)>=M10V_ZOOM_MIN_MM&&get(b+12)<=M10V_ZOOM_LEGACY_MAX_MM)&&(get(b+16)>=M10V_ZOOM_MIN_MM&&get(b+16)<=M10V_ZOOM_LEGACY_MAX_MM)))return 0;
+ s->sequence=get(b+8);s->mm[0]=(uint16_t)(get(b+12)>M10V_ZOOM_MAX_MM?M10V_ZOOM_MAX_MM:get(b+12));s->mm[1]=(uint16_t)(get(b+16)>M10V_ZOOM_MAX_MM?M10V_ZOOM_MAX_MM:get(b+16));return 1;
 }
 static void encode(uint8_t *b,const m10v_zoom_state *s){
  put(b,0x315a304du);put(b+4,1);put(b+8,s->sequence);
@@ -41,7 +43,7 @@ static void encode(uint8_t *b,const m10v_zoom_state *s){
 int m10v_zoom_load(m10v_zoom_state *s,const m10v_zoom_io *io){
  if(!s||!io||!io->read)return -1;
  uint8_t b[M10V_ZOOM_BYTES];m10v_zoom_state candidate;int found=0,failed=0;
- s->sequence=0;s->mm[0]=35;s->mm[1]=50;
+ s->sequence=0;s->mm[0]=M10V_ZOOM_DEFAULT_FIRST;s->mm[1]=M10V_ZOOM_DEFAULT_SECOND;
  for(unsigned p=0;p<2;p++){
   int result=io->read(io->context,p,b,sizeof(b));
   if(result<0)failed=1;

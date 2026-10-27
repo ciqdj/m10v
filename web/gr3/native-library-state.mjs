@@ -1,14 +1,15 @@
+import {isGr3Family,modelCapabilities} from './model-capabilities.mjs';
 // One catalogue and one selected-film contract for simulation and in-camera library.
 export const defaultEffects=()=>({grainSize:0,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0,filmExposure:0});
 export const defaultHalo=()=>({gain:0,spread:3,threshold:5,profile:2});
-export const defaultConfiguration=()=>({slots:Array.from({length:5},(_,i)=>({film:i===4?33:34+i,grain:0,soft:0,halo:defaultHalo(),effects:defaultEffects()})),stamp:0,format:0,corner:0,color:0,filmNameStamp:false,hdf:0,zoom:{write:false,slots:[35,50],revision:0}});
+export const defaultConfiguration=(model='gr3')=>({slots:Array.from({length:5},(_,i)=>({film:i===4?33:34+i,grain:0,soft:0,halo:defaultHalo(),effects:defaultEffects()})),stamp:0,format:0,corner:0,color:0,filmNameStamp:false,hdf:0,zoom:{write:false,slots:[...(modelCapabilities(model).zoom?.defaults??[35,50])],revision:0}});
 export function normalizeConfiguration(value=defaultConfiguration()){
  const exact=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).sort().join('|')===[...keys].sort().join('|');
  const int=(n,min,max)=>Number.isInteger(n)&&n>=min&&n<=max;
  const required=['slots','stamp','format','corner','color'],allowed=[...required,'hdf','filmNameStamp','zoom'];
  if(!value||typeof value!=='object'||Array.isArray(value)||required.some(k=>!Object.hasOwn(value,k))||Object.keys(value).some(k=>!allowed.includes(k))||!Array.isArray(value.slots)||value.slots.length>10)throw Error('需要完整的胶卷选择配置');
  const z=value.zoom===undefined?{write:false,slots:[35,50],revision:0}:value.zoom;
- if(!exact(z,['write','slots','revision'])||typeof z.write!=='boolean'||!Array.isArray(z.slots)||z.slots.length!==2||z.slots.some(n=>!int(n,28,50))||!int(z.revision,0,0xffffffff))throw Error('裁切焦距需要两档 28–50 mm 整数和有效写入标识');
+ if(!exact(z,['write','slots','revision'])||typeof z.write!=='boolean'||!Array.isArray(z.slots)||z.slots.length!==2||z.slots.some(n=>!int(n,28,71))||!int(z.revision,0,0xffffffff))throw Error('裁切焦距需要两档 28–71 mm 整数和有效写入标识');
  const zoom={write:z.write,slots:[...z.slots],revision:z.revision};
  const hdf=value.hdf===undefined?0:value.hdf;if(!int(hdf,0,3))throw Error('HDF 模拟档位无效');
  const slots=value.slots.map(s=>{
@@ -99,7 +100,9 @@ export function toggleNativeFilm(value,film){
 export function prepareZoomConfigurationForBuild(value,model,random=globalThis.crypto){
  const configuration=normalizeConfiguration(value);
  if(configuration.zoom.write){
-  if(model!=='gr3')throw Error('裁切焦距写入仅支持 GR III');
+  if(!isGr3Family(model))throw Error('裁切焦距写入仅支持 GR III / IIIx');
+  const lens=modelCapabilities(model).zoom;
+  if(configuration.zoom.slots.some(mm=>mm<lens.min||mm>lens.max))throw Error(`裁切焦距需要 ${lens.min}–${lens.max} mm 整数`);
   let revision=0;const word=new Uint32Array(1);
   while(!revision||revision===configuration.zoom.revision){random.getRandomValues(word);revision=word[0];}
   configuration.zoom.revision=revision;
@@ -109,4 +112,11 @@ export function prepareZoomConfigurationForBuild(value,model,random=globalThis.c
 export function zoomSummary(configuration){
  const z=configuration.zoom;
  return z?.write?`裁切焦距 · 更新时写入一次：第一档 ${z.slots[0]} mm / 第二档 ${z.slots[1]} mm`:'裁切焦距 · 保留机内设置';
+}
+
+export function configurationForModel(value,model){
+ const c=normalizeConfiguration(value),lens=modelCapabilities(model).zoom;
+ if(!lens){c.zoom.write=false;return c;}
+ if(c.zoom.slots.some(mm=>mm<lens.min||mm>lens.max))c.zoom={...c.zoom,slots:[...lens.defaults],revision:0};
+ return c;
 }

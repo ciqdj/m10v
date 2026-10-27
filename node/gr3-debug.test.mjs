@@ -21,7 +21,7 @@ test('debug mode is off by default and changes the accepted firmware plan',async
  await assert.rejects(()=>generateNative(source,configuration,normal.configuration_sha256,{debug_mode:true}),/变化/);
 });
 
-test('GR IIIx debug export retains its own established pipeline',()=>{
+test('GR IIIx debug export shares the native ISP pipeline',()=>{
  const source=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.equal(prepareNative(source,defaultConfiguration(),{debug_mode:true}).capture_pipeline,'software');
+ assert.equal(prepareNative(source,defaultConfiguration(),{debug_mode:true}).capture_pipeline,'gr3-native-v8');
 });

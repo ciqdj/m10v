@@ -1,4 +1,5 @@
-// Independent GR III focal hook/readback contract.
+// Independent model-aware focal hook/readback contract.
+import {modelCapabilities} from '../web/gr3/model-capabilities.mjs';
 const need=(ok,message)=>{if(!ok)throw Error('custom focal: '+message);};
 const branch=(a,b,link=false)=>{
  const d=b-a-8;need(Number.isInteger(b)&&d%4===0&&d>=-(2**25)&&d<2**25,'branch range');
@@ -9,16 +10,18 @@ export function zoomPatches(runtime,m){
  const z=m.zoom;
  need(typeof z?.enabled==='boolean','explicit enabled contract missing');
  if(!z.enabled)return [];
- need(z?.schema==='m10v-gr3-zoom/v1'&&z.slots===2&&z.min_mm===28&&z.max_mm===50,'module contract missing');
+ const camera=m.camera_model??'gr3',lens=modelCapabilities(camera).zoom;
+ need(lens&&z.camera_model===camera&&z.lens_base_mm===lens.base&&JSON.stringify(z.defaults)===JSON.stringify(lens.defaults),'lens contract differs');
+ need(z?.schema==='m10v-gr3-zoom/v1'&&z.slots===2&&z.min_mm===lens.min&&z.max_mm===lens.max,'module contract missing');
  need(z.title_id===1024&&z.focal_first_id===1031,'resource allocation differs');
  need(z.aspect===(m.base>=0x540be000),'aspect fallback contract differs');
  need(Number.isInteger(z.base)&&Number.isInteger(z.bytes)&&z.bytes>0&&z.base>=m.base&&z.base+z.bytes<=m.base+runtime.length,'module bounds');
  const seed=z.seed;
- need(seed===null||(typeof seed?.id==='string'&&/^[0-9a-f]{16}$/.test(seed.id)&&seed.id!=='0000000000000000'&&Array.isArray(seed.slots)&&seed.slots.length===2&&seed.slots.every(mm=>Number.isInteger(mm)&&mm>=28&&mm<=50)),'invalid seed');
+ need(seed===null||(typeof seed?.id==='string'&&/^[0-9a-f]{16}$/.test(seed.id)&&seed.id!=='0000000000000000'&&Array.isArray(seed.slots)&&seed.slots.length===2&&seed.slots.every(mm=>Number.isInteger(mm)&&mm>=lens.min&&mm<=lens.max)),'invalid seed');
  const lo=seed?parseInt(seed.id.slice(0,8),16):0,hi=seed?parseInt(seed.id.slice(8),16):0;
  const at=z.seed_parameters-m.base;
  need(Number.isInteger(at)&&at>=0&&at+24<=runtime.length,'seed parameter bounds');
- [0x31575a4d,lo,hi,~(0x31575a4d^lo^hi)>>>0,...(seed?seed.slots:[35,50])].forEach((n,i)=>need(runtime.readUInt32LE(at+i*4)===(n>>>0),'seed parameter readback differs'));
+ [0x31575a4d,lo,hi,~(0x31575a4d^lo^hi)>>>0,...(seed?seed.slots:lens.defaults)].forEach((n,i)=>need(runtime.readUInt32LE(at+i*4)===(n>>>0),'seed parameter readback differs'));
  need(z.debug_trace===m.debug_mode,'trace mode differs');
  const inventory=[...hooks,...(z.debug_trace?[[0x536b93d0,0xe1a0c00d,'m10v_zoom_assert_trace',false]]:[])];
  const patches=inventory.map(([address,expected,name,link])=>{

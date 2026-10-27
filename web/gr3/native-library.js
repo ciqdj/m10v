@@ -1,10 +1,11 @@
+import {isGr3Family,modelCapabilities} from './model-capabilities.mjs';
 import {renderZoomControls,validateZoomControls} from './zoom-controls.mjs';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFilmPreview} from './preview-controller.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
-import {defaultConfiguration,normalizeConfiguration,prepareZoomConfigurationForBuild,selectNativeFilm,toggleNativeFilm,resetNativeTexture,retainCatalogFilms} from './native-library-state.mjs';
+import {defaultConfiguration,normalizeConfiguration,configurationForModel,prepareZoomConfigurationForBuild,selectNativeFilm,toggleNativeFilm,resetNativeTexture,retainCatalogFilms} from './native-library-state.mjs';
 export function mountNativeLibrary(root=document,{model='gr3',showZoom=true,defaultZoomWrite=false,onInspect=()=>{},onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
-const selectionLimit=()=>sourceModel==='gr3'?10:5;
+const selectionLimit=()=>modelCapabilities(sourceModel).filmSlots;
 const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
 let halationWrite=false;
 let pixelPreview=null,pixelFigure=null;
@@ -12,10 +13,10 @@ window.addEventListener('pagehide',()=>{pixelPreview?.destroy();pixelPreview=nul
 window.addEventListener('pageshow',event=>{if(event.persisted)render();});
 const storageKey=model==='gr4'?'m10v-gr4-native-library-v1':'m10v-native-library-v1';
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
-let configuration=defaultConfiguration(),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
-configuration.zoom.write=defaultZoomWrite&&model==='gr3';
+let configuration=defaultConfiguration(model),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
+configuration.zoom.write=defaultZoomWrite&&isGr3Family(model);
 try{const saved=localStorage.getItem(storageKey);if(saved)configuration=normalizeConfiguration(JSON.parse(saved));}catch{}
-if(sourceModel!=='gr3')configuration.zoom.write=false;
+configuration=configurationForModel(configuration,sourceModel);
 // Retired M10V sketches migrate by slot; their numeric IDs remain firmware-compatible.
 
 const message=(text,error=false)=>{$('#progress').textContent=text;$('#progress').dataset.error=String(error);};
@@ -51,7 +52,7 @@ function render(){
  segment('#grain',levels,current.grain,v=>configuration.slots[active].grain=v);
 
  const film=configuration.slots[active].film;
- for(const button of $('#grain').querySelectorAll('button'))button.disabled=busy||((sourceModel!=='gr3'||[289,290].includes(film))&&button.dataset.focus!=='grain-0');
+ for(const button of $('#grain').querySelectorAll('button'))button.disabled=busy||((!modelCapabilities(sourceModel).nativeGrain||[289,290].includes(film))&&button.dataset.focus!=='grain-0');
  if(film===290&&!pixelFigure){
   pixelFigure=document.createElement('figure');pixelFigure.style.margin='16px 0';
   const canvas=document.createElement('canvas');canvas.width=620;canvas.height=413;
@@ -106,7 +107,7 @@ function toggleFilm(id){
 async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(data.error||`请求失败 ${r.status}`);return data;}
 function post(url,value,signal){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(value),signal});}
 function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
-async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
+async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';configuration=configurationForModel(configuration,sourceModel);$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
 for(const k of ['filmExposure'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};
@@ -121,7 +122,7 @@ $('#native-version-unlock').onchange=()=>{invalidate();render();};
 $('#native-version-known').onchange=()=>{invalidate();render();};
 for(const key of ['dsp','cpu'])$('#native-version-'+key).oninput=()=>{invalidate();render();};
 $('#build').onclick=async()=>{
- if(busy||!project)return;if(sourceModel!=='gr3'&&configuration.slots.length>5){message('此机型暂不支持导出超过 5 款胶卷',true);return;}let version_unlock;try{validateZoomControls($('#native-zoom-controls'));configuration=prepareZoomConfigurationForBuild(configuration,sourceModel);version_unlock=versionUnlockSnapshot();}catch(e){message(e.message,true);return;}invalidate();abort=new AbortController();setBusy(true);const snapshot=normalizeConfiguration(configuration),debug_mode=$('#native-debug-mode').checked;
+ if(busy||!project)return;if(configuration.slots.length>selectionLimit()){message('此机型暂不支持导出超过 5 款胶卷',true);return;}let version_unlock;try{validateZoomControls($('#native-zoom-controls'));configuration=prepareZoomConfigurationForBuild(configuration,sourceModel);version_unlock=versionUnlockSnapshot();}catch(e){message(e.message,true);return;}invalidate();abort=new AbortController();setBusy(true);const snapshot=normalizeConfiguration(configuration),debug_mode=$('#native-debug-mode').checked;
  try{message('1 / 3 · 校验所选胶卷配置与官方基线…');const plan=await jsonResponse(await post(`/api/projects/${project}/native-library/prepare`,{configuration:snapshot,debug_mode,version_unlock},abort.signal));
  message('2 / 3 · 编译 ARM 模块、接入机内菜单和 JPEG 路径…');
  const response=await post(`/api/projects/${project}/native-library/build`,{configuration:snapshot,debug_mode,version_unlock,accepted_configuration_sha256:plan.configuration_sha256},abort.signal);
@@ -138,6 +139,6 @@ $('#build').onclick=async()=>{
 };
 (async()=>{try{const [status,catalog]=await Promise.all([fetch('/api/status').then(jsonResponse),fetch(catalogApi).then(jsonResponse)]);token=status.session_token;films=catalog.films;const retained=retainCatalogFilms(configuration,films),removed=configuration.slots.length-retained.slots.length;if(removed){configuration=retained;invalidate({filmSelection:true});const status=$('#film-selection-status');if(status)status.textContent=`已清理 ${removed} 款已停用胶卷，请按当前目录选择。`;}$('#search').placeholder=`搜索 ${films.length} 套胶卷…`;for(const node of root.querySelectorAll('[data-film-count-copy]'))for(const child of node.childNodes)if(child.nodeType===3)child.textContent=child.textContent.replace(/[0-9]+(?=\s*[套款])/g,String(films.length));for(const group of [...new Set(films.map(f=>f.group))]){const option=document.createElement('option');option.value=group;option.textContent=group;option.dataset.icon=films.find(f=>f.group===group)?.icon_url;$('#film-group').append(option);}enhanceFilmSelect($('#film-group'),{caption:'胶卷分类',searchable:false});$('#local-source').dataset.available=catalog.local_source_available?'1':'';$('#source-status').textContent=catalog.local_source_available?'已找到目录中的官方包，请选择使用。':'请选择对应的官方固件包。';render();}catch(e){message(e.message,true);$('#source-status').textContent='服务暂不可用，请刷新页面。';}})();render();
 
-return {toggleFilm,setHalationWrite:value=>{if(halationWrite!==value){halationWrite=value;render();}},setModel:value=>{if(!['gr3','gr3x','gr4'].includes(value))throw Error('不支持的相机机型');sourceModel=value;if(value!=='gr3'&&configuration.zoom.write){configuration.zoom.write=false;invalidate({globalZoom:true});}render();},getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{if(films.length&&!films.some(f=>f.id===id))throw Error('胶卷已停用，请从当前目录选择');active=slot;if(slot===configuration.slots.length){configuration=toggleNativeFilm(configuration,id);}else configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=films.length?retainCatalogFilms(value,films):normalizeConfiguration(value);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
+return {toggleFilm,setHalationWrite:value=>{if(halationWrite!==value){halationWrite=value;render();}},setModel:value=>{if(!['gr3','gr3x','gr4'].includes(value))throw Error('不支持的相机机型');sourceModel=value;const previous=JSON.stringify(configuration.zoom);configuration=configurationForModel(configuration,value);if(previous!==JSON.stringify(configuration.zoom))invalidate({globalZoom:true});render();},getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{if(films.length&&!films.some(f=>f.id===id))throw Error('胶卷已停用，请从当前目录选择');active=slot;if(slot===configuration.slots.length){configuration=toggleNativeFilm(configuration,id);}else configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=configurationForModel(films.length?retainCatalogFilms(value,films):normalizeConfiguration(value),sourceModel);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
 }
 if(location.pathname.endsWith('/native-library.html'))mountNativeLibrary();

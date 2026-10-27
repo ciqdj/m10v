@@ -87,7 +87,7 @@ test('actual independent exporter posts identical version snapshot and refuses m
   const configuration=defaultConfiguration(),option=simple?{enabled:true,mode:'dsp-package-only'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
   const receipt={debug_mode:false,candidate_sha256:'aa',configuration,version_unlock:simple?{enabled:true,mode:mismatch?'observed-versions':'dsp-package-only',checks:{cpu_payload_unchanged:true}}:{enabled:true,mode:'observed-versions',current_versions:{dsp:option.dsp,cpu:mismatch?'2.10.21.28':option.cpu}}};
   const context=vm.createContext({$,configuration,AbortController,Blob,TextDecoder,Uint8Array,atob,JSON,Array,
-   normalizeConfiguration:structuredClone,prepareZoomConfigurationForBuild,validateZoomControls(){},versionUnlockSnapshot:()=>normalizeVersionUnlock(option),assertVersionUnlockReceipt,
+   selectionLimit:()=>10,normalizeConfiguration:structuredClone,prepareZoomConfigurationForBuild,validateZoomControls(){},versionUnlockSnapshot:()=>normalizeVersionUnlock(option),assertVersionUnlockReceipt,
    invalidate(){},setBusy:v=>busyChanges.push(v),message:(...args)=>messages.push(args),jsonResponse:async r=>r.json(),
    crypto:{subtle:{digest:async()=>new Uint8Array([170]).buffer}},
    URL:{createObjectURL:()=>{created.push('url');return 'blob:test';}},
@@ -166,11 +166,11 @@ test('GR IIIx actual prepare and build preserve the 1.60 advanced snapshot and v
  assert.deepEqual(h.calls[1].body.version_unlock,h.calls[0].body.version_unlock);assert.equal(h.downloads.length,1);
 });
 
-test('studio freezes power images with the same preparation snapshot and omits them for GR IIIx',async()=>{
+test('studio freezes power images with the same preparation snapshot and preserves them for GR IIIx',async()=>{
  const powerConfiguration={startup:{jpeg_base64:'initial-cropped-jpeg'}};const h=studioHarness({powerConfiguration});
  await h.context.prepare();powerConfiguration.startup.jpeg_base64='later-cropped-jpeg';await h.context.build();
  assert.deepEqual(h.calls[0].body.power_images,h.calls[1].body.power_images);assert.equal(h.calls[1].body.power_images.startup.jpeg_base64,'initial-cropped-jpeg');
- const x=studioHarness({model:'gr3x',powerConfiguration});await x.context.prepare();assert.equal(Object.hasOwn(x.calls[0].body,'power_images'),false);
+ const x=studioHarness({model:'gr3x',powerConfiguration});await x.context.prepare();assert.deepEqual(x.calls[0].body.power_images,powerConfiguration);
 });
 
 test('changing configuration while response bytes arrive suppresses stale binary and completion',async()=>{const h=studioHarness({duringBody:state=>{state.revision++;}});await h.context.prepare();await h.context.build();assert.equal(h.downloads.length,0);assert.equal(h.completed.length,0);});

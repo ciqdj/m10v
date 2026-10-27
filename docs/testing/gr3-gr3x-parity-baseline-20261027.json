@@ -1,0 +1,57 @@
+{
+  "schema": "m10v-gr3-gr3x-parity-baseline/v1",
+  "base_commit": "aa9207f7cd55cb9d704a0beba7a5ec75097daf2c",
+  "commands": [
+    "npm test (base)",
+    "npm test (candidate)"
+  ],
+  "baseline": {
+    "tests": 381,
+    "passed": 340,
+    "failed": 32,
+    "skipped": 9
+  },
+  "candidate": {
+    "tests": 400,
+    "passed": 359,
+    "failed": 32,
+    "skipped": 9
+  },
+  "same_failure_names": true,
+  "new_failure_names": [],
+  "failure_names": [
+    "Charmera has an independent identity without stealing existing custom ID 79",
+    "GR III preflight preserves factory choices and binds the new slot layout to approval",
+    "Harman films append stable IDs and shared 40px icon records",
+    "M10V native library builds from official bytes without a compatibility runtime and audits every patch",
+    "Phoenix EI120 persists independently per slot and resets on a different stock",
+    "SD pack contains every current platform recipe, independent of five active slots",
+    "both colour views edit a single native configuration and do not restore the legacy film builder",
+    "deleting texture processing retains all55 previous-revision film records",
+    "digital HDF is independent of films and retired soft values never become HDF",
+    "film name stamp migrates off and packs independently from date",
+    "final joined firmware contains all selected components and rejects repaired-checksum tampering",
+    "five retained style filters keep their identities and requested group names",
+    "four colors persist per slot, texture reset preserves color and switching film clears it",
+    "four halo controls and grain/soft are packed in each version4 slot",
+    "fresh defaults and every film selection leave extra effects off",
+    "fresh journals preserve independent timestamp corner and colour bytes",
+    "last delivered 47-film and named custom packs remain readable after opt-in defaults",
+    "legacy effects serialize as neutral and resetting preserves film and special controls",
+    "legacy retired effects migrate to neutral without losing other slot settings",
+    "new builtin LUT records retain names icons and source contract identity",
+    "old effects upgrade and film-specific bounds accept bounded integer simulated EI",
+    "old web configuration migrates into v4 and validates effect ranges",
+    "one catalogue exposes only requested legacy simulations",
+    "original M10V web workflow binds all five slots and timestamp into audited firmware",
+    "prior renderer custom LUTs remain accepted while repaired-CRC tampering is rejected",
+    "product home exposes GR IV native workbench and GR II inspection with truthful limits",
+    "requested groups retain stock identities",
+    "schema4 packs EI in each effects reserved byte and common reset preserves EI and disables extra effects",
+    "single studio orders source, settings and save with the library embedded directly",
+    "switching away from a manually enabled effect resets extras, selecting same film preserves them",
+    "v1 built-in pack from the preceding release remains readable",
+    "web debug export uses the running Node when the service PATH contains no node"
+  ],
+  "note": "Final clean-runtime full-suite comparison. These existing failures are reproduced on unmodified main; the suite is not all green. Candidate-specific Node, HTTP and ARM checks passed separately."
+}

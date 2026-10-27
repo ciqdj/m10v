@@ -27,7 +27,7 @@ test('original M10V web workflow binds all five slots and timestamp into audited
   const config=normalizeConfiguration({slots:[{film:33,grain:3,soft:2},{film:77,grain:1,soft:3},{film:298,grain:0,soft:1},{film:75,grain:2,soft:0},{film:291,grain:0,soft:0}],stamp:2,format:3,corner:2,color:1});
   assert.equal((await post(route+'prepare',{configuration:{...config,stamp:9}})).status,400);
   const xconfig=normalizeConfiguration({...config,slots:config.slots.map(s=>({...s,grain:0}))});
-  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,400);
+  assert.equal((await post(`/api/projects/${xid}/native-library/prepare`,{configuration:config})).status,200);
   const nrExtensions={aspect:false,level:false,negativeGrain:false,rawNr:{mode:'off'}};
   for(const rawNr of [{mode:'stock'},{mode:'off'},{mode:'threshold',iso:6400}]){
    const nr=await post(route+'prepare',{configuration:config,extensions:{...nrExtensions,rawNr}});
@@ -124,6 +124,6 @@ test('HDF feature at strength zero selects its own allocator and shares the nati
  assert.throws(()=>prepareNative(source,{...configuration,hdf:1},{hdf_enabled:false}),/HDF/);
  assert.throws(()=>prepareNative(source,configuration,{film_library:false,hdf_enabled:false}),/HDF/);
  const gr3x=await readNativeOfficial('gr3x');
- assert.throws(()=>prepareNative(gr3x,configuration,{hdf_enabled:true}),/普通 GR III/);
+ assert.equal(prepareNative(gr3x,configuration,{hdf_enabled:true}).hdf_enabled,true);
  assert.equal(prepareNative(gr3x,configuration,{hdf_enabled:false}).hdf_enabled,false);
 });

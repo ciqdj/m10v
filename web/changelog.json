@@ -2,6 +2,35 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.27.5",
+      "date": "2026-10-27",
+      "title": "统一 GR III 与 GR IIIx 功能",
+      "changes": [
+        "统一 GR III / IIIx 的十胶卷位置、新版 ISP 成片与胶卷取景预览、原生颗粒及新增漫画/E6胶卷。",
+        "GR IIIx 同步开放 HDF、通用光晕、自定义两档裁切与开关机图片，组合扩展及配置入口与 GR III 一致。",
+        "修复跨机型切换和恢复草稿时的焦距状态不同步；IIIx 按40mm镜头适配，保留原厂71mm精确裁切倍率和元数据。"
+      ],
+      "sections": [
+        {
+          "type": "improved",
+          "items": [
+            "统一 GR III / IIIx 的十胶卷位置、新版 ISP 成片与胶卷取景预览、原生颗粒及新增漫画/E6胶卷。",
+            "GR IIIx 同步开放 HDF、通用光晕、自定义两档裁切与开关机图片，组合扩展及配置入口与 GR III 一致。"
+          ]
+        },
+        {
+          "type": "fixed",
+          "items": [
+            "修复跨机型切换和恢复草稿时的焦距状态不同步；IIIx 按40mm镜头适配，保留原厂71mm精确裁切倍率和元数据。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III 2.10 与 GR IIIx 1.60；两款候选已获用户实机通过确认。机型身份、完整CPU与镜头基准分别保留；GR IV不纳入本次功能统一。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.4",
       "date": "2026-10-27",
       "title": "新增漫画与 E6 滤镜",
@@ -21,9 +50,9 @@
         }
       ],
       "notice": "新滤镜适用于 GR III 2.10；GR IIIx / IV 暂不支持导出这些新滤镜。保留既有胶卷、存档和 SD 胶卷包兼容。效果为风格拟合，不代表实物胶片或作品的完全还原。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "aa9207f7cd55cb9d704a0beba7a5ec75097daf2c",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40469275863"
     },
     {
       "version": "2026.10.27.3",

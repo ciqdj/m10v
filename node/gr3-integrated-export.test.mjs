@@ -20,7 +20,7 @@ test('one accepted plan binds native slots, timestamp, aspect, level and native 
  assert.ok(joined.features.includes('aspect')&&joined.features.includes('level')&&joined.features.includes('negativeGrain'));
  await assert.rejects(()=>generateNative(source,c,plain.configuration_sha256,{extensions}),/变化/);
  const x=readFileSync(new URL('../bin/fwdc243b-gr3x-official.bin',import.meta.url));
- assert.throws(()=>prepareNative(x,c,{extensions}),/颗粒.*GR III/);
+ assert.deepEqual(prepareNative(x,c,{extensions}).extensions,joined.extensions);
  assert.throws(()=>prepareNative(source,c,{extensions,live_color:false}),/颗粒.*GR III/);
  const supported=structuredClone(c);supported.slots[4].grain=0;
  assert.deepEqual(prepareNative(x,supported,{extensions}).extensions,prepareNative(source,supported,{extensions}).extensions);

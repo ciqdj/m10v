@@ -15,7 +15,7 @@ test('each opt-in prepare refreshes nonzero revision and snapshots remain indepe
  const random={getRandomValues(a){a[0]=++seed;return a;}};
  const first=prepareZoomConfigurationForBuild(config,'gr3',random),second=prepareZoomConfigurationForBuild(first,'gr3',random);
  assert.equal(first.zoom.revision,1);assert.equal(second.zoom.revision,2);assert.equal(config.zoom.revision,0);
- for(const model of ['gr3x','gr4'])assert.throws(()=>prepareZoomConfigurationForBuild(config,model,random),/GR III/);
+ for(const model of ['gr4'])assert.throws(()=>prepareZoomConfigurationForBuild(config,model,random),/GR III/);
  const unchanged=defaultConfiguration();assert.deepEqual(prepareZoomConfigurationForBuild(unchanged,'gr4',null),unchanged);
  assert.match(zoomSummary(first),/35 mm.*50 mm/);assert.match(zoomSummary(unchanged),/保留机内/);
 });
@@ -32,5 +32,5 @@ test('native preflight binds opt-in focal slots and rejects unsupported models',
  assert.notEqual(first.zoom_seed.id,second.zoom_seed.id);
  assert.throws(()=>prepareNative(source,on,{film_library:false}),/GR III/);
  assert.throws(()=>normalizeGr4Request({configuration:on}),/GR III/);
- const x=await readNativeOfficial('gr3x');assert.throws(()=>prepareNative(x,on),/GR III/);
+ const x=await readNativeOfficial('gr3x');assert.deepEqual(prepareNative(x,on).zoom_seed.slots,[40,50]);
 });

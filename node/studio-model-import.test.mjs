@@ -79,3 +79,8 @@ test('opening imaging settings preserves an HDF-only selection',()=>{
  vm.runInContext("let settingsTab='library';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
  context.showSettingsTab('imaging');assert.equal(state.profile,'native');assert.deepEqual([...state.features],['digitalHdf']);
 });
+test('IIIx import retains shared HDF and halation selections',async()=>{
+ const h=harness();h.state.features=new Set(['film','digitalHdf','halation']);
+ await h.run(h.report('GR IIIx','d'));
+ assert.deepEqual([...h.state.features],['film','digitalHdf','halation']);
+});

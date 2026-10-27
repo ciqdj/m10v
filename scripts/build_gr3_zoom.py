@@ -154,11 +154,16 @@ BINDINGS={'m10v_zoom_native_icon_alloc':0x536af2a8,'m10v_zoom_native_icon_free':
  'm10v_zoom_native_raw_mag': 1395144364,
  'm10v_zoom_native_summary_write': 1398530152}
 
-def build(base, stock, aspect=False, seed=None, debug_log=None):
+def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr3'):
+    if camera_model not in ('gr3','gr3x'):raise ValueError('invalid zoom camera model')
+    lens_base,max_mm,defaults=(40,71,[50,71]) if camera_model=='gr3x' else (28,50,[35,50])
     if seed is not None:
-        if not isinstance(seed,dict) or set(seed)!={'id','slots'} or len(seed['id'])!=16 or any(c not in '0123456789abcdef' for c in seed['id']) or int(seed['id'],16)==0 or len(seed['slots'])!=2 or any(type(mm)is not int or not 28<=mm<=50 for mm in seed['slots']):raise ValueError('invalid zoom seed')
+        if not isinstance(seed,dict) or set(seed)!={'id','slots'} or len(seed['id'])!=16 or any(c not in '0123456789abcdef' for c in seed['id']) or int(seed['id'],16)==0 or len(seed['slots'])!=2 or any(type(mm)is not int or not lens_base<=mm<=max_mm for mm in seed['slots']):raise ValueError('invalid zoom seed')
+    # Original marker writer/reader require the exact stock ratio bits.
+    if struct.unpack_from('<I',stock,0xd2ffe8)[0]!=0x3fe49249:raise ValueError('stock crop ratio differs')
     flags=[] if seed is None else [f'-DM10V_ZOOM_SEED_LO=0x{seed["id"][:8]}u',f'-DM10V_ZOOM_SEED_HI=0x{seed["id"][8:]}u',f'-DM10V_ZOOM_SEED_FIRST={seed["slots"][0]}u',f'-DM10V_ZOOM_SEED_SECOND={seed["slots"][1]}u']
-    flags+=[f'-DM10V_DEBUG_MODE={int(debug_log is not None)}']
+    max_bits=0x3fe49249  # Shared stock enum6, nominal50 (III) /71 (IIIx).
+    flags+=[f'-DM10V_DEBUG_MODE={int(debug_log is not None)}',f'-DM10V_CAMERA_GR3X={int(camera_model=="gr3x")}',f'-DM10V_ZOOM_MAX_BITS_LO={max_bits&65535}',f'-DM10V_ZOOM_MAX_BITS_HI={max_bits>>16}']
     extra_hooks=[] if debug_log is None else [{'address':0x536b93d0,'preimage':0xe1a0c00d,'symbol':'m10v_zoom_assert_trace','link':False}]
     from scripts.build_gr3_m10v_library import FLAGS,link_object
     from scripts.build_gr3_menu_patches import branch
@@ -209,7 +214,7 @@ def build(base, stock, aspect=False, seed=None, debug_log=None):
         image+=code
     lo=int(seed['id'][:8],16) if seed else 0
     hi=int(seed['id'][8:],16) if seed else 0
-    parameters=struct.pack('<6I',0x31575a4d,lo,hi,(~(0x31575a4d^lo^hi))&0xffffffff,*(seed['slots'] if seed else [35,50]))
+    parameters=struct.pack('<6I',0x31575a4d,lo,hi,(~(0x31575a4d^lo^hi))&0xffffffff,*(seed['slots'] if seed else defaults))
     if bytes(image).count(parameters)!=1:raise ValueError('zoom seed parameter provenance differs')
     seed_parameters=base+bytes(image).find(parameters)
     patches=[]
@@ -224,6 +229,6 @@ def build(base, stock, aspect=False, seed=None, debug_log=None):
               'native/gr3/m10v_zoom_menu.h','native/gr3/m10v_zoom_capture.h','scripts/build_gr3_zoom.py','node/gr3-zoom.mjs']
     return bytes(image),dict(schema='m10v-gr3-zoom/v1',base=base,bytes=len(image),
         symbols=symbols,bindings=bindings,patches=patches,aspect=aspect,
-        slots=2,min_mm=28,max_mm=50,title_id=1024,focal_first_id=1031,
+        camera_model=camera_model,lens_base_mm=lens_base,defaults=defaults,slots=2,min_mm=lens_base,max_mm=max_mm,title_id=1024,focal_first_id=1031,
         debug_trace=debug_log is not None,seed=seed,seed_parameters=seed_parameters,
         sources={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in sources},camera_tested=False)

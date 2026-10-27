@@ -1,6 +1,7 @@
 #ifndef M10V_ZOOM_CAPTURE_H
 #define M10V_ZOOM_CAPTURE_H
 #include <stdint.h>
+#include "m10v_zoom.h"
 /* Stateless helpers only: firmware integration must supply the current image's
  * immutable focal value and native/aspect baseline dimensions. Zero means
  * unhandled: invoke the unchanged native path. No camera validation implied. */
