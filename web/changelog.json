@@ -2,6 +2,37 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.27.3",
+      "date": "2026-10-27",
+      "title": "全新沉浸式摄影工作台",
+      "changes": [
+        "全新沉浸式摄影工作台，沿用深色暖金配色，统一 GR III/IIIx、GR IV 与 GR II 的布局和机型下拉入口。",
+        "固件导出后引导下载匹配机型的全量胶卷库，支持重复下载 BIN、配置与校验记录，并附 SD 卡安装说明。",
+        "胶卷查看与加入分开，保留搜索分类、机型选择上限、本卷参数、草稿和撤销重做，并优化手机编辑面板。",
+        "开关机画面独立成步，保留上传、裁切、位置调整与原厂恢复，离开前应用并校验待处理裁切。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "全新沉浸式摄影工作台，沿用深色暖金配色，统一 GR III/IIIx、GR IV 与 GR II 的布局和机型下拉入口。",
+            "固件导出后引导下载匹配机型的全量胶卷库，支持重复下载 BIN、配置与校验记录，并附 SD 卡安装说明。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "胶卷查看与加入分开，保留搜索分类、机型选择上限、本卷参数、草稿和撤销重做，并优化手机编辑面板。",
+            "开关机画面独立成步，保留上传、裁切、位置调整与原厂恢复，离开前应用并校验待处理裁切。"
+          ]
+        }
+      ],
+      "notice": "影响网页工作台与下载引导；保留各机型能力边界，未修改相机成像与运行时代码。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.2",
       "date": "2026-10-27",
       "title": "优化 GR III 光晕、取景与菜单回放",
@@ -28,9 +59,9 @@
         }
       ],
       "notice": "适用于 GR III 2.10；GR IIIx 同步共享水印菜单调整。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "e7be5038322654b26e3e783c58a74c60e7609762",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40439146991"
     },
     {
       "version": "2026.10.27.1",
