@@ -47,6 +47,28 @@ class NativeHostTests(adapter.ControllerLifetimeTests):
   u=self.begin();self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
   # The native icon setter receives the appended builtin resource.
   self.assertTrue(any(e[0]==0x533a1734 and 761 in e[1:] for e in self.ui))
+ def test_d76_and_anime_e6_slots_keep_icons_in_ab_picker(self):
+  for film,icon in [*[(299+i,775+i) for i in range(7)],*[(306+i,858+i) for i in range(6)]]:
+   self.fresh_films=[film,34,35,36,37]
+   u=self.begin();self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
+   self.assertTrue(any(e[0]==0x533a1734 and e[2]==icon for e in self.ui),(film,icon))
+
+ def test_physical_disp_closing_host_does_not_reopen_it_in_dispatch_recovery(self):
+  u=self.begin();self.stock_input_gate(u);self.real_dispatch=False
+  original=self.externals['m10v_ab_dispatch_original']
+  physical=self.physical(u)
+  def forward(m,a,n,_):
+   if a==original:
+    m.reg_write(UC_ARM_REG_R0,self.controller);m.reg_write(UC_ARM_REG_R1,physical)
+    m.reg_write(UC_ARM_REG_PC,self.externals['m10v_settings_controller_ab_adj_exit'])
+  u.hook_add(UC_HOOK_CODE,forward)
+  self.call(u,'ab_setup',self.controller,self.event(u,0x37),self.route)
+  self.call(u,'ab_setup',self.controller,self.event(u,0x36),self.route)
+  before=sum(e[0]==0x53394e8c for e in self.ui)
+  physical=self.physical(u)
+  self.call(u,'ab_dispatch',self.controller,physical)
+  self.assertEqual(sum(e[0]==0x53394e8c for e in self.ui),before)
+  self.assertEqual(self.count('m10v_ab_adj_exit_original'),1)
  def test_5213_slot_keeps_its_name_and_icon_in_ab_picker(self):
   for film,caption,icon in [(298,1128,774),(291,1104,762),(292,1105,763),(296,1109,767),(297,1110,768)]:
    self.fresh_films=[film,34,35,36,37]

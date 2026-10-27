@@ -277,7 +277,12 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
  uint32_t keyboard=((fn1)0x5320b1fcu)(((uint32_t (*)(void))0x5320ad88u)());
  M10V_LOG(208,c,route,type,ab_ram(keyboard,0x524)?*(const uint8_t *)(uintptr_t)(keyboard+0x520):0xffffffffu);
 #endif
+ /* An owned picker may close during native dispatch while the queued route
+  * still names ADJ. Its closing DISP is already handled; never reinterpret
+  * the same physical press as a request to open another picker. */
+ int was_host=ab_host_owned(ab_host(ab_owner()),c);
  uint32_t r=m10v_ab_dispatch_original(c,event);
+ if(was_host)return r;
  if(ab_route()!=route)return r;
  m10v_settings_controller *p=ab_owner();
  if(ab_host_owned(ab_host(p),c))return r;

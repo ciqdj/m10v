@@ -2,6 +2,28 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.27.6",
+      "date": "2026-10-27",
+      "title": "修复新增滤镜图标与 ADJ 快切退出",
+      "changes": [
+        "补齐新增漫画/E6胶卷在影像控制 MENU、ADJ 与各胶卷位置中的图标，补齐快切列表的漫画/E6与D76图标。",
+        "修复 ADJ 快切页面退出时，同一次 DISP 按键被补偿分发再次打开页面的问题。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "补齐新增漫画/E6胶卷在影像控制 MENU、ADJ 与各胶卷位置中的图标，补齐快切列表的漫画/E6与D76图标。",
+            "修复 ADJ 快切页面退出时，同一次 DISP 按键被补偿分发再次打开页面的问题。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享菜单运行时；两款固件已完成离线构建，新增定向用例通过，真机表现待确认。按用户要求直接发布。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.5",
       "date": "2026-10-27",
       "title": "统一 GR III 与 GR IIIx 功能",
@@ -26,9 +48,9 @@
         }
       ],
       "notice": "影响 GR III 2.10 与 GR IIIx 1.60；两款候选已获用户实机通过确认。机型身份、完整CPU与镜头基准分别保留；GR IV不纳入本次功能统一。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "8e9b292da69825add8043040c54f4459c81dac62",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/8e9b292da69825add8043040c54f4459c81dac62"
     },
     {
       "version": "2026.10.27.4",

@@ -177,6 +177,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
 #if M10V_SD_LIBRARY
             if(M10V_CUSTOM(state.slots[i].film))return 754;
 #endif
+            if(M10V_ANIME_E6(state.slots[i].film))return M10V_ANIME_E6_ICON_FIRST+state.slots[i].film-M10V_ANIME_FIRST;
             if(M10V_D76(state.slots[i].film))return 775+state.slots[i].film-M10V_D76_FIRST;
             if(state.slots[i].film==M10V_5213_ID)return 774;
             if(M10V_STYLE(state.slots[i].film))return 762+state.slots[i].film-M10V_STYLE_FIRST;
