@@ -1,0 +1,18 @@
+{
+  "candidate": "m10v-gr3-ui-r1-20261027",
+  "status": "USER_VALIDATED",
+  "model": "GR III",
+  "firmware": "2.10",
+  "bin_sha256": "391cfd4bac4741bb10077da7606b269d6aaa1e39ab812c916073d9280d9e61ea",
+  "zip_sha256": "38c5e8e5aa73a89361ac678ce18c4472c83b3a14e5537388406d78e21a2d9542",
+  "base_commit": "2bda0df3b2cd85463a2f99ce062e06b46eb4278c",
+  "runtime_source_sha256": "94308326a480a1ba6c92171348d2962a08df98feb53a28a4266ea880d879d18c",
+  "integration_source_sha256": "b8335fa1f75bee04bcf5ef2a9fef59c415d8257c3c4a2f0d963c839a2f264676",
+  "configuration_sha256": "e4749d44508685e56280957634282c7a2ca30230db77b2a052dbed85e9e0b32e",
+  "user_feedback": "已实测通过，按此候选发布",
+  "feedback_date": "2026-10-27",
+  "authorization": "合并 main 发布宝塔和github",
+  "measured_timings": null,
+  "gr3x_device_validated": false,
+  "scope": "User confirmed current UI R1 candidate; no additional native behavior/configuration changed for release. Shared menu/resource GR IIIx compatibility build/readback passed, not a GR IIIx device acceptance claim."
+}

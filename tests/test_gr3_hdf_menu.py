@@ -37,7 +37,7 @@ class HdfMenuTests(unittest.TestCase):
    elif a==0x5316cde8:self.destroyed.append((r[1],r[2]))
    elif a==0x5316ca28:self.closed.append(r[0])
    elif a==0x53396f80:self.captions.append((r[0],r[1]))
-   elif a in (0x5316c8d4,0x5316ce8c,0x5316c774,0x533aba64,0x53393e00,0x5339658c,0x533ad308,0x5316d354,0x55009100,0x55009104):result=r[0]
+   elif a in (0x5316c8d4,0x5316ce8c,0x5316c774,0x533aba64,0x53393e00,0x5339658c,0x533ad3c0,0x533ad308,0x5316d354,0x55009100,0x55009104):result=r[0]
    else:return
    uc.reg_write(A.UC_ARM_REG_R0,result);uc.reg_write(A.UC_ARM_REG_PC,uc.reg_read(A.UC_ARM_REG_LR))
   u.hook_add(UC_HOOK_CODE,service)

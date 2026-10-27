@@ -167,7 +167,7 @@ static void aspect_label(u32 view,u32 surface,u32 ratio) {
 }
 void m10v_aspect_draw(u32 view,u32 surface) {
     u32 ratio=m10v_aspect_current();
-    if(ratio!=5) {
+    if(ratio!=4 && ratio!=5) {
         CALL(0x540b8000,void (*)(u32,u32))(view,surface);
         aspect_label(view,surface,ratio);
         return;
@@ -179,13 +179,17 @@ void m10v_aspect_draw(u32 view,u32 surface) {
     if(!graphics) return;
     graphics=CALL(0x532081ec,u32 (*)(u32))(graphics);
     if(!graphics) return;
-    u32 scale=canvas[2]==720?2:1, mask=40*scale;
+    u32 scale=canvas[2]==720?2:1, mask=(ratio==5?40:54)*scale;
     typedef void (*Draw)(u32,u32,u32 *,u32 *,u32,u32,u32,u32,u32);
     Draw draw=CALL(0x540b88b4,Draw);
-    draw(graphics,surface,canvas,clip,0,0,mask,canvas[3],16);
-    draw(graphics,surface,canvas,clip,canvas[2]-mask,0,mask,canvas[3],16);
-    draw(graphics,surface,canvas,clip,mask-scale,0,scale,canvas[3],2);
-    draw(graphics,surface,canvas,clip,canvas[2]-mask,0,scale,canvas[3],2);
+    /* Keep the aspect mask; the native view already owns its edge frame. */
+    if(ratio==5){
+        draw(graphics,surface,canvas,clip,0,0,mask,canvas[3],16);
+        draw(graphics,surface,canvas,clip,canvas[2]-mask,0,mask,canvas[3],16);
+    }else{
+        draw(graphics,surface,canvas,clip,0,0,canvas[2],mask,16);
+        draw(graphics,surface,canvas,clip,0,canvas[3]-mask,canvas[2],mask,16);
+    }
     aspect_label(view,surface,ratio);
 }
 

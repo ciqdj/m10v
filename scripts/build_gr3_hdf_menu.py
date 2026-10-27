@@ -13,7 +13,7 @@ def build_hooks(base,symbols,settings,film_library=True,live_color=False,custom_
     exports['m10v_hdf_menu_vtable']=stub(f'movw r0,#{vtable&65535};movt r0,#{vtable>>16};bx lr')
     parents={name:symbols['m10v_settings_controller_'+other] for name,other in [('ctor','top_ctor'),('dtor','top_dtor'),('factory','factory'),('key_route','key_route')]} if film_library else {'ctor':0x5319aa68,'dtor':settings['exports']['m10v_settings_top_dtor_original'],'factory':settings['exports']['m10v_settings_factory_original'],'key_route':0x53228c4c}
     exports.update({'m10v_hdf_menu_parent_'+name:a for name,a in parents.items()})
-    hdfrow=stub('push {r4,lr};mov r4,r1;mov r0,r4;mov r1,#0;bl 0x5339de20;mov r0,r4;movw r1,#970;mov r2,r1;pop {r4,lr};b 0x5339dc70')
+    hdfrow=stub(f'push {{r4,lr}};mov r4,r1;mov r0,r4;mov r1,#0;bl 0x5339de20;mov r0,r4;movw r1,#{1140 if film_library else 970};mov r2,r1;pop {{r4,lr}};b 0x5339dc70')
     rows=settings['rows']+[hdfrow] if film_library else [hdfrow]
     offset=(0x223c if live_color else 0x213c) if film_library else 0x13bc;owner=offset+0x1c0
     patches=[]
@@ -23,6 +23,6 @@ def build_hooks(base,symbols,settings,film_library=True,live_color=False,custom_
     add(0x53b36adc,0x1e1d1b19,((30+len(rows))<<24)|0x1d1b19,'HDF menu root count')
     for i,row in enumerate(rows):
         add(0x53b36bd0+i*8,0,row,'HDF menu row '+str(i))
-        add(0x53b36c88+i*4,0x10000000,([0x0200f100,0x0200f101,0x0200f103,0x0200f102])[i] if film_library else 0x0200f102,'HDF menu route '+str(i))
+        add(0x53b36c88+i*4,0x10000000,([0x0200f100,0x0200f101,0x0200f102])[i] if film_library else 0x0200f102,'HDF menu route '+str(i))
     if film_library and custom_zoom:add(0x53b37018,0x02000074,0x0200f105,'Crop selection and focal editor entry')
     return bytes(image),dict(schema='m10v-gr3-hdf-menu/v1',base=base,bytes=len(image),exports=exports,patches=patches,vtable=vtable,rows=rows,owner_offset=offset,owner_bytes=owner,controller_bytes=0x1c0,route=0x0200f102,film_library=film_library,resource_ids=list(range(970,978)),camera_tested=False)

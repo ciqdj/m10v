@@ -115,7 +115,6 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    * Its three-digit value alone gets 60px, still inside the native 120px rail. */
   static const uint16_t icons[12]={484,473,398,478,484,0,0,0,0,0,648,648};
   v=value(&s,(uint32_t)target,field);char text[4]={(char)('0'+v),0,0,0};
-  if(field==4){const char *m=v==1?"GLO":v==2?"STR":"OFF";for(uint32_t k=0;k<3;k++)text[k]=m[k];}
   if(field==10){text[0]=v==1?'6':v==2?'2':'1';text[1]=v==1?'4':v==2?'5':'2';text[2]=v==1?0:v==2?'0':'5';}
   if(field==10&&film==67){text[0]=v?'1':'2';text[1]=v?'2':'0';text[2]='0';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x194);if(!ram(list,4))return 0;

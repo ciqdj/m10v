@@ -2,6 +2,37 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.27.2",
+      "date": "2026-10-27",
+      "title": "优化 GR III 光晕、取景与菜单回放",
+      "changes": [
+        "修复 GR III 光晕调节标题和数值显示不完整。",
+        "移除 XPan、6×7 取景中重复的附加边线，保留裁切遮罩。",
+        "补齐 GR III 自定义胶卷回放的通用胶卷标识和参数面板。",
+        "设置菜单按「水印：日期时间、胶卷名称」「效果：HDF」分组，保留原有选项和存档。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III 光晕调节标题和数值显示不完整。",
+            "移除 XPan、6×7 取景中重复的附加边线，保留裁切遮罩。",
+            "补齐 GR III 自定义胶卷回放的通用胶卷标识和参数面板。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "设置菜单按「水印：日期时间、胶卷名称」「效果：HDF」分组，保留原有选项和存档。"
+          ]
+        }
+      ],
+      "notice": "适用于 GR III 2.10；GR IIIx 同步共享水印菜单调整。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.1",
       "date": "2026-10-27",
       "title": "优化更新日志展示",
@@ -16,9 +47,9 @@
           ]
         }
       ],
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "2bda0df3b2cd85463a2f99ce062e06b46eb4278c",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40355859912"
     },
     {
       "version": "2026.10.26.7",

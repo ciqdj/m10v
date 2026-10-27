@@ -1,0 +1,132 @@
+{
+  "candidate": "m10v-gr3-ui-r1-20261027",
+  "status": "WAITING_FOR_USER_VALIDATION",
+  "base_commit": "2bda0df3b2cd85463a2f99ce062e06b46eb4278c",
+  "production_commit": "2bda0df3b2cd85463a2f99ce062e06b46eb4278c",
+  "model": "GR III",
+  "official_firmware": "2.10",
+  "official_sha256": "d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4",
+  "bin_sha256": "391cfd4bac4741bb10077da7606b269d6aaa1e39ab812c916073d9280d9e61ea",
+  "changed": [
+    {
+      "feature": "光晕参数显示",
+      "before": "完整枚举挤入标题，40px值框放OFF/GLO/STR而省略",
+      "after": "标题简化为光晕 0关 1溢出 2拉丝，值框显示0/1/2",
+      "entry": "native/gr3/m10v_detail.c + scripts/build_gr3_m10v_library.py"
+    },
+    {
+      "feature": "XPan/6x7取景",
+      "before": "遮罩另画两条实线，与系统边框重复",
+      "after": "保持54/40基准遮罩，仅去掉额外实线；输出/AF路径不变",
+      "entry": "native/gr3/m10v_aspect.c"
+    },
+    {
+      "feature": "菜单分组",
+      "before": "胶卷库/时间水印/胶卷名称水印/HDF为同级",
+      "after": "胶卷库；水印 > 日期时间/胶卷名称；效果 > HDF（启用HDF功能时）",
+      "entry": "m10v_settings*/m10v_hdf_menu + Python hook builders + Node auditors"
+    },
+    {
+      "feature": "回看面板",
+      "before": "私有ImageTone无法通过原厂映射，无图标且参数列表为空",
+      "after": "对已记录0x10c..0x115增加通用胶卷标识和Standard参数列表回退；原厂返回优先",
+      "entry": "scripts/build_gr3_film_slot_extension.py + node/gr3-m10v-native-build.mjs"
+    }
+  ],
+  "preserved": [
+    "胶卷ID/目录/十个槽位",
+    "184-byte v5存档及历史迁移",
+    "独立日期/胶卷名水印设置",
+    "HDF强度0时功能仍可用",
+    "原厂图标/参数/未知照片回退",
+    "裁切输出/JPEG/DNG/AF几何",
+    "ISP投递/逐张快照/编码桥",
+    "RAW/普通胶卷零像素快速路径",
+    "A/B宿主page7和zoom page8隔离，水印使用page9"
+  ],
+  "focused_checks": {
+    "ui_and_hdf": 13,
+    "native_watermark_view": 1,
+    "final_bin_aspect_geometry_dng_blitter": 25,
+    "aspect_indicators_and_geometry": 30,
+    "settings_root_and_halation": 10,
+    "final_bin_actual_isp_capture_submission": 15,
+    "node_settings_and_playback_tamper_audit": 1,
+    "combined_final_ui_run": {
+      "tests": 24,
+      "result": "passed",
+      "note": "same UI/HDF/root/watermark tests above rerun together after fixture updates; do not add twice"
+    }
+  },
+  "baseline_failures": {
+    "python_existing_ui": "Unmodified main reproduced 23 failures + 2 errors / 56 cases. Several old fixtures still assume the 104-byte/five-slot state and 40-widget layout; these pre-existing failures were not expanded into unrelated repairs. Requested root-row expectations updated; HDF visibility service boundary added to fixture; current-ABI group/view checks pass.",
+    "python_existing_pipeline": "main and current both 8 failures + 3 errors / 71 cases in old view-recovery/appended-slot/detail fixtures. Initial missing official-RTOS setup error resolved; final candidate actual pipeline rerun: 15/15 passed."
+  },
+  "cross_model": {
+    "gr3x": "shared menu/resource consumer: official 1.60 export + final readback passed; no device validation; not included in delivery",
+    "gr4": "skipped firmware build: native/gr3 target-specific implementation; no GR4 consumer changed"
+  },
+  "reference": {
+    "grkit_revision": "f62cd016298c97a1cfc3427b5cfeaf68780e7068",
+    "grkit_dirty": false,
+    "source": "https://github.com/ahonn/grkit/blob/f62cd016298c97a1cfc3427b5cfeaf68780e7068/runtime/menu.S",
+    "metadata": "https://github.com/ahonn/grkit/blob/f62cd016298c97a1cfc3427b5cfeaf68780e7068/runtime/menu.c",
+    "other_projects": "searched gr-custom-tool, darkslide-gr, gr3-film-mods, Ricoh-GRMod; no GR4 addresses copied"
+  },
+  "independent_review": "No actionable new regression found; ROM metadata offset, wrapper ABI, masks, enum isolation and owner/resource allocation reviewed.",
+  "limitations": [
+    "camera_tested=false：没有安装或启用设备设置；没有机身/运行中构建证据",
+    "旧照片若使用历史替换原厂槽拍摄，仍沿用原厂元数据标识",
+    "槽位编号不能还原换卷前的卷名，因此只显示通用标识，不读取当前槽位冒充历史胶卷",
+    "需要实机确认LCD字宽/边框/菜单按键/回放及原厂同条件性能",
+    "未合并main、未推送GitHub、未部署宝塔"
+  ],
+  "recovery": "See README.txt; preserve existing SD configuration and FILMS.M10; restore known-good firmware through established recovery flow.",
+  "node_full_suite": {
+    "baseline": {
+      "passed": 328,
+      "failed": 32,
+      "skipped": 9
+    },
+    "candidate": {
+      "passed": 328,
+      "failed": 32,
+      "skipped": 9
+    },
+    "new_failures": [],
+    "failure_names": [
+      "Charmera has an independent identity without stealing existing custom ID 79",
+      "GR III preflight preserves factory choices and binds the new slot layout to approval",
+      "Harman films append stable IDs and shared 40px icon records",
+      "Phoenix EI120 persists independently per slot and resets on a different stock",
+      "SD pack contains every current platform recipe, independent of five active slots",
+      "both colour views edit a single native configuration and do not restore the legacy film builder",
+      "deleting texture processing retains all55 previous-revision film records",
+      "digital HDF is independent of films and retired soft values never become HDF",
+      "film name stamp migrates off and packs independently from date",
+      "final joined firmware contains all selected components and rejects repaired-checksum tampering",
+      "five retained style filters keep their identities and requested group names",
+      "four colors persist per slot, texture reset preserves color and switching film clears it",
+      "four halo controls and grain/soft are packed in each version4 slot",
+      "fresh defaults and every film selection leave extra effects off",
+      "fresh journals preserve independent timestamp corner and colour bytes",
+      "last delivered 47-film and named custom packs remain readable after opt-in defaults",
+      "legacy effects serialize as neutral and resetting preserves film and special controls",
+      "legacy retired effects migrate to neutral without losing other slot settings",
+      "new builtin LUT records retain names icons and source contract identity",
+      "node/gr3-m10v-native-build.test.mjs",
+      "old effects upgrade and film-specific bounds accept bounded integer simulated EI",
+      "old web configuration migrates into v4 and validates effect ranges",
+      "one catalogue exposes only requested legacy simulations",
+      "original M10V web workflow binds all five slots and timestamp into audited firmware",
+      "prior renderer custom LUTs remain accepted while repaired-CRC tampering is rejected",
+      "product home exposes GR IV native workbench and GR II inspection with truthful limits",
+      "requested groups retain stock identities",
+      "schema4 packs EI in each effects reserved byte and common reset preserves EI and disables extra effects",
+      "single studio orders source, settings and save with the library embedded directly",
+      "switching away from a manually enabled effect resets extras, selecting same film preserves them",
+      "v1 built-in pack from the preceding release remains readable",
+      "web debug export uses the running Node when the service PATH contains no node"
+    ]
+  }
+}

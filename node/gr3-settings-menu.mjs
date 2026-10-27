@@ -9,7 +9,7 @@ const stockVtable=[0x5316c7e0,0x5316c774,0x5316c7bc,0x5316c740,0x5316c748,0x5316
 export function settingsPatches(m){
  if(!m.sd_library)return [];
  need(typeof m.zoom?.enabled==='boolean','explicit zoom enabled contract');
- const zoom=m.zoom.enabled,count=3;
+ const zoom=m.zoom.enabled,count=2;
  const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x223c:0x213c;
  need(d&&d.owner_bytes===ownerBytes&&JSON.stringify(d.private_routes)===JSON.stringify([33616128,33616129,33616131,33616132,...(zoom?[33616133]:[])])&&d.rows?.length===count,'missing route/owner contract');
  const patches=[];
@@ -30,7 +30,7 @@ export function checkSettings(runtime,m){
  for(const [name,target] of [['selector',0x53221a1c],['mapper',0x5320c844],['live_enter',0x5317696c],['live_leave',0x53176de4],['live_destroy',0x53170b50],['live_event',0x531771c0],['adj_event',0x531a4db8],['adj_refresh',0x531a4114],['adj_exit',0x531a3e88],['adj_destroy',0x5319ff24],['adj_changed',0x531a4cfc],['dispatch',0x5316d5dc]]){const at=d.exports['m10v_ab_'+name+'_original'];words(at,[name==='adj_event'?0xe1d130b0:name==='adj_exit'?0xe5d02270:0xe1a0c00d,branch(at+4,target+4)]);}
  abPatches(m);
  for(let i=0;i<d.rows.length;i++){const a=d.rows[i];words(a,[0xe92d4010,0xe1a04001,0xe1a00004,0xe3a01000,branch(a+16,0x5339de20,true),0xe1a00004,movw(1,[937,938,990,1024][i]),0xe1a02001,0xe8bd4010,branch(a+36,0x5339dc70)]);}
- need(m.resources.texts[151]==='胶卷库'&&m.resources.texts[152]==='时间水印','root captions');
+ need(m.resources.texts[151]==='胶卷库'&&m.resources.texts[152]==='水印','root captions');
  need(JSON.stringify(m.resources.texts.slice(179,184))===JSON.stringify(['编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']),'focus captions');
 }
 

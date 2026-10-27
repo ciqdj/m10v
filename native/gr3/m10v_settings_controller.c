@@ -96,7 +96,7 @@ uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
 uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t route){
  p->display_trace=0;
  p->pending_source=0;
- p->page=route==M10V_SETTINGS_ZOOM_ROUTE?M10V_SETTINGS_ZOOM:route==M10V_SETTINGS_AB_ROUTE?M10V_SETTINGS_AB:route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_STAMP:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
+ p->page=route==M10V_SETTINGS_ZOOM_ROUTE?M10V_SETTINGS_ZOOM:route==M10V_SETTINGS_AB_ROUTE?M10V_SETTINGS_AB:route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_WATERMARK:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
  /* AB is a shooting ImageControl child, not a generic Setup controller.
   * Match stock 531ab0f8 / 531ab160(route02000012): mode0 waits for the
   * shooting transition before presentation; parameter137=0 keeps the active

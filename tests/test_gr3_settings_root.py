@@ -34,7 +34,7 @@ class SettingsRootTests(unittest.TestCase):
         new,_=audit.emulate_loader(bytes(patched))
         self.assertEqual(struct.unpack_from('<I',old,0x3e4+28*4)[0],0x02000074)
         self.assertEqual(struct.unpack_from('<I',new,0x3e4+28*4)[0],0x0200f105)
-        self.assertEqual(new[4*0x384+0x2b3],33)
+        self.assertEqual(new[4*0x384+0x2b3],32)
         for category in range(5):
             for row in range([38,18,16,22,30][category]):
                 if (category,row)==(0,28):continue

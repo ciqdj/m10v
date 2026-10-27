@@ -61,9 +61,26 @@ def build_appended_slots(base, native_base, stock, symbols):
         (0x53599e4c,0xe353000c,0xe3530016),
         (0x53599e60,0xe2800030,0xe2800058),
     ]:patch(at,old,new)
+    # The EXIF writer above stores slot tones 25..34 as ImageTone 0x10c..0x115.
+    # Native metadata key25 exposes these as 0x10000 | (ImageTone - 0x100).
+    # Use a generic film mark: journals can be reassigned after capture, so a
+    # current-slot artwork would incorrectly relabel older photos.
+    private='movw ip,#12;movt ip,#1;sub r2,r2,ip;cmp r2,#9;'
+    icon=base+len(image)
+    image.extend(assembly('push {r4,lr};bl 0x532b6eec;cmp r0,#0;bne done;'
+        'bl 0x5320ad88;bl 0x5320b97c;cmp r0,#0;beq done;ldr r2,[r0,#0x220];'+private+
+        'movls r0,#754;movhi r0,#0;done:;pop {r4,pc}',icon))
+    detail=base+len(image)
+    image.extend(assembly('push {r0,r1,r4,lr};bl 0x532b44bc;cmp r0,#0;bne done;'
+        'ldr r2,[sp];ldr r2,[r2,#0x220];'+private+'bhi done;'
+        'ldr r1,[sp,#4];cmp r1,#0;movne r2,#11;strbne r2,[r1];mov r0,#1;'
+        'done:;add sp,sp,#8;pop {r4,pc}',detail))
+    patch(0x53179b7c,0xeb04f4da,branch(0x53179b7c,icon,True))
+    patch(0x532b7cfc,0xebfff1ee,branch(0x532b7cfc,detail,True))
     return bytes(image),dict(schema='m10v-gr3-appended-slots/v2',base=base,bytes=len(image),
         tones=list(range(25,35)),stock_choices=12,shooting_choices='12+enabled_films',shooting_choices_max=22,
         library_index='14+enabled_films',movie_choices=10,raw_development_choices=12,
         entries=dict(count=count,index=index,position=position,maximum=maximum,display=display),
         exif_table=table,exif_bytes=88,patches=patches,
+        playback=dict(icon=icon,detail=detail,icon_id=754,metadata_key=0x25,recorded_codes=[0x10c,0x115],identity="recorded-slot-generic-film"),
         stock_parameter_proxy=False,state_version=5,camera_tested=False)

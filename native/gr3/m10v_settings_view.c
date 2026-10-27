@@ -179,6 +179,15 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
    }
   }
  }
+ if(s->screen==M10V_SETTINGS_WATERMARK){
+  caption(v->widgets[TITLE],M10V_VIEW_STAMP);
+  for(uint32_t i=0;i<4;i++){
+   visible(v->widgets[ROW+i],i<2);visible(v->widgets[VALUE+i],0);
+   visible(v->widgets[ROW_FRAME+i],i<2&&i==s->focus);
+   visible(v->widgets[ROW_INNER+i],i<2&&i==s->focus);
+   if(i<2)caption(v->widgets[ROW+i],1138+i);
+  }
+ }else if(s->screen==M10V_SETTINGS_STAMP){caption(v->widgets[TITLE],1138);}
  ((fn1)0x533ad308u)(v->widgets[ROOT]);
 }
 

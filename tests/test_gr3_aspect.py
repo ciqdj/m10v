@@ -219,13 +219,13 @@ class AspectTests(unittest.TestCase):
 
     def test_native_grid_draw_uses_vertical_six_by_seven_mask(self):
         from unicorn import arm_const as A
-        for entry in [0x540b90a4,0x540b91cc]:
-            with self.subTest(entry=hex(entry)):
+        for entry,ratio,width in [(e,r,w) for e in (0x540b90a4,0x540b91cc) for r in (4,5) for w in (720,360)]:
+            with self.subTest(entry=hex(entry),ratio=ratio,width=width):
                 u=self.machine();view=RAM+0x2000;surface=RAM+0x3000
                 u.mem_write(RAM+0x100,struct.pack('<I',RAM+0x200))
                 u.mem_write(view+0x9e,b'\x01')
-                for offset in [0x30,0x64]: u.mem_write(view+offset,struct.pack('<4I',0,0,720,480))
-                returns={0x53525d5c:RAM+0x100,0x5354a778:5,0x53549958:0,
+                for offset in [0x30,0x64]: u.mem_write(view+offset,struct.pack('<4I',0,0,width,width*2//3))
+                returns={0x53525d5c:RAM+0x100,0x5354a778:ratio,0x53549958:0,
                          0x53654150:RAM+0x300,0x53654220:0,0x5339c3b0:0,
                          0x533ab9bc:0,0x5320804c:RAM+0x400,0x532081ec:RAM+0x500,
                          0x53208298:0} # Isolate mask drawing; final indicator test executes the icon renderer.
@@ -240,8 +240,9 @@ class AspectTests(unittest.TestCase):
                 u.hook_add(UC_HOOK_CODE,native)
                 u.reg_write(A.UC_ARM_REG_R0,view);u.reg_write(A.UC_ARM_REG_R1,surface)
                 u.emu_start(entry,STOP,count=2000)
-                self.assertEqual(rectangles,[(0,0,80,480,16),(640,0,80,480,16),
-                                             (78,0,2,480,2),(640,0,2,480,2)])
+                scale=width//360
+                expected=[(0,0,40*scale,240*scale,16),(320*scale,0,40*scale,240*scale,16)] if ratio==5 else [(0,0,width,54*scale,16),(0,186*scale,width,54*scale,16)]
+                self.assertEqual(rectangles,expected)
 
 
 if __name__ == '__main__':

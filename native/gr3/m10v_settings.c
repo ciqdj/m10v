@@ -13,7 +13,7 @@ static uint32_t value(const m10v_library_state *s,uint32_t field){
 int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t screen){
  if(!p||!ready(o))return -1;
  p->screen=M10V_SETTINGS_CLOSED;
- if(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP&&screen!=M10V_SETTINGS_NAME&&screen!=M10V_SETTINGS_AB)return -1;
+ if(screen!=M10V_SETTINGS_FILMS&&screen!=M10V_SETTINGS_STAMP&&screen!=M10V_SETTINGS_NAME&&screen!=M10V_SETTINGS_AB&&screen!=M10V_SETTINGS_WATERMARK)return -1;
  if(o->load(o->context,&p->saved)<0)return -1;
  if(p->saved.stamp>2||p->saved.format>3||p->saved.corner>3||p->saved.color>3)return -1;
  if(!m10v_library_valid(&p->saved))return -1;
@@ -83,19 +83,28 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
    if(r||o->load(o->context,&p->saved)<0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
    p->error=0;
   }
+ }else if(p->screen==M10V_SETTINGS_WATERMARK){
+  if(previous)p->focus=0;
+  if(next)p->focus=1;
+  if(key==M10V_KEY_BACK)p->screen=M10V_SETTINGS_CLOSED;
+  if(key==M10V_KEY_OK){
+   p->group=1;
+   p->screen=p->focus?M10V_SETTINGS_NAME:M10V_SETTINGS_STAMP;
+   p->value=p->saved.reserved&1u;p->focus=0;p->error=0;
+  }
  }else if(p->screen==M10V_SETTINGS_NAME){
   if(previous)p->value=0;
   if(next)p->value=1;
-  if(key==M10V_KEY_BACK)p->screen=M10V_SETTINGS_CLOSED;
+  if(key==M10V_KEY_BACK){p->screen=p->group?M10V_SETTINGS_WATERMARK:M10V_SETTINGS_CLOSED;p->focus=1;p->error=0;}
   if(key==M10V_KEY_OK){
    if(o->film_name_stamp(o->context,p->value)!=0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
-   p->saved.reserved=p->value;p->screen=M10V_SETTINGS_CLOSED;p->error=0;
+   p->saved.reserved=p->value;p->screen=p->group?M10V_SETTINGS_WATERMARK:M10V_SETTINGS_CLOSED;p->focus=1;p->error=0;
   }
  }else if(p->screen==M10V_SETTINGS_STAMP){
   if(p->focus>=4)return;
   if(previous&&p->focus)p->focus--;
   if(next&&p->focus<3)p->focus++;
-  if(key==M10V_KEY_BACK)p->screen=M10V_SETTINGS_CLOSED;
+  if(key==M10V_KEY_BACK){p->screen=p->group?M10V_SETTINGS_WATERMARK:M10V_SETTINGS_CLOSED;p->focus=0;p->error=0;}
   if(key==M10V_KEY_OK){p->value=value(&p->saved,p->focus);p->screen=M10V_SETTINGS_VALUE;p->error=0;}
  }else if(p->screen==M10V_SETTINGS_VALUE){
   if(p->focus>=4)return;

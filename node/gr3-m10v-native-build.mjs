@@ -225,7 +225,7 @@ function checkRuntime(runtime, manifest) {
     need(manifest.d76_icons?.first_id===775&&manifest.d76_icons?.last_id===781&&art.length===7*6400&&manifest.d76_icons.sha256===sha(art)&&Number.isInteger(p)&&p>=BASE&&p+art.length<=BASE+runtime.length&&runtime.subarray(p-BASE,p-BASE+art.length).equals(art),'D76 artwork differs');
     for(let i=0;i<7;i++){const d=icons.descriptors+(104+i)*8,at=d-BASE;need(runtime.readUInt32LE(icons.table-BASE+(775+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)*4===p+i*6400,'D76 icon descriptor differs');}
   }
-  const resourceCount=(manifest.sd_library?351:183)+(manifest.universal_halation?1:0);
+  const resourceCount=manifest.sd_library?356:183;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -445,6 +445,12 @@ function appendedSlotPatches(runtime,manifest,raw) {
   [0x53599e2c,0xe345c3d2,movt(12,m.exif_table>>>16)],[0x53599e30,0xe2801030,0xe2801058],
   [0x53599e4c,0xe353000c,0xe3530016],[0x53599e60,0xe2800030,0xe2800058],
  ])patches.push({address,expected,replacement,name:'appended EXIF '+address.toString(16)});
+ const playback=m.playback;
+ need(playback?.icon_id===754&&playback.metadata_key===0x25&&JSON.stringify(playback.recorded_codes)==='[268,277]'&&playback.identity==='recorded-slot-generic-film','playback identity contract differs');
+ const checkPlayback=(name,words)=>{const start=playback[name],body=read(start,words.length*4);words.forEach((w,i)=>{if(Array.isArray(w))w=branch(start+4*i,w[0],true);need(body.readUInt32LE(4*i)===(w>>>0),'playback '+name+' instructions differ');});};
+ checkPlayback('icon',[0xe92d4010,[0x532b6eec],0xe3500000,0x1a00000a,[0x5320ad88],[0x5320b97c],0xe3500000,0x0a000006,0xe5902220,0xe300c00c,0xe340c001,0xe042200c,0xe3520009,0x930002f2,0x83a00000,0xe8bd8010]);
+ checkPlayback('detail',[0xe92d4013,[0x532b44bc],0xe3500000,0x1a00000b,0xe59d2000,0xe5922220,0xe300c00c,0xe340c001,0xe042200c,0xe3520009,0x8a000004,0xe59d1004,0xe3510000,0x13a0200b,0x15c12000,0xe3a00001,0xe28dd008,0xe8bd8010]);
+ for(const [address,expected,name] of [[0x53179b7c,0xeb04f4da,'icon'],[0x532b7cfc,0xebfff1ee,'detail']])patches.push({address,expected,replacement:branch(address,playback[name],true),name:'recorded film playback '+name});
  need(m.patches.length===patches.length&&patches.every((p,i)=>p.address===m.patches[i].address&&p.expected===m.patches[i].expected&&p.replacement===m.patches[i].replacement),'appended patch inventory differs');
  return patches;
 }
@@ -569,7 +575,7 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
     verified_hooks:patchList(manifest,runtime).length,universal_halation:manifest.universal_halation?{modes:['off','spill','streak'],per_film:true,default:'off',special_spill_films:[33,67],camera_tested:false}:null,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:78,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:5,film_count:manifest.film_library_enabled===false?0:95,active_slots:manifest.film_library_enabled===false?0:Array.from({length:10},(_,i)=>Buffer.from(manifest.initial_state_hex,'hex').readUInt16LE(12+i*8)).filter(Boolean).length,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:37,max_records:256,custom_lut:true,page_rows:10}:null,
-    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 时间水印':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:Array.from({length:10},(_,i)=>25+i),stock_choices:12,shooting_choices:'12+enabled_films',capacity:10,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus up to ten selected M10V films':'12 stock entries only; no private IDs',
+    menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 水印 / 效果':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:Array.from({length:10},(_,i)=>25+i),stock_choices:12,shooting_choices:'12+enabled_films',capacity:10,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus up to ten selected M10V films':'12 stock entries only; no private IDs',
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},
     camera_tested:false,debug_mode:manifest.debug_mode,debug_log:manifest.debug_log,status:'OFFLINE_VERIFIED_EXPERIMENTAL_CANDIDATE',
