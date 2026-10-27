@@ -1,3 +1,6 @@
+import {mountCinematicStudio} from './cinematic-studio.mjs';
+import {mountBuildCompletion} from './full-library.mjs';
+import {focusWorkbenchHeading} from '/shared/workbench-focus.mjs';
 import {mountPowerImages} from './power-images.js';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFirmwareSaveGate} from './firmware-save-gate.mjs';
@@ -14,7 +17,10 @@ const nativeApi=gr4Workbench?'/api/gr4/native-library':'/api/gr3/native-library'
 let chosenModel=gr4Workbench?'gr4':location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
 let modelLabel=chosenModel==='gr4'?'GR IV':chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
+let cinematicEditor;
+let completion;
 let powerImages;
+let powerTransitioning=false;
 let settingsTab='library';
 let debugMode=false;
 const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.features.has('level'),negativeGrain:state.features.has('negativeGrain'),rawNr:state.features.has('rawNr')?state.rawNr:{mode:'stock'}});
@@ -117,7 +123,8 @@ function saveDraft() {
       filmIds: state.filmIds, filmLibrary: state.filmLibrary,
       filmTexture: state.filmTexture, nativeConfiguration:state.nativeConfig, stockPresets:state.stockPresets, rawNr:state.rawNr,
     }));
-  } catch { notice('草稿未能保存到本机，请检查浏览器存储空间。',true); }
+    $('draft-indicator').textContent='草稿已保存到本机';
+  } catch { $('draft-indicator').textContent='草稿保存失败';notice('草稿未能保存到本机，请检查浏览器存储空间。',true); }
 }
 function restoreDraft() {
   try {
@@ -140,6 +147,7 @@ function restoreDraft() {
   editHistory.restore(historyConfiguration());updateHistoryButtons();
 }
 function invalidate(recordHistory=true) {
+  completion?.reset();
   fitController?.abort();fitSequence++;
   iconImports.invalidate();
   if(recordHistory)editHistory.update(historyConfiguration());
@@ -155,15 +163,19 @@ function invalidate(recordHistory=true) {
   clearTimeout(draftTimer); draftTimer=setTimeout(saveDraft,300);
   renderLedger();
 }
-function showStep(step) {
+async function showStep(step) {
+  if(powerTransitioning)return;
+  if(state.activeStep==='power'&&step!=='power'&&powerImages?.hasPending()){powerTransitioning=true;$('power-next').disabled=true;try{if(!await powerImages.applyPending())return;}finally{powerTransitioning=false;$('power-next').disabled=false;}}
+  cinematicEditor?.close();
+  document.body.dataset.view=step;
   state.activeStep = step;
   document.querySelectorAll('.page').forEach((page) => { page.hidden = page.dataset.page !== step; });
-  document.querySelectorAll('.step').forEach((button) => button.classList.toggle('active', button.dataset.step === step));
+  document.querySelectorAll('.step').forEach((button) => (button.classList.toggle('active', button.dataset.step === step),button.setAttribute('aria-current',button.dataset.step===step?'step':'false')));
   if (step === 'build') renderBuildSummary();
   renderLedger();
   notice('');
   const heading=document.querySelector(`.page[data-page="${step}"] h2`);
-  if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
+  focusWorkbenchHeading(heading);
 }
 function versionUnlockSnapshot(){
  if(chosenModel!=='gr3x')return normalizeVersionUnlock({enabled:false},chosenModel);
@@ -187,6 +199,7 @@ function renderVersionUnlock(){
 }
 function renderLedger() {
   powerImages?.setModel();
+  $('power-unavailable').hidden=chosenModel==='gr3';
   const ledger = $('plan-ledger');
   ledger.replaceChildren();
   const native=state.profile==='native';
@@ -230,8 +243,8 @@ function renderFeatures() {
   nativeEditor?.setHalationWrite?.(state.features.has('halation'));
   const target = $('feature-list');
   let zoomControls=$('studio-zoom-controls');
-  if(!zoomControls){zoomControls=document.createElement('section');zoomControls.id='studio-zoom-controls';zoomControls.className='feature-row';target.before(zoomControls);}
-  renderZoomControls(zoomControls,state.nativeConfig,chosenModel,value=>nativeEditor.setConfiguration(value));
+  if(!zoomControls){zoomControls=document.createElement('section');zoomControls.id='studio-zoom-controls';zoomControls.className='feature-row';target.prepend(zoomControls);}
+  renderZoomControls(zoomControls,state.nativeConfig,chosenModel,value=>nativeEditor.setConfiguration(value),false,{feature:true,number:'01'});
   for (const [index, [id, name, description, tag]] of definitions.entries()) {
     const active = state.features.has(id);
     const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:null]);
@@ -242,7 +255,7 @@ function renderFeatures() {
     const copy = document.createElement('div');
     const heading = document.createElement('div');
     heading.className = 'feature-title';
-    heading.append(textNode('span', String(index + 1).padStart(2, '0'), 'feature-num'), textNode('h3', name));
+    heading.append(textNode('span', String(index + (chosenModel==='gr3'?2:1)).padStart(2, '0'), 'feature-num'), textNode('h3', name));
     copy.append(heading, textNode('p',gr4Workbench&&id==='timestamp'?'在 JPEG 中写入拍摄日期与时间，样式可在机内调整。':gr4Workbench&&id==='aspect'?'增加 65:24 画幅与宽幅取景蒙版。':description), textNode('span', gr4Workbench&&id==='aspect'?'65:24':tag, 'feature-tag'));
     const button = textNode('button', active ? '关闭' : '开启', 'feature-toggle' + (active ? ' selected' : ''));
     button.type = 'button';
@@ -268,7 +281,7 @@ function renderFeatures() {
       } else if (id === 'digitalHdf') {
         const levels=document.createElement('div');levels.className='hdf-levels';levels.setAttribute('role','group');levels.setAttribute('aria-label','HDF 模拟默认档位');
         ['关闭','弱','中','强'].forEach((label,value)=>{const b=textNode('button',label);b.type='button';b.setAttribute('aria-pressed',String(state.nativeConfig.hdf===value));b.onclick=()=>nativeEditor.setHdf(value);levels.append(b);});
-        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){state.features.delete('film');state.features.delete('halation');state.features.delete('timestamp');state.nativeConfig.stamp=0;}else state.features.add('film');invalidate();renderFeatures();};
+        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){state.features.delete('film');state.features.delete('halation');state.features.delete('timestamp');state.nativeConfig.stamp=0;state.nativeConfig.zoom.write=false;}else state.features.add('film');invalidate();renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
       } else if (id === 'recipes') renderRecipeDetail(detail);
       else if (id === 'film') renderFilmDetail(detail);
@@ -301,7 +314,7 @@ function renderFeatures() {
     }
     if(existing)existing.replaceWith(row);else target.append(row);
   }
-  $('selection-count').textContent = settingsTab==='library'?`已选 ${state.nativeConfig.slots.length}/${chosenModel==='gr3'?10:5} 款胶卷`:`已开启 ${extensionFeatures.filter(id=>state.features.has(id)).length} 项扩展功能`;
+  $('selection-count').textContent = settingsTab==='library'?`已选 ${state.nativeConfig.slots.length}/${chosenModel==='gr3'?10:5} 款胶卷`:`已开启 ${extensionFeatures.filter(id=>state.features.has(id)).length+(chosenModel==='gr3'&&state.nativeConfig.zoom.write?1:0)} 项扩展功能`;
   $('features-next').disabled = state.profile!=='native' && !state.features.size || (state.features.has('recipes') && !state.recipes.size);
   renderLedger();
 }
@@ -579,6 +592,7 @@ async function build() {
   if (!state.preparation || !state.preparationRequest || !(riskAcceptedRevision===state.revision)) return;
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;
+  const exported={model:chosenModel,catalog:structuredClone(state.nativeCatalog),filmLibrary:state.profile==='native'&&state.features.has('film'),request:structuredClone(state.preparationRequest)};
   $('build-firmware').disabled = true;
   $('cancel-build').hidden=false;
   renderLedger();
@@ -591,12 +605,18 @@ async function build() {
       headers: { 'Content-Type': 'application/json' },
     });
     if(revision!==state.revision||activeBuildController!==controller){notice('构建期间方案已变化，已放弃旧方案下载。请重新预检。',true);return;}
+    let completedReceipt=null;
     if(state.profile==='native'){
       const encoded=response.headers.get('X-M10V-Native-Receipt');if(!encoded)throw Error('缺少构建校验记录');
       const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
-      assertVersionUnlockReceipt(receipt.version_unlock,state.preparationRequest.version_unlock,chosenModel);
+      completedReceipt=receipt;
+      assertVersionUnlockReceipt(receipt.version_unlock,exported.request.version_unlock,exported.model);
     }
-    await download(response, state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin'));
+    const filename=state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin');
+    const firmwareBlob=await response.blob();
+    if(revision!==state.revision||activeBuildController!==controller){notice('方案已变化，已放弃旧方案下载，请重新保存。',true);return;}
+    await download(new Response(firmwareBlob),filename);
+    completion?.show({firmwareBlob,filename,model:exported.model,catalog:exported.catalog,filmLibrary:exported.filmLibrary,record:{receipt:completedReceipt,configuration:exported.request}});
     $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+(state.source?.build_source?.update_compatibility?`本包更新版本 ${state.source.build_source.update_compatibility.package_version}。`:'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
@@ -605,11 +625,14 @@ async function build() {
   } finally { if(activeBuildController===controller){activeBuildController=null;$('cancel-build').hidden=true;$('build-firmware').disabled=!(state.preparation&&(riskAcceptedRevision===state.revision));renderLedger();} }
 }
 function showSettingsTab(tab){
+ cinematicEditor?.close();
  enterNativeSelection();
  settingsTab=tab;renderFeatures();const library=tab==='library';$('imaging-settings').hidden=library;$('native-editor').hidden=!library;
  for(const name of ['imaging','library']){const b=$('tab-'+name);b.setAttribute('aria-selected',String(name===tab));b.tabIndex=name===tab?0:-1;}
 }
 $('tab-imaging').onclick=()=>showSettingsTab('imaging');$('tab-library').onclick=()=>showSettingsTab('library');
+document.querySelector('[data-close-imaging]')?.addEventListener('click',()=>showSettingsTab('library'));
+
 for(const name of ['imaging','library'])$('tab-'+name).onkeydown=e=>{
  if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
  e.preventDefault();const next=e.key==='Home'?'library':e.key==='End'?'imaging':settingsTab==='imaging'?'library':'imaging';
@@ -629,7 +652,8 @@ document.querySelectorAll('.step').forEach((button) =>
 document.querySelectorAll('[data-back]').forEach((button) =>
   button.addEventListener('click', () => showStep(button.dataset.back)));
 $('camera-next').addEventListener('click', () => showStep('features'));
-$('features-next').addEventListener('click', () => showStep(state.projectId?'build':'source'));
+$('power-next').addEventListener('click',()=>showStep(state.projectId?'build':'source'));
+$('features-next').addEventListener('click', () => showStep('power'));
 $('source-next').addEventListener('click', () => showStep('features'));
 $('open-build-desk').addEventListener('click', () => showStep(state.projectId?'build':'source'));
 document.querySelectorAll('input[name="recipe-source"]').forEach((input) =>
@@ -711,7 +735,8 @@ try {
   state.token = status.session_token; state.runtime = gr4Workbench || status.gr3_custom_runtime === true;
   state.nativeCatalog=nativeCatalog.films;
   $('native-editor').innerHTML=gr4Workbench?nativeMarkup.replaceAll('GR III STREET · 2.10','GR IV · 1.11').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replaceAll('fwdc239b.bin','fwdc248b.bin'):nativeMarkup;
-  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';if(!meta.globalHdf&&!meta.globalZoom)state.features.add('film');if(configuration.hdf)state.features.add('digitalHdf');if(configuration.stamp||configuration.filmNameStamp)state.features.add('timestamp');if(meta.filmSelection)state.unresolvedSlots=[];if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
+  cinematicEditor=mountCinematicStudio($('native-editor'),{showImaging:()=>showSettingsTab('imaging'),addFilm:id=>nativeEditor.toggleFilm(id)});
+  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onInspect:(film,selected)=>cinematicEditor?.inspect(film,selected),showZoom:false,defaultZoomWrite:true,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';if(!meta.globalHdf&&!meta.globalZoom)state.features.add('film');if(configuration.hdf)state.features.add('digitalHdf');if(configuration.stamp||configuration.filmNameStamp)state.features.add('timestamp');if(meta.filmSelection)state.unresolvedSlots=[];if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
   state.nativeConfig=nativeEditor.getConfiguration();
   if(state.nativeConfig.stamp||state.nativeConfig.filmNameStamp)state.features.add('timestamp');
   if(state.nativeConfig.hdf)state.features.add('digitalHdf');
@@ -721,6 +746,7 @@ try {
   if (!state.runtime&&state.profile==='custom') notice('构建组件尚未就绪，固件导出会被阻止。', true);
 } catch (error) { notice(`工作区载入失败：${error.message}`, true); }
 
+completion=mountBuildCompletion($('build-completion'),{api});
 $('debug-mode').addEventListener('change',()=>{debugMode=$('debug-mode').checked;invalidate(false);});
 
 $('version-unlock').addEventListener('change',()=>invalidate(false));

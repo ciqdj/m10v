@@ -27,7 +27,19 @@ export function enhanceFilmSelect(select,{placeholder='搜索胶卷…',caption=
   const row=document.createElement('button');row.type='button';row.className='film-picker-option';row.setAttribute('role','option');row.setAttribute('aria-selected',String(option.selected));row.append(art(option));const copy=document.createElement('span');copy.textContent=option.textContent;row.append(copy);if(option.selected){const check=document.createElement('b');check.textContent='✓';row.append(check);}
   row.onclick=()=>{select.value=option.value;sync();close(true);select.dispatchEvent(new Event('change',{bubbles:true}));};list.append(row);count++;
  }if(!count){const empty=document.createElement('p');empty.className='film-picker-empty';empty.textContent='没有找到胶卷，试试其他名称';list.append(empty);}}
- function open(){if(select.disabled)return;search.value='';render();panel.showPopover();const r=trigger.getBoundingClientRect(),width=Math.min(Math.max(r.width,320),innerWidth-24),below=innerHeight-r.bottom,up=r.top,down=below>=Math.min(420,up),height=Math.min(420,(down?below:up)-20);panel.style.width=`${width}px`;panel.style.maxHeight=`${height}px`;panel.style.left=`${Math.max(12,Math.min(r.left,innerWidth-width-12))}px`;panel.style.top=`${down?r.bottom+8:Math.max(12,r.top-height-8)}px`;trigger.setAttribute('aria-expanded','true');if(searchable)search.focus();else list.querySelector('[aria-selected="true"]')?.focus();}
+ function open(){
+  if(select.disabled)return;
+  trigger.scrollIntoView({block:'nearest',inline:'nearest'});
+  search.value='';render();panel.showPopover();
+  const r=trigger.getBoundingClientRect(),width=Math.min(Math.max(r.width,320),innerWidth-24);
+  const below=Math.max(0,innerHeight-r.bottom-20),above=Math.max(0,r.top-20),down=below>=Math.min(420,above);
+  panel.style.width=`${width}px`;panel.style.maxHeight=`${Math.max(0,Math.min(420,down?below:above))}px`;
+  panel.style.left=`${Math.max(12,Math.min(r.left,innerWidth-width-12))}px`;
+  const height=panel.getBoundingClientRect().height;
+  panel.style.top=`${Math.max(12,Math.min(down?r.bottom+8:r.top-height-8,innerHeight-height-12))}px`;
+  trigger.setAttribute('aria-expanded','true');
+  if(searchable)search.focus({preventScroll:true});else list.querySelector('[aria-selected="true"]')?.focus({preventScroll:true});
+ }
  trigger.onclick=()=>panel.matches(':popover-open')?close():open();
  trigger.onkeydown=e=>{if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();open();list.querySelector('[aria-selected="true"]')?.focus();}};
  panel.addEventListener('keydown',e=>{const options=[...list.querySelectorAll('[role="option"]')],current=options.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();close(true);}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const index=e.key==='Home'?0:e.key==='End'?options.length-1:e.key==='ArrowDown'?Math.min(current+1,options.length-1):Math.max(current-1,0);options[index]?.focus();}else if(e.key==='Enter'&&document.activeElement===search){e.preventDefault();options[0]?.click();}else if(e.key==='Tab'){close();}});

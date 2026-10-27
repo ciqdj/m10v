@@ -52,7 +52,7 @@ test('GR IIIx native workflow does not fetch retired stock customization resourc
  assert.ok(!h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
 test('GR IIIx extension tab retains the native workflow',()=>{
- const node=()=>({setAttribute(){}}),context=vm.createContext({gr4Workbench:false,state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
+ const node=()=>({setAttribute(){}}),context=vm.createContext({cinematicEditor:undefined,gr4Workbench:false,state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
  vm.runInContext("let chosenModel='gr3x',settingsTab='library';"+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
  context.showSettingsTab('imaging');assert.equal(vm.runInContext('state.profile',context),'native');
 });
@@ -75,7 +75,7 @@ test('GR IV backup keeps its actual BIN format and model filename',async()=>{
 
 test('opening imaging settings preserves an HDF-only selection',()=>{
  const node=()=>({setAttribute(){}}),state={profile:'native',features:new Set(['digitalHdf'])};
- const context=vm.createContext({state,$:node,renderFeatures(){}});
+ const context=vm.createContext({cinematicEditor:undefined,state,$:node,renderFeatures(){}});
  vm.runInContext("let settingsTab='library';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
  context.showSettingsTab('imaging');assert.equal(state.profile,'native');assert.deepEqual([...state.features],['digitalHdf']);
 });
