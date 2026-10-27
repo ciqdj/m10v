@@ -159,7 +159,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False,camera_model='gr3'):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False,camera_model='gr3',adj_exit_trace=False):
     if camera_model not in ('gr3','gr3x'):raise ValueError('invalid camera model')
     if type(custom_zoom)is not bool:raise ValueError('custom zoom must be boolean')
     if zoom_seed is not None and not (custom_zoom and film_library and sd_library):raise ValueError('zoom seed requires GR III film/SD library')
@@ -187,6 +187,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     owner_cache=bool(live_color or (recipe_snapshot and sd_library))
     profile_flags=[f'-DM10V_CAPTURE_PROFILE={int(profile_mode)}',f'-DM10V_SPATIAL_NEON={int(spatial_neon)}']
     color_flags=[f'-DM10V_FILM_COLOR_CANDIDATE={int(candidate_color)}',f'-DM10V_SPATIAL_NEON={int(spatial_neon)}',f'-DM10V_TEXTURE_NEON={int(texture_neon)}']
+    if type(adj_exit_trace)is not bool or (adj_exit_trace and not debug_mode):raise ValueError('ADJ exit trace requires explicit debug mode')
     if type(debug_mode) is not bool or not isinstance(debug_build_id,int) or not 0<=debug_build_id<=0xffffffff:
         raise ValueError('invalid debug build options')
     if initial_state_hex is None:
@@ -350,7 +351,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
                 image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
         capture_recipe_bytes='M10V_SAVE_RECIPE_EXTENDED_BYTES' if lifecycle_trace else '(M10V_SAVE_RECIPE_BYTES+16u)' if hdf_enabled else 'M10V_SAVE_RECIPE_BYTES'
-        debug_flags = [*profile_flags,f'-DM10V_CAPTURE_RECIPE_BYTES={capture_recipe_bytes}',f'-DM10V_HDF_SHARED_RECIPE={int(hdf_enabled and lifecycle_trace)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}',f'-DM10V_RECIPE_SNAPSHOT={int(recipe_snapshot)}',f'-DM10V_RAW_LIFETIME={int(save_chain_trace)}',f'-DM10V_ISP_NATIVE_LOOK={int(native_color)}',f'-DM10V_ISP_NATIVE_GRAIN_MODE={int(native_grain)}']
+        debug_flags = [*profile_flags,f'-DM10V_ADJ_EXIT_TRACE={int(adj_exit_trace)}',f'-DM10V_CAPTURE_RECIPE_BYTES={capture_recipe_bytes}',f'-DM10V_HDF_SHARED_RECIPE={int(hdf_enabled and lifecycle_trace)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}',f'-DM10V_RECIPE_SNAPSHOT={int(recipe_snapshot)}',f'-DM10V_RAW_LIFETIME={int(save_chain_trace)}',f'-DM10V_ISP_NATIVE_LOOK={int(native_color)}',f'-DM10V_ISP_NATIVE_GRAIN_MODE={int(native_grain)}']
         if debug_mode or lifecycle_trace:
             debug_obj = folder / 'debug.o'
             debug_source=ROOT/'native/gr3/m10v_debug.c'
@@ -898,7 +899,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['capture_profile']={'schema':'m10v-capture-profile/v1','counter_service':0x53050b7c,'units':'milliseconds','flush':'once after render and cache writeback','max_batch':32} if profile_mode else None
     manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
         'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'],
-        'page_bytes':4096,'records_per_channel':63,'guard_address':0x5506821f} if debug_mode else None
+        'page_bytes':4096,'records_per_channel':63,'guard_address':0x5506821f,'adj_exit_trace':adj_exit_trace} if debug_mode else None
     initial_offset = bytes(image).find(initial)
     if initial_offset < 0 or bytes(image).find(initial, initial_offset+1) >= 0: raise ValueError('initial state not uniquely embedded')
     manifest['initial_state_hex'] = initial.hex()
@@ -970,6 +971,7 @@ if __name__ == '__main__':
     parser.add_argument('--lifecycle-trace',action='store_true')
     parser.add_argument('--recipe-snapshot',action='store_true')
     parser.add_argument('--debug',action='store_true')
+    parser.add_argument('--adj-exit-trace',action='store_true')
     parser.add_argument('--debug-build-id',type=lambda v:int(v,0),default=0)
     parser.add_argument('--native-color',action='store_true')
     parser.add_argument('--live-color',action='store_true')
@@ -982,4 +984,4 @@ if __name__ == '__main__':
     parser.add_argument('--zoom-seed',help='Validated one-time two-slot preset JSON')
     parser.add_argument('--camera-model',choices=['gr3','gr3x'],default='gr3')
     parser.add_argument('--no-custom-zoom',action='store_true',help='Keep original focal crop hooks and hide custom zoom menu (GR IIIx)')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,camera_model=args.camera_model,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,adj_exit_trace=args.adj_exit_trace,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,camera_model=args.camera_model,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None), indent=2))

@@ -2,6 +2,28 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.27.7",
+      "date": "2026-10-27",
+      "title": "修复 ADJ 关机与快切退出卡死",
+      "changes": [
+        "修复 ADJ 影像控制关机及 A/B 快切退出时，迟到的按键事件重新打开选卷页、导致无法正常退出的问题。",
+        "修复漫画/E6胶卷在 A/B 选择页显示为槽位或测试文字的问题。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 ADJ 影像控制关机及 A/B 快切退出时，迟到的按键事件重新打开选卷页、导致无法正常退出的问题。",
+            "修复漫画/E6胶卷在 A/B 选择页显示为槽位或测试文字的问题。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享菜单运行时。GR III 的 D2 测试包已由用户实机确认通过；IIIx 完成离线导出检查，未做本次实机验收。正式构建默认关闭专项退出日志。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.6",
       "date": "2026-10-27",
       "title": "修复新增滤镜图标与 ADJ 快切退出",
@@ -19,9 +41,9 @@
         }
       ],
       "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享菜单运行时；两款固件已完成离线构建，新增定向用例通过，真机表现待确认。按用户要求直接发布。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "87cc28ae876643d82566bdd2eda6b78193af8c64",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40498799324"
     },
     {
       "version": "2026.10.27.5",
