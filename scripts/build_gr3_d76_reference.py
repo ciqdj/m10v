@@ -61,14 +61,22 @@ def generate():
   delta=colour.delta_E(colour.XYZ_to_Lab(colour.sRGB_to_XYZ(target)),colour.XYZ_to_Lab(colour.sRGB_to_XYZ(actual)),method='CIE 2000')
   error=dict(samples=8192,seed=299305,delta_e00_median=float(np.median(delta)),delta_e00_p95=float(np.quantile(delta,.95)),delta_e00_max=float(np.max(delta)),max_code_error=float(np.max(np.abs(target-actual))*255))
   reports.append(dict(stock,table_sha256=hashlib.sha256(raw.tobytes()).hexdigest(),interpolation=error));print(spec['id'],error,flush=True)
+ for table in tables:
+  if not np.all(table==table[:,0,None]):raise ValueError('D76 target is not neutral')
  for bank,part in enumerate([tables[:4],tables[4:]]):
-  text='/* Generated D76 display targets; see d76-reference.json. */\nstatic const uint8_t m10v_d76_luts_%d[%d][3375][3]={\n'%(bank,len(part))
-  text+=''.join('{\n'+''.join('{%d,%d,%d},\n'%tuple(v) for v in table)+'},\n' for table in part)+'};\n'
+  text='/* Generated D76 display targets; see d76-reference.json. */\nstatic const uint8_t m10v_d76_luts_%d[%d][3375]={\n'%(bank,len(part))
+  text+=''.join('{\n'+''.join('%d,\n'%int(v[0]) for v in table)+'},\n' for table in part)+'};\n'
   (ROOT/f'native/gr3/film_d76_{bank}_data.h').write_text(text)
-  (ROOT/f'native/gr3/film_d76_{bank}.c').write_text('#include <stdint.h>\n#include "film_d76_%d_data.h"\nconst uint8_t *m10v_d76_%d_table(uint32_t v){return v<%d?&m10v_d76_luts_%d[v][0][0]:0;}\n'%(bank,bank,len(part),bank))
+  (ROOT/f'native/gr3/film_d76_{bank}.c').write_text('#include <stdint.h>\n#include "film_d76_%d_data.h"\nconst uint8_t *m10v_d76_%d_table(uint32_t v){return v<%d?&m10v_d76_luts_%d[v][0]:0;}\n'%(bank,bank,len(part),bank))
  (ROOT/'web/gr3/d76-luts.json').write_text(json.dumps(dict(size=15,bits=8,order='RGB, blue fastest',stocks=stocks),separators=(',',':'))+'\n')
  files=['scripts/build_gr3_d76_reference.py','scripts/build_gr3_curated_reference.py','scripts/build_gr3_harman_reference.py']+[str(p.relative_to(ROOT)) for p in sorted(ASSETS.iterdir()) if p.is_file()]
  ref=dict(schema='m10v-d76-reference/v1',community_revision=REVISION,parameters=PARAMETERS,stocks=reports,camera_calibrated=False,film_calibrated=False,official_lut=False,files={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in files},limits='Errors measure LUT implementation against its declared display target, NOT accuracy against real film. No 100 percent physical-replication claim.')
+ ref['native_storage']=dict(channels=1,entries_per_stock=3375,bytes_per_stock=3375,expanded_rgb_bytes_per_stock=10125,lossless_neutral_rgb=True)
+ previous=ROOT/'native/gr3/d76-reference.json'
+ if previous.exists():
+  old=json.loads(previous.read_text())
+  for key in ('native_profiles_full','native_profiles'):
+   if key in old:ref[key]=old[key]
  (ROOT/'native/gr3/d76-reference.json').write_text(json.dumps(ref,indent=2)+'\n')
 
 if __name__=='__main__':generate()

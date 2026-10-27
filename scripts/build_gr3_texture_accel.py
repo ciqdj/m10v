@@ -43,7 +43,7 @@ def build(out_dir,base=0x54150000):
                     symbol=strings[n:].split(b'\0',1)[0].decode()
                     if section==0 and symbol:raise ValueError('undefined symbol '+symbol)
                     if symbol.startswith('m10v_texture_') and info&15==2:symbols[symbol]=value
-        if set(symbols)!={'m10v_texture_block8','m10v_texture_block8_cached','m10v_texture_effects_block8'}:raise ValueError('texture API mismatch')
+        if set(symbols)!={'m10v_texture_block8','m10v_texture_block8_cached','m10v_texture_mono_block8_cached','m10v_texture_effects_block8'}:raise ValueError('texture API mismatch')
         if not image:raise ValueError('empty image')
         (out/'m10v-texture-arm.o').write_bytes(obj.read_bytes())
         (out/'m10v-texture-arm.elf').write_bytes(b)

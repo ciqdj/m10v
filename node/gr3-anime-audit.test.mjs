@@ -21,5 +21,10 @@ test('all six film icons and five FN enum resources have independent immutable r
     assert.throws(()=>buildNativeLibrary(source,changed,{...m,code_sha256:createHash('sha256').update(changed).digest('hex')}),/anime artwork|anime icon/);
    }
   }
+  for(const film of m.film_d76){
+   assert.equal(film.storage,'mono-u8');assert.equal(film.stored_bytes,3375);
+   const changed=Buffer.from(r);changed[film.offset]^=1;
+   assert.throws(()=>buildNativeLibrary(source,changed,{...m,code_sha256:createHash('sha256').update(changed).digest('hex')}),/D76 lossless mono readback/);
+  }
  }finally{rmSync(folder,{recursive:true,force:true});}
 });

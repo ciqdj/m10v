@@ -6,8 +6,14 @@ def verify(root):
  if (web['size'],web['bits'],web['order'])!=(15,8,'RGB, blue fastest') or [s['id'] for s in web['stocks']]!=list(range(299,306)):raise ValueError('D76 inventory differs')
  for p,h in ref['files'].items():
   if hashlib.sha256((root/p).read_bytes()).hexdigest()!=h:raise ValueError('D76 source changed: '+p)
- raw=b''.join(b''.join(bytes(map(int,v)) for v in re.findall(r'\{(\d+),(\d+),(\d+)\}',(root/f'native/gr3/film_d76_{bank}_data.h').read_text())) for bank in range(2))
- if len(raw)!=7*10125:raise ValueError('D76 native extent differs')
+ mono=b''
+ for bank,count in [(0,4),(1,3)]:
+  text=(root/f'native/gr3/film_d76_{bank}_data.h').read_text()
+  if f'[{count}][3375]={{' not in text:raise ValueError('D76 storage shape differs')
+  values=list(map(int,re.findall(r'\b\d+\b',text.split('={',1)[1])))
+  if len(values)!=count*3375 or any(v>255 for v in values):raise ValueError('D76 mono extent differs')
+  mono+=bytes(values)
+ raw=b''.join(bytes((v,v,v)) for v in mono)
  payloads=[]
  for i,(spec,stock) in enumerate(zip(ref['stocks'],web['stocks'])):
   if spec['id']!=299+i or len(stock['values'])!=10125 or any(type(v)is not int or not 0<=v<=255 for v in stock['values']):raise ValueError('D76 table bounds differ')

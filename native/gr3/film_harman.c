@@ -27,7 +27,7 @@ const uint8_t *m10v_harman_texture_table(uint32_t variant){
 #endif
 void m10v_harman_rgb(uint32_t variant,const uint8_t rgb[3],uint8_t out[3]){
     if(variant>29){for(uint32_t c=0;c<3;c++)out[c]=rgb[c];return;}
-    const uint8_t (*table)[3]=variant>=23?(const uint8_t (*)[3])d76_table(variant-23):variant==22?(const uint8_t (*)[3])m10v_style_filters_1_table(3):variant>=15?(const uint8_t (*)[3])style_table(variant-15):variant==14?m10v_harman_luts[4]:variant>=8?(const uint8_t (*)[3])m10v_newstocks_table(variant-8):variant>=4?(const uint8_t (*)[3])m10v_curated_table(variant-4):m10v_harman_luts[variant];
+    const uint8_t (*table)[3]=variant>=23?0:variant==22?(const uint8_t (*)[3])m10v_style_filters_1_table(3):variant>=15?(const uint8_t (*)[3])style_table(variant-15):variant==14?m10v_harman_luts[4]:variant>=8?(const uint8_t (*)[3])m10v_newstocks_table(variant-8):variant>=4?(const uint8_t (*)[3])m10v_curated_table(variant-4):m10v_harman_luts[variant];
 #if M10V_FILM_COLOR_CANDIDATE
     if(variant==0)table=m10v_phoenix_ii_candidate_lut;
 #endif
@@ -45,6 +45,11 @@ void m10v_harman_rgb(uint32_t variant,const uint8_t rgb[3],uint8_t out[3]){
     if(f2>f0){t=f0;f0=f2;f2=t;t=s0;s0=s2;s2=t;}
     if(f2>f1){t=f1;f1=f2;f2=t;t=s1;s1=s2;s2=t;}
     uint32_t index=(p0*15+p1)*15+p2;
+    if(variant>=23){
+        const uint8_t *mono=d76_table(variant-23);
+        uint32_t value=((255-f0)*mono[index]+(f0-f1)*mono[index+s0]+(f1-f2)*mono[index+s0+s1]+f2*mono[index+241]+127)/255;
+        out[0]=out[1]=out[2]=(uint8_t)value;return;
+    }
     const uint8_t *a=table[index],*b=table[index+s0],*c=table[index+s0+s1],*d=table[index+(225+15+1)];
     uint32_t w0=255-f0,w1=f0-f1,w2=f1-f2;
     out[0]=clip((int)((w0*a[0]+w1*b[0]+w2*c[0]+f2*d[0]+127)/255));

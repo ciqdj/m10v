@@ -2,6 +2,30 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.27.4",
+      "date": "2026-10-27",
+      "title": "新增漫画与 E6 滤镜",
+      "changes": [
+        "「创意」新增 Makoto Shinkai、Ghibli、1970s 三款动漫配色滤镜。",
+        "C41 下方新增 E6 类目，提供 Fuji Velvia 50、Fuji Provia 100F、Kodak Ektachrome E100 与 5294。",
+        "新增 FN「漫画进阶」：关闭、线稿、色块、手绘。默认使用 ISP 配色；开启进阶才追加 CPU 空间处理，拍摄处理时间会增加。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "「创意」新增 Makoto Shinkai、Ghibli、1970s 三款动漫配色滤镜。",
+            "C41 下方新增 E6 类目，提供 Fuji Velvia 50、Fuji Provia 100F、Kodak Ektachrome E100 与 5294。",
+            "新增 FN「漫画进阶」：关闭、线稿、色块、手绘。默认使用 ISP 配色；开启进阶才追加 CPU 空间处理，拍摄处理时间会增加。"
+          ]
+        }
+      ],
+      "notice": "新滤镜适用于 GR III 2.10；GR IIIx / IV 暂不支持导出这些新滤镜。保留既有胶卷、存档和 SD 胶卷包兼容。效果为风格拟合，不代表实物胶片或作品的完全还原。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.3",
       "date": "2026-10-27",
       "title": "全新沉浸式摄影工作台",
@@ -28,9 +52,9 @@
         }
       ],
       "notice": "影响网页工作台与下载引导；保留各机型能力边界，未修改相机成像与运行时代码。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "9ae4cf5c3fea4e02cc43521c1c679da002eb186b",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40453837685"
     },
     {
       "version": "2026.10.27.2",

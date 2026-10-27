@@ -18,6 +18,8 @@ int m10v_texture_block8(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_tex
  * All-four-lane hits skip interpolation; partial hits recompute the four lanes.
  * Cache/planes/params/LUT must be disjoint with lifetimes spanning the call. */
 int m10v_texture_block8_cached(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache);
+/* Same contract as cached RGB above; LUT contains 3375 neutral single-byte nodes. */
+int m10v_texture_mono_block8_cached(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache);
 /* Retired ABI entry point: validates pointers and otherwise leaves planes unchanged. */
 int m10v_texture_effects_block8(uint8_t *y,uint8_t *uv,const m10v_texture_block_params *p,uint32_t chroma_enabled);
 #endif

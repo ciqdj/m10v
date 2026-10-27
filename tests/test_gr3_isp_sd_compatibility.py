@@ -38,6 +38,16 @@ class ISPSdCompatibilityTests(unittest.TestCase):
         struct.pack_into('<I', record, 12284, zlib.crc32(record[:-4]))
         return record
 
+    def test_user_validated_rc1_all_44_records_survive_lossless_storage_change(self):
+        import gzip
+        pack=gzip.decompress((ROOT/'tests/fixtures/gr3-anime-e6-rc1-films.m10.gz').read_bytes())
+        self.assertEqual(struct.unpack_from('<I',pack,16)[0],44)
+        for i in range(44):
+            record=bytearray(pack[4096+i*12288:4096+(i+1)*12288]);film=struct.unpack_from('<I',record,8)[0]
+            self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),film),film)
+            record[100]^=1;struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
+            self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),film),0)
+
     def test_native_accepts_all_63_exact_main_records_and_rejects_repaired_edits(self):
         for index, film in enumerate(self.prior['ids']):
             r = self.old_record(index)

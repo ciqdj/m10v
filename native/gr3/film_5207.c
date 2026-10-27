@@ -55,7 +55,7 @@ static void color_texture(m10v_library_image *im,uint32_t color,void *memory,uin
         uint32_t at=y*im->stride+x;
 #if M10V_TEXTURE_NEON
         if(x+8<=im->width){
-            int hits=m10v_texture_block8_cached(im->y+at,im->chroma+at,table,&block,memory);
+            int hits=color>=25&&color<=31?m10v_texture_mono_block8_cached(im->y+at,im->chroma+at,table,&block,memory):m10v_texture_block8_cached(im->y+at,im->chroma+at,table,&block,memory);
             if(hits>=0){if(stats){stats[0]+=8;stats[1]+=(uint32_t)hits;}x+=6;continue;}
             if(stats)stats[2]|=8;
         }

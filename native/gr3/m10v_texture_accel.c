@@ -22,11 +22,22 @@ static __attribute__((always_inline)) inline void gather3(const uint8_t *lut,V i
  for(unsigned c=0;c<3;c++)for(unsigned k=0;k<4;k++)out[c][k]=lut[3*ix[k]+c];
 #endif
 }
-static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache,uint32_t chroma_enabled){
+/* Gather four exact mono nodes into a vector; interpolation stays SIMD. */
+static __attribute__((always_inline)) inline V gather1(const uint8_t *lut,V ix){
+#if defined(__arm__)
+ uint8x8_t v=vdup_n_u8(0);
+ v=vld1_lane_u8(lut+ix[0],v,0);v=vld1_lane_u8(lut+ix[1],v,1);
+ v=vld1_lane_u8(lut+ix[2],v,2);v=vld1_lane_u8(lut+ix[3],v,3);
+ return (V)vmovl_u16(vget_low_u16(vmovl_u8(v)));
+#else
+ return (V){lut[ix[0]],lut[ix[1]],lut[ix[2]],lut[ix[3]]};
+#endif
+}
+static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache,uint32_t channels){
  if(!y||!uv||!p||((uintptr_t)p&3)||((uintptr_t)cache&3))return -1;
  int hits=0;
  if(!lut)return 0;
- (void)chroma_enabled;
+
  V mapped[2][3];
  for(unsigned half=0;half<2;half++){
   V yy,cb,cr;
@@ -58,10 +69,17 @@ static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,c
   for(unsigned j=0;j<3;j++){unsigned a=aa[j],b=bb[j];V mask=f[b]>f[a],fa=f[a],sa=step[a];f[a]=sel(mask,f[b],fa);f[b]=sel(mask,fa,f[b]);step[a]=sel(mask,step[b],sa);step[b]=sel(mask,sa,step[b]);}
   V ix=pos[0]*225+pos[1]*15+pos[2],weights[4]={255-f[0],f[0]-f[1],f[1]-f[2],f[2]};
   V indices[4]={ix,ix+step[0],ix+step[0]+step[1],ix+241};
+  if(channels==1){
+   V total={127,127,127,127};
+   #pragma clang loop unroll(full)
+   for(unsigned j=0;j<4;j++)total+=gather1(lut,indices[j])*weights[j];
+   mapped[half][0]=mapped[half][1]=mapped[half][2]=div255(total);
+  }else{
   V total[3]={{127,127,127,127},{127,127,127,127},{127,127,127,127}};
   #pragma clang loop unroll(full)
   for(unsigned j=0;j<4;j++){V g[3];gather3(lut,indices[j],g);total[0]+=g[0]*weights[j];total[1]+=g[1]*weights[j];total[2]+=g[2]*weights[j];}
   for(unsigned c=0;c<3;c++)mapped[half][c]=div255(total[c]);
+  }
   if(cache)for(unsigned k=0;k<4;k++){
    slots[k][0]=(uint32_t)keys[k]|0x01000000u;
    slots[k][1]=(uint32_t)mapped[half][0][k]|((uint32_t)mapped[half][1][k]<<8)|((uint32_t)mapped[half][2][k]<<16);
@@ -87,6 +105,10 @@ static __attribute__((noinline)) int texture_block_core(uint8_t *y,uint8_t *uv,c
  return hits;
 }
 int m10v_texture_block8_cached(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache){
+ if(!lut)return -1;
+ return texture_block_core(y,uv,lut,p,cache,3);
+}
+int m10v_texture_mono_block8_cached(uint8_t *y,uint8_t *uv,const uint8_t *lut,const m10v_texture_block_params *p,void *cache){
  if(!lut)return -1;
  return texture_block_core(y,uv,lut,p,cache,1);
 }

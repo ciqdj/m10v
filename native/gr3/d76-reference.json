@@ -290,7 +290,7 @@
   "film_calibrated": false,
   "official_lut": false,
   "files": {
-    "scripts/build_gr3_d76_reference.py": "cf99a3acdd5c5bf53d94e3fac2c5ca3f0f69fed41b64f7e35d4dab0478a36b3c",
+    "scripts/build_gr3_d76_reference.py": "baed27a1b80f66a5e5b1779f9a4c7fc7e1899bba750d90202858e1704991785d",
     "scripts/build_gr3_curated_reference.py": "cb61d1cbec87211a1a0e976d0ea8d74d689f76ec3e882cd88a5b61808801b543",
     "scripts/build_gr3_harman_reference.py": "02f098e3bff0c9ecfd2a48f5bb894e4e8dff440bd1a9d0584dc2633d563bf1cf",
     "third_party/d76-film-luts/LICENSE": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",
@@ -8053,5 +8053,12 @@
       },
       "role": "live-preview approximation only; exact still LUT is mandatory"
     }
-  ]
+  ],
+  "native_storage": {
+    "channels": 1,
+    "entries_per_stock": 3375,
+    "bytes_per_stock": 3375,
+    "expanded_rgb_bytes_per_stock": 10125,
+    "lossless_neutral_rgb": true
+  }
 }
