@@ -21,7 +21,11 @@ int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t scre
  p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_CATALOG:screen;
  if(p->screen==M10V_SETTINGS_CATALOG){
   /* Cache the extent on open; browsing must not scan the entire card per key. */
-  p->group=M10V_DIRECTORY_COUNT;while(p->group<M10V_SD_DIRECTORY_LIMIT&&item(o,p->group))p->group++;
+  p->group=o->extent?o->extent(o->context):M10V_DIRECTORY_COUNT;
+  if(!o->extent)while(p->group<M10V_SD_DIRECTORY_LIMIT&&item(o,p->group))p->group++;
+  if(p->group<M10V_DIRECTORY_COUNT||p->group>M10V_SD_DIRECTORY_LIMIT){
+   p->group=M10V_DIRECTORY_COUNT;p->error=M10V_SETTINGS_SAVE_FAILED;return 0;
+  }
   while(p->index+1<p->group&&!item(o,p->index))p->index++;
   p->expected=item(o,p->index);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;
  }
@@ -56,10 +60,22 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
   if(key==M10V_KEY_OK&&p->focus>=2)p->value=p->focus-1;
  }else if(p->screen==M10V_SETTINGS_CATALOG){
+  /* Retry a failed header read on user input, rather than freezing a truncated
+   * directory for the lifetime of the page. No storage mutations occur here. */
+  if(o->extent&&(p->error==M10V_SETTINGS_SAVE_FAILED||p->error==M10V_SETTINGS_EMPTY)&&key!=M10V_KEY_BACK){
+   uint32_t extent=o->extent(o->context);
+   if(extent<M10V_DIRECTORY_COUNT||extent>M10V_SD_DIRECTORY_LIMIT)return;
+   p->group=extent;
+   if(p->index>=extent)p->index=0;
+   while(p->index+1<extent&&!item(o,p->index))p->index++;
+   p->expected=item(o,p->index);
+   p->error=p->expected?0:M10V_SETTINGS_EMPTY;
+   return; /* Refresh only; never install a newly discovered film on this key. */
+  }
+  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;return;}
   uint32_t first=0,end=p->group;
   if(end<M10V_DIRECTORY_COUNT||end>M10V_SD_DIRECTORY_LIMIT)return;
   if(p->index<first||p->index>=end)return;
-  if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;return;}
   uint32_t i=p->index;
   if(key==M10V_KEY_LEFT&&i>first)i--;
   if(key==M10V_KEY_RIGHT)i++;

@@ -7,7 +7,8 @@ HARNESS=r'''
 #include "m10v_film_directory.h"
 #include <assert.h>
 static m10v_library_state saved;
-static unsigned writes, changed;
+static unsigned writes, changed, fail_extent;
+static unsigned extent(void *c){(void)c;return fail_extent?0:M10V_DIRECTORY_COUNT+2;}
 static int store(void *c,const m10v_library_state *s){(void)c;(void)s;writes++;return 0;}
 static int load(void *c,m10v_library_state *s){(void)c;*s=saved;return 0;}
 static unsigned item(void *c,unsigned i){(void)c;
@@ -24,9 +25,19 @@ static int stamp(void *c,unsigned a,unsigned b,unsigned d,unsigned e){(void)c;re
 static int name(void *c,unsigned v){(void)c;return m10v_library_film_name_stamp(&saved,v,store,0);}
 int main(void){
  m10v_settings_ops o={0,load,item,install,remove_film,stamp,name};m10v_settings p;
+ o.extent=extent;
  m10v_library_init(&saved);
  while(m10v_library_count(&saved))assert(remove_film(0,0)==0);
  unsigned before=writes;
+ fail_extent=1;assert(m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS)==0);
+ assert(p.error==M10V_SETTINGS_SAVE_FAILED);
+ fail_extent=0;m10v_settings_key(&p,&o,M10V_KEY_OK);
+ assert(p.group==M10V_DIRECTORY_COUNT+2&&p.expected==33&&!p.error&&writes==before);
+ p.index=M10V_DIRECTORY_COUNT+9;p.error=M10V_SETTINGS_SAVE_FAILED;
+ m10v_settings_key(&p,&o,M10V_KEY_LEFT);
+ assert(p.index==0&&p.expected==33&&!p.error);
+ p.index=M10V_DIRECTORY_COUNT+9;m10v_settings_key(&p,&o,M10V_KEY_BACK);
+ assert(p.screen==M10V_SETTINGS_CLOSED);
  assert(m10v_settings_open(&p,&o,M10V_SETTINGS_FILMS)==0);
  m10v_settings_key(&p,&o,M10V_KEY_RIGHT);
  assert(p.index==M10V_DIRECTORY_COUNT&&p.expected==79&&writes==before);

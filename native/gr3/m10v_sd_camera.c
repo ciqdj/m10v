@@ -26,8 +26,8 @@ static int exact(uint32_t fs,const uint32_t *v,uint32_t handle,uint32_t at,uint8
 /* Return selected ID after closing the file, with the complete record in out
  * when requested. Fixed 16 KiB scratch; header bounds all index arithmetic. */
 static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
- uint32_t directory=page==32;
- if(!memory||(directory?row>=M10V_SD_DIRECTORY_LIMIT:page>=32||row>=8))return 0;
+ uint32_t directory=page==32,extent=page==33;
+ if(!memory||(extent?row!=0:directory?row>=M10V_SD_DIRECTORY_LIMIT:page>=32||row>=8))return 0;
  uint32_t manager=((get_fn)0x535847d8u)();if(!ram(manager,24))return 0;
  uint32_t fs=((const uint32_t *)(uintptr_t)manager)[5];if(!ram(fs,4))return 0;
  uint32_t vt=*(const uint32_t *)(uintptr_t)fs;if(!code(vt,56))return 0;
@@ -51,7 +51,10 @@ static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
     for(;index<count;index++)if(M10V_CUSTOM(m10v_sd_u32(memory+64+index*12))){if(!custom)break;custom--;}
    }
   }
-  if(count&&index<count){
+  if(extent&&count){
+   id=M10V_DIRECTORY_COUNT;
+   for(uint32_t i=0;i<count;i++)if(M10V_CUSTOM(m10v_sd_u32(memory+64+i*12)))id++;
+  }else if(count&&index<count){
    id=m10v_sd_u32(memory+64+index*12);
    if(full){uint32_t expected=m10v_sd_u32(memory+68+index*12);uint8_t *record=memory+4096;
     if(!exact(fs,v,handle,4096+index*M10V_SD_RECORD_BYTES,record,M10V_SD_RECORD_BYTES)||
@@ -67,6 +70,12 @@ uint32_t m10v_sd_camera_item(uint32_t page,uint32_t row){
  if(page>=32||row>=8)return 0;
  uint8_t *memory=allocate();if(!memory)return 0;
  uint32_t id=fetch(page,row,memory,0);((free_fn)0x536af2e4u)(memory);return id;
+}
+/* Read the validated header once. Zero means an I/O/format error, never an
+ * empty custom list; a valid builtin-only pack returns DIRECTORY_COUNT. */
+uint32_t m10v_sd_camera_directory_extent(void){
+ uint8_t *memory=allocate();if(!memory)return 0;
+ uint32_t extent=fetch(33,0,memory,0);((free_fn)0x536af2e4u)(memory);return extent;
 }
 uint32_t m10v_sd_camera_directory_item(uint32_t index){
  if(index>=M10V_SD_DIRECTORY_LIMIT)return 0;
@@ -98,6 +107,7 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
+ if(M10V_EXTRA_FILM(id))id=id-314+25;
  if(M10V_C41(id))id=id-312+23;
  if(M10V_ANIME_E6(id))id=id-306+17;
  if(M10V_D76(id))id=id-M10V_D76_FIRST+10;
@@ -169,7 +179,7 @@ int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,ui
  ((free_fn)0x536af2e4u)(memory);return ok;
 }
 static int install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if((page==32?row>=M10V_SD_DIRECTORY_LIMIT:page>=32||row>=8)||expected_id<33||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
+ if((page==32?row>=M10V_SD_DIRECTORY_LIMIT:page>=32||row>=8)||expected_id<33||M10V_ANIME(expected_id)||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){

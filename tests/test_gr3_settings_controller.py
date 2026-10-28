@@ -45,7 +45,7 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log','m10v_debug_batch','m10v_library_name','m10v_sd_camera_custom_name',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event']]]
   names += [f'm10v_ab_adj_{n}_original' for n in ('refresh','exit','destroy','changed')]
   names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom','m10v_zoom_live_apply','m10v_zoom_live_slot']
-  names += ['m10v_library_valid','m10v_library_count','m10v_sd_camera_directory_item','m10v_sd_camera_directory_install','m10v_camera_library_remove','m10v_camera_library_shooting_count']
+  names += ['m10v_library_valid','m10v_library_count','m10v_sd_camera_directory_item','m10v_sd_camera_directory_extent','m10v_sd_camera_directory_install','m10v_camera_library_remove','m10v_camera_library_shooting_count']
   names += ['m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end']
   names += ['m10v_camera_library_preview']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
@@ -100,6 +100,7 @@ class ControllerLifetimeTests(unittest.TestCase):
      for i in range(5):struct.pack_into('<H',state,12+8*i,getattr(self,'fresh_films',[33,34,35,36,37])[i])
      m.mem_write(r[0],bytes(state))
     elif name=='m10v_camera_library_reconcile_legacy_selection':result=0xffffffff if getattr(self,'reconcile_fail',False) else 0
+    elif name=='m10v_sd_camera_directory_extent':result=46
     elif name=='m10v_sd_camera_item':result=33+r[0]*8+r[1]
     elif name=='m10v_sd_camera_install':result=0xffffffff if self.install_fail else 0
     elif name=='m10v_library_valid':result=1 # state decoding is exercised by real-library tests

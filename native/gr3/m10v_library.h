@@ -39,6 +39,10 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_FIRST 306u
 #define M10V_ANIME_LAST 308u
 #define M10V_ANIME(id) ((id)>=306u && (id)<=308u)
+#define M10V_E6(id) ((id)>=309u && (id)<=311u)
+#define M10V_EXTRA_FILM(id) ((id)>=314u && (id)<=316u)
+#define M10V_EXTRA_FILM_ICON_FIRST 871u
+#define M10V_EXTRA_FILM_NAME_FIRST 1152u
 #define M10V_C41(id) ((id)>=312u && (id)<=313u)
 #define M10V_C41_ICON_FIRST 869u
 #define M10V_C41_NAME_FIRST 1150u
@@ -47,7 +51,7 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_VALUE_FIRST 864u
 #define M10V_ANIME_SCALE_ICON 868u
 #define M10V_ANIME_CAPTION 1148u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)))
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 10u
 #define M10V_CUSTOM_IMMUTABLE_FIRST 21u
@@ -112,7 +116,6 @@ static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,u
     uint32_t software_color=M10V_CUSTOM(v->film)||v->film==M10V_CHAR_ID||v->film==M10V_PIXEL_ID;
     uint32_t stages=(software_color||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
     if(m10v_halo_enabled(v->film,v->halo_gain,v->halo_profile)&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
-    if(M10V_ANIME(v->film)&&state->effects[slot].reserved[1])stages|=M10V_CPU_ANIME;
     if(state->stamp||(state->reserved&1u))stages|=M10V_CPU_STAMP;
     return stages;
 }

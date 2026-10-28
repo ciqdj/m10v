@@ -2,6 +2,40 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.3",
+      "date": "2026-10-28",
+      "title": "修复 SD 自定义目录读取，更新胶卷库",
+      "changes": [
+        "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。",
+        "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。",
+        "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。"
+          ]
+        },
+        {
+          "type": "added",
+          "items": [
+            "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。新增胶卷为来源明确的近似模拟，未完成实体胶卷及相机标定，无法保证 100% 还原。按用户要求只做定向离线测试和构建检查，不做全量回归；目录读取缺陷已离线复现修复，尚未确认覆盖用户现场全部成因。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.2",
       "date": "2026-10-28",
       "title": "新增 OptiColour 200 与 NC500",
@@ -18,10 +52,10 @@
           ]
         }
       ],
-      "notice": "依据厂商公开的定性资料建立独立近似模型，非官方 LUT；未完成相机与实体胶卷标定，不承诺 100% 还原。仅完成针对性离线验证及两机型封包，未做全量回归与本次实机验收。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "notice": "依据厂商公开的定性资料建立独立近似模型，非官方 LUT；未完成相机与实体胶卷标定，不承诺 100% 还原。仅完成针对性离线验证及两机型封包，未做全量回归与本次实机验收。 该提交部署因调试组合包体积超限失败并回退，未作为线上版本生效。",
+      "commit": "6b395f616a9aeb59c27179fa9575c11e8fb32558",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40646235364"
     },
     {
       "version": "2026.10.28.1",

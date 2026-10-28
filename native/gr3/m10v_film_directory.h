@@ -40,19 +40,19 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {303,3,"Ilford SFX 200"},
 {304,3,"Fomapan 400"},
 {305,3,"CatLABS X Film 80"},
+{314,3,"ACROS II 100"},
+{315,3,"Double-X 5222"},
 {289,4,"Kodak Charmera"},
 {72,4,"CCD"},
 {293,4,"Polaroid"},
 {296,4,"Cyanotype"},
 {290,4,"Pixel Worlds"},
 {76,4,"Aerochrome"},
-{306,4,"Makoto Shinkai"},
-{307,4,"Ghibli"},
-{308,4,"1970s"},
+{316,4,"LomoChrome Turquoise"},
 {291,5,"Leica Monochrome"},
 {297,5,"German Cool"},
 {65,5,"GR2"},
 };
-static const uint8_t m10v_directory_first[7]={0,6,22,26,34,43,46};
+static const uint8_t m10v_directory_first[7]={0,6,22,26,36,43,46};
 static inline const char *m10v_directory_name(uint32_t id){for(uint32_t i=0;i<M10V_DIRECTORY_COUNT;i++)if(m10v_directory[i].id==id)return m10v_directory[i].name;return 0;}
 #endif
