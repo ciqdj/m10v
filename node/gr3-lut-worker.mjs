@@ -9,7 +9,7 @@ try {
  const originalTarget=rgb=>original(...rgb),strength=workerData.approximationStrength;
  const target=strength===undefined?originalTarget:approximateTarget(originalTarget,strength);
  const sourceSha256=workerData.sourceSha256||sha256(workerData.cube);
- const sourceFiles=['./gr3-fit-quality.mjs','./gr3-fit-binding.mjs','./gr3-fit-envelope.mjs','./gr3-lut-worker.mjs','../.runtime/grlife/web/firmware-store/film-fit.js','../.runtime/grlife/web/firmware-store/film-camera-model.js'];
+ const sourceFiles=['./gr3-fit-quality.mjs','./gr3-fit-binding.mjs','./gr3-fit-envelope.mjs','./gr3-lut-worker.mjs','../.runtime/grlife/web/firmware-store/film-fit.js','../.runtime/grlife/web/firmware-store/film-camera-model.js','../.runtime/grlife/web/recipes/custom-recipe-core.js',...(workerData.inputType==='xmp'?['./gr3-xmp-fit.mjs','./gr3-xmp-worker.py','../vendor/gr4/gr4_editor/offline_look.py']:[])];
  const provenance={references:[{project:'Darkslide GR',commit:'5f57f6dba7992b537344ae49025846d4c4838b47',methods:'factory envelope and explicit convergence'},{project:'Ricoh GRMod',commit:'1f4216e4b80d737a3e670c0b6169398f57598b5e',methods:'held-out grey/skin guard and dedicated monochrome'}],fitter_sources:Object.fromEntries(sourceFiles.map(file=>[file,sha256(readFileSync(new URL(file,import.meta.url)))])),input_type:workerData.inputType||'cube',...(workerData.provenance||{}),...(strength===undefined?{}:{explicit_approximation:true,retained_source_strength:strength})};
  let fits;
  try{if(detectTargetStyle(target)!=='colour'){const look=monochromeFit(target);fits={tone:look,gamut:structuredClone(look)};}else fits=fitLookChoices((r,g,b)=>target([r,g,b]));}catch(error){parentPort.postMessage({error:error.message,approximation_available:true});process.exit(0);}
