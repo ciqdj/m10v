@@ -1,3 +1,4 @@
+import {unwrapFirmwareDownload} from './firmware-download.mjs';
 import {isGr3Family,modelCapabilities} from './model-capabilities.mjs';
 import {renderZoomControls,validateZoomControls} from './zoom-controls.mjs';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
@@ -104,7 +105,7 @@ function toggleFilm(id){
  }catch(error){const status=$('#film-selection-status');if(status)status.textContent=error.message;renderFilms();}
 }
 async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(data.error||`请求失败 ${r.status}`);return data;}
-function post(url,value,signal){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(value),signal});}
+async function post(url,value,signal){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token,...(url.endsWith('/build')?{Accept:'multipart/form-data'}:{})},body:JSON.stringify(value),signal});return unwrapFirmwareDownload(response);}
 function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
 async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';configuration=configurationForModel(configuration,sourceModel);$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}

@@ -2,6 +2,30 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.7",
+      "date": "2026-10-28",
+      "title": "修复 GR III / IIIx 固件保存下载失败",
+      "changes": [
+        "修复 GR III / GR IIIx 保存固件时构建回执超出网关响应头限制、导致预检通过但下载提示操作失败的问题；完整回执随下载正文传输。",
+        "保留机型、输出版本、配置绑定与最终固件独立回读，下载后还原完整构建校验记录；兼容已有二进制下载客户端。",
+        "下载网关或构建等待失败时显示 HTTP 状态及具体说明，避免错误被统一隐藏成操作失败。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III / GR IIIx 保存固件时构建回执超出网关响应头限制、导致预检通过但下载提示操作失败的问题；完整回执随下载正文传输。",
+            "保留机型、输出版本、配置绑定与最终固件独立回读，下载后还原完整构建校验记录；兼容已有二进制下载客户端。",
+            "下载网关或构建等待失败时显示 HTTP 状态及具体说明，避免错误被统一隐藏成操作失败。"
+          ]
+        }
+      ],
+      "notice": "已使用 GR III 2.20 与 GR IIIx 1.70 真实文件完成完整原生构建、受限响应头 HTTP 下载及最终版本回读验证；此修复不改变相机运行代码，实机刷入与恢复仍待验证。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.6",
       "date": "2026-10-28",
       "title": "GR II 支持网页配置 HDF 初始强度",
@@ -26,9 +50,9 @@
         }
       ],
       "notice": "仅影响 GR II 实验版。相关原生、存档、构建与回读验证通过，尚无 GR II 真机验收；本次不是与 GR III 完全同步的完成声明，十槽、现行胶卷目录、ISP 成片色彩及其他工具仍待对齐。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "b41a768a6829d2e89db31cf654501b938e978336",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/b41a768a6829d2e89db31cf654501b938e978336"
     },
     {
       "version": "2026.10.28.5",
