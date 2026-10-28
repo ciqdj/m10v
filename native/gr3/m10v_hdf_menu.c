@@ -1,6 +1,7 @@
 /* Independent HDF settings controller. Original TopMenu owns this small tail;
  * no film objects, film selection, film detail page or film journal is used. */
 #include <stdint.h>
+#include "m10v_hdf_state.h"
 #ifndef M10V_HDF_OWNER_OFFSET
 #define M10V_HDF_OWNER_OFFSET 0x193cu
 #endif
@@ -20,7 +21,7 @@ typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef struct {uint8_t base[0x158];uint32_t widgets[WORDS],count,value,saved,error,root;} page;
-_Static_assert(sizeof(page)<=0x1c0,"HDF owned controller capacity");
+_Static_assert(sizeof(page)<=M10V_HDF_CACHE_OFFSET,"HDF controller must not overlap its owned cache tail");
 static uint32_t ptr(const void *p){return (uint32_t)(uintptr_t)p;}
 static void caption(uint32_t w,uint32_t id){((fn3)0x53396f80u)(w,id,0);}
 static int make(page *p,uint32_t type,uint32_t x,uint32_t y,uint32_t width,uint32_t height){
@@ -46,15 +47,22 @@ static void draw(page *p){
  caption(p->widgets[8],p->error?976:977);
  ((fn1)0x533ad308u)(p->widgets[0]);
 }
+void m10v_hdf_menu_cache_init(uint32_t owner){
+ m10v_hdf_ui *p=(m10v_hdf_ui *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET+M10V_HDF_CACHE_OFFSET);
+ for(uint32_t i=0;i<sizeof(*p)/4;i++)((uint32_t *)p)[i]=0;
+ p->magic=M10V_HDF_CACHE_MAGIC;
+}
 uint32_t m10v_hdf_menu_top_ctor(uint32_t owner){
  m10v_hdf_menu_parent_ctor(owner);page *p=(page *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET);
- for(uint32_t i=0;i<sizeof(*p);i++)((uint8_t *)p)[i]=0;
+ for(uint32_t i=0;i<0x1c0u;i++)((uint8_t *)p)[i]=0;
+ m10v_hdf_menu_cache_init(owner);
  ((fn1)0x5316c8d4u)(ptr(p));*(uint32_t *)p=m10v_hdf_menu_vtable();return owner;
 }
 uint32_t m10v_hdf_menu_destroy(page *p){
  ((fn1)0x5316ce8cu)(ptr(p));clear(p);((fn1)0x5316c774u)(ptr(p));return ptr(p);
 }
 uint32_t m10v_hdf_menu_top_dtor(uint32_t owner){
+ ((m10v_hdf_ui *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET+M10V_HDF_CACHE_OFFSET))->magic=0;
  m10v_hdf_menu_destroy((page *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET));return m10v_hdf_menu_parent_dtor(owner);
 }
 uint32_t m10v_hdf_menu_factory(uint32_t factory,uint32_t route){

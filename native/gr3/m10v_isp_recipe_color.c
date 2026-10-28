@@ -11,6 +11,7 @@
 #define M10V_ISP_RECIPE_COLOR_PRODUCER 0
 #endif
 #if M10V_ISP_SHARED_HDF
+extern void m10v_hdf_task_snapshot(uint32_t);
 extern uint32_t m10v_hdf_settings(uint32_t,uint32_t);
 extern void m10v_hdf_done(uint32_t,uint32_t,uint32_t);
 #endif
@@ -120,6 +121,9 @@ static int producer_mutating(m10v_isp_recipe_color *s){
 }
 int m10v_isp_frame_recipe_producer(void *recipe){
 #if M10V_ISP_RECIPE_COLOR_PRODUCER
+#if M10V_ISP_SHARED_HDF
+    m10v_hdf_task_snapshot((uint32_t)(uintptr_t)recipe);
+#endif
     m10v_isp_recipe_color *s=owned(recipe);
     if(!s)return 0;
     if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC)return 1;

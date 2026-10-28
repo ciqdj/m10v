@@ -45,7 +45,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     if type(external_noise)is not bool or external_noise:raise ValueError('CPU grain noise shaping has been removed')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native per-recipe color mode')
     if type(native_color)is not bool or (native_color and observer):raise ValueError('native color requires apply mode')
-    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())
+    required=(('m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
     compiler=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
     if not Path(compiler).is_file():compiler=shutil.which('clang')
@@ -70,12 +70,13 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         at=base+len(code)
         code+=assembly('push {r0-r12,lr};mrs ip,cpsr;.word 0xeef1ea10;push {ip,lr};.word 0xed2d0b20;.word 0xed6d0b20;mov r0,r1;bl '+hex(exports['m10v_isp_frame_recipe_producer'])+';.word 0xecfd0b20;.word 0xecbd0b20;pop {ip,lr};.word 0xeee1ea10;msr cpsr_f,ip;pop {r0-r12,lr};.word '+hex(expected)+';b '+hex(site+4),at)
         patches.append(dict(address=site,expected_hex=struct.pack('<I',expected).hex(),replacement_hex=struct.pack('<I',branch(site,at)).hex(),entry=at))
-        # Independent HDF reservation timing is unchanged in this repair.
+        # Reservation marks a fresh exposure only. The exact5351ea9c task
+        # producer freezes HDF from the UI cache, independently of color.
         for site in ((0x5351aed4,0x5351b068) if shared_hdf else ()):
             expected=0xe59420f0
             if struct.unpack_from('<I',rom,site-0x53000000)[0]!=expected:raise ValueError('post-mutex recipe load differs')
             at=base+len(code)
-            code+=assembly('push {r0-r12,lr};mrs ip,cpsr;push {ip,lr};ldr r0,[r4,#0xf0];bl '+hex(library_exports['m10v_hdf_producer'])+';pop {ip,lr};msr cpsr_f,ip;pop {r0-r12,lr};.word '+hex(expected)+';b '+hex(site+4),at)
+            code+=assembly('push {r0-r12,lr};mrs ip,cpsr;push {ip,lr};ldr r0,[r4,#0xf0];bl '+hex(library_exports['m10v_hdf_reserve'])+';pop {ip,lr};msr cpsr_f,ip;pop {r0-r12,lr};.word '+hex(expected)+';b '+hex(site+4),at)
             patches.append(dict(address=site,expected_hex=struct.pack('<I',expected).hex(),replacement_hex=struct.pack('<I',branch(site,at)).hex(),entry=at))
     if live_color:
         # Original Live Make takes r0/r1 only. Keep original outputs, flags,
