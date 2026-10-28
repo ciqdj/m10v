@@ -51,7 +51,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
 
     def fixture(self, film=66, slot=0, stage=1):
         e = StockISP(self.image)
-        recipe = e.alloc(0x5140)
+        recipe = e.alloc(self.manifest['capture_lifecycle']['owner']['storage']['extended_recipe_bytes'])
         e.w32(recipe, 0x53d0fc90)
         e.w32(recipe + 0x4778, 0x31545653)
         obj = e.cursor

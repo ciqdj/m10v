@@ -119,6 +119,16 @@ static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,u
     if(state->stamp||(state->reserved&1u))stages|=M10V_CPU_STAMP;
     return stages;
 }
+/* Transient per-exposure render context; serialized state and image ABI stay
+ * unchanged. Direction follows official ShootingInfo+0xc8 (1/2/3 => EXIF8/3/6).
+ * Out-of-range directions retain landscape layout. */
+typedef struct {
+    uint32_t direction,completed;
+    const uint8_t *lut;
+    const char *name;
+} m10v_library_render_context;
+int m10v_library_render_oriented(m10v_library_image *,const m10v_library_state *,uint32_t,
+        const m10v_library_date *,uint32_t,uint8_t *,uint32_t,const m10v_library_render_context *);
 int m10v_library_render_native(m10v_library_image *,const m10v_library_state *,uint32_t,
         const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t completed);
 int m10v_library_render_custom(m10v_library_image *,const m10v_library_state *,uint32_t,

@@ -24,6 +24,7 @@
 #endif
 #if M10V_CAPTURE_PROFILE
 int m10v_library_render_profiled(m10v_library_image *,const m10v_library_state *,uint32_t,const m10v_library_date *,uint32_t,uint8_t *,uint32_t,m10v_capture_profile *);
+int m10v_library_render_oriented_profiled(m10v_library_image *,const m10v_library_state *,uint32_t,const m10v_library_date *,uint32_t,uint8_t *,uint32_t,const m10v_library_render_context *,m10v_capture_profile *);
 int m10v_library_render_native_profiled(m10v_library_image *,const m10v_library_state *,uint32_t,const m10v_library_date *,uint32_t,uint8_t *,uint32_t,uint32_t,m10v_capture_profile *);
 #endif
 typedef void *(*allocate_fn)(uint32_t);
@@ -410,18 +411,27 @@ int m10v_capture_library(uint32_t context) {
 #if M10V_DEBUG_MODE && !M10V_CAPTURE_PROFILE
     trace_flush(trace);
 #endif
-    int result;
-#if M10V_SD_LIBRARY
-    if(M10V_CUSTOM(state.slots[slot].film))
-        result=m10v_library_render_custom(&image,&state,slot,(const m10v_library_date *)time,
-                                           seed,use_halo?scratch+M10V_SD_RECORD_BYTES:0,use_halo?scratch_bytes-M10V_SD_RECORD_BYTES:0,completed,scratch+64,(const char *)(scratch+16));
-    else
+    m10v_library_render_context render_context={0,completed,0,0};
+#if M10V_RECIPE_SNAPSHOT
+    if(state.stamp||(state.reserved&1u))
+        render_context.direction=m10v_isp_frame_recipe_direction((void *)(uintptr_t)recipe,shooting);
 #endif
+    uint8_t *render_scratch=scratch;
+    uint32_t render_scratch_bytes=scratch_bytes;
+#if M10V_SD_LIBRARY
+    if(M10V_CUSTOM(state.slots[slot].film)){
+        render_context.lut=scratch+64;render_context.name=(const char *)(scratch+16);
+        render_scratch=use_halo?scratch+M10V_SD_RECORD_BYTES:0;
+        render_scratch_bytes=use_halo?scratch_bytes-M10V_SD_RECORD_BYTES:0;
+    }
+#endif
+    int result;
 #if M10V_CAPTURE_PROFILE
-        result=m10v_library_render_native_profiled(&image,&state,slot,(const m10v_library_date *)time,seed,scratch,scratch_bytes,completed,profile);
+    result=m10v_library_render_oriented_profiled(&image,&state,slot,(const m10v_library_date *)time,
+        seed,render_scratch,render_scratch_bytes,&render_context,profile);
 #else
-        result=m10v_library_render_native(&image,&state,slot,(const m10v_library_date *)time,
-                                           seed,scratch,scratch_bytes,completed);
+    result=m10v_library_render_oriented(&image,&state,slot,(const m10v_library_date *)time,
+        seed,render_scratch,render_scratch_bytes,&render_context);
 #endif
     CAPTURE_LOG(111,context,(uint32_t)result,(uint32_t)state.slots[slot].halo_gain|((uint32_t)state.slots[slot].halo_spread<<4)|((uint32_t)state.slots[slot].halo_threshold<<8)|((uint32_t)state.slots[slot].halo_profile<<12),scratch_bytes);
     if (!result) {
