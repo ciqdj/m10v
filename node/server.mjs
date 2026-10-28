@@ -255,7 +255,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(bridgeMatch) {
         const original=await readBuildOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(buildSource.update_compatibility)return send(response,409,{error:'2.20 来源请直接导出已适配更新版本的功能固件；旧 2.10 桥接包不适用于 2.20。'});
+        if(buildSource.update_compatibility)return send(response,409,{error:'此来源已自动适配更新版本，请直接导出功能固件；不使用旧版桥接包（包括 2.20 来源）。'});
         if(bridgeMatch[2]==='prepare'){
           if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)throw Error('桥接预检不接受自定义版本或补丁');
           return send(response,200,{...prepareGr3Bridge(original),build_source:buildSource});
@@ -265,7 +265,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('2.20 来源已自动适配更新版本，不能叠加旧版单包版本适配');
+        if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('此来源已自动适配更新版本，不能叠加旧版单包版本适配');
         const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
         if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});

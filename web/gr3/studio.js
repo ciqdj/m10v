@@ -544,7 +544,7 @@ async function importSource(file,local=false) {
     renderFeatures();
 
     const node = $('source-report'); node.hidden = false; node.replaceChildren();
-    node.append(textNode('h3', `${report.model} · ${report.public_version} · 来源核验通过`));
+    node.append(textNode('h3', `${report.model} · ${report.public_version} · ${report.proof?.identity===false?'固件结构核验通过':'来源核验通过'}`));
     const dl = document.createElement('dl');
     for (const [key, value] of [['内部版本', report.internal_version], ['文件字节', report.size.toLocaleString('zh-CN')],
       ['SHA-256', report.sha256], ['分区数量', String(report.sections.length)]]) {
@@ -552,10 +552,10 @@ async function importSource(file,local=false) {
     }
     node.append(dl);
     node.append(textNode('p',`输出基线：${report.model} · ${report.build_source?.public_version||report.public_version}（${report.build_source?.internal_version||report.internal_version}）。`));
-    if(report.build_source?.normalized)node.append(textNode('p',`上传的 ${report.public_version} 官方原包用于机型与来源核验，并保留在备份中。M10V 将基于已适配的 ${report.build_source.public_version} 官方包生成，不包含上传版本的新功能；实际相机能否接受更新仍取决于机内版本。`));
-    if(report.build_source?.update_compatibility)node.append(textNode('p',`2.20 机身更新：导出包版本 ${report.build_source.update_compatibility.package_version}，保留 2.10 功能基线并附带官方固件恢复准入；刷入与恢复待实机验证。`));
+    if(report.build_source?.normalized)node.append(textNode('p',`上传的 ${report.public_version} 固件原包用于机型与版本核验，并保留在备份中。M10V 将基于已适配的 ${report.build_source.public_version} 官方包生成，不包含上传版本的新功能；实际相机能否接受更新仍取决于机内版本。`));
+    if(report.build_source?.update_compatibility)node.append(textNode('p',`机身更新兼容：导出包版本 ${report.build_source.update_compatibility.package_version}，保留 ${report.build_source.public_version} 功能基线并附带官方固件恢复准入；刷入与恢复待实机验证。`));
     $('download-backup').disabled = false; $('source-next').disabled = false;
-    showStep(globalThis.location?.hash==='#bridge'&&chosenModel==='gr3'?'build':'features');showSettingsTab(state.profile==='native'?'library':'imaging');notice('官方固件核验通过，继续设置方案。');
+    showStep(globalThis.location?.hash==='#bridge'&&chosenModel==='gr3'?'build':'features');showSettingsTab(state.profile==='native'?'library':'imaging');notice(report.proof?.identity===false?'固件结构核验通过，继续设置方案。':'官方固件核验通过，继续设置方案。');
   } catch (error) { notice(error.message, true); }
 }
 async function download(response, filename) {
