@@ -64,6 +64,36 @@ class SdCameraTests(unittest.TestCase):
   for i,value in enumerate(args[4:]):self.w(sp+4*i,value)
   u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.manifest['symbols'][name],0x550ff000,count=10000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x550ff000);return u.reg_read(UC_ARM_REG_R0)
+ def test_curated_catalog_appends_custom_names_and_installs_by_directory_index(self):
+  script="import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([33,66],[{name:'User LUT',rgb:Buffer.alloc(6591),sha256:'a'},{name:'Night LUT',rgb:Buffer.alloc(6591,42),sha256:'b'}]));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  # Builtin order is unchanged; custom entries are compact even in sparse packs.
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',0),33)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',1),66)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',44),79)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',45),80)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',46),0)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',45,80,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'Night LUT')
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',44,80,0),0xffffffff)
+  self.assertEqual(self.calls,[])
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',45,80,0),0)
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+  self.assertEqual(self.call('m10v_sd_camera_custom_name',0x5500a000,0,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'Night LUT')
+  self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_custom_catalog_upper_bound_and_corrupted_record_rejection(self):
+  script="import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([],Array.from({length:210},(_,i)=>({name:'LUT '+i,rgb:Buffer.alloc(6591,i),sha256:String(i).padStart(3,'0')}))));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',253),288)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',254),0)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',253,288,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'LUT 209')
+  damaged=bytearray(self.card);damaged[-20]^=1;self.card=bytes(damaged)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',253,288,0x5500c000,24),0)
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',253,288,0),0xffffffff)
+  self.assertEqual(self.calls,[])
+  self.assertEqual((self.opened,self.allocated),(0,0))
  def test_pages_and_final_record(self):
   for page,row,expected in [(0, 0, 33), (0, 1, 66), (0, 2, 67), (0, 3, 68), (0, 4, 69), (0, 5, 70), (0, 6, 71), (0, 7, 72), (1, 0, 73), (1, 1, 74), (1, 2, 75), (1, 3, 76), (1, 4, 77), (1, 5, 78), (1, 6, 289), (1, 7, 290), (2, 0, 291), (2, 1, 292), (2, 2, 293), (2, 3, 294), (2, 4, 295), (2, 5, 296), (2, 6, 297), (2, 7, 34), (3, 0, 35), (3, 1, 36), (3, 2, 37), (3, 3, 38), (3, 4, 39), (3, 5, 40), (3, 6, 41), (3, 7, 42), (4, 0, 43), (4, 1, 44), (4, 2, 45), (4, 3, 46), (4, 4, 47), (4, 5, 48), (4, 6, 49), (4, 7, 50), (5, 0, 51), (5, 1, 52), (5, 2, 53), (5, 3, 54), (5, 4, 55), (5, 5, 56), (5, 6, 57), (5, 7, 58), (6, 0, 59), (6, 1, 60), (6, 2, 61), (6, 3, 62), (6, 4, 63), (6, 5, 64), (6, 6, 65), (32, 0, 0), (0, 8, 0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),expected)
   self.assertEqual((self.opened,self.allocated),(0,0));self.assertEqual(self.calls,[])
@@ -106,7 +136,7 @@ class SdCameraTests(unittest.TestCase):
   self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
   custom_pack=self.card
   self.assertEqual(self.call('m10v_sd_camera_item',0,0),79)
-  self.assertEqual(self.call('m10v_sd_camera_catalog_name',0,79,0x5500c000,24),1)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',44,79,0x5500c000,24),1)
   self.assertEqual(self.string(0x5500c000),'My Film')
   self.assertEqual(self.call('m10v_sd_camera_install',0,0,79,0),0)
   self.assertIn('M10VC00.bin',self.files)

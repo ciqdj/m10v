@@ -76,8 +76,8 @@ static uint32_t film(const m10v_settings *s,const m10v_settings_ops *o,uint32_t 
  uint32_t id;
  if(s->screen==M10V_SETTINGS_CATALOG){
   uint32_t index=(s->index/10)*10+i;
-  id=index<M10V_DIRECTORY_COUNT&&o&&o->item?o->item(o->context,index):0;
-  if(index>=M10V_DIRECTORY_COUNT||id!=m10v_directory[index].id)id=0;
+  id=index<M10V_SD_DIRECTORY_LIMIT&&o&&o->item?o->item(o->context,index):0;
+  if(index<M10V_DIRECTORY_COUNT?id!=m10v_directory[index].id:!M10V_CUSTOM(id))id=0;
   if(id<33)id=0;
  }else id=s->saved.slots[i].film;
  return id&&(id<=M10V_CUSTOM_MAX_ID||M10V_BUILTIN(id))?id:0;
@@ -103,7 +103,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  if(error)caption(v->widgets[films?TITLE:ERROR_TEXT],s->error==4?1127:M10V_VIEW_EMPTY+s->error-1);
  ((fn2)0x5339658cu)(v->widgets[TITLE],films&&error?10:31);
  if(s->screen==M10V_SETTINGS_CATALOG){
-  for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film&&!m10v_directory_name(s->saved.slots[k].film)){
+  for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film&&!M10V_CUSTOM(s->saved.slots[k].film)&&!m10v_directory_name(s->saved.slots[k].film)){
    caption(v->widgets[FOOTER],1129);break;
   }
  }
@@ -138,7 +138,12 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  }
  visible(v->widgets[PAGE],films);
  if(films){
-  char page[4]={(char)('1'+s->index/10),'/',(char)('0'+(M10V_DIRECTORY_COUNT+9)/10),0};
+  uint32_t current=s->index/10+1,total=((s->group>=M10V_DIRECTORY_COUNT&&s->group<=M10V_SD_DIRECTORY_LIMIT?s->group:M10V_DIRECTORY_COUNT)+9)/10,n=0;
+  char page[6];
+  if(current>=10)page[n++]=(char)('0'+current/10);
+  page[n++]=(char)('0'+current%10);page[n++]='/';
+  if(total>=10)page[n++]=(char)('0'+total/10);
+  page[n++]=(char)('0'+total%10);page[n]=0;
   ((fn2)0x53390ef8u)(v->widgets[PAGE],ptr(page));
  }
 

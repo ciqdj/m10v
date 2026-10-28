@@ -2,6 +2,28 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.1",
+      "date": "2026-10-28",
+      "title": "修复自定义 LUT 在机内胶卷库缺失",
+      "changes": [
+        "修复平台导出的自定义 LUT 未显示在机内「胶卷库」的问题，自定义胶卷追加在内建目录之后，支持名称显示、翻页与选用。",
+        "修复自定义胶卷被误判为已下架胶卷、可能被清理的问题。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复平台导出的自定义 LUT 未显示在机内「胶卷库」的问题，自定义胶卷追加在内建目录之后，支持名称显示、翻页与选用。",
+            "修复自定义胶卷被误判为已下架胶卷、可能被清理的问题。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享胶卷库菜单。按用户要求完成代码定位与定向离线检查后直接发布，未做本次实机验收及全量回归。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.27.7",
       "date": "2026-10-27",
       "title": "修复 ADJ 关机与快切退出卡死",
@@ -19,9 +41,9 @@
         }
       ],
       "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享菜单运行时。GR III 的 D2 测试包已由用户实机确认通过；IIIx 完成离线导出检查，未做本次实机验收。正式构建默认关闭专项退出日志。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "8929bdbb43ff2fcb26dadf7eb53ca881c7219603",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40526640163"
     },
     {
       "version": "2026.10.27.6",

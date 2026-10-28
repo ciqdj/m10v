@@ -2,6 +2,9 @@
 #define M10V_SD_LIBRARY_H
 #include <stdint.h>
 #include "m10v_library.h"
+#include "m10v_film_directory.h"
+/* Curated builtins followed by the compact list of custom records on SD. */
+#define M10V_SD_DIRECTORY_LIMIT (M10V_DIRECTORY_COUNT+M10V_CUSTOM_MAX_ID-M10V_FILM_COUNT)
 #define M10V_SD_HEADER_BYTES 4096u
 #define M10V_SD_RECORD_BYTES 12288u
 #define M10V_SD_MAX_FILMS 256u

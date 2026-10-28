@@ -172,7 +172,7 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
      *(const uint32_t *)(uintptr_t)(payload+4)!=1)return 0;
   if(raw==0x1b){
    uint32_t retired=0;
-   for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(p->state.saved.slots[i].film&&!m10v_directory_name(p->state.saved.slots[i].film))retired=1;
+   for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(p->state.saved.slots[i].film&&!M10V_CUSTOM(p->state.saved.slots[i].film)&&!m10v_directory_name(p->state.saved.slots[i].film))retired=1;
    if(!retired)return 0;
   }
   p->pending_source=event;
