@@ -2,6 +2,37 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.8",
+      "date": "2026-10-28",
+      "title": "新增 LUT 质量报告、竖拍水印与独立 HDF ADJ",
+      "changes": [
+        "新增 LUT / XMP 拟合质量工具，整合 Darkslide 范围保护与 GRMod 灰阶、肤色候选思路，提供量化后色差、来源追溯和独立近似方案。",
+        "日期与胶卷名水印根据本张拍摄方向自动旋转，适配横拍与竖拍。",
+        "ADJ 模式设定新增独立「HDF 模拟」，提供关、弱、中、强四档，并保留全部原厂 ADJ 项；与 MENU 共用设置。",
+        "LUT 工作台采用深色与金色主题，重整导入、质量报告、五胶卷配置与导出区域，适配窄屏。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "新增 LUT / XMP 拟合质量工具，整合 Darkslide 范围保护与 GRMod 灰阶、肤色候选思路，提供量化后色差、来源追溯和独立近似方案。",
+            "日期与胶卷名水印根据本张拍摄方向自动旋转，适配横拍与竖拍。",
+            "ADJ 模式设定新增独立「HDF 模拟」，提供关、弱、中、强四档，并保留全部原厂 ADJ 项；与 MENU 共用设置。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "LUT 工作台采用深色与金色主题，重整导入、质量报告、五胶卷配置与导出区域，适配窄屏。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。当前交付候选已获用户验收通过；LUT 误差报告是软件模型评估，不等于实拍色差标定。拟合工具沿用独立五胶卷 ISP 导出，SD 原始 LUT 路径尚未迁移。回退到不支持此功能的固件前，请先从所有 ADJ 槽与 U 配置移除 HDF 模拟。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.7",
       "date": "2026-10-28",
       "title": "修复 GR III / IIIx 固件保存下载失败",
@@ -21,9 +52,9 @@
         }
       ],
       "notice": "已使用 GR III 2.20 与 GR IIIx 1.70 真实文件完成完整原生构建、受限响应头 HTTP 下载及最终版本回读验证；此修复不改变相机运行代码，实机刷入与恢复仍待验证。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "b3a95de8fb7d3fe8a119d8192843a1d717e81c9f",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40669443187"
     },
     {
       "version": "2026.10.28.6",

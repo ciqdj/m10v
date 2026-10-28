@@ -1,6 +1,6 @@
 # GR III / IIIx：拟合质量、水印方向与独立 HDF ADJ
 
-状态：`WAITING_FOR_USER_VALIDATION`。仅本地候选，未推送、未合并回 main、未部署、未刷机。
+状态：`USER_VALIDATED`。用户于 2026-10-28 明确反馈“没问题了，验收OK”，并授权合并 main、发布 GitHub 和宝塔。验收绑定下表当前交付候选；未提供额外的逐机型测量数据，不据此声称完成色彩标定。验收后仅整理网页样式、说明与发布记录，原生成像代码未变。部署结果以对应 GitHub Actions 的 DEPLOY_OK 为准。
 
 ## 源码身份及范围
 
