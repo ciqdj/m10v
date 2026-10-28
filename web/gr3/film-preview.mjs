@@ -71,10 +71,14 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
-let animeE6TablesPromise;
+let animeE6TablesPromise,c41TablesPromise;
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=312&&film<=313){
+    c41TablesPromise??=fetch(new URL('./c41-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('C41 LUT unavailable');return r.json();}).catch(e=>{c41TablesPromise=undefined;throw e;});
+    const lut=await c41TablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
+  }
   if(Number.isInteger(film)&&film>=306&&film<=311){
     animeE6TablesPromise??=fetch(new URL('./anime-e6-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('滤镜色表载入失败');return r.json();}).catch(e=>{animeE6TablesPromise=undefined;throw e;});
     const lut=await animeE6TablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);

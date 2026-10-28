@@ -2,7 +2,7 @@
 #ifndef M10V_FILM_DIRECTORY_H
 #define M10V_FILM_DIRECTORY_H
 #include <stdint.h>
-#define M10V_DIRECTORY_COUNT 44u
+#define M10V_DIRECTORY_COUNT 46u
 #define M10V_DIRECTORY_GROUPS 6u
 #define M10V_DIRECTORY_GROUP_RESOURCE 1129u
 static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]={
@@ -26,6 +26,8 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {67,1,"Harman Phoenix II"},
 {68,1,"Harman Red"},
 {292,1,"Lomography"},
+{312,1,"OptiColour 200"},
+{313,1,"NC500"},
 {294,2,"Fuji Velvia 50"},
 {309,2,"Fuji Provia 100F"},
 {310,2,"Kodak Ektachrome E100"},
@@ -51,6 +53,6 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {297,5,"German Cool"},
 {65,5,"GR2"},
 };
-static const uint8_t m10v_directory_first[7]={0,6,20,24,32,41,44};
+static const uint8_t m10v_directory_first[7]={0,6,22,26,34,43,46};
 static inline const char *m10v_directory_name(uint32_t id){for(uint32_t i=0;i<M10V_DIRECTORY_COUNT;i++)if(m10v_directory[i].id==id)return m10v_directory[i].name;return 0;}
 #endif

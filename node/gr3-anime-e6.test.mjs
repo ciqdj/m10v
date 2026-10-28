@@ -12,7 +12,7 @@ test('E6 follows C41 and seven visible additions preserve stable identities',asy
  const c=await nativeCatalog(),groups=FILM_GROUPS.map(g=>g.name);
  assert.equal(groups[groups.indexOf('C41')+1],'E6');
  assert.deepEqual(FILM_GROUPS.find(g=>g.name==='E6').films.map(f=>[f.id,f.name]),[[294,'Fuji Velvia 50'],[309,'Fuji Provia 100F'],[310,'Kodak Ektachrome E100'],[311,'5294']]);
- assert.equal(c.film_count,44);assert.equal(FILM_DIRECTORY.length,44);
+ assert.equal(c.film_count,46);assert.equal(FILM_DIRECTORY.length,46);
  assert.deepEqual(c.films.filter(f=>f.id>=306&&f.id<=308).map(f=>f.name),['Makoto Shinkai','Ghibli','1970s']);
 });
 test('anime mode defaults off and only explicit valid per-anime states serialize',()=>{

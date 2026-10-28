@@ -253,7 +253,7 @@ int m10v_camera_library_load(m10v_library_state *state){
 }
 int m10v_camera_library_select(m10v_library_state *state, uint32_t slot, uint32_t film) {
 #if !M10V_LIVE_COLOR
-    if(film==294||M10V_ANIME_E6(film))return M10V_LIBRARY_INVALID;
+    if(film==294||(M10V_ANIME_E6(film)||M10V_C41(film)))return M10V_LIBRARY_INVALID;
 #endif
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     uint32_t fs = filesystem();

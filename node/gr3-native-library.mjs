@@ -35,6 +35,7 @@ export async function nativeCatalog(){
  films.push({id:298,key:'vision3-200t-5213',name:'5213',group:'ECN2',camera_calibrated:false,film_calibrated:false});
  films.push(...JSON.parse(readFileSync(path.join(root,'web/gr3/d76-luts.json'),'utf8')).stocks.map(({values,...f})=>({...f,group:'D76'})));
  films.push(...JSON.parse(readFileSync(path.join(root,'web/gr3/anime-e6-luts.json'),'utf8')).stocks.map(({values,...f})=>f));
+ films.push(...JSON.parse(readFileSync(path.join(root,'web/gr3/c41-luts.json'),'utf8')).stocks.map(({values,...f})=>f));
  films.forEach(f=>{const d=directoryFilm(f.id);if(d)Object.assign(f,d);});
  const icons=JSON.parse(await readFile(path.join(root,'web/gr3/film-icons/catalog.json'),'utf8'));
  if(icons.length!==films.length||icons.some((v,i)=>v.id!==films[i].id||v.name!==films[i].name))throw Error('M10V 图标目录与胶卷不同步');
@@ -85,7 +86,7 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
  const native_grain=capabilities.nativeGrain&&film_library&&['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline);
  if(configuration.slots.some(s=>s.grain>0)&&!native_grain)throw Error('颗粒仅支持 GR III 原厂原生成像管线，请关闭颗粒后导出此方案');
  if(configuration.slots.some(s=>s.grain>0&&[289,290].includes(s.film)))throw Error('Charmera / 方块世界暂不支持原厂颗粒，请关闭该槽位颗粒');
- if(configuration.slots.some(s=>s.film===294||(s.film>=306&&s.film<=311))&&!['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline))throw Error('新滤镜需要 GR III 已接入的 ISP 成片管线');
+ if(configuration.slots.some(s=>s.film===294||(s.film>=306&&s.film<=313))&&!['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline))throw Error('新滤镜需要 GR III 已接入的 ISP 成片管线');
  const runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,film_library,appended_slots,hdf_enabled,halation_enabled,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256,capture_pipeline}));
  const zoom_seed=configuration.zoom.write?{id:hash(JSON.stringify({source:report.sha256,zoom:configuration.zoom,runtime_source_sha256})).slice(0,16),slots:configuration.zoom.slots}:null;
  return {camera_model,capabilities,zoom_seed,schema:'m10v-native-library-plan/v1',ready:true,extensions,version_unlock,integration_source_sha256,film_library,appended_slots,slot_tone_ids:appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],hdf_enabled,halation_enabled,features:[...(halation_enabled?['halation']:[]),...(film_library?['film','800t','5207','phoenix-ii-200','harman-red-125',...(native_grain?['grain']:[]),'timestamp']:[]),...(hdf_enabled?['digitalHdf']:[]),...activeExtensions(extensions)],source_sha256:report.sha256,configuration,configuration_sha256,runtime_source_sha256,model:report.model,public_version:report.public_version,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',

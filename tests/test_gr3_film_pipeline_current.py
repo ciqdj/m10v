@@ -226,6 +226,20 @@ class CurrentFilmPipelineTests(unittest.TestCase):
                     self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
                     self.assertEqual(self.capture(e,recipe,si,request),0)
 
+    def test_c41_looks_real_task_producer_to_unmapped_24mp_encoder(self):
+        for film in (312,313):
+            for stage in (0,1):
+                with self.subTest(film=film,stage=stage):
+                    e,recipe,obj,frame,si,request,data=self.fixture(film,stage=stage)
+                    # Discard fixture snapshot; only the actual task producer
+                    # can publish this shot before the original Still Make.
+                    e.u.mem_write(recipe+0x4a08,bytes(1796))
+                    self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
+                    self.make(e,recipe,obj,frame)
+                    self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+                    self.assertEqual(self.capture(e,recipe,si,request),0)
+
     def test_advanced_mode_is_frozen_by_real_submission_despite_later_ui_change(self):
         for mode in (1,2,3):
             e,recipe,obj,frame,si,request,data=self.fixture(306)

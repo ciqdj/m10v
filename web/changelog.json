@@ -2,6 +2,28 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.2",
+      "date": "2026-10-28",
+      "title": "新增 OptiColour 200 与 NC500",
+      "changes": [
+        "在胶卷库 C41 分组新增 OptiColour 200 与 NC500，支持 GR III / GR IIIx 的机内选择、图标、网页预览与 SD 导出。",
+        "两款胶卷采用独立离线参考及本机 ISP 拟合，保留既有胶卷编号及旧 SD 包、自定义 LUT 的兼容读取。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "在胶卷库 C41 分组新增 OptiColour 200 与 NC500，支持 GR III / GR IIIx 的机内选择、图标、网页预览与 SD 导出。",
+            "两款胶卷采用独立离线参考及本机 ISP 拟合，保留既有胶卷编号及旧 SD 包、自定义 LUT 的兼容读取。"
+          ]
+        }
+      ],
+      "notice": "依据厂商公开的定性资料建立独立近似模型，非官方 LUT；未完成相机与实体胶卷标定，不承诺 100% 还原。仅完成针对性离线验证及两机型封包，未做全量回归与本次实机验收。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.1",
       "date": "2026-10-28",
       "title": "修复自定义 LUT 在机内胶卷库缺失",
@@ -19,9 +41,9 @@
         }
       ],
       "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享胶卷库菜单。按用户要求完成代码定位与定向离线检查后直接发布，未做本次实机验收及全量回归。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "213cb7f772788b57363f95bdca652bda1be10a02",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40644028289"
     },
     {
       "version": "2026.10.27.7",

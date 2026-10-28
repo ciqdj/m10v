@@ -907,5 +907,23 @@
     "color": "#b8954b",
     "icon_url": "/gr3/film-icons/311-large.png",
     "sha256": "8ffc8acc4c423d9a0b70c9be4974cef42398d6f9ca6bba12f9f2bab2a3bafe11"
+  },
+  {
+    "id": 312,
+    "name": "OptiColour 200",
+    "title": "OPTICOLOUR",
+    "code": "200",
+    "color": "#73946b",
+    "icon_url": "/gr3/film-icons/312-large.png",
+    "sha256": "cb6db60c03787e35b936f6a4b86d680781da1a1e2649f7f8dfcdc0273ff1e724"
+  },
+  {
+    "id": 313,
+    "name": "NC500",
+    "title": "WOLFEN",
+    "code": "NC500",
+    "color": "#8c7e4f",
+    "icon_url": "/gr3/film-icons/313-large.png",
+    "sha256": "2605e8fbc53e7295a08f528aea66979fc8a7710f0f1da1cdcdd4297e3593dc2d"
   }
 ]
