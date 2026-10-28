@@ -44,6 +44,7 @@ test('an enabled HDF menu cannot silently omit independent ADJ capability',()=>{
  assert.throws(()=>hdfAdjPatches(runtime,{hdf_enabled:true,hdf_menu:{}}),/missing/);
  assert.deepEqual(hdfAdjPatches(runtime,{hdf_enabled:false}),[]);
  assert.throws(()=>hdfAdjPatches(runtime,{hdf_enabled:true,hdf_menu:{},hdf_adj_capability:false}),/missing/);
+ assert.throws(()=>hdfAdjPatches(runtime,{hdf_enabled:false,hdf_menu:{}}),/missing/);
 });
 
 test('resealed parent-event metadata cannot bypass original AB and poweroff composition',()=>{
