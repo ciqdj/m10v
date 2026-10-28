@@ -1,7 +1,8 @@
 import {renderFitChoices,saveJson,createFitSession} from './fit-report.mjs';
+import {createFitApi} from './fit-api.mjs';
 const $=id=>document.getElementById(id),session=createFitSession();let token,selected,project,prepared,catalog=[],existingLibrary=[],existingConfig={variant:'street',features:['film']},revision=0,sourceSequence=0,ids=['ektar100','gold200','pro400h','portra400','vision3-250d'];
 const message=text=>{$('fit-status').textContent=text;};
-async function api(path,options={}){const response=await fetch(path,{...options,headers:{'X-M10V-Token':token,...options.headers}});if(!response.ok)throw Error((await response.json()).error);return response;}
+const api=createFitApi(()=>token);
 const configuration=()=>{if(!selected||!ids.includes(selected.id)||new Set(ids).size!==5)throw Error('请选择五个不同胶卷，其中一个位置使用本次 LUT');return {...structuredClone(existingConfig),variant:'street',features:[...new Set([...(existingConfig.features||[]),'film'])],filmIds:[...ids],filmLibrary:[...existingLibrary.filter(v=>v.id!==selected.id),selected]};};
 function invalidate(){revision++;prepared=null;$('fit-build').disabled=true;}
 function renderSlots(){const host=$('fit-slots');host.replaceChildren();for(let i=0;i<5;i++){const label=document.createElement('label'),select=document.createElement('select');label.textContent=`胶卷 ${i+1} `;for(const f of [...catalog,...existingLibrary,...(selected?[selected]:[])]){const option=document.createElement('option');option.value=f.id;option.textContent=f.name;select.append(option);}select.value=ids[i];select.onchange=()=>{ids[i]=select.value;invalidate();};label.append(select);host.append(label);}}
