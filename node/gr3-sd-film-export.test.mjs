@@ -13,3 +13,5 @@ test('duplicate user film names fail export',()=>{
  const entry={name:'My Film',filename:'test.cube',base64:Buffer.from(cube).toString('base64')};
  assert.throws(()=>exportSdFilms({ids:[],customFilms:[entry,entry]}),/重复/);
 });
+
+test('raw SD LUT manifest explicitly records unassessed CPU path without pretending ISP fit',()=>{const result=exportSdFilms({ids:[],customFilms:[{name:'My Film',filename:'test.cube',base64:Buffer.from(cube).toString('base64')}]});assert.equal(result.receipt.custom_lut_assessment.status,'legacy-unassessed');assert.equal(result.receipt.custom_lut_assessment.isp_fit,false);assert.equal(result.receipt.custom_lut_assessment.source_sha256.length,1);});

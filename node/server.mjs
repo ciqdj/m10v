@@ -283,7 +283,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       if (pathname === '/api/gr3/film/fit') {
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
         const filename=decodeURIComponent(request.headers['x-m10v-filename']||'Imported LUT.cube');
-        return send(response,200,await (/\.xmp$/i.test(filename)?fitXmp:fitCube)(body,filename,{signal:cancellation.signal}));
+        return send(response,200,await (/\.xmp$/i.test(filename)?fitXmp:fitCube)(body,filename,{signal:cancellation.signal,model:request.headers['x-m10v-fit-model']||'gr3',...(request.headers['x-m10v-approximation-strength']!==undefined?{approximationStrength:Number(request.headers['x-m10v-approximation-strength'])}:{})}));
       }
       if (haloMatch) {
         const original = await readBuildOriginal(haloMatch[1]);
@@ -316,7 +316,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         if (input.accepted_configuration_sha256 !== prepared.configuration_sha256 || !prepared.ready)
           return send(response, 409, { error: '方案已变化或预检未通过，请重新预检并确认风险。' });
         const { candidate, receipt } = await buildCustomization(original, input.selection, input.accepted_configuration_sha256, options);
-        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,audit:receipt.audit,build_source:buildSource})).toString('base64'));
+        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,fit_reports:receipt.fit_reports?.map(({id,assessment,report,encoded_curve_form})=>({id,assessment,encoded_curve_form,report_sha256:report?.report_sha256,parameter_sha256:report?.parameter_sha256,source_sha256:report?.source_sha256,model:report?.model})),audit:receipt.audit,build_source:buildSource})).toString('base64'));
         return sendBuild(candidate,receipt.filename);
       }
       if (versionMatch) {
