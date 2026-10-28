@@ -2,6 +2,35 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.6",
+      "date": "2026-10-28",
+      "title": "GR II 支持网页配置 HDF 初始强度",
+      "changes": [
+        "GR II 网页新增 HDF 首次使用强度：关闭、弱、中、强，支持配置导入、撤销/重做，并在保存固件前展示所选初始档位。",
+        "将网页 HDF 初始值绑定到 GR II 大端运行体、独立双页存档及构建校验记录；已有有效机内设置优先，换卷与胶卷重置不改变 HDF。",
+        "首次创建非零 HDF 设置前先通过原厂内存池准入；已有损坏存档、介质错误或无法确认文件不存在时不自动覆盖。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR II 网页新增 HDF 首次使用强度：关闭、弱、中、强，支持配置导入、撤销/重做，并在保存固件前展示所选初始档位。",
+            "将网页 HDF 初始值绑定到 GR II 大端运行体、独立双页存档及构建校验记录；已有有效机内设置优先，换卷与胶卷重置不改变 HDF。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "首次创建非零 HDF 设置前先通过原厂内存池准入；已有损坏存档、介质错误或无法确认文件不存在时不自动覆盖。"
+          ]
+        }
+      ],
+      "notice": "仅影响 GR II 实验版。相关原生、存档、构建与回读验证通过，尚无 GR II 真机验收；本次不是与 GR III 完全同步的完成声明，十槽、现行胶卷目录、ISP 成片色彩及其他工具仍待对齐。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.5",
       "date": "2026-10-28",
       "title": "修复 GR III / IIIx 固件上传版本限制",
@@ -21,9 +50,9 @@
         }
       ],
       "notice": "影响 GR III / GR IIIx。输出功能仍基于已适配的 2.10 / 1.60，不包含上传新版的原厂新增功能。相关离线、ARM 和候选回读验证通过；实机刷入及恢复尚未验证，未知机内服务版本或未来格式变化仍可能影响兼容性。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "84feaa97bf489b4ffde319c08b71c9750bded6f9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40658889263"
     },
     {
       "version": "2026.10.28.4",
