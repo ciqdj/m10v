@@ -35,3 +35,7 @@
 
 - gr3: bytes=32350352, sha256=62ca094379054c16b450973028d0c378c6fff737bdc656871ca1a24c15668db9, debug=True, RTOS growth=1114532, film_count=103, SD visible=46。
 - gr3x: bytes=32474760, sha256=f395985be6c63a90def788fb5a94b2bb446d5591315b9bc6ad25f159f49ab0ff, debug=False, RTOS growth=1106756, film_count=103, SD visible=46。
+
+6a4bb9c 的服务器 GR III debug 构建通过，随后 GR IV 发布构建因共享链接器新增 directory_extent、GR IV 缺少显式接口排除声明而失败，run 40652219088 回退 213cb7f。补齐 GR IV 的专用排除清单，保持该机型原有位置目录和不支持自定义 LUT 的边界，不削弱链接器必需接口检查。GR III / GR IIIx 功能代码保持不变。
+
+补齐后执行与服务器相同的 `scripts/check_gr4_release.mjs`：完整编译、链接、固件封包及重新解码回读通过；GR IV SHA256=4ed9c8823796e2e8ac350d6b96e59474084b769cfb6eede96815b3264b417863，bytes=41191236，camera_tested=false。更新日志四项检查通过。此修正仅为保持已存在的 GR IV 发布构建边界。

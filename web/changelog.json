@@ -2,6 +2,42 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.28.4",
+      "date": "2026-10-28",
+      "title": "修复 SD 自定义目录读取，更新胶卷库",
+      "changes": [
+        "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。",
+        "补齐多机型共享构建接口声明，保持各机型原有能力边界与发布检查。",
+        "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。",
+        "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。",
+            "补齐多机型共享构建接口声明，保持各机型原有能力边界与发布检查。"
+          ]
+        },
+        {
+          "type": "added",
+          "items": [
+            "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。新增胶卷为来源明确的近似模拟，未完成实体胶卷及相机标定，无法保证 100% 还原。仅做定向离线测试及发布必需的机型构建检查，未做全量回归与本次实机验收。目录读取缺陷已离线复现修复，尚未确认覆盖用户现场全部成因。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.3",
       "date": "2026-10-28",
       "title": "修复 SD 自定义目录读取，更新胶卷库",
@@ -30,10 +66,10 @@
           ]
         }
       ],
-      "notice": "影响 GR III / GR IIIx。新增胶卷为来源明确的近似模拟，未完成实体胶卷及相机标定，无法保证 100% 还原。按用户要求只做定向离线测试和构建检查，不做全量回归；目录读取缺陷已离线复现修复，尚未确认覆盖用户现场全部成因。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "notice": "影响 GR III / GR IIIx。新增胶卷为来源明确的近似模拟，未完成实体胶卷及相机标定，无法保证 100% 还原。按用户要求只做定向离线测试和构建检查，不做全量回归；目录读取缺陷已离线复现修复，尚未确认覆盖用户现场全部成因。 本次部署在 GR IV 共享链接接口检查失败后回退，未作为线上版本生效。",
+      "commit": "6a4bb9c846f6cfef7d0dc26b1d4c132b9989153a",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40652219088"
     },
     {
       "version": "2026.10.28.2",
