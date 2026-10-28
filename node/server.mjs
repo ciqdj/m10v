@@ -1,3 +1,4 @@
+import {sendFirmwareDownload} from './firmware-download.mjs';
 import {handleGr2NativeRequest} from './gr2-native-routes.mjs';
 import {bindPowerPreparation,applyPowerImages,previewPowerImages} from './gr3-power-images.mjs';
 import {createHash} from 'node:crypto';
@@ -115,7 +116,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         }
         response.setHeader('X-M10V-Update-Compatibility',Buffer.from(JSON.stringify(result.receipt)).toString('base64'));
       }
-      return send(response,200,result.candidate,'application/octet-stream',filename);
+      return sendFirmwareDownload(request,response,result.candidate,filename);
     };
     const localOrigin = `http://127.0.0.1:${server.address().port}`;
     const origin=configuredOrigin||localOrigin;

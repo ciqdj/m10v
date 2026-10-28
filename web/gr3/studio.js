@@ -1,3 +1,4 @@
+import {unwrapFirmwareDownload} from './firmware-download.mjs';
 import {mountCinematicStudio} from './cinematic-studio.mjs';
 import {mountBuildCompletion} from './full-library.mjs';
 import {focusWorkbenchHeading} from '/shared/workbench-focus.mjs';
@@ -100,13 +101,16 @@ async function api(path, options = {}) {
     if(match){path=nativeApi+'/'+(match[3]||'backup');options={...options,body:JSON.stringify({...JSON.parse(options.body||'{}'),project_id:match[1]})};}
   }
   const response = await fetch(path, { ...options,
-    headers: { 'X-M10V-Token': state.token, ...(options.headers || {}) } });
+    headers: { 'X-M10V-Token': state.token, ...(/\/(native-library|edit)\/build$/.test(path)&&!gr4Workbench?{Accept:'multipart/form-data'}:{}), ...(options.headers || {}) } });
   if (!response.ok) {
-    let message = '操作失败';
-    try { message = (await response.json()).error || message; } catch {}
+    let message = `请求失败（HTTP ${response.status}）`;
+    try { message = (await response.json()).error || message; } catch {
+      if(response.status===502)message+='：下载网关未能接收构建结果，请重试；若持续失败，请反馈此错误码。';
+      if(response.status===504)message+='：构建等待超时，请稍后重试。';
+    }
     throw new Error(message);
   }
-  return response;
+  return unwrapFirmwareDownload(response);
 }
 function selection() {
   return { variant: 'street', features: definitions.map(([id]) => id).filter((id) => state.features.has(id)),
