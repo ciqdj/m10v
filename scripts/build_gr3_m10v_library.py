@@ -131,7 +131,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_style_filters_1_': {'m10v_style_filters_1_table'},
         'm10v_harman_': {'m10v_harman_rgb'},
         'm10v_library_': {'m10v_library_init','m10v_library_count','m10v_library_remove', 'm10v_library_valid', 'm10v_library_name',
-            'm10v_library_reset','m10v_library_detail','m10v_library_effects','m10v_library_select','m10v_library_select_custom', 'm10v_library_texture', 'm10v_library_halation', 'm10v_library_tables', 'm10v_library_stamp','m10v_library_film_name_stamp', 'm10v_library_render','m10v_library_render_native','m10v_library_render_custom'},
+            'm10v_library_reset','m10v_library_detail','m10v_library_effects','m10v_library_select','m10v_library_select_custom', 'm10v_library_texture', 'm10v_library_halation', 'm10v_library_tables', 'm10v_library_stamp','m10v_library_film_name_stamp', 'm10v_library_render','m10v_library_render_native','m10v_library_render_custom','m10v_library_render_oriented'},
         'm10v_camera_library_': {'m10v_camera_library_load','m10v_camera_library_shooting_count','m10v_camera_library_menu_index','m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_remove', 'm10v_camera_library_select','m10v_camera_library_select_custom',
             'm10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_reset','m10v_camera_library_detail','m10v_camera_library_effects','m10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp'},
         'm10v_menu_': {'m10v_menu_count', 'm10v_menu_max_count', 'm10v_menu_index', 'm10v_menu_name',
@@ -150,8 +150,9 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
         'm10v_settings_controller_': {'m10v_settings_controller_card_directory','m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
-        'm10v_hdf_': {'m10v_hdf_alloc','m10v_hdf_producer','m10v_hdf_gate','m10v_hdf_settings','m10v_hdf_load','m10v_hdf_save','m10v_hdf_done'},
-        'm10v_hdf_menu_': {'m10v_hdf_menu_top_ctor','m10v_hdf_menu_top_dtor','m10v_hdf_menu_destroy','m10v_hdf_menu_factory','m10v_hdf_menu_ready','m10v_hdf_menu_enter','m10v_hdf_menu_key','m10v_hdf_menu_key_route'},
+        'm10v_hdf_': {'m10v_hdf_alloc','m10v_hdf_producer','m10v_hdf_gate','m10v_hdf_settings','m10v_hdf_load','m10v_hdf_save','m10v_hdf_done','m10v_hdf_cached','m10v_hdf_bootstrap','m10v_hdf_reserve','m10v_hdf_task_snapshot'},
+        'm10v_hdf_adj_': {'m10v_hdf_adj_'+n for n in ('enter','draw','current','set','count','available','event')},
+        'm10v_hdf_menu_': {'m10v_hdf_menu_top_ctor','m10v_hdf_menu_top_dtor','m10v_hdf_menu_cache_init','m10v_hdf_menu_destroy','m10v_hdf_menu_factory','m10v_hdf_menu_ready','m10v_hdf_menu_enter','m10v_hdf_menu_key','m10v_hdf_menu_key_route'},
         'm10v_level_': {'m10v_level_callback','m10v_level_draw','m10v_level_quarter'},
     }[prefix]
     if not set(omitted_exports)<=required:raise ValueError('unknown omitted API')
@@ -305,7 +306,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         film,film_symbols=link_object(film_obj.read_bytes(),film_base,halo_symbols,prefix='m10v_5207_')
         halo_symbols.update(film_symbols)
         core_base = (film_base+len(film)+15)&~15
-        core, symbols = link_object(obj.read_bytes(), core_base, halo_symbols, additional_exports=('m10v_library_render_profiled','m10v_library_render_native_profiled') if profile_mode else ())
+        core, symbols = link_object(obj.read_bytes(), core_base, halo_symbols, additional_exports=('m10v_library_render_profiled','m10v_library_render_native_profiled','m10v_library_render_oriented_profiled') if profile_mode else ())
         symbols.update(halo_symbols)
         image = bytearray(0x100)+spatial+bytes(harman_base-spatial_base-len(spatial))+halo+bytes(film_base-harman_base-len(halo))+film+bytes(core_base-film_base-len(film))+core
         # Single-instruction entry trampolines, before the new C module. Each
@@ -335,13 +336,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         hdf_report=None
         if hdf_enabled:
             hdf_obj=folder/'digital-hdf.o'
-            subprocess.run([compiler,*compile_flags,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
+            hdf_owner_offset=(0x223c if owner_cache else 0x213c) if film_library else 0x13bc
+            subprocess.run([compiler,*compile_flags,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-DM10V_HDF_UI_CACHE='+str(int(sd_library)),'-DM10V_HDF_OWNER_OFFSET='+hex(hdf_owner_offset),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
             hdf_base=(base+len(image)+15)&~15
             hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else ())
             image+=bytes(hdf_base-base-len(image))+hdf_code;symbols.update(hdf_symbols)
             from scripts.build_gr3_digital_hdf import build as build_digital_hdf
             hdf_base=(base+len(image)+15)&~15
-            hdf_code,hdf_report=build_digital_hdf(hdf_base,symbols,shared_recipe=lifecycle_trace)
+            hdf_code,hdf_report=build_digital_hdf(hdf_base,symbols,shared_recipe=lifecycle_trace,ui_cache=sd_library)
             image+=bytes(hdf_base-base-len(image))+hdf_code
         if sd_library:
             node = os.environ.get('M10V_NODE') or shutil.which('node')
@@ -355,7 +357,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
                 image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
         capture_recipe_bytes='M10V_SAVE_RECIPE_EXTENDED_BYTES' if lifecycle_trace else '(M10V_SAVE_RECIPE_BYTES+16u)' if hdf_enabled else 'M10V_SAVE_RECIPE_BYTES'
-        debug_flags = [*profile_flags,f'-DM10V_ADJ_EXIT_TRACE={int(adj_exit_trace)}',f'-DM10V_CAPTURE_RECIPE_BYTES={capture_recipe_bytes}',f'-DM10V_HDF_SHARED_RECIPE={int(hdf_enabled and lifecycle_trace)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}',f'-DM10V_RECIPE_SNAPSHOT={int(recipe_snapshot)}',f'-DM10V_RAW_LIFETIME={int(save_chain_trace)}',f'-DM10V_ISP_NATIVE_LOOK={int(native_color)}',f'-DM10V_ISP_NATIVE_GRAIN_MODE={int(native_grain)}']
+        debug_flags = [*profile_flags,f'-DM10V_HDF_UI_CACHE={int(sd_library and hdf_enabled)}',f'-DM10V_ADJ_EXIT_TRACE={int(adj_exit_trace)}',f'-DM10V_CAPTURE_RECIPE_BYTES={capture_recipe_bytes}',f'-DM10V_HDF_SHARED_RECIPE={int(hdf_enabled and lifecycle_trace)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_DEBUG_BUILD_ID={debug_build_id}u',f'-DM10V_SD_LIBRARY={int(sd_library)}',f'-DM10V_RECIPE_SNAPSHOT={int(recipe_snapshot)}',f'-DM10V_RAW_LIFETIME={int(save_chain_trace)}',f'-DM10V_ISP_NATIVE_LOOK={int(native_color)}',f'-DM10V_ISP_NATIVE_GRAIN_MODE={int(native_grain)}']
         if debug_mode or lifecycle_trace:
             debug_obj = folder / 'debug.o'
             debug_source=ROOT/'native/gr3/m10v_debug.c'
@@ -454,6 +456,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
         hdf_menu_report=None
+        hdf_adj_report=None
         if sd_library and hdf_enabled:
             menu_obj=folder/'hdf-menu.o';start=(base+len(image)+15)&~15
             subprocess.run([compiler,*compile_flags,f'-DM10V_HDF_GROUPED={int(film_library)}','-DM10V_HDF_OWNER_OFFSET='+hex((0x223c if owner_cache else 0x213c) if film_library else 0x13bc),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
@@ -464,6 +467,21 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=owner_cache,custom_zoom=custom_zoom)
             code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
+            # Compose the added ADJ function with the already audited A/B
+            # event wrapper. The Node writer replaces this ONE original site,
+            # retaining all other A/B hooks and their original trampolines.
+            adj_obj=folder/'hdf-adj.o';adj_start=(base+len(image)+15)&~15
+            subprocess.run([compiler,*compile_flags,'-DM10V_HDF_UI_CACHE=1',
+                '-DM10V_HDF_OWNER_OFFSET='+hex(hdf_owner_offset),'-c',
+                str(ROOT/'native/gr3/m10v_hdf_adj.c'),'-o',str(adj_obj)],check=True,capture_output=True)
+            parent_event=symbols['m10v_settings_controller_ab_adj_event']
+            adj_code,adj_symbols=link_object(adj_obj.read_bytes(),adj_start,
+                {**symbols,'m10v_hdf_adj_parent_event':parent_event},'m10v_hdf_adj_')
+            image+=bytes(adj_start-base-len(image))+adj_code;symbols.update(adj_symbols)
+            from scripts.build_gr3_hdf_adj import build as build_hdf_adj
+            adj_base=(base+len(image)+15)&~15
+            adj_hooks,hdf_adj_report=build_hdf_adj(adj_base,symbols,icon_id=874,parent_event=parent_event)
+            image+=bytes(adj_base-base-len(image))+adj_hooks
         # Link dedicated stock-detail backend against the same camera journal.
         from scripts.build_gr3_native_detail import build_detail, STOCK_TABLE
         detail_obj=folder/'detail.o'
@@ -705,8 +723,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         aspect_icon_first = 855 if focal_icons else 782
         old_icon_count = aspect_icon_first+2
         old_descriptor_count=113+int(focal_icons)
-        icon_count = 874
-        descriptor_count=old_descriptor_count+8
+        icon_count = 874+int(hdf_adj_report is not None)
+        descriptor_count=old_descriptor_count+8+int(hdf_adj_report is not None)
         icon_descriptors = icon_table + icon_count*4
         icon_data = icon_descriptors + descriptor_count*8
         image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(111))
@@ -718,6 +736,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += bytes(5*4) # Retired anime enum resources 864..868 remain unbound.
         image += b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+3+i)*8) for i in range(2))
         image += b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+5+i)*8) for i in range(3))
+        if hdf_adj_report:image+=struct.pack('<I',icon_descriptors+(old_descriptor_count+8)*8)
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+(len(icon_pixels) if i<retired_icon_count else (i-retired_icon_count)*6400))//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
@@ -761,6 +780,13 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         extra_pixels=(ROOT/'native/gr3/m10v_extra_films.rgba').read_bytes()
         if len(extra_pixels)!=19200:raise ValueError('extra film artwork extent differs')
         for i in range(3):image+=struct.pack('<HHI',40,40,(c41_data+len(c41_pixels)+i*6400)//4)
+        hdf_adj_pixels=(ROOT/'native/gr3/m10v_hdf_adj.rgba').read_bytes() if hdf_adj_report else b''
+        if hdf_adj_report:
+            if len(hdf_adj_pixels)!=6400:raise ValueError('HDF ADJ icon extent differs')
+            hdf_adj_icon_data=c41_data+len(c41_pixels)+len(extra_pixels)
+            image+=struct.pack('<HHI',40,40,hdf_adj_icon_data//4)
+            hdf_adj_report['icon']={'id':874,'descriptor':icon_descriptors+(old_descriptor_count+8)*8,
+                'pixels':hdf_adj_icon_data,'bytes':6400,'width':40,'height':40,'sha256':hashlib.sha256(hdf_adj_pixels).hexdigest()}
         image += icon_pixels
         if sd_library:
             from scripts.generate_m10v_film_cards import custom_icon
@@ -768,7 +794,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if custom_pixels!=custom_icon():raise ValueError('custom LUT icon differs from source')
             image += custom_pixels
         image += (ROOT/'native/gr3/m10v_charmera.rgba').read_bytes()
-        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels
+        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels+hdf_adj_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
             .syntax unified
@@ -871,11 +897,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['sd_library']=sd_library
     manifest['film_library_enabled']=film_library
     manifest['hdf_menu']=hdf_menu_report
+    manifest['hdf_adj']=hdf_adj_report
     manifest['digital_hdf']=hdf_report
     manifest['hdf_default']=hdf_default
     manifest['hdf_enabled']=hdf_enabled
     manifest['universal_halation']=universal_halation
-    manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py']})
+    manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py','native/gr3/m10v_hdf_state.h','native/gr3/m10v_hdf_adj.c','native/gr3/m10v_hdf_adj.rgba','scripts/build_gr3_hdf_adj.py','node/gr3-sd-pre-oriented-stamp-contract.json']})
     manifest['capture_lifecycle']=lifecycle_report
     manifest['experimental_capture']={'candidate_color':candidate_color,'spatial_neon':spatial_neon,'full_isp_effects':False,'save_chain_fixed':False}
     if native_color:manifest['experimental_capture']['native_color']=True

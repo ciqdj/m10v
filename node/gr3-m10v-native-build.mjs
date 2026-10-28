@@ -9,6 +9,7 @@ import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
 import {settingsSources,settingsPatches,checkSettings,abPatches} from './gr3-settings-menu.mjs';
 import {zoomPatches} from './gr3-zoom.mjs';
 import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
+import {hdfAdjPatches} from './gr3-hdf-adj.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 
 const LOAD = 0x53000000;
@@ -50,6 +51,7 @@ sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targ
 sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c');
 sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
 sources.push(...hdfSources);
+sources.push('node/gr3-sd-pre-oriented-stamp-contract.json');
 sources.push('native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
 const nativeGrainSources=['scripts/build_gr3_native_grain_hooks.py'];
@@ -157,7 +159,7 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
-  const aspectFirst=focalIcons?855:782,iconCount=874,descriptorCount=121+(focalIcons?1:0);
+  const aspectFirst=focalIcons?855:782,iconCount=874+Number(!!manifest.hdf_adj),descriptorCount=121+(focalIcons?1:0)+Number(!!manifest.hdf_adj);
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
   const retired=manifest.sd_library?32:0, packedArt=artwork.subarray(retired*6400), packedCount=78-retired;
@@ -169,6 +171,14 @@ function checkRuntime(runtime, manifest) {
     need(f?.first_id===782&&f.last_id===854&&f.width===60&&f.height===20&&f.descriptor===descriptor&&f.storage==='draw-owned-heap'&&f.heap_bytes===4800&&f.owner_fp_offset===-0x80&&runtime.readUInt16LE(at)===60&&runtime.readUInt16LE(at+2)===20&&runtime.readUInt32LE(at+4)===0,'native focal icon descriptor differs');
     for(let id=782;id<=854;id++)need(runtime.readUInt32LE(icons.table-BASE+id*4)===descriptor,'native focal directory differs');
   }else need(icons.focal===null,'unexpected focal icons');
+  if(manifest.hdf_adj){
+    const a=manifest.hdf_adj.icon,art=readFileSync(new URL('../native/gr3/m10v_hdf_adj.rgba',import.meta.url));
+    const d=icons.descriptors+(121+(focalIcons?1:0))*8,at=d-BASE;
+    need(a?.id===874&&a.descriptor===d&&a.width===40&&a.height===40&&a.bytes===6400&&art.length===6400&&a.sha256===sha(art)&&
+      Number.isInteger(a.pixels)&&a.pixels>=BASE&&a.pixels+6400<=BASE+runtime.length&&
+      runtime.readUInt32LE(icons.table-BASE+874*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
+      runtime.readUInt32LE(at+4)*4===a.pixels&&runtime.subarray(a.pixels-BASE,a.pixels-BASE+6400).equals(art),'HDF ADJ icon readback differs');
+  }
   {
     const art=readFileSync(new URL('../native/gr3/m10v_aspect_icons.rgba',import.meta.url)),a=manifest.aspect_icons,p=a?.pixels;
     need(a?.first_id===aspectFirst&&a.last_id===aspectFirst+1&&a.width===60&&a.height===40&&art.length===19200&&a.sha256===sha(art)&&Number.isInteger(p)&&runtime.subarray(p-BASE,p-BASE+art.length).equals(art),'aspect artwork differs');
@@ -356,7 +366,7 @@ function checkIspBase(runtime,manifest) {
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
  const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
- need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x5140&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
+ need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x5150&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.owner.storage?.stamp_offset===0x5140&&m.owner.storage?.stamp_bytes===16&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
  const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],
   ...[0x535153ec,0x53516e14,0x53516ebc,0x5351897c,0x5351af20,0x5351feb4].map(a=>[a,0x535216d0,'m10v_save_trace_recipe_allocate']),
   ...[0x5351703c,0x535170cc,0x535182f8,0x5351f3a8,0x5351fd50].map(a=>[a,0x53521d14,'m10v_save_trace_recipe_release'])];
@@ -390,6 +400,11 @@ function lifecyclePatches(manifest,runtime){
   expected.push({address:0x53521e18,expected:0xe58d5008,replacement:branch(0x53521e18,target),name:'raw pool dispatch return'});
  }
  if(m.snapshot){
+  const o=m.snapshot.stamp_orientation;
+  need(o?.source==='this recipe ShootingInfo +0xc8'&&o.shooting_pointer_offset===0x44c8&&o.field_offset===0xc8&&
+    JSON.stringify(o.normalized_directions)==='[0,1,2,3]'&&JSON.stringify(o.exif_mapping)==='[1,8,3,6]'&&o.unknown_direction===0&&
+    o.freeze==='first original processing-task producer before enqueue'&&o.live_direction_reads===0&&o.stamp_offset===0x5140&&o.stamp_bytes===16&&o.extended_recipe_bytes===0x5150&&o.exif_table===0x53d30190&&
+    JSON.stringify(o.guard_words)===JSON.stringify({'0x53491528':'0xe5d000c8','0x53491530':'0xe5c010c8','0x534322f0':'0xe2524000','0x53432360':'0xe5c41946','0x535f63d0':'0xe28320c8','0x535f63d4':'0xe5842014','0x535f67ac':'0xe5923014','0x535f67b0':'0xe5d33000'}),'invalid per-exposure stamp orientation contract');
   need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1796&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
   need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ea9c&&m.snapshot.filesystem_calls===0,'snapshot must freeze at processing-task submission without storage');
   for(const [i,address,word,link]of [[0,0x53501d68,0xe12fff33,true],[1,0x5351ea9c,0xe1a0c00d,false],...(m.snapshot.shared_hdf?[[2,0x5351aed4,0xe59420f0,false],[3,0x5351b068,0xe59420f0,false]]:[])]){
@@ -400,6 +415,21 @@ function lifecyclePatches(manifest,runtime){
   need(inRuntime(helper),'snapshot submission helper outside runtime');
   const words=[0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20,0xe1a00001,branch(at+28,helper,true),0xecfd0b20,0xecbd0b20,0xe8bd5000,0xeee1ea10,0xe128f00c,0xe8bd5fff,0xe1a0c00d,branch(at+60,0x5351eaa0)];
   words.forEach((word,i)=>need(runtime.readUInt32LE(at-manifest.base+i*4)===(word>>>0),'snapshot submission wrapper instruction differs'));
+  if(m.snapshot.shared_hdf){
+   const reserve=manifest.symbols.m10v_hdf_reserve,freeze=manifest.symbols.m10v_hdf_task_snapshot;
+   need(inRuntime(reserve)&&inRuntime(freeze),'HDF task ownership helper outside runtime');
+   for(const row of m.snapshot.patches.slice(2,4)){
+    const a=row.entry,shim=[0xe92d5fff,0xe10fc000,0xe92d5000,0xe59400f0,branch(a+16,reserve,true),0xe8bd5000,0xe128f00c,0xe8bd5fff,0xe59420f0,branch(a+36,row.address+4)];
+    shim.forEach((w,i)=>need(runtime.readUInt32LE(a-manifest.base+i*4)===(w>>>0),'HDF reservation must reset without freezing settings'));
+   }
+   let callsFreeze=false;
+   for(let i=0;i<Math.min(256,manifest.base+runtime.length-helper);i+=4){
+    const w=runtime.readUInt32LE(helper-manifest.base+i);if(w>>>24!==0xeb)continue;
+    let d=(w&0xffffff)<<2;if(d&0x2000000)d-=0x4000000;
+    if(helper+i+8+d===freeze)callsFreeze=true;
+   }
+   need(callsFreeze,'actual task producer must freeze HDF before color admission');
+  }
  }
  if(m.snapshot?.live_color){
   need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x223c,'preview requires owned parameter cache');
@@ -474,6 +504,7 @@ function appendedSlotPatches(runtime,manifest,raw) {
  return patches;
 }
 function patchList(manifest,runtime) {
+  const abHooks=abPatches(manifest).filter(p=>!manifest.hdf_adj||p.address!==0x531a4db8);
   const table=manifest.icons.table, movt=(reg,v)=>(0xe3400000|((v&0xf000)<<4)|(reg<<12)|(v&0xfff))>>>0;
   const iconPatches=[[0x53209fcc,0xe30230fc,3,false],[0x53209fd0,0xe3453500,3,true],[0x5320a000,0xe30230fc,3,false],[0x5320a004,0xe3453500,3,true],[0x5320a804,0xe30220fc,2,false],[0x5320a808,0xe3452500,2,true]].map(([address,expected,reg,upper])=>({address,expected,replacement:upper?movt(reg,table>>>16):movw(reg,table&65535),name:'M10V icon directory '+address.toString(16)}));
   if(manifest.sd_library){
@@ -488,12 +519,12 @@ function patchList(manifest,runtime) {
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){
     need(manifest.sd_library&&manifest.hdf_menu,'independent HDF menu required');
-    return [...appendedSlotPatches(runtime,manifest),...abPatches(manifest),...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),
-      ...hooks.filter(row=>row[2].startsWith('m10v_resource_')).map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.symbols[name],link),name})),
+    return [...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...(manifest.hdf_adj?iconPatches:[]),
+      ...hooks.filter(row=>row[2].startsWith('m10v_resource_')||(manifest.hdf_adj&&row[2]==='m10v_icon_pixels')).map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.symbols[name],link),name})),
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abPatches(manifest),...hdfPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},
@@ -593,7 +624,8 @@ export function auditNativeLibrary(source,candidate,runtime,manifest) {
   return {schema:'m10v-gr3-native-library-candidate/v2',source_sha256:report.sha256,candidate_sha256:sha(candidate),
     candidate_bytes:candidate.length,runtime_sha256:sha(runtime),runtime_bytes:runtime.length,
     rtos_growth:structural.rtosGrowth,changed_sections:structural.changedSections,
-    verified_hooks:patchList(manifest,runtime).length,universal_halation:manifest.universal_halation?{modes:['off','spill','streak'],per_film:true,default:'off',special_spill_films:[33,67],camera_tested:false}:null,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:manifest.film_count,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:5,film_count:manifest.film_library_enabled===false?0:manifest.film_count,active_slots:manifest.film_library_enabled===false?0:Array.from({length:10},(_,i)=>Buffer.from(manifest.initial_state_hex,'hex').readUInt16LE(12+i*8)).filter(Boolean).length,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:FILM_DIRECTORY.length,max_records:256,custom_lut:true,page_rows:10}:null,
+    verified_hooks:patchList(manifest,runtime).length,universal_halation:manifest.universal_halation?{modes:['off','spill','streak'],per_film:true,default:'off',special_spill_films:[33,67],camera_tested:false}:null,film_library_enabled:manifest.film_library_enabled!==false,digital_hdf:manifest.hdf_enabled?{menu:'MENU > 设置 > HDF 模拟',scope:'global; independent of film library',journal:['M10VHD0.BIN','M10VHD1.BIN'],native:'original Clarity pyramid',adj:manifest.hdf_adj?{function_id:20,original_functions_preserved:20,levels:['off','weak','medium','strong'],assignment:'user chooses an existing ADJ slot'}:null,camera_tested:false}:null,icon_count:manifest.film_library_enabled===false?0:manifest.film_count,icon_dimensions:[40,40],icon_storage:'embedded RTOS; original ICONBIN unchanged',mapping_verified:true,state_version:5,film_count:manifest.film_library_enabled===false?0:manifest.film_count,active_slots:manifest.film_library_enabled===false?0:Array.from({length:10},(_,i)=>Buffer.from(manifest.initial_state_hex,'hex').readUInt16LE(12+i*8)).filter(Boolean).length,external_film_pack:manifest.film_library_enabled!==false&&manifest.sd_library,sd_film_library:manifest.film_library_enabled!==false&&manifest.sd_library?{format:2,accepted_formats:[1,2],path:"M10V/FILMS.M10",supported_films:FILM_DIRECTORY.length,max_records:256,custom_lut:true,page_rows:10}:null,
+    stamp_orientation:manifest.capture_lifecycle?.snapshot?.stamp_orientation?{source:'per-exposure ShootingInfo',directions:[0,90,180,270],default:'automatic',image_rotation:false,camera_tested:false}:null,
     menu_entry:manifest.film_library_enabled===false?'MENU > 设置 > HDF 模拟':manifest.sd_library?'MENU > 设置 > 胶卷库 / 水印 / 效果':'MENU > Image Control > M10V Library',appended_slots:manifest.appended_slots?{tones:Array.from({length:10},(_,i)=>25+i),stock_choices:12,shooting_choices:'12+enabled_films',capacity:10,stock_presets_preserved:true}:null,adj_scope:manifest.appended_slots?'12 stock choices plus up to ten selected M10V films':'12 stock entries only; no private IDs',
     still_isp_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],verified_dispatches:5,shooting_tone_preserved:true},
     live_view_base:manifest.film_library_enabled===false?null:{tone:11,carriers:manifest.appended_slots?Array.from({length:10},(_,i)=>25+i):[12,18,19,20,21],film_color_preview:!!manifest.capture_lifecycle?.snapshot?.live_color},

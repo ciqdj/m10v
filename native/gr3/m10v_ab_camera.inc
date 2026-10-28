@@ -5,6 +5,9 @@ extern uint32_t m10v_ab_adj_event_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_mapper_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_selector_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_live_enter_original(uint32_t,uint32_t,uint32_t);
+#if M10V_HDF_UI_CACHE
+extern void m10v_hdf_bootstrap(void);
+#endif
 extern uint32_t m10v_ab_live_leave_original(uint32_t);
 extern uint32_t m10v_ab_live_destroy_original(uint32_t);
 extern uint32_t m10v_ab_live_event_original(uint32_t,uint32_t);
@@ -314,6 +317,9 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
   m10v_library_state preview;int loaded=m10v_camera_library_load(&preview);
   M10V_EXIT_LOG(246,live,(uint32_t)loaded,loaded>=0?preview.sequence:0,0);
   if(loaded<0)initialized=0;
+#endif
+#if M10V_HDF_UI_CACHE
+  m10v_hdf_bootstrap();
 #endif
   p=ab_owner();if(p&&initialized)p->library_initialized=1;
  }
