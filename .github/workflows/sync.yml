@@ -2,22 +2,24 @@ name: Auto Sync Upstream
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 0点 自动触发同步
-  workflow_dispatch:     # 支持手动点击运行
+    - cron: '0 0 * * *' # 每天 UTC 0 点自动同步
+  workflow_dispatch:     # 支持手动点击触发
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write    # 赋予写权限，允许推送代码
     steps:
       - name: Checkout target repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Sync Upstream
         uses: aormsby/Fork-Sync-With-Upstream-Action@v3.4.1
         with:
+          target_sync_branch: main
           upstream_sync_repo: zhaoo/m10v
           upstream_sync_branch: main
-          target_branch: main
-          git_sync_bot_user: "github-actions[bot]"
-          git_sync_bot_email: "41898282+github-actions[bot]@users.noreply.github.com"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          git_config_user: "github-actions[bot]"
+          git_config_email: "41898282+github-actions[bot]@users.noreply.github.com"
