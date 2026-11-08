@@ -2,14 +2,14 @@ name: Auto Sync Upstream
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 0 点自动同步
-  workflow_dispatch:     # 支持手动点击触发
+    - cron: '0 0 * * *' # 每天 UTC 0点自动同步
+  workflow_dispatch:     # 支持手动点击运行
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: write    # 赋予写权限，允许推送代码
+      contents: write    # 赋予写权限，允许向仓库推送更新
     steps:
       - name: Checkout target repo
         uses: actions/checkout@v4
