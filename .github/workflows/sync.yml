@@ -1,0 +1,28 @@
+name: Auto Sync Upstream
+
+on:
+  schedule:
+    # 每天定时自动同步一次（可按需修改 Cron 表达式，例如 '0 0 * * *' 代表每天 UTC 时间 0 点）
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 允许你在 GitHub Actions 页面手动点击按钮随时触发同步
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 赋予写权限以提交更新到仓库
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Sync upstream changes
+        uses: aormsby/Fork-Sync-With-Upstream-Action@v3.4.1
+        with:
+          upstream_sync_repo: zhaoo/m10v
+          upstream_sync_branch: main
+          target_branch: main
+          git_sync_bot_user: "github-actions[bot]"
+          git_sync_bot_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          token: ${{ secrets.GITHUB_TOKEN }}
