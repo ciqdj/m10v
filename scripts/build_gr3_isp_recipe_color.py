@@ -32,7 +32,7 @@ def stamp_orientation_contract(rom):
         live_direction_reads=0,stamp_offset=0x5140,stamp_bytes=16,extended_recipe_bytes=0x5778,
         guard_words={hex(k):hex(v) for k,v in words.items()},exif_table=0x53d30190)
 
-def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False,pure_isp_effects=False,four_looks_native=False,raw_development=False):
+def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False,pure_isp_effects=False,four_looks_native=False,raw_development=False,torn_overlay=False,leica_native=False):
     rom=bytes(rom)
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('wrong official RTOS')
     stamp_contract=stamp_orientation_contract(rom)
@@ -41,7 +41,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     owner=owner_manifest.get('storage',{})
     if type(pure_isp_effects)is not bool or (pure_isp_effects and not (native_color and native_grain and producer_snapshot)):
         raise ValueError('pure ISP requires native color/grain and genuine producer ingress')
-    if owner.get('color_offset')!=0x4a08 or owner.get('color_bytes')!=COLOR_BYTES or owner.get('extended_recipe_bytes')!=(0x57d8 if pure_isp_effects else 0x5778) or owner.get('stamp_offset')!=0x5140 or owner.get('stamp_bytes')!=16 or not any(p.get('address')==0x53523e0c for p in owner_manifest.get('patches',[])):
+    if owner.get('color_offset')!=0x4a08 or owner.get('color_bytes')!=COLOR_BYTES or owner.get('extended_recipe_bytes')!=(0x57f8 if torn_overlay else 0x57d8 if pure_isp_effects else 0x5778) or owner.get('stamp_offset')!=0x5140 or owner.get('stamp_bytes')!=16 or not any(p.get('address')==0x53523e0c for p in owner_manifest.get('patches',[])):
         raise ValueError('matching extended recipe factory hook required')
     if type(observer)is not bool or type(producer_snapshot)is not bool:raise ValueError('invalid hook mode')
     if type(external_noise)is not bool or external_noise:raise ValueError('CPU grain noise shaping has been removed')
@@ -52,6 +52,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         raise ValueError('RAW development requires owned native ISP and recorded identity')
     required=(('m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview','m10v_camera_library_custom_profile') if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())+(('m10v_border_shot_freeze',) if border_snapshot else ())
     if native_color:required+=('m10v_c41_native_data',)
+    if leica_native:required+=('m10v_leica_native_data',)
     if pure_isp_effects:
         required+=('m10v_isp_effects_shot_freeze','m10v_isp_effects_shot_reserve','m10v_isp_effects_shot_read','m10v_isp_effects_pipeline_settings')
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
@@ -60,11 +61,11 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     with tempfile.TemporaryDirectory() as d:
         d=Path(d);src=d/'module.c';obj=d/'module.o'
         src.write_text(''.join('#include "'+str(ROOT/'native/gr3'/name)+'"\n' for name in (('m10v_isp_frame_color.c','m10v_isp_multiaxis.c','m10v_isp_native_look.c','m10v_isp_recipe_color.c') if native_color else ('m10v_isp_frame_color.c','m10v_isp_recipe_color.c'))))
-        pure_flags=['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'] if pure_isp_effects else []
+        pure_flags=['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778',f'-DM10V_TORN_ENABLED={int(torn_overlay)}'] if pure_isp_effects else []
         recipe_flags=['-Oz' if flag=='-Os' else flag for flag in FLAGS] if pure_isp_effects else FLAGS
         raw_flags=['-DM10V_RAW_DEVELOPMENT=1'] if raw_development else []
         raw_exports=('m10v_isp_frame_raw_supported','m10v_isp_frame_raw_snapshot') if raw_development else ()
-        subprocess.run([compiler,*recipe_flags,*pure_flags,*raw_flags,'-DM10V_C41_EXTERNAL_DATA=1','-DM10V_MARLBORO_NATIVE='+str(int(native_color and producer_snapshot)),'-DM10V_FOUR_LOOKS_NATIVE='+str(int(four_looks_native)),'-DM10V_BORDER_SHOT='+str(int(border_snapshot)),'-DM10V_APPENDED_SLOTS='+str(int(appended_slots)),'-DM10V_ISP_SHARED_HDF='+str(int(shared_hdf)),'-DM10V_ISP_LIVE_COLOR='+str(int(live_color)),'-DM10V_ISP_RECIPE_COLOR_OBSERVER='+str(int(observer)),'-DM10V_ISP_RECIPE_COLOR_PRODUCER='+str(int(producer_snapshot)),'-DM10V_ISP_NATIVE_LOOK='+str(int(native_color)),'-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)),'-c',str(src),'-o',str(obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*recipe_flags,*pure_flags,*raw_flags,'-DM10V_C41_EXTERNAL_DATA=1','-DM10V_LEICA_EXTERNAL_DATA=1','-DM10V_LEICA_NATIVE='+str(int(leica_native)),'-DM10V_MARLBORO_NATIVE='+str(int(native_color and producer_snapshot)),'-DM10V_FOUR_LOOKS_NATIVE='+str(int(four_looks_native)),'-DM10V_BORDER_SHOT='+str(int(border_snapshot)),'-DM10V_APPENDED_SLOTS='+str(int(appended_slots)),'-DM10V_ISP_SHARED_HDF='+str(int(shared_hdf)),'-DM10V_ISP_LIVE_COLOR='+str(int(live_color)),'-DM10V_ISP_RECIPE_COLOR_OBSERVER='+str(int(observer)),'-DM10V_ISP_RECIPE_COLOR_PRODUCER='+str(int(producer_snapshot)),'-DM10V_ISP_NATIVE_LOOK='+str(int(native_color)),'-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)),'-c',str(src),'-o',str(obj)],check=True,capture_output=True)
         code,exports=link_object(obj.read_bytes(),base,externals={k:library_exports[k] for k in required},prefix='m10v_isp_frame_',additional_exports=('m10v_isp_frame_identity_code','m10v_isp_frame_identity_clear','m10v_isp_frame_live_prepare','m10v_isp_frame_live_color','m10v_isp_frame_recipe_snapshot','m10v_isp_frame_recipe_state','m10v_isp_frame_recipe_begin','m10v_isp_frame_recipe_finish','m10v_isp_frame_recipe_producer','m10v_isp_frame_recipe_direction','m10v_isp_frame_recipe_completed','m10v_isp_frame_recipe_grain_settings','m10v_isp_frame_recipe_grain_done')+(('m10v_isp_multiaxis_apply','m10v_isp_native_look_prepare','m10v_isp_native_look_apply','m10v_isp_native_look_matches') if native_color else ())+raw_exports)
     entry=base+len(code)
     # Both preparation and finish preserve all original result/caller registers.
@@ -105,8 +106,8 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         patches.append(dict(address=site,expected_hex=struct.pack('<I',expected).hex(),replacement_hex=struct.pack('<I',at).hex(),entry=at))
     manifest=dict(stamp_orientation=stamp_contract,schema=1,base=base,bytes=len(code),exports=exports,patches=patches,required_rtos_sha256=SHA,required_owner_factory=0x53523e0c,color_offset=0x4a08,color_bytes=COLOR_BYTES,mutable_global_bytes=0,filesystem_calls=0,isp_filesystem_calls=0,allocator_calls=0,camera_tested=False,quality_equivalence_proven=False,activation_requires=['Install matching owner factory allocation hook.','Snapshot current recipe before submission; never snapshot the next reserved raw buffer.' if producer_snapshot else 'Snapshot184-byte state before queueing on a proven safe producer.','CPU fallback uses recipe_state(), never reload another selected state.'],context_contract={'site':SITE,'stock_instruction':'blx r3','r0':'ImageTuningStill','r1':'module+40 R2Y info','r6':'Develop context C','C+30':'sourceRecipe+1a8','C+34':'ShootingInfo','scope':'only actual Develop process caller, stage0 or stage1','color_space':'shot+7be==1 as original536dc474..494'},unsupported='Observer preserves all film engines; experimental apply rejects IDs outside34..65 without3D LUT fit',native_color=native_color,native_grain=native_grain,live_color=live_color,shared_hdf=shared_hdf,snapshot_ingress_installed=producer_snapshot,observer=observer,producer_sites=[0x5351ea9c] if producer_snapshot else [],producer_lock_contract='Processing-task producer; cached state only, no filesystem/allocator/mutex; preserves all GPRs, SP/LR, NZCV, d0-d31 and FPSCR')
     if pure_isp_effects:
-        manifest.update(pure_isp_effects=True,effects_shot_offset=0x5778,effects_shot_bytes=96,extended_recipe_bytes=0x57d8)
-        stamp_contract['extended_recipe_bytes']=0x57d8
+        manifest.update(pure_isp_effects=True,effects_shot_offset=0x5778,effects_shot_bytes=96,extended_recipe_bytes=0x57f8 if torn_overlay else 0x57d8)
+        stamp_contract['extended_recipe_bytes']=0x57f8 if torn_overlay else 0x57d8
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     (out/'isp-recipe-color.bin').write_bytes(code);(out/'isp-recipe-color.json').write_text(json.dumps(manifest,indent=2)+'\n')
     return code,manifest

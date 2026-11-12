@@ -22,8 +22,8 @@ test('GRemote opt-in binds current App metadata and deterministic source/configu
  const source=await readNativeOfficial(),input={gremote_enabled:true,configuration:defaultConfiguration()},before=structuredClone(input);
  const options=resolveIspEffectOptions(source,input,'GR III'),identity=options.companion_identity;
  assert.ok(identity,'GRemote opt-in must include the resident owner');
- assert.equal(identity.catalogHash,'1b1b34c3da9b80de854eae3ad9fc3e85ffee5687f0e28fead0504129ff6294e8');
- assert.equal(identity.rendererHash,'bcef872c4ff5789a34b47f4c1becc31303a55b95f381c032d9b73bc7cc4c1ae7');
+ assert.equal(identity.catalogHash,'641428c8f8461c4ece0e87e98647b4424cbf2ee7cbe6e9162c51d208730bf921');
+ assert.equal(identity.rendererHash,'d949f6917beb8261ab4ffe888e86aad1677c62d96a81cd2c3562a1d01d9aa851');
  assert.match(identity.buildId,/^[a-f0-9]{64}$/);
  assert.deepEqual(resolveIspEffectOptions(source,structuredClone(input),'GR III'),options);
  assert.deepEqual(input,before);
@@ -164,4 +164,24 @@ test('active GRemote card exposes preservation checked by default and applies an
  assert.ok(control);assert.equal(control.checked,true);assert.equal(control.disabled,false);
  assert.ok(elements.some(element=>element.tag==='label'&&element.children.includes(' 保留机内设置')));
  control.checked=false;control.listeners.change();assert.equal(state.gremotePreserveSettings,false);
+});
+
+test('the GR III workbench exposes the reviewed tear in the public companion plan',async()=>{
+ const selected=updateWorkbenchFeature(new Set(['film']),'tornOverlay',true);
+ for(const feature of ['film','tornOverlay','gremote','ispEffects','digitalHdf','border'])
+  assert.ok(selected.has(feature),feature);
+ for(const dependency of ['gremote','ispEffects','border','digitalHdf','film'])
+  assert.equal(updateWorkbenchFeature(selected,dependency,false).has('tornOverlay'),false);
+ assert.equal(normalizeWorkbenchDraft({profile:'native',features:[...selected]},[],defaultConfiguration(),'gr3x').features.includes('tornOverlay'),false);
+ const source=await readNativeOfficial(),input={
+  configuration:defaultConfiguration(),gremote_enabled:true,pure_isp_effects:true,
+  hdf_enabled:true,border_enabled:true,torn_overlay:true,
+ };
+ const options=resolveIspEffectOptions(source,input,'GR III');
+ const plan=prepareNative(source,input.configuration,options);
+ assert.ok(plan.torn_overlay&&plan.features.includes('tornOverlay'));
+ assert.notEqual(options.companion_identity.buildId,
+  resolveIspEffectOptions(source,{...input,torn_overlay:false},'GR III').companion_identity.buildId);
+ for(const invalid of [{gremote_enabled:false},{pure_isp_effects:false},{torn_overlay:'true'}])
+  assert.throws(()=>resolveIspEffectOptions(source,{...input,...invalid},'GR III'),/撕纸/);
 });

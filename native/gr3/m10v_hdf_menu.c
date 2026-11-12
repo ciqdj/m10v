@@ -20,6 +20,15 @@
 #ifndef M10V_PURE_ISP_EFFECTS
 #define M10V_PURE_ISP_EFFECTS 0
 #endif
+#ifndef M10V_TORN_ENABLED
+#define M10V_TORN_ENABLED 0
+#endif
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+#if M10V_COMPANION_ENABLED
+#include "m10v_companion_owner.h"
+#endif
+#endif
 #if M10V_PURE_ISP_EFFECTS
 #include "m10v_isp_effects_camera.h"
 #include "m10v_isp_effects_resources.h"
@@ -27,6 +36,7 @@
 #define VIGNETTE_CHILD 4u
 #define VIGNETTE_SWITCH 5u
 #define VIGNETTE_STRENGTH 6u
+#define TORN_SWITCH 7u
 #endif
 #ifndef M10V_HDF_OWNER_OFFSET
 #define M10V_HDF_OWNER_OFFSET 0x193cu
@@ -139,6 +149,22 @@ static int imprint_save(page *p){
     !m10v_isp_effects_validate(&settings)||!m10v_isp_effects_set_imprint(&settings,p->value))return -1;
  return m10v_isp_effects_camera_save(ptr(p)-M10V_HDF_OWNER_OFFSET,&settings);
 }
+static uint32_t root_rows(void){return (M10V_HDF_ENABLED?4u:3u)+M10V_TORN_ENABLED;}
+#if M10V_TORN_ENABLED
+static int torn_action(page *p,uint32_t action){
+ uint32_t stage=0,generation=0;
+ if(!m10v_torn_state(&stage,&generation)||m10v_torn_busy()){M10V_LOG(38,2,stage,generation,0);return -1;}
+#if M10V_COMPANION_ENABLED
+ uint32_t token=m10v_companion_ui_storage_enter(0);if(!token){M10V_LOG(38,3,stage,generation,action);return -1;}
+#endif
+ int result=m10v_torn_set(ptr(p)-M10V_HDF_OWNER_OFFSET,action);
+#if M10V_COMPANION_ENABLED
+ if(!m10v_companion_ui_storage_leave(token))result=-1;
+#endif
+ M10V_LOG(38,action,stage,generation,(uint32_t)result);
+ return result;
+}
+#endif
 #endif
 static void draw(page *p){
  if(p->count!=WORDS||!p->style)return;
@@ -147,25 +173,39 @@ static void draw(page *p){
 #if M10V_PURE_ISP_EFFECTS
  uint32_t imprint=!p->root&&p->child==IMPRINT_CHILD;
  uint32_t first=imprint?(p->value/4u)*4u:0u;
+ uint32_t root_first=p->root&&p->focus>=4u?p->focus-3u:0u;
  if(imprint)border=0;
+#if M10V_TORN_ENABLED
+ uint32_t torn=!p->root&&p->child==TORN_SWITCH;
+ if(torn)border=0;
+#endif
 #endif
  caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
 #if M10V_PURE_ISP_EFFECTS
  if(imprint)caption(p->widgets[2],M10V_ISP_TEXT_IMPRINT);
- if(!p->root&&p->child>=VIGNETTE_CHILD)caption(p->widgets[2],1214);
+ if(!p->root&&p->child>=VIGNETTE_CHILD&&p->child<=VIGNETTE_STRENGTH)caption(p->widgets[2],1214);
+#if M10V_TORN_ENABLED
+ if(torn)caption(p->widgets[2],1218);
+#endif
 #endif
  for(uint32_t i=0;i<4;i++){
   uint32_t visible=p->root?i<(M10V_HDF_ENABLED?2u:1u):i<(border?3u:4u);
 #if M10V_PURE_ISP_EFFECTS
-  if(p->root)visible=i<(M10V_HDF_ENABLED?4u:3u);
+  uint32_t row=p->root?root_first+i:i;
+  if(p->root)visible=row<root_rows();
   if(!p->root&&p->child>=VIGNETTE_CHILD)visible=i<(p->child==VIGNETTE_STRENGTH?3u:2u);
   if(imprint)visible=first+i<8u;
 #endif
   ((fn2)0x533ad3c0u)(p->widgets[4+i],visible);
   uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1155):border?(i==0?972:i==1?1156:1157):972+i;
 #if M10V_PURE_ISP_EFFECTS
-  if(p->root&&i==(M10V_HDF_ENABLED?2u:1u))id=M10V_ISP_TEXT_IMPRINT;
-  if(p->root&&i==(M10V_HDF_ENABLED?3u:2u))id=1214;
+  if(p->root){id=M10V_HDF_ENABLED&&row==0u?1141:1155;}
+  if(p->root&&row==(M10V_HDF_ENABLED?2u:1u))id=M10V_ISP_TEXT_IMPRINT;
+  if(p->root&&row==(M10V_HDF_ENABLED?3u:2u))id=1214;
+#if M10V_TORN_ENABLED
+  if(p->root&&row==root_rows()-1u)id=1218;
+  if(torn)id=i?1219u:1220u;
+#endif
   if(!p->root&&p->child==VIGNETTE_CHILD)id=1215+i;
   if(!p->root&&p->child==VIGNETTE_SWITCH)id=i?1217:M10V_ISP_TEXT_OFF;
   if(!p->root&&p->child==VIGNETTE_STRENGTH)id=973+i;
@@ -175,6 +215,7 @@ static void draw(page *p){
   uint32_t selected=p->root?p->focus==i:p->value==i;
 #if M10V_PURE_ISP_EFFECTS
   if(imprint)selected=p->value==first+i;
+  if(p->root)selected=p->focus==row;
 #endif
   style_row(p,i,visible,selected);
  }
@@ -186,7 +227,11 @@ static void draw(page *p){
   style_row(p,i,!p->root||i==0,p->root?i==0:p->value==i);
  }
 #endif
+#if M10V_TORN_ENABLED
+ ((fn2)0x533ad3c0u)(p->widgets[8],p->error&&(!p->root||p->focus==root_rows()-1u));
+#else
  ((fn2)0x533ad3c0u)(p->widgets[8],!p->root&&p->error);
+#endif
  caption(p->widgets[8],976);
  ((fn1)0x533ad308u)(p->widgets[0]);
 }
@@ -267,8 +312,8 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
  if(p->root){
 #if M10V_BORDER_ENABLED
 #if M10V_PURE_ISP_EFFECTS
-  if(key==0xce||key==0xd0||key==0xd4){if(p->focus)p->focus--;draw(p);return 1;}
-  if(key==0xd1||key==0xd5){if(p->focus<(M10V_HDF_ENABLED?3u:2u))p->focus++;draw(p);return 1;}
+  if(key==0xce||key==0xd0||key==0xd4){if(p->focus)p->focus--;p->error=0;draw(p);return 1;}
+  if(key==0xd1||key==0xd5){if(p->focus+1u<root_rows())p->focus++;p->error=0;draw(p);return 1;}
 #else
   if(key==0xce||key==0xd0||key==0xd4){p->focus=0;draw(p);return 1;}
   if(key==0xd1||key==0xd5){p->focus=M10V_HDF_ENABLED?1:0;draw(p);return 1;}
@@ -276,6 +321,16 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   if(key==0xd8||key==0xcf||key==0xd3){
    p->child=M10V_HDF_ENABLED?p->focus:1;
 #if M10V_PURE_ISP_EFFECTS
+#if M10V_TORN_ENABLED
+   if(p->focus==root_rows()-1u){
+    uint32_t stage=0,generation=0;
+    p->child=TORN_SWITCH;p->root=0;
+    p->error=!m10v_torn_state(&stage,&generation);
+    p->value=p->saved=stage==1u||stage==2u;
+    draw(p);
+    return 1;
+   }
+#endif
    if(p->focus==(M10V_HDF_ENABLED?3u:2u)){
     p->child=VIGNETTE_CHILD;p->value=p->saved=0;p->root=0;p->error=0;draw(p);return 1;
    }else if(p->focus==(M10V_HDF_ENABLED?2u:1u)){
@@ -296,6 +351,18 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   return key==0xce||key==0xd0||key==0xd1||key==0xd4||key==0xd5;
  }
  #if M10V_PURE_ISP_EFFECTS
+#if M10V_TORN_ENABLED
+ if(p->child==TORN_SWITCH){
+  if(key==0x86||key==0x89||key==0xda){p->root=1;p->error=0;}
+  else if(key==0xce||key==0xd0||key==0xd4){p->value=0;p->error=0;}
+  else if(key==0xcf||key==0xd3||key==0xd1||key==0xd5){p->value=1;p->error=0;}
+  else if(key==0xd8){
+   p->error=torn_action(p,p->value)!=0;
+   if(!p->error)p->root=1;
+  }else return 0;
+  draw(p);return 1;
+ }
+#endif
  if(p->child==VIGNETTE_CHILD&&(key==0xd8||key==0xcf||key==0xd3)){
   p->child=p->value?VIGNETTE_STRENGTH:VIGNETTE_SWITCH;
   p->error=vignette_load(p)!=0;draw(p);return 1;

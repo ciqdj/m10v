@@ -17,7 +17,8 @@ class DebugLogArmTests(unittest.TestCase):
 
     def setUp(self):
         self.u = Uc(UC_ARCH_ARM, UC_MODE_ARM)
-        self.u.mem_map(0x53000000, 0x1200000)
+        end=self.manifest['base']+len(self.code)
+        self.u.mem_map(0x53000000, max(0x1200000,(end-0x53000000+4095)&~4095))
         self.u.mem_write(self.manifest['base'], self.code)
         self.u.mem_map(0x55000000, 0x100000)
         self.files = {}; self.handles = {}; self.calls = []; self.available = True
@@ -41,7 +42,8 @@ class DebugLogArmTests(unittest.TestCase):
         elif address==0x536af2e4: result=0
         elif address==0x53900100:
             name=bytes(u.mem_read(args[1],16)).split(b'\0')[0].decode()
-            self.assertIn(name,('C:\\M10VMN0.BIN','C:\\M10VMN1.BIN','C:\\M10VCP0.BIN','C:\\M10VCP1.BIN','C:\\M10VIO0.BIN','C:\\M10VIO1.BIN','C:\\M10VAK0.BIN','C:\\M10VAK1.BIN'))
+            expected=self.manifest.get('debug_log',{}).get('files',[])
+            self.assertIn(name,['C:\\'+file for file in expected])
             self.assertIn(args[2],(0,1)); self.calls.append(('open',name,args[2]))
             result=int(args[2]==0 or name in self.files)
             if result:
@@ -195,6 +197,14 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(records[0]['imprint']['result'],-4)
         self.assertEqual(records[1]['isp_effects']['imprint_style'],7)
         self.assertEqual(records[1]['isp_effects']['rainbow'],0)
+
+    def test_torn_checkpoint_identifies_rejected_second_shot_and_jpeg_handoff(self):
+        recipe=0x55005000
+        self.assertEqual(self.log(198,recipe,0x544f5204,0x210,2),1)
+        self.assertEqual(self.log(198,recipe,0x544f5208,0x02ff0000,2),1)
+        rejected,jpeg=[r['torn'] for r in self.decoded()['records']]
+        self.assertEqual((rejected['phase'],rejected['raw_status'],rejected['generation']),(2,0,2))
+        self.assertEqual((jpeg['kind'],jpeg['phase'],jpeg['result'],jpeg['complete']),('jpeg-handoff',2,-1,0))
 
     def test_arm_writes_history_with_payload_build_identity_and_balanced_close(self):
         self.assertEqual(self.log(),1);self.assertEqual(self.log(31),1)

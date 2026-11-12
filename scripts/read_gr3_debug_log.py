@@ -4,7 +4,7 @@ import json
 import struct
 import zlib
 EFFECTS_MENU_EVENTS={32:'effects.lifecycle',33:'effects.ready.before',34:'effects.ready.stage',
-                     35:'effects.enter',36:'effects.key.before',37:'effects.route',39:'effects.key.after'}
+                     35:'effects.enter',36:'effects.key.before',37:'effects.route',38:'torn.toggle',39:'effects.key.after'}
 from pathlib import Path
 
 EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'menu.key.after',
@@ -77,17 +77,23 @@ GUARDS={1:'context',2:'recipe',3:'topology',4:'sequence-mode',5:'objects',6:'jpe
         15:'preview-planes',16:'settings',17:'scratch-allocation',18:'scratch-overlap'}
 
 EVENTS.update(EFFECTS_MENU_EVENTS)
+EVENTS[225]='torn.outcome'
+TORN_EXEC_REASONS=('isp-complete','no-shot','owner-or-lease','session-changed','invalid-context-or-descriptor',
+                   'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry',
+                   'invalid-mask-selection','mask-resize','mask-edge')
+TORN_LAYOUT_FAULTS=('format','dimensions','alignment','stride-or-rows','third-plane-or-roi','address-mode','orientation','mask-capacity')
+TORN_PROTECTED_OBJECTS=('recipe','shooting-info','menu-owner','context','descriptor','request','raw-dimensions')
 
 def page_records(data):
     if len(data)!=4096:return None
     h=struct.unpack_from('<16I',data)
-    if h[0]!=0x4744564d or h[1]!=1 or h[3]>63 or h[4]>=63 or not 0<h[5]<0xffffff00 or h[5]<h[3] or h[6] not in (1,2,3,4) or h[15]!=zlib.crc32(data[:60]) or (h[3]<63 and h[4]!=h[3]):return None
+    if h[0]!=0x4744564d or h[1]!=1 or h[3]>63 or h[4]>=63 or not 0<h[5]<0xffffff00 or h[5]<h[3] or h[6] not in (1,2,3,4,5) or h[15]!=zlib.crc32(data[:60]) or (h[3]<63 and h[4]!=h[3]):return None
     records=[]
     for index in range(h[3]):
         raw=data[64+index*64:128+index*64];r=struct.unpack('<16I',raw)
         if r[0]!=0x474c564d or r[1]!=1 or not 0<r[2]<=h[5] or r[8]!=h[2] or r[9]!=h[6] or r[15]!=zlib.crc32(raw[:60]):return None
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
-                        'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab'}[r[9]]})
+                        'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab',5:'torn'}[r[9]]})
     for record in records:
         if record['event']==198:
             recipe,tag,a,b=record['arguments']
@@ -175,6 +181,72 @@ def page_records(data):
         if record['event']==125:
             context,tone,mode,raw=record['arguments']
             record['request_identity']={'context':hex(context),'stock_tone':tone,'sequence_mode':mode,'raw_source':hex(raw)}
+        if record['event']==225 and record['channel']=='torn':
+            recipe,generation,packed,result=record['arguments']
+            result=struct.unpack('<i',struct.pack('<I',result))[0]
+            diagnostic={'kind':'jpeg-outcome','recipe':hex(recipe),'generation':generation,
+                        'phase':packed>>8,'complete':bool(packed&1),'result':result}
+            if result<0:
+                reason=(-result)&255
+                diagnostic['reason']=TORN_EXEC_REASONS[reason] if reason<len(TORN_EXEC_REASONS) else reason
+                if reason==6:
+                    diagnostic['layout_faults']=[name for bit,name in enumerate(TORN_LAYOUT_FAULTS) if (-result)>>8 & (1<<bit)]
+                elif reason==7:
+                    faults=('luma-span','chroma-span','luma/chroma-overlap','image/mask-overlap')
+                    faults+=tuple(f'image/{name}-overlap' for name in TORN_PROTECTED_OBJECTS)
+                    faults+=tuple(f'mask/{name}-overlap' for name in TORN_PROTECTED_OBJECTS)
+                    diagnostic['buffer_faults']=[name for bit,name in enumerate(faults) if (-result)>>8 & (1<<bit)]
+                elif reason==8:
+                    detail=(-result)>>8
+                    diagnostic['raw_fault']={1:'dimensions-pointer',2:'dimensions',3:'span',4:'image-overlap',5:'mask-overlap'}.get(detail,detail)
+                elif 16<=reason<=31:
+                    diagnostic.update(reason='unverified-raw-release',raw_status=reason-16)
+                elif 32<=reason<64:
+                    diagnostic.update(reason='freeze-rejection',freeze_code=reason-32)
+                elif reason==64:
+                    diagnostic['reason']='cancelled'
+            record['torn']=diagnostic
+        if record['event']==38:
+            action,stage,generation,result=record['arguments']
+            record['torn']={'kind':'toggle','action':{0:'off',1:'on',2:'busy-or-unavailable',3:'storage-busy'}.get(action,action),
+                            'previous_stage':stage,'generation':generation,'result':result}
+        if record['event']==198:
+            recipe,tag,value,detail=record['arguments']
+            if 0x544f5201<=tag<=0x544f5209:
+                diagnostic={'recipe':hex(recipe)}
+                kind=tag&255
+                if kind==1:
+                    reasons=('armed','no-owner','lease-busy','inactive','pending-recipe','no-plane','saved-shot-ineligible')
+                    reason=value&255
+                    diagnostic.update(kind='freeze',stage=value>>8,reason=reasons[reason] if reason<len(reasons) else reason,generation=detail)
+                elif kind==2:
+                    diagnostic.update(kind='saved-si',requested_drive=value>>24,normalized_drive=(value>>16)&255,
+                                      aspect=(value>>8)&255,tone=value&255,orientation=detail)
+                elif kind==3:
+                    diagnostic.update(kind='layout',width=value&65535,height=value>>16,stride=detail&65535,rows=detail>>16)
+                elif kind==4:
+                    reason=value&255
+                    diagnostic.update(kind='execute',phase=(value>>8)&255,generation=detail,
+                                      reason=TORN_EXEC_REASONS[reason] if reason<len(TORN_EXEC_REASONS) else reason)
+                    if value>>16:diagnostic['mask']=value>>16
+                    if reason>=16:diagnostic['raw_status']=reason-16
+                elif kind==9:
+                    diagnostic.update(kind='paper-shadow',generation=detail,
+                                      status={1:'complete',2:'resize-rejected',3:'mask-rejected'}.get(value,value))
+                elif kind in (5,8):
+                    diagnostic.update(kind='encoder-admit' if kind==5 else 'jpeg-handoff',generation=detail)
+                    if value==0xffffffff:diagnostic['snapshot']='missing-or-mismatched'
+                    else:
+                        result=(value>>16)&255
+                        diagnostic.update(phase=value>>24,result=result-256 if result>=128 else result,complete=(value>>8)&255)
+                        if kind==5:diagnostic['admitted']=bool(value&1)
+                elif kind==6:
+                    diagnostic.update(kind='spatial',plan={0:'invalid',1:'no-stock-query',2:'stock-query-verified'}.get(value,value),
+                                      stock_result=detail)
+                else:
+                    diagnostic.update(kind='format',format=value&255,layout_flags=(value>>8)&255,
+                                      roi=bool(value&0x30000),orientation=detail)
+                record['torn']=diagnostic
         if record['event']==197:
             recipe,tag,value,detail=record['arguments']
             if tag&0xff000000==0x4a000000:
