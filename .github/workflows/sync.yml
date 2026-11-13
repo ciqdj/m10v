@@ -2,28 +2,24 @@ name: Auto Sync Upstream
 
 on:
   schedule:
-    - cron: '0 */8 * * *' # 每 8 小时自动同步一次，可根据需要自行调整
-  workflow_dispatch: # 支持在 GitHub Actions 页面手动点击触发同步
+    - cron: '0 */8 * * *' # 每天每隔8小时自动同步
+  workflow_dispatch:     # 支持手动点击运行
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    
-    # 必须赋予写权限，以便 Action 能将上游更新推送到您的 Fork 仓库
     permissions:
-      contents: write
-
+      contents: write    # 赋予写权限，允许向仓库推送更新
     steps:
       - name: Checkout target repo
         uses: actions/checkout@v4
 
       - name: Sync Upstream
-        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1
+        uses: aormsby/Fork-Sync-With-Upstream-Action@v3.4.1
         with:
           target_sync_branch: main
-           # 请确保改为上游实际的账号/仓库名，如: owner/repo
-          upstream_sync_repo: zhaoo/m10v   <上游拥有者>/<上游仓库名>
+          upstream_sync_repo: zhaoo/m10v
           upstream_sync_branch: main
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-          # 如果遇到冲突希望强制同步覆盖（谨慎使用，会覆盖 Fork 仓库中的本地修改）：
-          test_mode: false
+          git_config_user: "github-actions[bot]"
+          git_config_email: "41898282+github-actions[bot]@users.noreply.github.com"
