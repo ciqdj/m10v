@@ -2,6 +2,89 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.16.3",
+      "date": "2026-11-16",
+      "title": "GR III 机身菜单排版与胶卷设置",
+      "changes": [
+        "保留 m10v 大卡插画，调整文字间距并增加分页指示。效果和设置采用深色列表与暖金焦点，打赏页保留原有的支付宝和微信二维码。",
+        "胶卷库的两排封面向下居中。选中已启用的胶卷后，按 Fn 调整该卷的颗粒、颗粒尺寸和支持的光晕强度。",
+        "A/B 快速对比改名为滤镜快切。开启半格后，画幅显示 Half。XPan 始终可选。",
+        "GRemote 仍可通过原有 Half 开关选用半格。R4 和 R5 固件分别下载对应的菜单资源。"
+      ],
+      "notice": "适用于 GR III 2.10。半格开关在每次开机时默认为关。使用 R5 固件时，将配套的 R5 菜单资源放在 SD 卡的 M10V/MENU.M10。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
+      "version": "2026.11.16.2",
+      "date": "2026-11-16",
+      "title": "GR III 机身 m10v 大卡菜单",
+      "changes": [
+        "原厂设置新增 m10v 统一入口。首屏从左到右排列设置、胶卷库、效果。横滑到第二屏可进入说明或打赏。",
+        "效果和设置的 m10v 功能页采用深色圆角列表。胶卷印花支持上下滑动，保存或返回后回到新版效果列表。暗角提供开关和强度。",
+        "说明显示官网二维码，打赏显示支付宝和微信二维码。工作台提供独立菜单资源下载，配套 GRemote ZIP 内含同一资源。",
+        "修复服务器 ARM 编译器生成的调试菜单构建依赖。"
+      ],
+      "notice": "适用于 GR III 2.10。R4 日志候选已通过用户真机验证（Build ID c124d8c3）。新版菜单在同时启用胶卷库、ISP 逐卷效果和调试模式时可用，需将 MENU.M10 放在 SD 卡的 M10V 目录。",
+      "commit": "47a3fb656d9f62de9cc55d5fa88cc220e4d05aa9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43742589642"
+    },
+    {
+      "version": "2026.11.16.1",
+      "date": "2026-11-16",
+      "title": "GR III 机身 m10v 大卡菜单",
+      "changes": [
+        "原厂设置新增 m10v 统一入口。首屏从左到右排列设置、胶卷库、效果。横滑到第二屏可进入说明或打赏。",
+        "效果和设置的 m10v 功能页采用深色圆角列表。胶卷印花支持上下滑动，保存或返回后回到新版效果列表。暗角提供开关和强度。",
+        "说明显示官网二维码，打赏显示支付宝和微信二维码。工作台提供独立菜单资源下载，配套 GRemote ZIP 内含同一资源。"
+      ],
+      "notice": "首轮自动部署因服务器 ARM 编译器缺少构建依赖，已回滚。R4 日志候选的真机验收仍适用。",
+      "commit": "281c6ea960801fb5a8d1e8eacf944b7640c8ac9c",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43741939326"
+    },
+    {
+      "version": "2026.11.15.3",
+      "date": "2026-11-15",
+      "title": "优化 GR III 机身胶卷库与触屏操作",
+      "changes": [
+        "机身胶卷库在封面下显示卷名，修正英文字形的基线和裁切。右上角显示已选数量，已启用的胶卷用黄底黑勾圆标标记。",
+        "GR III 2.10 支持左右滑动翻页，点按封面可以启用或停用胶卷。点按后隐藏黄色焦点框，按方向键时恢复。"
+      ],
+      "notice": "GR III 2.10 的 R3 胶卷库已通过用户真机验证。本次同步修正 GR IV 构建时的符号校验。",
+      "commit": "98e9d8d584b8fb283f53418dba457c0c7b062fd8",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43724653000"
+    },
+    {
+      "version": "2026.11.15.2",
+      "date": "2026-11-15",
+      "title": "GR III 机身胶卷库发布候选",
+      "changes": [
+        "完成机身胶卷库的卷名、启用标记和触屏操作更新。"
+      ],
+      "notice": "本次部署未通过 GR IV 构建校验，官网回滚到上一版。",
+      "commit": "e0c7a9c110242b2ef54f519971406a94a9fae2c4",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43723472837"
+    },
+    {
+      "version": "2026.11.15.1",
+      "date": "2026-11-15",
+      "title": "GR III 新增机内关机图与拍摄配方联动",
+      "changes": [
+        "GR III 2.10 工作台支持将 1 至 3 张图片加入固件。刷入后在「设置 → 关机图」选择，关机图和边框各有独立入口。",
+        "配套的 GRemote 联动固件可以把拍摄时的胶卷、白平衡偏移和色温随 JPG 与 DNG 保存，并校验自定义胶卷的内容身份。原拍配方复用需使用支持该功能的 GRemote 和匹配的 SD 连接服务。",
+        "在配套固件上可用机身原有「保存设置」为 U1、U2、U3 保存配方。ADJ 影像控制支持取景试色，确认后切换胶卷，取消后恢复。机内 RAW 显影走原厂 ISP。"
+      ],
+      "notice": "适用机型为 GR III 2.10。关机图菜单修正版已通过用户真机验证。",
+      "commit": "c6d776ba247035aea7746db6fef5b75c49cfaf6a",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43696891454"
+    },
+    {
       "version": "2026.11.12.2",
       "date": "2026-11-12",
       "title": "GR III 新增四款莱卡风格胶卷",
@@ -11,9 +94,9 @@
         "GRemote 1.2.12 支持新胶卷目录，并兼容此前的莱卡测试候选。相机装卷需配套固件与 SD 连接服务。"
       ],
       "notice": "四款效果依据公开样片拟合，已完成离线构建和 ARM 回归。真机色彩、LCD 显示和保存速度仍待验证。适用机型为 GR III 2.10。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "b44b9c3cf2bbc872021508902a0ba63c0a9a29ca",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43253178905"
     },
     {
       "version": "2026.11.12.1",

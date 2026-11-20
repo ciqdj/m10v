@@ -13,6 +13,11 @@ export function settingsOwnerBytes(m,fallback){
  need(m.adj_extra?.owner_offset===0x6500&&m.adj_extra?.owner_bytes===0x100&&
   m.camera_guides&&m.pure_isp_effects?.enabled===true&&m.sd_library&&m.appended_slots&&parent<=0x6500,
   'camera controls owner regions differ');
+ if(m.menu_hub){
+  const h=m.menu_hub;
+  need(m.camera_model==='gr3'&&m.debug_mode===true&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0&&h.artwork_version===5,'menu hub owner differs');
+  return h.owner_bytes;
+ }
  return m.torn_overlay?.enabled?0x6e00:0x6d00;
 }
 export function adjExtraPatches(runtime,m){
@@ -50,6 +55,17 @@ export function adjExtraPatches(runtime,m){
   need(p.address===address&&p.expected===expected&&p.replacement===replacement,'ADJ patch contract differs');
   return {address,expected,replacement,name:'ADJ extra '+name};
  });
+}
+export function dialRecipePatches(m){
+ const patches=[],s=m.symbols;
+ if(m.symbols.m10v_isp_frame_photo_recipe_write){
+  for(const [address,original,action] of [[0x531d147c,0x5324b760,'save'],[0x5322421c,0x53279fa0,'load'],[0x53224268,0x53279fa0,'load']]){
+   const target=s['m10v_settings_controller_'+action+'_dial_recipe'];
+   need(Number.isInteger(target)&&target>=m.base&&target+4<=m.base+m.code_bytes,'dial recipe handler bounds');
+   patches.push({address,expected:branch(address,original,true),replacement:branch(address,target,true),name:'dial recipe '+action});
+  }
+ }
+ return patches;
 }
 export function settingsPatches(m){
  if(!m.sd_library)return [];
