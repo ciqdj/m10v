@@ -15,7 +15,8 @@ export function settingsOwnerBytes(m,fallback){
   'camera controls owner regions differ');
  if(m.menu_hub){
   const h=m.menu_hub;
-  need(m.camera_model==='gr3'&&m.debug_mode===true&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0&&h.artwork_version===5,'menu hub owner differs');
+  const deviceRoll=m.roll_capture?.schema==='m10v-gr3-roll-capture/v1'&&m.flags?.includes('-DM10V_ROLL_NATIVE_DEVICE=1');
+  need(m.camera_model==='gr3'&&(m.debug_mode===true||deviceRoll)&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0&&h.artwork_version===5,'menu hub owner differs');
   return h.owner_bytes;
  }
  return m.torn_overlay?.enabled?0x6e00:0x6d00;
@@ -36,7 +37,16 @@ export function adjExtraPatches(runtime,m){
  const hooks=[[0x531a2820,0xe1a0c00d,'slot_type',false],[0x531a45d0,0xebfffee4,'initial_render',true],
   [0x531a3160,0xeb019f08,'remember_slot',false],
   ...Array.from({length:5},(_,i)=>[0x531a48f0+0x14*i,0xe5d031f4,'touch'+i,false]),[0x53b394f4,0x5316dfa8,'enter',null]];
- if(m.debug_log?.adj_exit_trace===true)hooks.push(
+ const controlsOnly=m.flags?.includes('-DM10V_CONTROLS_TRACE_ONLY=1')===true;
+ if(controlsOnly){
+  need(m.debug_mode===true&&m.debug_scope==='controls'&&m.debug_log?.adj_exit_trace===true&&
+   m.roll_capture?.schema==='m10v-gr3-roll-capture/v1'&&
+   m.control_debug_compile_flags?.includes('-DM10V_ADJ_EXIT_TRACE=0')&&
+   m.control_debug_compile_flags?.includes('-DM10V_DEBUG_MODE=1')&&
+   !Object.keys(m.symbols).some(name=>name.startsWith('m10v_adj_extra_camera_trace_')),
+   'focused control diagnostic policy differs');
+ }
+ if(m.debug_log?.adj_exit_trace===true&&!controlsOnly)hooks.push(
   [0x531a45d8,0xebfff4bf,'trace_keys',true],[0x531a45e0,0xebfff4e2,'trace_aux_key',true],
   [0x531a45e8,0xebfff8d1,'trace_touch',true],[0x531a45f8,0xebff2355,'trace_canvas',true],
   [0x531a4610,0xeafff4a0,'trace_timer',false],[0x5316d434,0xeb0318a2,'trace_area',true],

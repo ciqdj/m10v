@@ -2,6 +2,77 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.25.3",
+      "date": "2026-11-25",
+      "title": "同步 R20 正式版本与发布记录",
+      "changes": [
+        "发布 GR III R20 ADJ/Fn 与画幅修正，正式完整包配套 GRemote 1.2.15。",
+        "补齐历史发布证据链接，保留服务器编译大小兼容及严格内存校验。"
+      ],
+      "notice": "仅发布记录调整，正式完整包内容不变。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
+      "version": "2026.11.25.2",
+      "date": "2026-11-25",
+      "title": "兼容服务器裁切模块编译大小",
+      "changes": [
+        "仅在裁切模块全部分配段均只读且超过原有 8 KB 上限时，以体积优化重编译；保持空间、段属性及来源校验。",
+        "正常构建字节不变，沿用已确认的 GR III ADJ/Fn 修复与正式完整包。"
+      ],
+      "notice": "构建兼容修正，不改变正常生成的相机运行体或放宽内存边界。",
+      "commit": "ee2e569ed24bf4c900ea9976ae52db0905e63b19",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ee2e569ed24bf4c900ea9976ae52db0905e63b19"
+    },
+    {
+      "version": "2026.11.25.1",
+      "date": "2026-11-25",
+      "title": "修复扩展 ADJ 光标胶卷 Fn 设置与预览",
+      "changes": [
+        "GR III 2.10 扩展 ADJ 第 6–9 格的影像控制可直接设置光标停留胶卷，无需先切换拍摄卷；各卷参数独立保存。",
+        "修正 ADJ XPan、6×7、Half 背景预览，并保留拍摄比例及胶卷锁定规则。",
+        "M10V 子菜单按 MENU 逐级返回，首页按 MENU 退出。",
+        "正式完整包包含固件、SD 服务、胶卷与菜单资源、GRemote 1.2.15 Android App；关闭诊断日志，Live 继续不可用。"
+      ],
+      "notice": "用户已确认 R20 候选本轮操作正常。正式包仅关闭诊断并完成对应产物检查；不扩大为所有功能或其他机型的全面真机保证。边框回显此前未闭环，不将新增诊断当作修复结论。发布范围为 GR III。 首次部署因服务器编译器的裁切模块校验失败回滚。",
+      "commit": "72de59845beb16b0871ee084125eb06448352831",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/45443071122"
+    },
+    {
+      "version": "2026.11.24.1",
+      "date": "2026-11-24",
+      "title": "修复 ADJ 胶卷参数绑定与画幅锁定提示",
+      "changes": [
+        "Fn 参数页绑定 ADJ 当前高亮胶卷，独立保存各卷参数；取消、存储失败和 RAW 开发保持原路径。",
+        "拍摄中的胶卷在 M10V 画幅和 Half 入口明确显示本卷画幅已锁定，暂停及收卷后可切换；保留本卷比例约束。",
+        "保留胶卷计数归档、JPEG/RAW 标记、HDF、下载及连接功能；Live 继续不可用，正式包不启用排障日志。",
+        "本次发布范围限定 GR III，明确跳过 IIIx／IV 构建；保留 GR III 的构建、身份与健康校验。"
+      ],
+      "notice": "GR III 2.10 正式完整包需配套更新固件和SD服务，App使用GRemote1.2.15。关键成品路径与菜单已完成离线检查；全量历史Node套件仍有失败，不扩大为全机身真机验收。",
+      "commit": "7cbdd176f32f8bcadfb46a21671c301c378d60c1",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/45319005402"
+    },
+    {
+      "version": "2026.11.23.1",
+      "date": "2026-11-23",
+      "title": "GR III 机内胶卷正式包与 GRemote 1.2.15",
+      "changes": [
+        "发布 GR III 2.10 机内胶卷模式：离线开卷、拍摄计数、滤镜锁定、收卷与 App 归档读取，保留 JPEG 与 RAW 独立归卷。",
+        "保留连接、对焦和相机设置的修复，调整 JPEG 卷标记和 HDF 本张拍摄参数绑定。",
+        "Live 暂不可用：正式完整包关闭采集、缓存分配和接口；历史文件与配置保留。",
+        "正式完整包默认关闭排障日志，配套 GRemote 1.2.15 正式签名 Android APK；相册及胶卷支持单张、多选和 JPG／RAW／RAW+JPG 下载。"
+      ],
+      "notice": "正式包适用于 GR III 官方 2.10 基线，需要配套更新固件、SD 服务及 App。机身胶卷与连接沿用用户反馈范围；本次关闭 Live 的正式产物完成离线验证，不扩大真机性能或其他机型兼容性结论。 该次服务器IIIx资源检查超时，部署已回滚，未宣称上线成功。",
+      "commit": "c81414b34cac201b7aaa1b3840217f6becfc59e4",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/45212344012"
+    },
+    {
       "version": "2026.11.16.3",
       "date": "2026-11-16",
       "title": "GR III 机身菜单排版与胶卷设置",
@@ -12,9 +83,9 @@
         "GRemote 仍可通过原有 Half 开关选用半格。R4 和 R5 固件分别下载对应的菜单资源。"
       ],
       "notice": "适用于 GR III 2.10。半格开关在每次开机时默认为关。使用 R5 固件时，将配套的 R5 菜单资源放在 SD 卡的 M10V/MENU.M10。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "7dbfffcddbcba7664712a22f5cfd9bf1346ba693",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43809277322"
     },
     {
       "version": "2026.11.16.2",
